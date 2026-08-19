@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import secrets
 from collections import defaultdict
 from typing import Any
 
 from aiogram import Bot, F, Router
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
@@ -14,7 +15,8 @@ from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
 from app.keyboards import (
     build_add_block_keyboard, build_block_editor_keyboard, build_block_position_keyboard,
     build_button_picker_keyboard, build_button_position_keyboard,
-    build_button_style_keyboard, build_buttons_manager_keyboard, build_chat_reached_keyboard,
+    build_button_style_keyboard, build_button_type_keyboard,
+    build_buttons_manager_keyboard, build_chat_reached_keyboard,
     build_delete_confirmation_keyboard, build_heading_level_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
     build_post_settings_keyboard, build_rich_editor_keyboard,
@@ -27,7 +29,8 @@ from app.services.blocks import (
     set_all_table_cells_style, set_table_cell_style, table_rows,
 )
 from app.services.buttons import (
-    BUTTON_STYLES, MAX_BUTTONS, add_message_button, delete_message_button,
+    BUTTON_STYLES, BUTTON_TYPES, MAX_BUTTONS, add_message_button,
+    delete_message_button, get_button_type, get_button_value,
     get_message_button, move_message_button, normalize_button_url,
 )
 from app.services.chat_registry import managed_chat_registry
@@ -36,6 +39,7 @@ from app.services.factory import (
     details_data, map_data, new_block, quote_data, text_data,
 )
 from app.services.parser import message_to_blocks, messages_to_blocks, replacement_data
+from app.services.popup_registry import popup_registry
 from app.services.renderer import (
     RichMessageRenderError, send_rich_message_post, send_rich_message_preview,
 )
@@ -109,21 +113,58 @@ async def _bot_add_links(bot: Bot) -> tuple[str, str]:
     )
 
 
+def _buttons_per_row(data: dict[str, Any]) -> int:
+    try:
+        return max(1, min(4, int(data.get("buttons_per_row", 1))))
+    except (TypeError, ValueError):
+        return 1
+
+
+async def _prepare_message_buttons(
+    buttons: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    prepared = [dict(button) for button in buttons]
+    for button in prepared:
+        if get_button_type(button) == "popup":
+            token = secrets.token_hex(10)
+            button["popup_token"] = token
+            await popup_registry.remember(token, get_button_value(button))
+    return prepared
+
+
+def _post_chats_text(chats: list[dict[str, Any]], selected_count: int) -> str:
+    if not chats:
+        return (
+            "إنشاء منشور\n\n"
+            "لا توجد قناة أو مجموعة مشتركة يكون فيها المستخدم والبوت مشرفين.\n"
+            "أضف البوت من أحد الزرين، وبعد نجاح الإضافة سيصلك إشعار هنا."
+        )
+    return (
+        "إنشاء منشور\n\n"
+        "اضغط على كل قناة أو مجموعة لتحديدها للإرسال المتعدد.\n"
+        f"المحدد حالياً: {selected_count}"
+    )
+
+
 async def _refresh_post_panel(bot: Bot, user_id: int) -> None:
     panel = await managed_chat_registry.panel_for_user(user_id)
     if panel is None:
         return
     chats = await managed_chat_registry.list_for_user(user_id)
+    available_ids = {int(chat["chat_id"]) for chat in chats}
+    selected = [
+        int(chat_id) for chat_id in panel.get("selected_chat_ids", [])
+        if int(chat_id) in available_ids
+    ]
     channel_url, group_url = await _bot_add_links(bot)
     try:
         await bot.edit_message_text(
             chat_id=panel["chat_id"],
             message_id=panel["message_id"],
-            text=(
-                "إنشاء منشور\n\n"
-                "اختر القناة أو المجموعة التي تريد إرسال المنشور إليها:"
+            text=_post_chats_text(chats, len(selected)),
+            reply_markup=build_post_chats_keyboard(
+                chats, channel_url, group_url, selected,
             ),
-            reply_markup=build_post_chats_keyboard(chats, channel_url, group_url),
         )
     except TelegramBadRequest as error:
         if "message is not modified" not in str(error).lower():
@@ -181,7 +222,7 @@ async def _open_editor(message: Message, state: FSMContext, blocks: list[dict[st
     sent = await message.answer(MAIN_TEXT, reply_markup=build_rich_editor_keyboard(blocks))
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
-        blocks=blocks, message_buttons=[], current_block_id=None,
+        blocks=blocks, message_buttons=[], buttons_per_row=1, current_block_id=None,
         management_chat_id=sent.chat.id, management_message_id=sent.message_id,
     )
 
@@ -623,9 +664,26 @@ async def open_buttons_manager(callback: CallbackQuery, state: FSMContext) -> No
     await _edit_ui(
         callback.message,
         f"إدارة الأزرار الشفافة\n\nعدد الأزرار: {len(buttons)}\nاختر العملية:",
-        build_buttons_manager_keyboard(buttons),
+        build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
     )
     await callback.answer()
+
+
+@router.callback_query(F.data == "r:brow")
+async def change_buttons_per_row(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    data, _ = session
+    buttons_per_row = 1 if _buttons_per_row(data) >= 4 else _buttons_per_row(data) + 1
+    await state.update_data(buttons_per_row=buttons_per_row)
+    buttons = data.get("message_buttons", [])
+    await _edit_ui(
+        callback.message,
+        f"إدارة الأزرار الشفافة\n\nعدد الأزرار: {len(buttons)}\nاختر العملية:",
+        build_buttons_manager_keyboard(buttons, buttons_per_row),
+    )
+    await callback.answer(f"عدد الأزرار في الصف: {buttons_per_row}")
 
 
 @router.callback_query(F.data == "r:ba")
@@ -644,6 +702,30 @@ async def start_add_button(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("r:bat:"))
+async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    data, _ = session
+    button_type = callback.data.rsplit(":", 1)[-1]
+    if button_type not in BUTTON_TYPES or not data.get("pending_button_text"):
+        await callback.answer("انتهت عملية إضافة الزر. حاول مجدداً.", show_alert=True)
+        return
+    prompts = {
+        "url": "أرسل الرابط؛ يقبل @username أو http:// أو https:// أو tg://",
+        "copy": "أرسل النص الذي تريد نسخه عند الضغط على الزر؛ الحد الأقصى 256 حرف.",
+        "popup": "أرسل نص التنبيه الذي سيظهر عند الضغط؛ الحد الأقصى 200 حرف.",
+    }
+    await state.set_state(RichEditorStates.editing_button)
+    await state.update_data(
+        pending_button_action=f"add_{button_type}",
+        pending_button_type=button_type,
+    )
+    await callback.message.answer(prompts[button_type])
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("r:bs:"))
 async def choose_button_action(callback: CallbackQuery, state: FSMContext) -> None:
     session = await _session(callback, state)
@@ -652,7 +734,7 @@ async def choose_button_action(callback: CallbackQuery, state: FSMContext) -> No
     data, _ = session
     buttons = data.get("message_buttons", [])
     action = callback.data.rsplit(":", 1)[-1]
-    if action not in {"delete", "style", "move", "url", "title"}:
+    if action not in {"delete", "style", "move", "value", "url", "title"}:
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
     if not buttons:
@@ -662,7 +744,8 @@ async def choose_button_action(callback: CallbackQuery, state: FSMContext) -> No
         "delete": "اختر الزر الذي تريد إزالته:",
         "style": "اختر الزر الذي تريد تغيير لونه:",
         "move": "اختر الزر الذي تريد تغيير ترتيبه:",
-        "url": "اختر الزر الذي تريد تغيير رابطه:",
+        "value": "اختر الزر الذي تريد تغيير محتواه:",
+        "url": "اختر الزر الذي تريد تغيير محتواه:",
         "title": "اختر الزر الذي تريد تغيير عنوانه:",
     }
     await _edit_ui(callback.message, labels[action], build_button_picker_keyboard(buttons, action))
@@ -691,7 +774,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         await _edit_ui(
             callback.message,
             f"✅ تم إزالة الزر.\n\nإدارة الأزرار الشفافة\nعدد الأزرار: {len(buttons)}",
-            build_buttons_manager_keyboard(buttons),
+            build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
         )
         await callback.answer("تم إزالة الزر")
         return
@@ -711,12 +794,20 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         )
         await callback.answer()
         return
-    if action not in {"url", "title"}:
+    if action not in {"value", "url", "title"}:
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
     await state.set_state(RichEditorStates.editing_button)
-    await state.update_data(pending_button_action=action, current_button_id=button_id)
-    prompt = "أرسل الرابط الجديد للزر." if action == "url" else "أرسل العنوان الجديد للزر."
+    pending_action = "value" if action in {"value", "url"} else "title"
+    await state.update_data(pending_button_action=pending_action, current_button_id=button_id)
+    if pending_action == "title":
+        prompt = "أرسل العنوان الجديد للزر."
+    else:
+        prompt = {
+            "url": "أرسل الرابط الجديد للزر؛ يقبل @username أيضاً.",
+            "copy": "أرسل النص الجديد الذي سيتم نسخه.",
+            "popup": "أرسل نص التنبيه الجديد؛ الحد الأقصى 200 حرف.",
+        }[get_button_type(button)]
     await callback.message.answer(prompt)
     await callback.answer()
 
@@ -742,7 +833,7 @@ async def change_button_style(callback: CallbackQuery, state: FSMContext) -> Non
     await _edit_ui(
         callback.message,
         "✅ تم تغيير لون الزر.\n\nإدارة الأزرار الشفافة",
-        build_buttons_manager_keyboard(buttons),
+        build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
     )
     await callback.answer("تم تغيير اللون")
 
@@ -767,7 +858,7 @@ async def change_button_position(callback: CallbackQuery, state: FSMContext) -> 
     await _edit_ui(
         callback.message,
         "✅ تم تغيير ترتيب الزر.\n\nإدارة الأزرار الشفافة",
-        build_buttons_manager_keyboard(buttons),
+        build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
     )
     await callback.answer("تم تغيير الترتيب")
 
@@ -782,6 +873,7 @@ async def preview_message_buttons(callback: CallbackQuery, state: FSMContext, bo
     if not buttons:
         await callback.answer("لا توجد أزرار لمعاينتها.", show_alert=True)
         return
+    prepared_buttons = await _prepare_message_buttons(buttons)
     old_preview_id = data.get("button_preview_message_id")
     if old_preview_id:
         try:
@@ -795,7 +887,8 @@ async def preview_message_buttons(callback: CallbackQuery, state: FSMContext, bo
             callback.from_user.id,
             tr("معاينة الأزرار:"),
             reply_markup=build_message_buttons_keyboard(
-                buttons, include_back=True, back_text=tr("🔙 رجوع"),
+                prepared_buttons, buttons_per_row=_buttons_per_row(data),
+                include_back=True, back_text=tr("🔙 رجوع"),
             ),
         )
     await state.update_data(button_preview_message_id=sent.message_id)
@@ -813,6 +906,16 @@ async def close_buttons_preview(callback: CallbackQuery, state: FSMContext) -> N
     await callback.answer("تم إغلاق المعاينة")
 
 
+@router.callback_query(F.data.startswith("r:popup:"))
+async def show_popup_button(callback: CallbackQuery) -> None:
+    button_id = callback.data.rsplit(":", 1)[-1]
+    popup_text = await popup_registry.get(button_id)
+    if popup_text is None:
+        await callback.answer("هذا التنبيه لم يعد متاحاً.", show_alert=True)
+        return
+    await callback.answer(popup_text[:200], show_alert=True)
+
+
 @router.message(RichEditorStates.editing_button)
 async def receive_button_value(message: Message, state: FSMContext, bot: Bot) -> None:
     data = await state.get_data()
@@ -826,15 +929,46 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
         await message.answer("عنوان الزر طويل جدًا؛ الحد الأقصى 64 حرفًا.")
         return
     if action == "add_title":
-        await state.update_data(pending_button_action="add_url", pending_button_text=value)
-        await message.answer("أرسل رابط الزر الآن؛ يقبل http:// أو https:// أو tg://")
+        await state.update_data(
+            pending_button_action="add_type",
+            pending_button_text=value,
+            pending_button_type=None,
+        )
+        await _edit_saved_ui(
+            bot,
+            state,
+            f"نوع الزر الجديد: {value}\n\nاختر وظيفة الزر:",
+            build_button_type_keyboard(),
+        )
         return
-    if action == "add_url":
-        url = normalize_button_url(value)
-        if url is None or len(url) > 256:
-            await message.answer("الرابط غير صالح. أرسل رابطًا يبدأ بـ http:// أو https:// أو tg://")
+
+    if action in {"add_url", "add_copy", "add_popup"}:
+        button_type = str(data.get("pending_button_type") or action.removeprefix("add_"))
+        normalized_value = value
+        if button_type == "url":
+            normalized = normalize_button_url(value)
+            if normalized is None or len(normalized) > 256:
+                await message.answer(
+                    "الرابط غير صالح. أرسل @username أو رابطًا يبدأ بـ http:// أو https:// أو tg://"
+                )
+                return
+            normalized_value = normalized
+        elif button_type == "copy" and len(value) > 256:
+            await message.answer("نص النسخ طويل جدًا؛ الحد الأقصى 256 حرفًا.")
             return
-        button = add_message_button(buttons, str(data.get("pending_button_text", "زر")), url)
+        elif button_type == "popup" and len(value) > 200:
+            await message.answer("نص التنبيه طويل جدًا؛ الحد الأقصى 200 حرف.")
+            return
+        elif button_type not in BUTTON_TYPES:
+            await message.answer("نوع الزر غير صالح. ارجع إلى لوحة الإدارة وحاول مجدداً.")
+            await state.set_state(RichEditorStates.managing)
+            return
+        button = add_message_button(
+            buttons,
+            str(data.get("pending_button_text", "زر")),
+            normalized_value,
+            button_type,
+        )
         if button is None:
             await message.answer("تعذر إضافة الزر؛ وصلت إلى الحد الأقصى.")
             await state.set_state(RichEditorStates.managing)
@@ -849,26 +983,47 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
         if action == "title":
             button["text"] = value
             notice = "✅ تم تغيير عنوان الزر."
-        elif action == "url":
-            url = normalize_button_url(value)
-            if url is None or len(url) > 256:
-                await message.answer("الرابط غير صالح. أرسل رابطًا يبدأ بـ http:// أو https:// أو tg://")
+        elif action == "value":
+            button_type = get_button_type(button)
+            normalized_value = value
+            if button_type == "url":
+                normalized = normalize_button_url(value)
+                if normalized is None or len(normalized) > 256:
+                    await message.answer(
+                        "الرابط غير صالح. أرسل @username أو رابطًا يبدأ بـ http:// أو https:// أو tg://"
+                    )
+                    return
+                normalized_value = normalized
+            elif button_type == "copy" and len(value) > 256:
+                await message.answer("نص النسخ طويل جدًا؛ الحد الأقصى 256 حرفًا.")
                 return
-            button["url"] = url
-            notice = "✅ تم تغيير رابط الزر."
+            elif button_type == "popup" and len(value) > 200:
+                await message.answer("نص التنبيه طويل جدًا؛ الحد الأقصى 200 حرف.")
+                return
+            button["value"] = normalized_value
+            if button_type == "url":
+                button["url"] = normalized_value
+                notice = "✅ تم تغيير رابط الزر."
+            elif button_type == "copy":
+                notice = "✅ تم تغيير نص النسخ."
+            else:
+                notice = "✅ تم تغيير نص التنبيه."
         else:
-            await message.answer("انتهت عملية تعديل الزر. ارجع إلى لوحة الإدارة وحاول مجددًا.")
+            await message.answer(
+                "انتهت عملية تعديل الزر. ارجع إلى لوحة الإدارة وحاول مجددًا."
+            )
             await state.set_state(RichEditorStates.managing)
             return
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
         message_buttons=buttons, current_button_id=None,
         pending_button_action=None, pending_button_text=None,
+        pending_button_type=None,
     )
     await _edit_saved_ui(
         bot, state,
         f"{notice}\n\nإدارة الأزرار الشفافة\nعدد الأزرار: {len(buttons)}",
-        build_buttons_manager_keyboard(buttons),
+        build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
     )
     await message.answer(notice)
 
@@ -1218,35 +1373,51 @@ async def move_to(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer("تم تغيير الموقع")
 
 
-@router.callback_query(F.data == "r:post")
-async def open_post_chats(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
-    session = await _session(callback, state)
-    if not session or not isinstance(callback.message, Message):
-        return
+async def _render_post_chat_picker(
+    callback: CallbackQuery,
+    state: FSMContext,
+    bot: Bot,
+    selected_chat_ids: list[int],
+) -> list[dict[str, Any]]:
     chats = await _eligible_post_chats(bot, callback.from_user.id)
+    available_ids = {int(chat["chat_id"]) for chat in chats}
+    selected = [chat_id for chat_id in selected_chat_ids if chat_id in available_ids]
     channel_url, group_url = await _bot_add_links(bot)
-    if chats:
-        text = "إنشاء منشور\n\nاختر القناة أو المجموعة التي تريد إرسال المنشور إليها:"
-    else:
-        text = (
-            "إنشاء منشور\n\n"
-            "لا توجد قناة أو مجموعة مشتركة يكون فيها المستخدم والبوت مشرفين.\n"
-            "أضف البوت من أحد الزرين، وبعد نجاح الإضافة سيصلك إشعار هنا."
-        )
-    await state.update_data(
-        post_target_chat_id=None, post_target_title=None,
-        post_silent=False, post_protected=False,
-    )
+    await state.update_data(post_selected_chat_ids=selected)
     await _edit_ui(
         callback.message,
-        text,
-        build_post_chats_keyboard(chats, channel_url, group_url),
+        _post_chats_text(chats, len(selected)),
+        build_post_chats_keyboard(chats, channel_url, group_url, selected),
     )
     await managed_chat_registry.remember_panel(
         callback.from_user.id,
         callback.message.chat.id,
         callback.message.message_id,
+        selected,
     )
+    return chats
+
+
+@router.callback_query(F.data == "r:post")
+async def open_post_chats(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    await state.update_data(
+        post_selected_chat_ids=[], post_silent=False, post_protected=False,
+    )
+    await _render_post_chat_picker(callback, state, bot, [])
+    await callback.answer()
+
+
+@router.callback_query(F.data == "r:postlist")
+async def return_to_post_chats(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    data, _ = session
+    selected = [int(item) for item in data.get("post_selected_chat_ids", [])]
+    await _render_post_chat_picker(callback, state, bot, selected)
     await callback.answer()
 
 
@@ -1255,6 +1426,7 @@ async def select_post_chat(callback: CallbackQuery, state: FSMContext, bot: Bot)
     session = await _session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
+    data, _ = session
     try:
         chat_id = int(callback.data.rsplit(":", 1)[-1])
     except (TypeError, ValueError):
@@ -1276,16 +1448,42 @@ async def select_post_chat(callback: CallbackQuery, state: FSMContext, bot: Bot)
             show_alert=True,
         )
         return
-    title = str(registered.get("title") or chat_id)
+    selected = [int(item) for item in data.get("post_selected_chat_ids", [])]
+    if chat_id in selected:
+        selected.remove(chat_id)
+        notice = "تم إلغاء تحديد المحادثة"
+    else:
+        selected.append(chat_id)
+        notice = "تم تحديد المحادثة للإرسال"
+    await _render_post_chat_picker(callback, state, bot, selected)
+    await callback.answer(notice)
+
+
+@router.callback_query(F.data == "r:postsettings")
+async def open_post_settings(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    data, _ = session
+    selected = [int(item) for item in data.get("post_selected_chat_ids", [])]
+    eligible = await _eligible_post_chats(bot, callback.from_user.id)
+    eligible_ids = {int(chat["chat_id"]) for chat in eligible}
+    selected = [chat_id for chat_id in selected if chat_id in eligible_ids]
+    if not selected:
+        await state.update_data(post_selected_chat_ids=[])
+        await callback.answer("حدد محادثة واحدة على الأقل.", show_alert=True)
+        return
+    await state.update_data(post_selected_chat_ids=selected)
     await managed_chat_registry.clear_panel(callback.from_user.id)
-    await state.update_data(
-        post_target_chat_id=chat_id, post_target_title=title,
-        post_silent=False, post_protected=False,
-    )
+    count = len(selected)
     await _edit_ui(
         callback.message,
-        f"إعدادات المنشور\n\nالمحادثة: {title}\nاختر الإعدادات ثم اضغط إرسال:",
-        build_post_settings_keyboard(silent=False, protected=False),
+        f"إعدادات المنشور\n\nالمحادثات المحددة: {count}\nاختر الإعدادات ثم اضغط إرسال:",
+        build_post_settings_keyboard(
+            silent=bool(data.get("post_silent", False)),
+            protected=bool(data.get("post_protected", False)),
+            selected_count=count,
+        ),
     )
     await callback.answer()
 
@@ -1296,8 +1494,9 @@ async def toggle_post_option(callback: CallbackQuery, state: FSMContext) -> None
     if not session or not isinstance(callback.message, Message):
         return
     data, _ = session
-    if not data.get("post_target_chat_id"):
-        await callback.answer("اختر المحادثة أولًا.", show_alert=True)
+    selected = [int(item) for item in data.get("post_selected_chat_ids", [])]
+    if not selected:
+        await callback.answer("حدد محادثة واحدة على الأقل.", show_alert=True)
         return
     option = callback.data.rsplit(":", 1)[-1]
     silent = bool(data.get("post_silent", False))
@@ -1310,11 +1509,12 @@ async def toggle_post_option(callback: CallbackQuery, state: FSMContext) -> None
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
     await state.update_data(post_silent=silent, post_protected=protected)
-    title = data.get("post_target_title") or data["post_target_chat_id"]
     await _edit_ui(
         callback.message,
-        f"إعدادات المنشور\n\nالمحادثة: {title}\nاختر الإعدادات ثم اضغط إرسال:",
-        build_post_settings_keyboard(silent=silent, protected=protected),
+        f"إعدادات المنشور\n\nالمحادثات المحددة: {len(selected)}\nاختر الإعدادات ثم اضغط إرسال:",
+        build_post_settings_keyboard(
+            silent=silent, protected=protected, selected_count=len(selected),
+        ),
     )
     await callback.answer()
 
@@ -1328,46 +1528,61 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
         if not session or not isinstance(callback.message, Message):
             return
         data, blocks = session
-        chat_id = data.get("post_target_chat_id")
-        if not isinstance(chat_id, int):
-            await callback.answer("اختر المحادثة أولًا.", show_alert=True)
-            return
-        if not await _can_publish_to_chat(bot, chat_id, callback.from_user.id):
-            await managed_chat_registry.remove(callback.from_user.id, chat_id)
-            await callback.answer(
-                "تعذر الإرسال؛ تأكد أن المستخدم والبوت ما زالا مشرفين.",
-                show_alert=True,
-            )
+        selected = [int(item) for item in data.get("post_selected_chat_ids", [])]
+        if not selected:
+            await callback.answer("حدد محادثة واحدة على الأقل.", show_alert=True)
             return
         await callback.answer("جاري إرسال المنشور…")
+        registered = {
+            int(chat["chat_id"]): chat
+            for chat in await managed_chat_registry.list_for_user(callback.from_user.id)
+        }
         buttons = data.get("message_buttons", [])
-        try:
-            await send_rich_message_post(
-                bot,
-                chat_id,
-                blocks,
-                build_message_buttons_keyboard(buttons) if buttons else None,
-                disable_notification=bool(data.get("post_silent", False)),
-                protect_content=bool(data.get("post_protected", False)),
-            )
-        except RichMessageRenderError as error:
-            logger.exception(
-                "Failed to publish rich message to chat_id=%s for user_id=%s",
-                chat_id,
-                callback.from_user.id,
-            )
-            await bot.send_message(
-                callback.from_user.id,
-                f"تعذر إرسال المنشور.\nالسبب: {error}",
-            )
-            return
-        title = data.get("post_target_title") or chat_id
+        prepared_buttons = await _prepare_message_buttons(buttons)
+        reply_markup = build_message_buttons_keyboard(
+            prepared_buttons, buttons_per_row=_buttons_per_row(data),
+        ) if buttons else None
+        succeeded: list[str] = []
+        failed: list[str] = []
+        for chat_id in selected:
+            title = str(registered.get(chat_id, {}).get("title") or chat_id)
+            if not await _can_publish_to_chat(bot, chat_id, callback.from_user.id):
+                await managed_chat_registry.remove(callback.from_user.id, chat_id)
+                failed.append(title)
+                continue
+            try:
+                await send_rich_message_post(
+                    bot,
+                    chat_id,
+                    blocks,
+                    reply_markup,
+                    disable_notification=bool(data.get("post_silent", False)),
+                    protect_content=bool(data.get("post_protected", False)),
+                )
+            except (RichMessageRenderError, TelegramAPIError) as error:
+                logger.exception(
+                    "Failed to publish rich message to chat_id=%s for user_id=%s: %s",
+                    chat_id,
+                    callback.from_user.id,
+                    error,
+                )
+                failed.append(title)
+            else:
+                succeeded.append(title)
+
+        lines = ["نتيجة الإرسال:", f"✅ نجح: {len(succeeded)}", f"❌ فشل: {len(failed)}"]
+        lines.extend(f"✅ {title}" for title in succeeded[:10])
+        lines.extend(f"❌ {title}" for title in failed[:10])
+        if len(succeeded) + len(failed) > 20:
+            lines.append("… تم اختصار قائمة النتائج")
+        lines.append("\nيمكنك تغيير الإعدادات وإرسال المنشور مرة أخرى.")
         await _edit_ui(
             callback.message,
-            f"✅ تم إرسال المنشور إلى «{title}».\n\nيمكنك تغيير الإعدادات وإرساله مرة أخرى:",
+            "\n".join(lines),
             build_post_settings_keyboard(
                 silent=bool(data.get("post_silent", False)),
                 protected=bool(data.get("post_protected", False)),
+                selected_count=len(selected),
             ),
         )
 
@@ -1382,11 +1597,14 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     await callback.answer("جاري إنشاء المعاينة…")
     panel_text = f"✅ المعاينة جاهزة.\n\n{MAIN_TEXT}"
     try:
+        prepared_buttons = await _prepare_message_buttons(buttons)
         sent_messages = await send_rich_message_preview(
             bot,
             callback.from_user.id,
             blocks,
-            build_message_buttons_keyboard(buttons) if buttons else None,
+            build_message_buttons_keyboard(
+                prepared_buttons, buttons_per_row=_buttons_per_row(data),
+            ) if buttons else None,
         ) or []
         if sent_messages:
             for message_id in data.get("preview_message_ids", []):

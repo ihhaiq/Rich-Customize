@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from aiogram.enums import ButtonStyle
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.services.blocks import get_block_button_text, table_rows
-from app.services.buttons import get_message_button, normalize_button_positions
+from app.services.buttons import (
+    get_button_type, get_button_value, get_message_button, normalize_button_positions,
+)
 from app.services.factory import MEDIA_CAPTION_TYPES, QUOTE_TYPES
 
 
@@ -25,17 +27,33 @@ def _style(value: str | None) -> ButtonStyle | None:
 
 
 def build_message_buttons_keyboard(
-    buttons: list[dict[str, Any]], *, include_back: bool = False,
+    buttons: list[dict[str, Any]], *, buttons_per_row: int = 1,
+    include_back: bool = False,
     back_text: str = "🔙 رجوع",
 ) -> InlineKeyboardMarkup:
-    rows = [
-        [InlineKeyboardButton(
-            text=str(button.get("text") or "زر"),
-            url=str(button.get("url") or "https://t.me"),
-            style=_style(str(button.get("style", "default"))),
-        )]
-        for button in normalize_button_positions(buttons)
-    ]
+    rendered: list[InlineKeyboardButton] = []
+    for button in normalize_button_positions(buttons):
+        common = {
+            "text": str(button.get("text") or "زر"),
+            "style": _style(str(button.get("style", "default"))),
+        }
+        button_type = get_button_type(button)
+        value = get_button_value(button)
+        if button_type == "copy":
+            rendered.append(InlineKeyboardButton(
+                **common, copy_text=CopyTextButton(text=value),
+            ))
+        elif button_type == "popup":
+            rendered.append(InlineKeyboardButton(
+                **common,
+                callback_data=f"r:popup:{button.get('popup_token') or button['id']}",
+            ))
+        else:
+            rendered.append(InlineKeyboardButton(
+                **common, url=value or "https://t.me",
+            ))
+    width = max(1, min(4, int(buttons_per_row)))
+    rows = [rendered[index:index + width] for index in range(0, len(rendered), width)]
     if include_back:
         rows.append([InlineKeyboardButton(text=back_text, callback_data="r:bpback")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -67,26 +85,33 @@ def build_post_chats_keyboard(
     chats: list[dict[str, Any]],
     channel_url: str,
     group_url: str,
+    selected_chat_ids: list[int] | None = None,
 ) -> InlineKeyboardMarkup:
+    selected = set(selected_chat_ids or [])
     rows: list[list[InlineKeyboardButton]] = []
     for chat in chats:
         chat_id = int(chat["chat_id"])
         icon = "📢" if chat.get("type") == "channel" else "👥"
         rows.append([InlineKeyboardButton(
-            text=f"{icon} {chat.get('title') or chat_id}",
+            text=f"{'✅' if chat_id in selected else '⬜'} {icon} {chat.get('title') or chat_id}",
             callback_data=f"r:postchat:{chat_id}",
         )])
-    if not chats:
-        rows.extend([
-            [InlineKeyboardButton(
-                text="➕ إضافة البوت إلى قناة", url=channel_url,
-                style=ButtonStyle.PRIMARY,
-            )],
-            [InlineKeyboardButton(
-                text="➕ إضافة البوت إلى مجموعة", url=group_url,
-                style=ButtonStyle.PRIMARY,
-            )],
-        ])
+    if chats:
+        rows.append([InlineKeyboardButton(
+            text=f"⚙️ إعدادات وإرسال ({len(selected)})",
+            callback_data="r:postsettings",
+            style=ButtonStyle.SUCCESS,
+        )])
+    rows.extend([
+        [InlineKeyboardButton(
+            text="➕ إضافة البوت إلى قناة", url=channel_url,
+            style=ButtonStyle.PRIMARY,
+        )],
+        [InlineKeyboardButton(
+            text="➕ إضافة البوت إلى مجموعة", url=group_url,
+            style=ButtonStyle.PRIMARY,
+        )],
+    ])
     rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -101,7 +126,7 @@ def build_chat_reached_keyboard(chat_id: int) -> InlineKeyboardMarkup:
 
 
 def build_post_settings_keyboard(
-    *, silent: bool, protected: bool,
+    *, silent: bool, protected: bool, selected_count: int = 1,
 ) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -113,14 +138,25 @@ def build_post_settings_keyboard(
             InlineKeyboardButton(text="✅" if protected else "❌", callback_data="r:pt:protected"),
         ],
         [InlineKeyboardButton(
-            text="📤 إرسال المنشور الآن", callback_data="r:postsend",
+            text=f"📤 إرسال إلى {selected_count} محادثة", callback_data="r:postsend",
             style=ButtonStyle.SUCCESS,
         )],
-        [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:post")],
+        [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:postlist")],
     ])
 
 
-def build_buttons_manager_keyboard(buttons: list[dict[str, Any]]) -> InlineKeyboardMarkup:
+def build_button_type_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔗 رابط أو @username", callback_data="r:bat:url")],
+        [InlineKeyboardButton(text="📋 نسخ نص", callback_data="r:bat:copy")],
+        [InlineKeyboardButton(text="💬 Popup تنبيه", callback_data="r:bat:popup")],
+        [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:buttons")],
+    ])
+
+
+def build_buttons_manager_keyboard(
+    buttons: list[dict[str, Any]], buttons_per_row: int = 1,
+) -> InlineKeyboardMarkup:
     count = len(buttons)
     rows = [
         [
@@ -132,9 +168,12 @@ def build_buttons_manager_keyboard(buttons: list[dict[str, Any]]) -> InlineKeybo
             InlineKeyboardButton(text="↕️ تغيير الترتيب", callback_data="r:bs:move"),
         ],
         [
-            InlineKeyboardButton(text="🔗 تغيير الرابط", callback_data="r:bs:url"),
+            InlineKeyboardButton(text="🧩 تغيير المحتوى", callback_data="r:bs:value"),
             InlineKeyboardButton(text="✏️ تغيير العنوان", callback_data="r:bs:title"),
         ],
+        [InlineKeyboardButton(
+            text=f"🔢 عدد الأزرار بالصف: {buttons_per_row}", callback_data="r:brow",
+        )],
         [InlineKeyboardButton(
             text=f"👁 معاينة الأزرار ({count})", callback_data="r:bpreview",
         )],

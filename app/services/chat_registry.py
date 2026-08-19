@@ -70,16 +70,23 @@ class ManagedChatRegistry:
             result = [item for item in chats.values() if isinstance(item, dict)]
             return sorted(result, key=lambda item: str(item.get("title", "")).casefold())
 
-    async def remember_panel(self, user_id: int, chat_id: int, message_id: int) -> None:
+    async def remember_panel(
+        self,
+        user_id: int,
+        chat_id: int,
+        message_id: int,
+        selected_chat_ids: list[int] | None = None,
+    ) -> None:
         async with self._lock:
             document = self._read_document()
             document["panels"][str(user_id)] = {
                 "chat_id": chat_id,
                 "message_id": message_id,
+                "selected_chat_ids": selected_chat_ids or [],
             }
             self._write_document(document)
 
-    async def panel_for_user(self, user_id: int) -> dict[str, int] | None:
+    async def panel_for_user(self, user_id: int) -> dict[str, Any] | None:
         async with self._lock:
             panel = self._read_document()["panels"].get(str(user_id))
             if not isinstance(panel, dict):
@@ -88,6 +95,9 @@ class ManagedChatRegistry:
                 return {
                     "chat_id": int(panel["chat_id"]),
                     "message_id": int(panel["message_id"]),
+                    "selected_chat_ids": [
+                        int(item) for item in panel.get("selected_chat_ids", [])
+                    ],
                 }
             except (KeyError, TypeError, ValueError):
                 return None

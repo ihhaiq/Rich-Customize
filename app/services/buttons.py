@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import secrets
 import re
+import secrets
 from typing import Any
 from urllib.parse import urlparse
 
 
 BUTTON_STYLES = {"default", "primary", "success", "danger"}
+BUTTON_TYPES = {"url", "copy", "popup"}
 MAX_BUTTONS = 100
 TELEGRAM_USERNAME_RE = re.compile(r"^@[A-Za-z0-9_]{5,32}$")
 
@@ -30,6 +31,17 @@ def get_message_button(
     return next((button for button in buttons if button.get("id") == button_id), None)
 
 
+def get_button_type(button: dict[str, Any]) -> str:
+    value = str(button.get("type", "url"))
+    return value if value in BUTTON_TYPES else "url"
+
+
+def get_button_value(button: dict[str, Any]) -> str:
+    if button.get("value") is not None:
+        return str(button["value"])
+    return str(button.get("url", ""))
+
+
 def normalize_button_url(value: str) -> str | None:
     url = value.strip()
     if TELEGRAM_USERNAME_RE.fullmatch(url):
@@ -45,17 +57,21 @@ def normalize_button_url(value: str) -> str | None:
 
 
 def add_message_button(
-    buttons: list[dict[str, Any]], text: str, url: str,
+    buttons: list[dict[str, Any]], text: str, value: str,
+    button_type: str = "url",
 ) -> dict[str, Any] | None:
-    if len(buttons) >= MAX_BUTTONS:
+    if len(buttons) >= MAX_BUTTONS or button_type not in BUTTON_TYPES:
         return None
     button = {
         "id": secrets.token_hex(5),
         "text": text.strip(),
-        "url": url,
+        "type": button_type,
+        "value": value,
         "style": "default",
         "position": len(buttons),
     }
+    if button_type == "url":
+        button["url"] = value
     buttons.append(button)
     return button
 
