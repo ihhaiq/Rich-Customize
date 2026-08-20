@@ -18,6 +18,8 @@ from app.keyboards import (
     build_button_style_keyboard, build_button_type_keyboard,
     build_buttons_manager_keyboard, build_chat_reached_keyboard,
     build_delete_confirmation_keyboard, build_heading_level_keyboard,
+    build_details_content_keyboard, build_inner_block_input_keyboard,
+    build_inner_block_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
     build_post_settings_keyboard, build_rich_editor_keyboard,
     build_table_cell_keyboard, build_table_options_keyboard, build_welcome_keyboard,
@@ -36,7 +38,8 @@ from app.services.buttons import (
 from app.services.chat_registry import managed_chat_registry
 from app.services.factory import (
     FINAL_RICH_BLOCK_TYPES, MEDIA_CAPTION_TYPES, QUOTE_TYPES, container_data,
-    details_data, map_data, new_block, quote_data, text_data,
+    compatible_child_block_types, details_data, map_data, new_block, quote_data,
+    text_data,
 )
 from app.services.parser import message_to_blocks, messages_to_blocks, replacement_data
 from app.services.popup_registry import popup_registry
@@ -234,6 +237,45 @@ async def _send_add_prompt(message: Message, state: FSMContext, text: str, reply
         add_prompt_message_id=sent.message_id,
     )
     return sent
+
+
+def _details_builder_text(payload: dict[str, Any]) -> str:
+    count = len(payload.get("children") or [])
+    return (
+        "ابنِ محتوى «تفاصيل».\n\n"
+        f"عدد البلوكات الداخلية: {count}\n"
+        "أرسل نصًا أو وسائط مباشرة للإنهاء، أو أضف بلوكات داخلية."
+    )
+
+
+async def _store_details_child(
+    message: Message,
+    state: FSMContext,
+    bot: Bot,
+    child: dict[str, Any],
+) -> None:
+    data = await state.get_data()
+    payload = dict(data.get("add_payload") or {})
+    children = list(payload.get("children") or [])
+    child["position"] = len(children)
+    children.append(child)
+    normalize_block_positions(children)
+    payload["children"] = children
+    payload.pop("child_quote_text", None)
+    payload.pop("child_quote_html", None)
+    await _delete_add_step_messages(bot, message, data, state)
+    await state.update_data(
+        pending_add_type="details",
+        pending_child_type=None,
+        add_step="details_content",
+        add_payload=payload,
+    )
+    await _send_add_prompt(
+        message,
+        state,
+        _details_builder_text(payload),
+        build_details_content_keyboard(len(children)),
+    )
 
 
 async def _delete_add_step_messages(
@@ -476,13 +518,167 @@ async def choose_add_block(callback: CallbackQuery, state: FSMContext, bot: Bot)
     await callback.answer()
 
 
+@router.callback_query(F.data == "r:details:add")
+async def open_details_inner_blocks(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    if (
+        data.get("pending_add_type") != "details"
+        or not isinstance(callback.message, Message)
+    ):
+        await callback.answer("انتهت عملية إضافة التفاصيل.", show_alert=True)
+        return
+    await state.update_data(add_step="details_child_select", pending_child_type=None)
+    await _edit_ui(
+        callback.message,
+        "اختر نوع البلوك الداخلي المتوافق مع «تفاصيل»:",
+        build_inner_block_keyboard("details"),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "r:details:content")
+async def return_to_details_content(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    if (
+        data.get("pending_add_type") != "details"
+        or not isinstance(callback.message, Message)
+    ):
+        await callback.answer("انتهت عملية إضافة التفاصيل.", show_alert=True)
+        return
+    payload = data.get("add_payload") or {}
+    children = payload.get("children") or []
+    await state.update_data(add_step="details_content", pending_child_type=None)
+    await _edit_ui(
+        callback.message,
+        _details_builder_text(payload),
+        build_details_content_keyboard(len(children)),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "r:details:cancel")
+async def cancel_details_builder(
+    callback: CallbackQuery,
+    state: FSMContext,
+    bot: Bot,
+) -> None:
+    data = await state.get_data()
+    blocks = data.get("blocks") or []
+    if not isinstance(callback.message, Message):
+        return
+    await _delete_add_step_messages(bot, callback.message, data, state)
+    await state.set_state(RichEditorStates.managing)
+    await state.update_data(
+        pending_add_type=None,
+        pending_child_type=None,
+        add_step=None,
+        add_payload=None,
+    )
+    await _edit_saved_ui(
+        bot,
+        state,
+        MAIN_TEXT,
+        build_rich_editor_keyboard(blocks),
+    )
+    await callback.answer("تم إلغاء إضافة التفاصيل")
+
+
+@router.callback_query(F.data == "r:details:finish")
+async def finish_details_builder(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
+    data = await state.get_data()
+    payload = data.get("add_payload") or {}
+    children = payload.get("children") or []
+    summary_html = payload.get("summary_html")
+    if (
+        data.get("pending_add_type") != "details"
+        or not isinstance(callback.message, Message)
+        or not summary_html
+    ):
+        await callback.answer("انتهت عملية إضافة التفاصيل.", show_alert=True)
+        return
+    if not children:
+        await callback.answer("أضف بلوكًا داخليًا واحدًا على الأقل.", show_alert=True)
+        return
+    await _finish_add(
+        callback.message,
+        state,
+        bot,
+        new_block("details", details_data(summary_html, children)),
+    )
+    await callback.answer("تمت إضافة التفاصيل")
+
+
+@router.callback_query(F.data.startswith("r:details:type:"))
+async def choose_details_child_type(
+    callback: CallbackQuery,
+    state: FSMContext,
+    bot: Bot,
+) -> None:
+    data = await state.get_data()
+    child_type = callback.data.rsplit(":", 1)[-1]
+    if (
+        data.get("pending_add_type") != "details"
+        or child_type not in compatible_child_block_types("details")
+        or not isinstance(callback.message, Message)
+    ):
+        await callback.answer("نوع بلوك داخلي غير صالح.", show_alert=True)
+        return
+    if child_type == "divider":
+        await _store_details_child(
+            callback.message,
+            state,
+            bot,
+            new_block("divider", {"html": "<hr/>"}),
+        )
+        await callback.answer("تمت إضافة البلوك الداخلي.")
+        return
+    if child_type == "heading":
+        await state.update_data(
+            add_step="details_child_heading", pending_child_type="heading",
+        )
+        await _edit_ui(
+            callback.message,
+            "اختر مستوى العنوان:",
+            build_heading_level_keyboard("details"),
+        )
+        await callback.answer()
+        return
+    prompts = {
+        "paragraph": "أرسل نص الفقرة",
+        "preformatted": "أرسل النص البرمجي",
+        "footer": "أرسل نص التذييل",
+        "mathematical_expression": "أرسل المعادلة بصيغة LaTeX",
+        "anchor": "أرسل اسم المرساة",
+        "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
+        "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
+        "blockquote": "أرسل نص الاقتباس",
+        "pullquote": "أرسل نص الاقتباس البارز",
+        "collage": "أرسل صور/فيديو أو Album للكولاج",
+        "slideshow": "أرسل صور/فيديو أو Album لعرض الشرائح",
+        "map": "أرسل موقعًا من مرفقات Telegram",
+        "animation": "أرسل GIF أو Animation",
+        "audio": "أرسل ملف Audio",
+        "photo": "أرسل صورة",
+        "video": "أرسل فيديو",
+        "voice": "أرسل بصمة صوتية",
+    }
+    step = "details_child_quote_text" if child_type in QUOTE_TYPES else "details_child_content"
+    await state.update_data(add_step=step, pending_child_type=child_type)
+    await _edit_ui(
+        callback.message,
+        prompts[child_type],
+        build_inner_block_input_keyboard(),
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("r:hs:"))
 async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> None:
     session = await _session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     parts = callback.data.split(":")
-    if len(parts) not in {4, 5} or parts[2] not in {"add", "edit"}:
+    if len(parts) not in {4, 5} or parts[2] not in {"add", "edit", "details"}:
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
     action = parts[2]
@@ -509,6 +705,23 @@ async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> No
             await callback.message.delete()
         except TelegramBadRequest:
             pass
+    elif action == "details":
+        data = await state.get_data()
+        if data.get("pending_add_type") != "details":
+            await callback.answer("انتهت عملية إضافة التفاصيل.", show_alert=True)
+            return
+        payload = dict(data.get("add_payload") or {})
+        payload["child_heading_size"] = heading_size
+        await state.update_data(
+            add_step="details_child_content",
+            pending_child_type="heading",
+            add_payload=payload,
+        )
+        await _edit_ui(
+            callback.message,
+            f"اخترت H{heading_size}. أرسل نص العنوان الآن.",
+            build_inner_block_input_keyboard(),
+        )
     else:
         if len(parts) != 5:
             await callback.answer("هذا العنوان لم يعد موجودًا.", show_alert=True)
@@ -546,11 +759,13 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
             await message.answer("عنوان التفاصيل يجب أن يكون نصًا.")
             return
         await _delete_add_step_messages(bot, message, data, state)
-        await state.update_data(add_step="details_content", add_payload={"summary_html": message.html_text})
+        payload = {"summary_html": message.html_text, "children": []}
+        await state.update_data(add_step="details_content", add_payload=payload)
         await _send_add_prompt(
             message,
             state,
-            "الآن أرسل المحتوى داخل «تفاصيل»: نصًا أو وسائط أو Album",
+            _details_builder_text(payload),
+            build_details_content_keyboard(),
         )
         return
 
@@ -575,6 +790,92 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
         await _finish_add(message, state, bot, block)
         return
 
+    if block_type == "details" and step == "details_child_quote_text":
+        if not message.text:
+            await message.answer("نص الاقتباس يجب أن يكون نصًا.")
+            return
+        await _delete_add_step_messages(bot, message, data, state)
+        payload = dict(payload)
+        payload["child_quote_text"] = message.text
+        payload["child_quote_html"] = message.html_text
+        await state.update_data(
+            add_step="details_child_quote_credit",
+            add_payload=payload,
+        )
+        await _send_add_prompt(
+            message,
+            state,
+            "أرسل اسم الكاتب، أو /skip لإضافته بدون كاتب",
+            build_inner_block_input_keyboard(),
+        )
+        return
+
+    if block_type == "details" and step == "details_child_quote_credit":
+        if not message.text:
+            await message.answer("أرسل اسم الكاتب كنص، أو /skip.")
+            return
+        child_type = data.get("pending_child_type")
+        if child_type not in QUOTE_TYPES:
+            await message.answer("انتهت عملية إضافة البلوك الداخلي.")
+            return
+        credit = None if message.text.strip().lower() == "/skip" else message.html_text
+        child = new_block(child_type, {
+            "quote_text": payload.get("child_quote_text", ""),
+            "quote_html": payload.get("child_quote_html", ""),
+            "credit_html": credit,
+        })
+        await _store_details_child(message, state, bot, child)
+        return
+
+    if block_type == "details" and step == "details_child_content":
+        child_type = data.get("pending_child_type")
+        if child_type not in compatible_child_block_types("details"):
+            await message.answer("انتهت عملية إضافة البلوك الداخلي.")
+            return
+        child: dict[str, Any] | None = None
+        if child_type in {"collage", "slideshow"}:
+            if message.media_group_id:
+                collected = await albums.collect(message)
+                if collected is None:
+                    return
+                children = messages_to_blocks(collected)
+            else:
+                children = message_to_blocks(message)
+            children = [item for item in children if item["type"] in {"photo", "video"}]
+            if children:
+                child = new_block(child_type, container_data(children))
+        elif child_type == "map":
+            if message.location:
+                child = new_block(
+                    "map",
+                    map_data(message.location.latitude, message.location.longitude),
+                )
+        elif child_type in {"photo", "video", "animation", "audio", "voice"}:
+            parsed = message_to_blocks(message)
+            child = next((item for item in parsed if item["type"] == child_type), None)
+            if child is not None:
+                caption = next((item for item in parsed if item["type"] == "caption"), None)
+                if caption:
+                    child["data"]["caption_html"] = caption["data"].get("html")
+                child["data"].setdefault("credit_html", None)
+        elif child_type in {
+            "paragraph", "heading", "preformatted", "footer",
+            "mathematical_expression", "anchor", "list", "table",
+        } and message.text:
+            child = new_block(
+                child_type,
+                text_data(
+                    message,
+                    child_type,
+                    int(payload.get("child_heading_size", 2)),
+                ),
+            )
+        if child is None:
+            await message.answer("نوع المحتوى غير صحيح للبلوك الداخلي المحدد.")
+            return
+        await _store_details_child(message, state, bot, child)
+        return
+
     if block_type == "details" and step == "details_content":
         if message.media_group_id:
             collected = await albums.collect(message)
@@ -586,7 +887,20 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
         if not children:
             await message.answer("هذا المحتوى غير مدعوم داخل «تفاصيل».")
             return
-        await _finish_add(message, state, bot, new_block("details", details_data(payload["summary_html"], children)))
+        stored_children = list(payload.get("children") or [])
+        for child in children:
+            child["position"] = len(stored_children)
+            stored_children.append(child)
+        normalize_block_positions(stored_children)
+        await _finish_add(
+            message,
+            state,
+            bot,
+            new_block(
+                "details",
+                details_data(payload["summary_html"], stored_children),
+            ),
+        )
         return
 
     if block_type in {"collage", "slideshow"}:

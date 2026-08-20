@@ -5,11 +5,13 @@ from typing import Any
 from aiogram.enums import ButtonStyle
 from aiogram.types import CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.services.blocks import get_block_button_text, table_rows
+from app.services.blocks import BLOCK_LABELS, get_block_button_text, table_rows
 from app.services.buttons import (
     get_button_type, get_button_value, get_message_button, normalize_button_positions,
 )
-from app.services.factory import MEDIA_CAPTION_TYPES, QUOTE_TYPES
+from app.services.factory import (
+    MEDIA_CAPTION_TYPES, QUOTE_TYPES, compatible_child_block_types,
+)
 
 
 def build_welcome_keyboard() -> InlineKeyboardMarkup:
@@ -312,6 +314,47 @@ def build_add_block_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def build_details_content_keyboard(child_count: int = 0) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(
+        text="➕ بلوك داخلي", callback_data="r:details:add",
+        style=ButtonStyle.PRIMARY,
+    )]]
+    if child_count:
+        rows.append([InlineKeyboardButton(
+            text=f"✅ إنهاء التفاصيل ({child_count})",
+            callback_data="r:details:finish",
+            style=ButtonStyle.SUCCESS,
+        )])
+    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:details:cancel")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_inner_block_keyboard(container_type: str) -> InlineKeyboardMarkup:
+    choices = [
+        (BLOCK_LABELS[kind], kind)
+        for kind in compatible_child_block_types(container_type)
+        if kind in BLOCK_LABELS
+    ]
+    rows = [
+        [InlineKeyboardButton(
+            text=text, callback_data=f"r:details:type:{kind}",
+        ) for text, kind in choices[index:index + 2]]
+        for index in range(0, len(choices), 2)
+    ]
+    rows.append([InlineKeyboardButton(
+        text="🔙 رجوع", callback_data="r:details:content",
+    )])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_inner_block_input_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="🔙 أنواع البلوكات الداخلية", callback_data="r:details:add",
+        ),
+    ]])
+
+
 def build_heading_level_keyboard(
     action: str,
     block_id: str | None = None,
@@ -331,7 +374,12 @@ def build_heading_level_keyboard(
         ]
         for start in range(1, 7, 2)
     ]
-    back_data = "r:addmenu" if action == "add" else f"r:b:{block_id}"
+    if action == "add":
+        back_data = "r:addmenu"
+    elif action == "details":
+        back_data = "r:details:add"
+    else:
+        back_data = f"r:b:{block_id}"
     rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data=back_data)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

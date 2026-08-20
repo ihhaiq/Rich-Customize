@@ -19,6 +19,24 @@ MEDIA_CAPTION_TYPES = {
 }
 QUOTE_TYPES = {"blockquote", "pullquote"}
 
+# Only container blocks may expose the inner-block builder.  Keep the
+# compatibility rules in the data layer so future containers can reuse the
+# same UI without accidentally offering unsupported children.
+CONTAINER_CHILD_BLOCK_TYPES: dict[str, tuple[str, ...]] = {
+    "details": (
+        "paragraph", "heading", "preformatted", "footer", "divider",
+        "mathematical_expression", "anchor", "list", "blockquote", "pullquote",
+        "table", "collage", "slideshow", "map", "animation", "audio",
+        "photo", "video", "voice",
+    ),
+    "collage": ("photo", "video"),
+    "slideshow": ("photo", "video"),
+}
+
+
+def compatible_child_block_types(container_type: str) -> tuple[str, ...]:
+    return CONTAINER_CHILD_BLOCK_TYPES.get(container_type, ())
+
 
 def new_block(block_type: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
     return {
