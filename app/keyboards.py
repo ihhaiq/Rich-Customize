@@ -264,8 +264,6 @@ def build_block_editor_keyboard(block: dict[str, Any]) -> InlineKeyboardMarkup:
 
 def build_table_options_keyboard(block_id: str) -> InlineKeyboardMarkup:
     choices = [
-        ("🔗 دمج مع الخلية التالية", "mg"), ("↔️ دمج حتى نهاية الصف", "mgr"),
-        ("✂️ فك دمج خلية", "um"),
         ("🟨 تظليل خلية", "sh"), ("⬜ إلغاء تظليل خلية", "uh"),
         ("↔️ توسيط خلية", "ce"), ("↩️ إلغاء توسيط خلية", "ue"),
         ("🟨 تظليل الجميع", "sha"), ("⬜ إلغاء تظليل الجميع", "uha"),

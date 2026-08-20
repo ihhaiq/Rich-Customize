@@ -3,12 +3,28 @@ from datetime import datetime, timezone
 
 from aiogram.types import Chat, Message, MessageEntity, User
 
-from app.services.factory import details_data, new_block
+from app.services.factory import details_data, new_block, table_data
 from app.services.parser import message_to_blocks
 from app.services.renderer import build_input_rich_message
 
 
 class FormattedTextParserTests(unittest.TestCase):
+    def test_single_cell_row_automatically_spans_table_width(self):
+        data = table_data("النص\nالخلية | الخلية")
+        table = new_block("table", data)
+
+        rich = build_input_rich_message([table]).model_dump(
+            mode="json", exclude_none=True,
+        )
+        first_row = rich["blocks"][0]["cells"][0]
+
+        self.assertEqual(len(first_row), 1)
+        self.assertEqual(first_row[0]["colspan"], 2)
+
+    def test_single_column_table_does_not_add_redundant_colspan(self):
+        data = table_data("الأول\nالثاني")
+        self.assertEqual(data["rows"], [["الأول"], ["الثاني"]])
+
     def test_list_inside_details_survives_typed_rendering(self):
         child = new_block("list", {
             "items": ["الأول", "الثاني"],

@@ -1,6 +1,8 @@
 import unittest
 
-from app.services.blocks import delete_block, move_block, normalize_block_positions
+from app.services.blocks import (
+    delete_block, move_block, normalize_block_positions,
+)
 from app.services.buttons import (
     add_message_button, delete_message_button, move_message_button,
     normalize_button_url,
@@ -54,6 +56,9 @@ class MessageButtonOperationsTests(unittest.TestCase):
 
     def test_normalize_button_url(self):
         self.assertEqual(normalize_button_url("t.me/example"), "https://t.me/example")
+        self.assertEqual(normalize_button_url("@ihhai"), "https://t.me/ihhai")
+        self.assertEqual(normalize_button_url("  @RichCustomizebot  "), "https://t.me/RichCustomizebot")
+        self.assertIsNone(normalize_button_url("@bad"))
         self.assertEqual(normalize_button_url("tg://resolve?domain=example"), "tg://resolve?domain=example")
         self.assertIsNone(normalize_button_url("javascript:alert(1)"))
 

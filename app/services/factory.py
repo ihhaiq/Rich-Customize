@@ -47,6 +47,39 @@ def new_block(block_type: str, data: dict[str, Any] | None = None) -> dict[str, 
     }
 
 
+def table_data(plain: str) -> dict[str, Any]:
+    rows: list[list[Any]] = [
+        [cell.strip() for cell in line.split("|")]
+        for line in plain.splitlines()
+        if line.strip()
+    ]
+    widest_row = max((len(row) for row in rows), default=1)
+    normalized_rows: list[list[Any]] = []
+    for row in rows:
+        if len(row) == 1 and widest_row > 1:
+            normalized_rows.append([{
+                "text": row[0],
+                "colspan": widest_row,
+            }])
+        else:
+            normalized_rows.append(row)
+
+    html_rows: list[str] = []
+    for row in normalized_rows:
+        cells: list[str] = []
+        for raw_cell in row:
+            cell = raw_cell if isinstance(raw_cell, dict) else {"text": str(raw_cell)}
+            colspan = cell.get("colspan")
+            attribute = f' colspan="{int(colspan)}"' if colspan else ""
+            cells.append(f"<td{attribute}>{html.escape(str(cell.get('text', '')))}</td>")
+        html_rows.append(f"<tr>{''.join(cells)}</tr>")
+    return {
+        "rows": normalized_rows,
+        "text": plain,
+        "html": f"<table bordered>{''.join(html_rows)}</table>",
+    }
+
+
 def text_data(message: Message, block_type: str, heading_size: int = 2) -> dict[str, Any]:
     plain = message.text or ""
     rich = message.html_text
@@ -72,15 +105,7 @@ def text_data(message: Message, block_type: str, heading_size: int = 2) -> dict[
             "html": "<ul>" + "".join(f"<li>{html.escape(item)}</li>" for item in items) + "</ul>",
         }
     if block_type == "table":
-        rows = [[cell.strip() for cell in line.split("|")] for line in plain.splitlines() if line.strip()]
-        return {
-            "rows": rows,
-            "text": plain,
-            "html": "<table bordered>" + "".join(
-                "<tr>" + "".join(f"<td>{html.escape(cell)}</td>" for cell in row) + "</tr>"
-                for row in rows
-            ) + "</table>",
-        }
+        return table_data(plain)
     return {"text": plain, "html": rich}
 
 
