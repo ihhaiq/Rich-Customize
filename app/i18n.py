@@ -15,6 +15,8 @@ from aiogram.exceptions import TelegramRetryAfter
 from aiogram.methods import TelegramMethod
 from aiogram.types import BotCommand, InlineKeyboardMarkup, TelegramObject
 
+from app.translations_zh import ZH_HANS, ZH_HANT
+
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
@@ -257,7 +259,14 @@ EN: dict[str, str] = {
 
 
 def resolve_language(language_code: str | None) -> str:
-    return "ar" if (language_code or "").lower().startswith("ar") else "en"
+    code = (language_code or "").strip().lower().replace("_", "-")
+    if code.startswith("ar"):
+        return "ar"
+    if code.startswith("zh"):
+        if any(marker in code for marker in ("hant", "tw", "hk", "mo")):
+            return "zh-hant"
+        return "zh-hans"
+    return "en"
 
 
 def current_language() -> str:
@@ -265,11 +274,16 @@ def current_language() -> str:
 
 
 def tr(text: str) -> str:
-    if _language.get() == "ar":
+    language = _language.get()
+    if language == "ar":
         return text
     translated = text
     for source, target in sorted(EN.items(), key=lambda item: len(item[0]), reverse=True):
         translated = translated.replace(source, target)
+    chinese = ZH_HANT if language == "zh-hant" else ZH_HANS if language == "zh-hans" else None
+    if chinese:
+        for source, target in sorted(chinese.items(), key=lambda item: len(item[0]), reverse=True):
+            translated = translated.replace(source, target)
     return translated
 
 
@@ -379,6 +393,16 @@ async def configure_bot_profile(bot: Bot) -> None:
             "description": "أنشئ وخصّص رسائل Telegram الغنية باستخدام البلوكات والوسائط والتفاصيل والاقتباسات والقوائم والجداول والمعاينة.",
             "short": "إنشاء وتخصيص رسائل Telegram الغنية.",
             "commands": [BotCommand(command="editor", description="بدء رسالة غنية جديدة"), BotCommand(command="draft", description="عرض قالب جميع البلوكات"), BotCommand(command="start", description="فتح البوت")],
+        },
+        "zh": {
+            "name": "富消息编辑器",
+            "description": "使用结构化区块、媒体、详情、引用、列表、表格和预览来创建并自定义 Telegram 富消息。",
+            "short": "创建并自定义 Telegram 富消息。",
+            "commands": [
+                BotCommand(command="editor", description="开始创建新的富消息"),
+                BotCommand(command="draft", description="显示所有富消息区块"),
+                BotCommand(command="start", description="打开机器人"),
+            ],
         },
     }
     signature = _profile_signature(profiles)
