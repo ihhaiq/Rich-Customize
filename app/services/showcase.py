@@ -5,6 +5,7 @@ import secrets
 import time
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
     InputMediaAnimation,
     InputMediaAudio,
@@ -35,7 +36,7 @@ class MissingShowcaseMedia(RuntimeError):
         super().__init__(", ".join(missing))
 
 
-def _html(user_id: int, arabic: bool) -> str:
+def _html(user_id: int, arabic: bool, *, include_voice: bool = True) -> str:
     future = int(time.time()) + 3600
     if arabic:
         intro = (
@@ -59,6 +60,12 @@ def _html(user_id: int, arabic: bool) -> str:
             "details": "تفاصيل قابلة للفتح", "inside": "فقرة داخل Details", "table": "جدول",
             "collage": "كولاج", "slides": "عرض شرائح",
         }
+        voice_block = (
+            f'<figure><audio src="tg://audio?id=show_voice"></audio>'
+            f'<figcaption>{labels["voice"]}</figcaption></figure>'
+            if include_voice
+            else '<p><i>تعذر تضمين البصمة الصوتية بسبب إعدادات الخصوصية في حسابك.</i></p>'
+        )
     else:
         intro = (
             '<h1>Every Rich Block Showcase</h1>'
@@ -81,6 +88,12 @@ def _html(user_id: int, arabic: bool) -> str:
             "details": "Expandable Details", "inside": "A paragraph inside Details", "table": "Table",
             "collage": "Collage", "slides": "Slideshow",
         }
+        voice_block = (
+            f'<figure><audio src="tg://audio?id=show_voice"></audio>'
+            f'<figcaption>{labels["voice"]}</figcaption></figure>'
+            if include_voice
+            else '<p><i>The voice note was omitted because of your privacy settings.</i></p>'
+        )
     return (
         intro + headings +
         f'<pre><code class="language-python">print(&quot;{labels["pre"]}&quot;)</code></pre>'
@@ -96,8 +109,8 @@ def _html(user_id: int, arabic: bool) -> str:
         f'<details open><summary>{labels["details"]}</summary><p>{labels["inside"]}</p><hr/></details>'
         f'<figure><img src="tg://photo?id=show_photo_1" tg-spoiler/><figcaption>{labels["photo"]}<cite>{labels["source"]}</cite></figcaption></figure>'
         f'<figure><video src="tg://video?id=show_video"></video><figcaption>{labels["video"]}</figcaption></figure>'
-        f'<figure><audio src="tg://audio?id=show_audio"></audio><figcaption>{labels["audio"]}</figcaption></figure>'
-        f'<figure><audio src="tg://audio?id=show_voice"></audio><figcaption>{labels["voice"]}</figcaption></figure>'
+        f'<figure><audio src="tg://audio?id=show_audio"></audio><figcaption>{labels["audio"]}</figcaption></figure>' +
+        voice_block +
         f'<figure><video src="tg://video?id=show_animation"></video><figcaption>{labels["animation"]}</figcaption></figure>'
         '<figure><tg-map lat="33.3152" long="44.3661" zoom="12"/><figcaption>Map — Baghdad</figcaption></figure>'
         f'<tg-collage><img src="tg://photo?id=show_photo_1"/><img src="tg://photo?id=show_photo_2"/><figcaption>{labels["collage"]}</figcaption></tg-collage>'
@@ -106,8 +119,10 @@ def _html(user_id: int, arabic: bool) -> str:
     )
 
 
-def _showcase_media() -> list[InputRichMessageMedia]:
+def _showcase_media(*, include_voice: bool = True) -> list[InputRichMessageMedia]:
     missing = showcase_media_library.missing_types()
+    if not include_voice:
+        missing = [kind for kind in missing if kind != "voice"]
     if missing:
         raise MissingShowcaseMedia(missing)
     photo_1 = showcase_media_library.random_id("photo")
@@ -115,16 +130,20 @@ def _showcase_media() -> list[InputRichMessageMedia]:
     video = showcase_media_library.random_id("video")
     animation = showcase_media_library.random_id("animation")
     audio = showcase_media_library.random_id("audio")
-    voice = showcase_media_library.random_id("voice")
-    assert all((photo_1, photo_2, video, animation, audio, voice))
-    return [
+    voice = showcase_media_library.random_id("voice") if include_voice else None
+    assert all((photo_1, photo_2, video, animation, audio))
+    media = [
         InputRichMessageMedia(id="show_photo_1", media=InputMediaPhoto(media=photo_1)),
         InputRichMessageMedia(id="show_photo_2", media=InputMediaPhoto(media=photo_2)),
         InputRichMessageMedia(id="show_video", media=InputMediaVideo(media=video)),
         InputRichMessageMedia(id="show_animation", media=InputMediaAnimation(media=animation)),
         InputRichMessageMedia(id="show_audio", media=InputMediaAudio(media=audio)),
-        InputRichMessageMedia(id="show_voice", media=InputMediaVoiceNote(media=voice)),
     ]
+    if voice:
+        media.append(
+            InputRichMessageMedia(id="show_voice", media=InputMediaVoiceNote(media=voice))
+        )
+    return media
 
 
 async def send_all_blocks_showcase(bot: Bot, chat_id: int, user_id: int) -> Message:
@@ -142,7 +161,22 @@ async def send_all_blocks_showcase(bot: Bot, chat_id: int, user_id: int) -> Mess
             ),
         )
         await asyncio.sleep(1)
-        return await bot.send_rich_message(
-            chat_id=chat_id,
-            rich_message=InputRichMessage(html=final_html, media=media, is_rtl=arabic),
-        )
+        try:
+            return await bot.send_rich_message(
+                chat_id=chat_id,
+                rich_message=InputRichMessage(html=final_html, media=media, is_rtl=arabic),
+            )
+        except TelegramBadRequest as error:
+            if "VOICE_MESSAGES_FORBIDDEN" not in str(error).upper():
+                raise
+            # Telegram rejects the whole rich message when the recipient blocks
+            # voice messages. Retry once without the voice-note block and explain
+            # the omission inside the showcase itself.
+            return await bot.send_rich_message(
+                chat_id=chat_id,
+                rich_message=InputRichMessage(
+                    html=_html(user_id, arabic, include_voice=False),
+                    media=_showcase_media(include_voice=False),
+                    is_rtl=arabic,
+                ),
+            )
