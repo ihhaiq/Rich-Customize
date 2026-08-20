@@ -28,7 +28,8 @@ from app.i18n import preserve_user_content, tr
 from app.services.albums import AlbumCollector
 from app.services.blocks import (
     BLOCK_LABELS, delete_block, get_block_by_id, move_block, normalize_block_positions,
-    set_all_table_cells_style, set_table_cell_style, table_rows,
+    merge_table_cell_right, merge_table_row_from_cell, set_all_table_cells_style,
+    set_table_cell_style, table_rows, unmerge_table_cell,
 )
 from app.services.buttons import (
     BUTTON_STYLES, BUTTON_TYPES, MAX_BUTTONS, add_message_button,
@@ -1371,6 +1372,7 @@ TABLE_ALL_ACTIONS = {
     "cea": (None, True, "تم توسيط نص جميع الخلايا"),
     "uea": (None, False, "تم إلغاء توسيط نص جميع الخلايا"),
 }
+TABLE_MERGE_ACTIONS = {"mg", "mgr", "um"}
 
 
 @router.callback_query(F.data.startswith("r:tm:"))
@@ -1420,12 +1422,17 @@ async def choose_table_action(callback: CallbackQuery, state: FSMContext) -> Non
         )
         await callback.answer(notice)
         return
-    if action not in TABLE_CELL_ACTIONS or not table_rows(block):
+    if action not in set(TABLE_CELL_ACTIONS) | TABLE_MERGE_ACTIONS or not table_rows(block):
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
+    prompt = {
+        "mg": "اختر الخلية التي تريد دمجها مع الخلية التالية:",
+        "mgr": "اختر الخلية؛ ستندمج مع جميع الخلايا التالية في الصف:",
+        "um": "اختر الخلية المدمجة التي تريد فكها:",
+    }.get(action, "اختر الخلية المطلوبة\n\nالرقم الأول للصف، والثاني للعمود:")
     await _edit_ui(
         callback.message,
-        "اختر الخلية المطلوبة\n\nالرقم الأول للصف، والثاني للعمود:",
+        prompt,
         build_table_cell_keyboard(block, action),
     )
     await callback.answer()
@@ -1448,14 +1455,34 @@ async def apply_table_cell_action(callback: CallbackQuery, state: FSMContext) ->
             return
         block = get_block_by_id(blocks, block_id)
         settings = TABLE_CELL_ACTIONS.get(action)
-        if block is None or block.get("type") != "table" or settings is None:
+        if (
+            block is None
+            or block.get("type") != "table"
+            or (settings is None and action not in TABLE_MERGE_ACTIONS)
+        ):
             await callback.answer("هذا الجدول أو الإجراء لم يعد موجودًا.", show_alert=True)
             return
-        shaded, centered, notice = settings
-        if not set_table_cell_style(
-            block, row_index, column_index, shaded=shaded, centered=centered,
-        ):
-            await callback.answer("هذه الخلية لم تعد موجودة.", show_alert=True)
+        if action == "mg":
+            changed = merge_table_cell_right(block, row_index, column_index)
+            notice = "تم دمج الخليتين"
+            error = "لا توجد خلية تالية قابلة للدمج."
+        elif action == "mgr":
+            changed = merge_table_row_from_cell(block, row_index, column_index)
+            notice = "تم دمج الخلايا حتى نهاية الصف"
+            error = "لا توجد خلايا تالية قابلة للدمج."
+        elif action == "um":
+            changed = unmerge_table_cell(block, row_index, column_index)
+            notice = "تم فك دمج الخلية"
+            error = "هذه الخلية غير مدمجة."
+        else:
+            assert settings is not None
+            shaded, centered, notice = settings
+            changed = set_table_cell_style(
+                block, row_index, column_index, shaded=shaded, centered=centered,
+            )
+            error = "هذه الخلية لم تعد موجودة."
+        if not changed:
+            await callback.answer(error, show_alert=True)
             return
         await state.update_data(blocks=blocks)
         await _edit_ui(

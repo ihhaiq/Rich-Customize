@@ -155,5 +155,92 @@ def set_all_table_cells_style(
     return changed
 
 
+def _positive_span(value: Any) -> int:
+    try:
+        return max(1, int(value or 1))
+    except (TypeError, ValueError):
+        return 1
+
+
+def merge_table_cell_right(
+    block: dict[str, Any], row_index: int, column_index: int,
+) -> bool:
+    """Merge a table cell with its next physical cell and preserve its data."""
+    data = _editable_table_data(block)
+    if data is None:
+        return False
+    rows = data["rows"]
+    if not 0 <= row_index < len(rows):
+        return False
+    row = rows[row_index]
+    if not 0 <= column_index < len(row) - 1:
+        return False
+
+    raw_cell = row[column_index]
+    raw_next = row[column_index + 1]
+    cell = copy.deepcopy(raw_cell) if isinstance(raw_cell, dict) else {"text": str(raw_cell)}
+    next_cell = copy.deepcopy(raw_next) if isinstance(raw_next, dict) else {"text": str(raw_next)}
+    if _positive_span(cell.get("rowspan")) != _positive_span(next_cell.get("rowspan")):
+        return False
+
+    current_colspan = _positive_span(cell.get("colspan"))
+    if "_original_colspan" not in cell:
+        cell["_original_colspan"] = current_colspan
+    merged = cell.get("_merged_right")
+    if not isinstance(merged, list):
+        merged = []
+    merged.append(next_cell)
+    cell["_merged_right"] = merged
+    cell["colspan"] = current_colspan + _positive_span(next_cell.get("colspan"))
+    row[column_index] = cell
+    row.pop(column_index + 1)
+    return True
+
+
+def merge_table_row_from_cell(
+    block: dict[str, Any], row_index: int, column_index: int,
+) -> bool:
+    """Merge the selected cell with every compatible cell after it in the row."""
+    changed = False
+    while merge_table_cell_right(block, row_index, column_index):
+        changed = True
+    return changed
+
+
+def unmerge_table_cell(
+    block: dict[str, Any], row_index: int, column_index: int,
+) -> bool:
+    """Undo a horizontal merge, restoring saved cells when available."""
+    data = _editable_table_data(block)
+    if data is None:
+        return False
+    rows = data["rows"]
+    if not 0 <= row_index < len(rows) or not 0 <= column_index < len(rows[row_index]):
+        return False
+    row = rows[row_index]
+    raw = row[column_index]
+    cell = copy.deepcopy(raw) if isinstance(raw, dict) else {"text": str(raw)}
+    colspan = _positive_span(cell.get("colspan"))
+    restored = cell.pop("_merged_right", None)
+    original_colspan = _positive_span(cell.pop("_original_colspan", 1))
+    if isinstance(restored, list) and restored:
+        if original_colspan == 1:
+            cell.pop("colspan", None)
+        else:
+            cell["colspan"] = original_colspan
+        row[column_index] = cell
+        for offset, restored_cell in enumerate(restored, start=1):
+            row.insert(column_index + offset, restored_cell)
+        return True
+    if colspan <= 1:
+        return False
+
+    cell.pop("colspan", None)
+    row[column_index] = cell
+    for offset in range(1, colspan):
+        row.insert(column_index + offset, {"text": "", "valign": "middle"})
+    return True
+
+
 def get_block_button_text(block: dict[str, Any], index: int) -> str:
     return f"{BLOCK_LABELS.get(block.get('type', ''), '📦 محتوى')} #{index + 1}"

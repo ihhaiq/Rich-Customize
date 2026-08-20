@@ -264,6 +264,8 @@ def build_block_editor_keyboard(block: dict[str, Any]) -> InlineKeyboardMarkup:
 
 def build_table_options_keyboard(block_id: str) -> InlineKeyboardMarkup:
     choices = [
+        ("🔗 دمج مع الخلية التالية", "mg"), ("↔️ دمج حتى نهاية الصف", "mgr"),
+        ("✂️ فك دمج خلية", "um"),
         ("🟨 تظليل خلية", "sh"), ("⬜ إلغاء تظليل خلية", "uh"),
         ("↔️ توسيط خلية", "ce"), ("↩️ إلغاء توسيط خلية", "ue"),
         ("🟨 تظليل الجميع", "sha"), ("⬜ إلغاء تظليل الجميع", "uha"),
@@ -279,14 +281,19 @@ def build_table_options_keyboard(block_id: str) -> InlineKeyboardMarkup:
 
 def build_table_cell_keyboard(block: dict[str, Any], action: str) -> InlineKeyboardMarkup:
     block_id = block["id"]
-    buttons = [
-        InlineKeyboardButton(
-            text=f"{row_index + 1}×{column_index + 1}",
-            callback_data=f"r:tc:{block_id}:{action}:{row_index}:{column_index}",
-        )
-        for row_index, row in enumerate(table_rows(block))
-        for column_index in range(len(row))
-    ]
+    buttons = []
+    for row_index, row in enumerate(table_rows(block)):
+        for column_index, raw_cell in enumerate(row):
+            cell = raw_cell if isinstance(raw_cell, dict) else {}
+            try:
+                colspan = max(1, int(cell.get("colspan") or 1))
+            except (TypeError, ValueError):
+                colspan = 1
+            span = f" ↔{colspan}" if colspan > 1 else ""
+            buttons.append(InlineKeyboardButton(
+                text=f"{row_index + 1}×{column_index + 1}{span}",
+                callback_data=f"r:tc:{block_id}:{action}:{row_index}:{column_index}",
+            ))
     rows = [buttons[index:index + 4] for index in range(0, len(buttons), 4)]
     rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data=f"r:tm:{block_id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
