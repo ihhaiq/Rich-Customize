@@ -17,7 +17,7 @@ from aiogram.types import (
     Message,
 )
 
-from app.i18n import current_language, preserve_user_content
+from app.i18n import current_language, preserve_user_content, tr
 from app.services.media_library import showcase_media_library
 
 
@@ -147,10 +147,13 @@ def _showcase_media(*, include_voice: bool = True) -> list[InputRichMessageMedia
 
 
 async def send_all_blocks_showcase(bot: Bot, chat_id: int, user_id: int) -> Message:
-    arabic = current_language() == "ar"
+    language = current_language()
+    arabic = language == "ar"
     final_html = _html(user_id, arabic)
+    if language in {"zh-hans", "zh-hant"}:
+        final_html = tr(final_html)
     media = _showcase_media()
-    thinking = "جاري تجهيز قالب كل البلوكات…" if arabic else "Building the all-block showcase…"
+    thinking = "جاري تجهيز قالب كل البلوكات…" if arabic else tr("Building the all-block showcase…")
     with preserve_user_content():
         await bot.send_rich_message_draft(
             chat_id=chat_id,
@@ -172,10 +175,13 @@ async def send_all_blocks_showcase(bot: Bot, chat_id: int, user_id: int) -> Mess
             # Telegram rejects the whole rich message when the recipient blocks
             # voice messages. Retry once without the voice-note block and explain
             # the omission inside the showcase itself.
+            fallback_html = _html(user_id, arabic, include_voice=False)
+            if language in {"zh-hans", "zh-hant"}:
+                fallback_html = tr(fallback_html)
             return await bot.send_rich_message(
                 chat_id=chat_id,
                 rich_message=InputRichMessage(
-                    html=_html(user_id, arabic, include_voice=False),
+                    html=fallback_html,
                     media=_showcase_media(include_voice=False),
                     is_rtl=arabic,
                 ),
