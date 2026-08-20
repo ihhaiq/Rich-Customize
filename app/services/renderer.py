@@ -153,7 +153,9 @@ def _native_input_rich_message(blocks: list[dict[str, Any]]) -> InputRichMessage
         return None
     ordered = sorted(blocks, key=lambda item: item["position"])
     payloads = [_native_input_block(block["data"]["native_data"]) for block in ordered]
-    return InputRichMessage(blocks=payloads, is_rtl=True)
+    # Leave direction unset so Telegram detects RTL/LTR from the message text.
+    # Forcing is_rtl=True makes Latin paragraphs render on the right.
+    return InputRichMessage(blocks=payloads)
 
 
 class _RichTextHTMLParser(HTMLParser):
@@ -386,7 +388,9 @@ def _typed_input_rich_message(blocks: list[dict[str, Any]]) -> InputRichMessage:
         except Exception as error:
             raise RichMessageRenderError(f"{path}: {error}") from error
     try:
-        return InputRichMessage(blocks=payloads, is_rtl=True)
+        # Direction is intentionally omitted. Telegram will render Arabic text
+        # as RTL and Latin text as LTR instead of forcing every message to RTL.
+        return InputRichMessage(blocks=payloads)
     except ValidationError as error:
         first = error.errors()[0] if error.errors() else {}
         location = ".".join(str(part) for part in first.get("loc", ()))
@@ -499,7 +503,6 @@ async def send_rich_message_preview(
                 draft_id=secrets.randbelow(2_147_483_647) + 1,
                 rich_message=InputRichMessage(
                     html=f"<tg-thinking>{tr('جاري إنشاء النتيجة…')}</tg-thinking>",
-                    is_rtl=True,
                 ),
             )
             # Give Telegram clients enough time to render the animated draft.
