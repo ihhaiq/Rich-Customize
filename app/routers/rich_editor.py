@@ -38,9 +38,10 @@ from app.services.buttons import (
     change_message_button_type,
     delete_message_button, get_button_type, get_button_value,
     get_message_button, move_message_button, normalize_button_url,
-    normalize_https_url,
+    normalize_https_url, normalize_page_code,
 )
 from app.services.chat_registry import managed_chat_registry
+from app.services.page_registry import page_registry
 from app.services.factory import (
     FINAL_RICH_BLOCK_TYPES, MEDIA_CAPTION_TYPES, QUOTE_TYPES, container_data,
     compatible_child_block_types, details_data, map_data, new_block, quote_data,
@@ -49,7 +50,7 @@ from app.services.factory import (
 from app.services.parser import message_to_blocks, messages_to_blocks, replacement_data
 from app.services.popup_registry import popup_registry
 from app.services.renderer import (
-    RichMessageRenderError, build_input_rich_message,
+    RichMessageRenderError, build_input_rich_message, edit_rich_message_page,
     send_rich_message_post, send_rich_message_preview,
 )
 from app.services.media_library import SHOWCASE_MEDIA_CHANNEL_ID, showcase_media_library
@@ -279,6 +280,11 @@ def _normalize_button_value(button_type: str, value: str) -> tuple[str | None, s
         if normalized is None or len(normalized) > 256:
             return None, "هذا النوع يحتاج إلى رابط HTTPS صالح."
         return normalized, None
+    if button_type == "page":
+        code = normalize_page_code(value)
+        if code is None:
+            return None, "كود الصفحة غير صالح."
+        return code, None
     if button_type == "copy" and len(value) > 256:
         return None, "نص النسخ طويل جدًا؛ الحد الأقصى 256 حرفًا."
     if button_type == "callback_data" and not 1 <= len(value.encode("utf-8")) <= 64:
@@ -386,7 +392,7 @@ async def _open_editor(message: Message, state: FSMContext, blocks: list[dict[st
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
         blocks=blocks, message_buttons=[], buttons_per_row=1, buttons_align="center",
-        current_block_id=None,
+        current_block_id=None, current_page_id=None,
         management_chat_id=sent.chat.id, management_message_id=sent.message_id,
     )
 
@@ -1405,6 +1411,7 @@ async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> 
         "login_url": "أرسل رابط تسجيل الدخول ويجب أن يبدأ بـ https://",
         "switch_inline": "أرسل الاستعلام الذي يُكتب بعد اختيار المحادثة؛ يمكن إرسال /empty لتركه فارغًا.",
         "switch_inline_current": "أرسل الاستعلام الذي يُكتب في المحادثة الحالية؛ يمكن إرسال /empty.",
+        "page": "أرسل كود الصفحة التي تريد الربط بها.",
     }
     if button_type == "disabled":
         buttons = data.get("message_buttons", [])
@@ -1536,6 +1543,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
             "switch_inline": "أرسل استعلام Inline الجديد، أو /empty.",
             "switch_inline_current": "أرسل استعلام Inline الحالي الجديد، أو /empty.",
             "disabled": "الزر المعطّل لا يحتوي قيمة؛ غيّر نوعه بحذفه وإضافته مجددًا.",
+            "page": "أرسل كود الصفحة الجديد الذي تريد الربط به.",
         }[get_button_type(button)]
     await _answer_with_button_guide(callback.message, prompt)
     await callback.answer()
@@ -1578,6 +1586,7 @@ async def change_button_type(callback: CallbackQuery, state: FSMContext) -> None
         "login_url": "أرسل رابط Login URL يبدأ بـ https://",
         "switch_inline": "أرسل استعلام Inline، أو /empty.",
         "switch_inline_current": "أرسل استعلام Inline للمحادثة الحالية، أو /empty.",
+        "page": "أرسل كود الصفحة التي تريد الربط بها.",
     }
     await state.set_state(RichEditorStates.editing_button)
     await state.update_data(
@@ -2345,6 +2354,7 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
                     buttons_align=str(data.get("buttons_align", "center")),
                     disable_notification=bool(data.get("post_silent", False)),
                     protect_content=bool(data.get("post_protected", False)),
+                    source_page_id=data.get("current_page_id"),
                 )
             except (RichMessageRenderError, TelegramAPIError) as error:
                 logger.exception(
@@ -2374,6 +2384,78 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
         )
 
 
+@router.callback_query(F.data == "r:savepage")
+async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session:
+        return
+    data, blocks = session
+    if not blocks:
+        await callback.answer("لا توجد أجزاء لحفظها.", show_alert=True)
+        return
+    buttons = data.get("message_buttons", [])
+    existing_id = data.get("current_page_id")
+    code = await page_registry.save(
+        callback.from_user.id,
+        blocks,
+        buttons,
+        _buttons_per_row(data),
+        str(data.get("buttons_align", "center")),
+        page_id=existing_id,
+    )
+    await state.update_data(current_page_id=code)
+    prefix = (
+        "✅ تم تحديث الصفحة المحفوظة.\n\nالكود: "
+        if existing_id == code
+        else "✅ تم حفظ الصفحة.\n\nالكود: "
+    )
+    await callback.bot.send_message(
+        callback.from_user.id,
+        f"{prefix}{code}\n\n"
+        "استخدم هذا الكود لإضافة زر «ربط بصفحة» في الصفحة الأخرى ليعود إليها.",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:page:"))
+async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
+    if not isinstance(callback.message, Message):
+        await callback.answer()
+        return
+    parts = callback.data.split(":")
+    target_id = parts[2] if len(parts) > 2 else ""
+    source_id = parts[3] if len(parts) > 3 and parts[3] else None
+    page = await page_registry.get(target_id)
+    if page is None:
+        await callback.answer("هذه الصفحة لم تعد موجودة أو انتهت صلاحيتها.", show_alert=True)
+        return
+    buttons = list(page.get("buttons") or [])
+    if source_id:
+        buttons = buttons + [{
+            "id": "back", "text": "🔙 رجوع", "type": "page",
+            "value": source_id, "position": len(buttons), "style": "default",
+        }]
+    prepared_buttons = await _prepare_message_buttons(buttons)
+    try:
+        await edit_rich_message_page(
+            bot,
+            callback.message.chat.id,
+            callback.message.message_id,
+            page.get("blocks", []),
+            buttons=prepared_buttons,
+            buttons_per_row=int(page.get("buttons_per_row", 1)),
+            buttons_align=str(page.get("buttons_align", "center")),
+            source_page_id=target_id,
+        )
+    except RichMessageRenderError:
+        logger.exception(
+            "Failed to open page_id=%s for user_id=%s", target_id, callback.from_user.id,
+        )
+        await callback.answer("تعذر فتح الصفحة.", show_alert=True)
+        return
+    await callback.answer()
+
+
 @router.callback_query(F.data == "r:result")
 async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     session = await _session(callback, state)
@@ -2392,6 +2474,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             buttons=prepared_buttons,
             buttons_per_row=_buttons_per_row(data),
             buttons_align=str(data.get("buttons_align", "center")),
+            source_page_id=data.get("current_page_id"),
         ) or []
         if sent_messages:
             for message_id in data.get("preview_message_ids", []):
