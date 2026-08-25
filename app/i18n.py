@@ -310,6 +310,16 @@ EN: dict[str, str] = {
     "مكتبة وسائط القالب ناقصة. أضف إلى قناة الوسائط: ": "The showcase media library is incomplete. Add to the media channel: ",
     "دريفت": "draft",
     "تفاصيل": "Details",
+    "💾 حفظ الصفحة": "💾 Save Page",
+    "🔗 ربط بصفحة": "🔗 Link to Page",
+    "أرسل كود الصفحة التي تريد الربط بها.": "Send the code of the page you want to link to.",
+    "كود الصفحة غير صالح.": "Invalid page code.",
+    "✅ تم حفظ الصفحة.\n\nالكود: ": "✅ Page saved.\n\nCode: ",
+    "استخدم هذا الكود لإضافة زر «ربط بصفحة» في الصفحة الأخرى ليعود إليها.": "Use this code to add a “Link to Page” button on the other page so it can return here.",
+    "هذه الصفحة لم تعد موجودة أو انتهت صلاحيتها.": "This page no longer exists or has expired.",
+    "تعذر فتح الصفحة.": "Couldn't open the page.",
+    "لا توجد أجزاء لحفظها.": "There are no blocks to save.",
+    "✅ تم تحديث الصفحة المحفوظة.\n\nالكود: ": "✅ The saved page was updated.\n\nCode: ",
 }
 
 
