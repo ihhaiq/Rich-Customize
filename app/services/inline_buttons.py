@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.services.buttons import normalize_button_url
+
 
 MARKER_RE = re.compile(r"\{([^{}\n]+)\}")
 COLOR_STYLES = {
@@ -60,13 +62,20 @@ def find_user_button_markers(text: str | None) -> list[dict[str, str | None]]:
 
 def resolve_user_button_marker(
     blocks: list[dict[str, Any]], marker: str, user_id: int,
+    username: str | None = None,
 ) -> None:
     replacement_parts = _marker_parts(marker)
     if not replacement_parts:
         return
     title, _, _, color = replacement_parts
     suffix = f"#{color}" if color else ""
-    replacement = f"{{{title}:url tg://user?id={user_id}{suffix}}}"
+    clean_username = (username or "").strip().lstrip("@")
+    target = (
+        f"https://t.me/{clean_username}"
+        if clean_username
+        else f"tg://user?id={user_id}"
+    )
+    replacement = f"{{{title}:url {target}{suffix}}}"
 
     def replace(value: Any) -> Any:
         if isinstance(value, str):
@@ -88,9 +97,10 @@ def _button_payload(title: str, button_type: str, value: str, color: str | None)
         button["style"] = style
 
     if button_type == "url":
-        if not value.startswith(("http://", "https://", "tg://")):
+        normalized_url = normalize_button_url(value)
+        if normalized_url is None:
             return None
-        button["url"] = value
+        button["url"] = normalized_url
     elif button_type == "user":
         if not value.isdigit():
             return None

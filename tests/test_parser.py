@@ -29,6 +29,21 @@ class FormattedTextParserTests(unittest.TestCase):
         self.assertEqual(text[3]["button"]["style"], "danger")
         self.assertEqual(text[4], " بعد")
 
+    def test_invalid_short_http_host_is_treated_as_telegram_username(self):
+        paragraph = new_block("paragraph", {
+            "text": "{الحساب:url https://IHHAI#b}",
+            "html": "<p>{الحساب:url https://IHHAI#b}</p>",
+        })
+
+        rich = build_input_rich_message([paragraph]).model_dump(
+            mode="json", exclude_none=True,
+        )
+
+        self.assertEqual(
+            rich["blocks"][0]["text"]["button"]["url"],
+            "https://t.me/ihhai",
+        )
+
     def test_user_marker_is_resolved_before_rendering(self):
         marker = "{حساب حسين:user#g}"
         blocks = [new_block("paragraph", {
@@ -44,6 +59,23 @@ class FormattedTextParserTests(unittest.TestCase):
 
         self.assertEqual(button["url"], "tg://user?id=123456789")
         self.assertEqual(button["style"], "success")
+
+    def test_user_marker_prefers_username_link(self):
+        marker = "{حساب:user#p}"
+        blocks = [new_block("paragraph", {
+            "text": marker,
+            "html": f"<p>{marker}</p>",
+        })]
+
+        resolve_user_button_marker(blocks, marker, 123456789, "@ihhaiq")
+        rich = build_input_rich_message(blocks).model_dump(
+            mode="json", exclude_none=True,
+        )
+
+        self.assertEqual(
+            rich["blocks"][0]["text"]["button"]["url"],
+            "https://t.me/ihhaiq",
+        )
 
     def test_bot_api_10_3_rich_buttons_are_embedded_as_blocks(self):
         paragraph = new_block("paragraph", {"text": "النص", "html": "<p>النص</p>"})

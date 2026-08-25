@@ -13,6 +13,7 @@ BUTTON_TYPES = {
 }
 MAX_BUTTONS = 100
 TELEGRAM_USERNAME_RE = re.compile(r"^@[A-Za-z0-9_]{5,32}$")
+BARE_TELEGRAM_USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{5,32}$")
 
 
 def normalize_button_positions(buttons: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -53,6 +54,15 @@ def normalize_button_url(value: str) -> str | None:
         url = f"https://{url}"
     parsed = urlparse(url)
     if parsed.scheme in {"http", "https"} and parsed.netloc:
+        hostname = parsed.hostname or ""
+        if (
+            "." not in hostname
+            and not parsed.path.strip("/")
+            and BARE_TELEGRAM_USERNAME_RE.fullmatch(hostname)
+        ):
+            return f"https://t.me/{hostname}"
+        if "." not in hostname:
+            return None
         return url
     if parsed.scheme == "tg" and (parsed.netloc or parsed.path):
         return url

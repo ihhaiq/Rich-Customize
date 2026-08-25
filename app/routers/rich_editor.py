@@ -173,6 +173,29 @@ async def _ask_for_button_user(
     )
 
 
+async def _defer_text_for_user_buttons(
+    message: Message,
+    state: FSMContext,
+    resume: str,
+) -> bool:
+    markers = find_user_button_markers(message.text)
+    if not markers:
+        return False
+    data = await state.get_data()
+    if data.get("resuming_user_buttons"):
+        return False
+    await state.set_state(RichEditorStates.selecting_button_user)
+    await state.update_data(
+        pending_user_resume=resume,
+        pending_user_message=message.model_dump(mode="json", exclude_none=True),
+        pending_user_markers=markers,
+        pending_user_marker_index=0,
+        pending_user_resolutions=[],
+    )
+    await _ask_for_button_user(message, state, markers[0])
+    return True
+
+
 def _quote_media_payload(parsed: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     media = [item for item in parsed if item.get("type") in PULLQUOTE_MEDIA_TYPES]
     normalize_block_positions(media)
@@ -503,6 +526,7 @@ async def receive_source(message: Message, state: FSMContext) -> None:
             pending_user_blocks=blocks,
             pending_user_markers=user_markers,
             pending_user_marker_index=0,
+            pending_user_resume="open_editor",
         )
         await _ask_for_button_user(message, state, user_markers[0])
         return
@@ -516,39 +540,93 @@ async def receive_button_user(message: Message, state: FSMContext) -> None:
     request_id = data.get("pending_user_request_id")
     blocks = data.get("pending_user_blocks")
     markers = data.get("pending_user_markers")
+    resume = str(data.get("pending_user_resume") or "open_editor")
+    pending_message = data.get("pending_user_message")
+    resolutions = list(data.get("pending_user_resolutions") or [])
     index = int(data.get("pending_user_marker_index", 0))
     if (
         shared is None
         or shared.request_id != request_id
         or not shared.users
-        or not isinstance(blocks, list)
         or not isinstance(markers, list)
         or not 0 <= index < len(markers)
+        or (resume == "open_editor" and not isinstance(blocks, list))
+        or (resume != "open_editor" and not isinstance(pending_message, dict))
     ):
         await message.answer("اختيار المستخدم لا يخص الزر الحالي. استخدم زر الاختيار الظاهر.")
         return
 
     marker = markers[index]
-    resolve_user_button_marker(
-        blocks,
-        str(marker.get("marker", "")),
-        shared.users[0].user_id,
-    )
+    selected_user = shared.users[0]
+    user_id = selected_user.user_id
+    username = getattr(selected_user, "username", None)
+    if not username:
+        try:
+            known_user = await message.bot.get_chat(user_id)
+        except (TelegramBadRequest, TelegramForbiddenError):
+            await message.answer(
+                "تعذر إنشاء زر لهذا الحساب: الحساب بلا username وغير معروف للبوت. "
+                "خليه يرسل /start للبوت أولًا، أو اختر حسابًا عنده username.",
+            )
+            await _ask_for_button_user(message, state, marker)
+            return
+        username = getattr(known_user, "username", None)
+    if isinstance(blocks, list):
+        resolve_user_button_marker(
+            blocks, str(marker.get("marker", "")), user_id, username,
+        )
+    resolutions.append({
+        "marker": str(marker.get("marker", "")),
+        "user_id": user_id,
+        "username": username,
+    })
     next_index = index + 1
     if next_index < len(markers):
         await state.update_data(
             pending_user_blocks=blocks,
             pending_user_marker_index=next_index,
+            pending_user_resolutions=resolutions,
         )
         await _ask_for_button_user(message, state, markers[next_index])
         return
 
-    await state.clear()
     await message.answer(
         "✅ تم ربط المستخدم بالزر.",
         reply_markup=ReplyKeyboardRemove(),
     )
-    await _open_editor(message, state, blocks)
+    if resume == "open_editor":
+        await state.clear()
+        await _open_editor(message, state, blocks)
+        return
+
+    clean_data = {
+        key: value for key, value in data.items()
+        if not key.startswith("pending_user_") and key != "resuming_user_buttons"
+    }
+    clean_data["resuming_user_buttons"] = True
+    await state.set_data(clean_data)
+    await state.set_state(
+        RichEditorStates.adding_block
+        if resume == "adding_block"
+        else RichEditorStates.editing_block
+    )
+    original = Message.model_validate(pending_message, context={"bot": message.bot})
+    if resume == "adding_block":
+        await receive_added_block(original, state, message.bot)
+    else:
+        await receive_replacement(original, state, message.bot)
+
+    resumed_data = await state.get_data()
+    resumed_data.pop("resuming_user_buttons", None)
+    wrapped = [{"data": resumed_data}]
+    for resolution in resolutions:
+        resolve_user_button_marker(
+            wrapped,
+            str(resolution["marker"]),
+            int(resolution["user_id"]),
+            resolution.get("username"),
+        )
+    await state.set_data(wrapped[0]["data"])
 
 
 @router.message(RichEditorStates.selecting_button_user)
@@ -882,6 +960,8 @@ async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> No
 
 @router.message(RichEditorStates.adding_block)
 async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> None:
+    if await _defer_text_for_user_buttons(message, state, "adding_block"):
+        return
     data = await state.get_data()
     block_type = data.get("pending_add_type")
     step = data.get("add_step")
@@ -1745,6 +1825,8 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(RichEditorStates.editing_block)
 async def receive_replacement(message: Message, state: FSMContext, bot: Bot) -> None:
+    if await _defer_text_for_user_buttons(message, state, "editing_block"):
+        return
     data = await state.get_data()
     blocks = data.get("blocks", [])
     block_id = data.get("current_block_id")
