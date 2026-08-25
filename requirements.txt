@@ -1,2 +1,2 @@
-aiogram==3.30.0
-
+#aiogram==3.30.0
+aiogram @ https://github.com/aiogram/aiogram/archive/52889dbd34608bc1cc307279c2a955575fc77ba5.zip
