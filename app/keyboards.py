@@ -77,6 +77,10 @@ def build_message_buttons_keyboard(
             rendered.append(InlineKeyboardButton(
                 **common, disabled=DisabledButton(),
             ))
+        elif button_type == "page":
+            rendered.append(InlineKeyboardButton(
+                **common, callback_data=f"r:page:{value}",
+            ))
         else:
             rendered.append(InlineKeyboardButton(
                 **common, url=value or "https://t.me",
@@ -98,6 +102,9 @@ def build_rich_editor_keyboard(
     rows.append([
         InlineKeyboardButton(text="➕ إضافة Block", callback_data="r:addmenu"),
         InlineKeyboardButton(text="🔘 إضافة أزرار", callback_data="r:buttons"),
+    ])
+    rows.append([
+        InlineKeyboardButton(text="💾 حفظ الصفحة", callback_data="r:savepage"),
     ])
     rows.append([
         InlineKeyboardButton(
@@ -189,6 +196,7 @@ def build_button_type_keyboard(callback_prefix: str = "r:bat") -> InlineKeyboard
             InlineKeyboardButton(text="💬 Inline هنا", callback_data=f"{callback_prefix}:switch_inline_current"),
         ],
         [InlineKeyboardButton(text="🚫 زر معطّل", callback_data=f"{callback_prefix}:disabled")],
+        [InlineKeyboardButton(text="🔗 ربط بصفحة", callback_data=f"{callback_prefix}:page")],
         [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:buttons")],
     ])
 
