@@ -405,7 +405,7 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
 
 def _editor_input_blocks(block: dict[str, Any], path: str) -> list[dict[str, Any]]:
     """Return one API block, converting media pullquotes to block quotations."""
-    if block.get("type") != "pullquote":
+    if block.get("type") not in {"blockquote", "pullquote"}:
         return [_editor_input_block(block, path)]
     data = block.get("data", {})
     attachments = data.get("media_children") or []
@@ -530,7 +530,7 @@ def _render_rich_blocks(
         if kind in {"blockquote", "pullquote"}:
             quote = data.get("quote_html") or data.get("html") or ""
             credit = data.get("credit_html")
-            if kind == "pullquote" and data.get("media_children"):
+            if kind in {"blockquote", "pullquote"} and data.get("media_children"):
                 nested_fragments: list[str] = []
                 _render_rich_blocks(
                     data["media_children"], nested_fragments, media, f"{block_path}.blocks",

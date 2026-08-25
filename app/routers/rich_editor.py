@@ -173,7 +173,7 @@ async def _ask_for_button_user(
     )
 
 
-def _pullquote_media_payload(parsed: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+def _quote_media_payload(parsed: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     media = [item for item in parsed if item.get("type") in PULLQUOTE_MEDIA_TYPES]
     normalize_block_positions(media)
     caption = next((item for item in parsed if item.get("type") == "caption"), None)
@@ -633,7 +633,7 @@ async def choose_add_block(callback: CallbackQuery, state: FSMContext, bot: Bot)
         "anchor": "أرسل اسم المرساة",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
         "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
-        "blockquote": "أرسل نص الاقتباس",
+        "blockquote": "أرسل نص الاقتباس، أو أرسل وسائط/ملفًا لوضعه داخل الاقتباس",
         "pullquote": "أرسل نص الاقتباس البارز، أو أرسل وسائط/ملفًا لإرفاقه به",
         "details": "أرسل عنوان «تفاصيل» أولًا",
         "collage": "أرسل صور/فيديو أو Album للكولاج",
@@ -787,7 +787,7 @@ async def choose_details_child_type(
         "anchor": "أرسل اسم المرساة",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
         "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
-        "blockquote": "أرسل نص الاقتباس",
+        "blockquote": "أرسل نص الاقتباس، أو وسائط/ملفًا لوضعه داخل الاقتباس",
         "pullquote": "أرسل نص الاقتباس البارز، أو وسائط/ملفًا لإرفاقه به",
         "collage": "أرسل صور/فيديو أو Album للكولاج",
         "slideshow": "أرسل صور/فيديو أو Album لعرض الشرائح",
@@ -907,7 +907,7 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
         return
 
     if block_type in QUOTE_TYPES and step == "quote_text":
-        if block_type == "pullquote" and not message.text:
+        if block_type in QUOTE_TYPES and not message.text:
             if message.media_group_id:
                 collected = await albums.collect(message)
                 if collected is None:
@@ -915,7 +915,7 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
                 parsed = messages_to_blocks(collected)
             else:
                 parsed = message_to_blocks(message)
-            media_children, caption = _pullquote_media_payload(parsed)
+            media_children, caption = _quote_media_payload(parsed)
             if not media_children:
                 await message.answer("أرسل نصًا أو صورة/فيديو/صوتًا/ملفًا للاقتباس البارز.")
                 return
@@ -945,7 +945,7 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
         await _send_add_prompt(message, state, "أرسل اسم الكاتب، أو /skip لإضافته بدون كاتب")
         return
 
-    if block_type == "pullquote" and step == "quote_media_text":
+    if block_type in QUOTE_TYPES and step == "quote_media_text":
         if not message.text:
             await message.answer("أرسل نص الاقتباس البارز بعد الوسائط.")
             return
@@ -971,7 +971,7 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
         return
 
     if block_type == "details" and step == "details_child_quote_text":
-        if data.get("pending_child_type") == "pullquote" and not message.text:
+        if data.get("pending_child_type") in QUOTE_TYPES and not message.text:
             if message.media_group_id:
                 collected = await albums.collect(message)
                 if collected is None:
@@ -979,7 +979,7 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
                 parsed = messages_to_blocks(collected)
             else:
                 parsed = message_to_blocks(message)
-            media_children, caption = _pullquote_media_payload(parsed)
+            media_children, caption = _quote_media_payload(parsed)
             if not media_children:
                 await message.answer("أرسل نصًا أو وسائط/ملفًا للاقتباس البارز.")
                 return
@@ -1726,7 +1726,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         "preformatted": "أرسل النص البرمجي الجديد", "footer": "أرسل التذييل الجديد",
         "mathematical_expression": "أرسل معادلة LaTeX الجديدة", "anchor": "أرسل اسم المرساة الجديد",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر", "table": "أرسل صفوف الجدول؛ افصل الأعمدة بعلامة |",
-        "blockquote": "أرسل نص الاقتباس الجديد",
+        "blockquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لوضعه داخله",
         "pullquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لإرفاقه به",
         "collage": "أرسل صور/فيديو أو Album جديدًا للكولاج",
         "slideshow": "أرسل صور/فيديو أو Album جديدًا لعرض الشرائح",
@@ -1803,9 +1803,9 @@ async def receive_replacement(message: Message, state: FSMContext, bot: Bot) -> 
     elif expected in QUOTE_TYPES:
         if message.text:
             replacement = quote_data(message, block.get("data", {}).get("credit_html"))
-            if expected == "pullquote":
+            if expected in QUOTE_TYPES:
                 replacement["media_children"] = block.get("data", {}).get("media_children", [])
-        elif expected == "pullquote":
+        elif expected in QUOTE_TYPES:
             if message.media_group_id:
                 collected = await albums.collect(message)
                 if collected is None:
@@ -1813,7 +1813,7 @@ async def receive_replacement(message: Message, state: FSMContext, bot: Bot) -> 
                 parsed = messages_to_blocks(collected)
             else:
                 parsed = message_to_blocks(message)
-            media_children, caption = _pullquote_media_payload(parsed)
+            media_children, caption = _quote_media_payload(parsed)
             if media_children:
                 replacement = {**block.get("data", {}), "media_children": media_children}
                 if caption:

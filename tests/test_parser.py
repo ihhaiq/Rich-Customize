@@ -98,6 +98,25 @@ class FormattedTextParserTests(unittest.TestCase):
         self.assertEqual(quote["blocks"][1]["text"], "النص")
         self.assertEqual(quote["credit"], "الكاتب")
 
+    def test_blockquote_media_is_nested_inside_the_quotation(self):
+        photo = new_block("photo", {"file": {"file_id": "photo-file-id"}})
+        blockquote = new_block("blockquote", {
+            "quote_text": "وصف الصورة",
+            "quote_html": "وصف الصورة",
+            "media_children": [photo],
+        })
+
+        rich = build_input_rich_message([blockquote]).model_dump(
+            mode="json", exclude_none=True,
+        )
+        quote = rich["blocks"][0]
+
+        self.assertEqual(quote["type"], "blockquote")
+        self.assertEqual(
+            [block["type"] for block in quote["blocks"]],
+            ["photo", "paragraph"],
+        )
+
     def test_single_cell_row_automatically_spans_table_width(self):
         data = table_data("النص\nالخلية | الخلية")
         table = new_block("table", data)
