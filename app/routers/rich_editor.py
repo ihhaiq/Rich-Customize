@@ -35,6 +35,7 @@ from app.services.blocks import (
 )
 from app.services.buttons import (
     BUTTON_STYLES, BUTTON_TYPES, MAX_BUTTONS, add_message_button,
+    change_message_button_type,
     delete_message_button, get_button_type, get_button_value,
     get_message_button, move_message_button, normalize_button_url,
     normalize_https_url,
@@ -48,7 +49,8 @@ from app.services.factory import (
 from app.services.parser import message_to_blocks, messages_to_blocks, replacement_data
 from app.services.popup_registry import popup_registry
 from app.services.renderer import (
-    RichMessageRenderError, send_rich_message_post, send_rich_message_preview,
+    RichMessageRenderError, build_input_rich_message,
+    send_rich_message_post, send_rich_message_preview,
 )
 from app.services.media_library import SHOWCASE_MEDIA_CHANNEL_ID, showcase_media_library
 from app.services.inline_buttons import (
@@ -69,6 +71,19 @@ CHANNEL_ADMIN_RIGHTS = (
 )
 GROUP_ADMIN_RIGHTS = "delete_messages+manage_chat+invite_users+restrict_members"
 PULLQUOTE_MEDIA_TYPES = {"photo", "video", "animation", "audio", "voice", "document"}
+
+BUTTON_SYNTAX_EXAMPLES = """{اسم الزر:url https://example.com#b}
+{الملف الشخصي:user#p}
+{تنفيذ:callback_data action:1#r}
+{نسخ:copy النص المطلوب#g}
+{تطبيق:web_app https://example.com/app#b}
+{دخول:login_url https://example.com/login#p}
+{بحث:switch_inline_query كلمة البحث}
+{بحث هنا:switch_inline_query_current_chat كلمة البحث}
+{معطّل:disabled#r}
+
+زران بجانب بعض:
+{موافق:callback_data yes#g} {رفض:callback_data no#r}"""
 
 
 def _status_value(member) -> str:
@@ -173,6 +188,54 @@ async def _ask_for_button_user(
     )
 
 
+def _button_guide_blocks(prompt: str) -> list[dict[str, Any]]:
+    return [
+        new_block("paragraph", {"text": prompt, "html": f"<p>{prompt}</p>"}),
+        new_block("details", {
+            "summary_html": "📘 دليل الأزرار داخل النص — اضغط للفتح",
+            "children": [
+                new_block("paragraph", {
+                    "text": "الصيغة: {اسم الزر:النوع القيمة#اللون}",
+                    "html": "<p>الصيغة: {اسم الزر:النوع القيمة#اللون}</p>",
+                }),
+                new_block("preformatted", {
+                    "text": BUTTON_SYNTAX_EXAMPLES,
+                    "html": f"<pre>{BUTTON_SYNTAX_EXAMPLES}</pre>",
+                }),
+                new_block("paragraph", {
+                    "text": (
+                        "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون الافتراضي. "
+                        "زر user يعرض كيبورد اختيار مستخدم. callback_data يحتاج Handler ينفذ الإجراء."
+                    ),
+                    "html": (
+                        "<p>الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون "
+                        "الافتراضي. زر user يعرض كيبورد اختيار مستخدم. callback_data يحتاج "
+                        "Handler ينفذ الإجراء.</p>"
+                    ),
+                }),
+            ],
+        }),
+    ]
+
+
+async def _answer_with_button_guide(
+    message: Message,
+    prompt: str,
+    reply_markup=None,
+) -> Message:
+    try:
+        return await message.bot.send_rich_message(
+            chat_id=message.chat.id,
+            rich_message=build_input_rich_message(_button_guide_blocks(prompt)),
+            reply_markup=reply_markup,
+        )
+    except TelegramAPIError:
+        return await message.answer(
+            f"{prompt}\n\n📘 دليل الأزرار داخل النص:\n{BUTTON_SYNTAX_EXAMPLES}",
+            reply_markup=reply_markup,
+        )
+
+
 async def _defer_text_for_user_buttons(
     message: Message,
     state: FSMContext,
@@ -216,6 +279,8 @@ def _normalize_button_value(button_type: str, value: str) -> tuple[str | None, s
         return normalized, None
     if button_type == "copy" and len(value) > 256:
         return None, "نص النسخ طويل جدًا؛ الحد الأقصى 256 حرفًا."
+    if button_type == "callback_data" and not 1 <= len(value.encode("utf-8")) <= 64:
+        return None, "قيمة callback_data يجب أن تكون بين 1 و64 بايت."
     if button_type == "popup" and len(value) > 200:
         return None, "نص التنبيه طويل جدًا؛ الحد الأقصى 200 حرف."
     if button_type in {"switch_inline", "switch_inline_current"}:
@@ -1315,7 +1380,7 @@ async def start_add_button(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(RichEditorStates.editing_button)
     await state.update_data(pending_button_action="add_title", current_button_id=None)
     if isinstance(callback.message, Message):
-        await callback.message.answer("أرسل عنوان الزر الجديد.")
+        await _answer_with_button_guide(callback.message, "أرسل عنوان الزر الجديد.")
     await callback.answer()
 
 
@@ -1331,6 +1396,7 @@ async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> 
         return
     prompts = {
         "url": "أرسل الرابط؛ يقبل @username أو http:// أو https:// أو tg://",
+        "callback_data": "أرسل callback_data؛ الحد الأقصى 64 بايت.",
         "copy": "أرسل النص الذي تريد نسخه عند الضغط على الزر؛ الحد الأقصى 256 حرف.",
         "popup": "أرسل نص التنبيه الذي سيظهر عند الضغط؛ الحد الأقصى 200 حرف.",
         "web_app": "أرسل رابط Web App يبدأ بـ https://",
@@ -1363,7 +1429,7 @@ async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> 
         pending_button_action=f"add_{button_type}",
         pending_button_type=button_type,
     )
-    await callback.message.answer(prompts[button_type])
+    await _answer_with_button_guide(callback.message, prompts[button_type])
     await callback.answer()
 
 
@@ -1375,7 +1441,7 @@ async def choose_button_action(callback: CallbackQuery, state: FSMContext) -> No
     data, _ = session
     buttons = data.get("message_buttons", [])
     action = callback.data.rsplit(":", 1)[-1]
-    if action not in {"delete", "style", "move", "value", "url", "title"}:
+    if action not in {"delete", "style", "move", "value", "url", "title", "type"}:
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
     if not buttons:
@@ -1388,6 +1454,7 @@ async def choose_button_action(callback: CallbackQuery, state: FSMContext) -> No
         "value": "اختر الزر الذي تريد تغيير محتواه:",
         "url": "اختر الزر الذي تريد تغيير محتواه:",
         "title": "اختر الزر الذي تريد تغيير عنوانه:",
+        "type": "اختر الزر الذي تريد تغيير نوعه:",
     }
     await _edit_ui(callback.message, labels[action], build_button_picker_keyboard(buttons, action))
     await callback.answer()
@@ -1439,6 +1506,15 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         )
         await callback.answer()
         return
+    if action == "type":
+        await state.update_data(current_button_id=button_id)
+        await _edit_ui(
+            callback.message,
+            f"تغيير نوع الزر: {button['text']}\n\nاختر النوع الجديد:",
+            build_button_type_keyboard(f"r:bct:{button_id}"),
+        )
+        await callback.answer()
+        return
     if action not in {"value", "url", "title"}:
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
@@ -1450,6 +1526,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
     else:
         prompt = {
             "url": "أرسل الرابط الجديد للزر؛ يقبل @username أيضاً.",
+            "callback_data": "أرسل callback_data الجديدة؛ الحد الأقصى 64 بايت.",
             "copy": "أرسل النص الجديد الذي سيتم نسخه.",
             "popup": "أرسل نص التنبيه الجديد؛ الحد الأقصى 200 حرف.",
             "web_app": "أرسل رابط Web App الجديد ويبدأ بـ https://",
@@ -1458,7 +1535,55 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
             "switch_inline_current": "أرسل استعلام Inline الحالي الجديد، أو /empty.",
             "disabled": "الزر المعطّل لا يحتوي قيمة؛ غيّر نوعه بحذفه وإضافته مجددًا.",
         }[get_button_type(button)]
-    await callback.message.answer(prompt)
+    await _answer_with_button_guide(callback.message, prompt)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:bct:"))
+async def change_button_type(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    data, _ = session
+    buttons = data.get("message_buttons", [])
+    try:
+        _, _, button_id, button_type = callback.data.split(":", 3)
+    except ValueError:
+        await callback.answer("اختيار غير صالح.", show_alert=True)
+        return
+    button = get_message_button(buttons, button_id)
+    if button is None or button_type not in BUTTON_TYPES:
+        await callback.answer("هذا الزر أو النوع لم يعد موجودًا.", show_alert=True)
+        return
+    if button_type == "disabled":
+        change_message_button_type(button, "disabled", "")
+        await state.set_state(RichEditorStates.managing)
+        await state.update_data(message_buttons=buttons, current_button_id=None)
+        await _edit_ui(
+            callback.message,
+            "✅ تم تغيير نوع الزر إلى زر معطّل.\n\nإدارة أزرار الرسالة الغنية",
+            build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
+        )
+        await callback.answer("تم تغيير النوع")
+        return
+
+    prompts = {
+        "url": "أرسل الرابط الجديد؛ يقبل @username أيضًا.",
+        "callback_data": "أرسل callback_data الجديدة؛ الحد الأقصى 64 بايت.",
+        "copy": "أرسل النص الذي تريد نسخه؛ الحد الأقصى 256 حرفًا.",
+        "popup": "أرسل نص التنبيه؛ الحد الأقصى 200 حرف.",
+        "web_app": "أرسل رابط Web App يبدأ بـ https://",
+        "login_url": "أرسل رابط Login URL يبدأ بـ https://",
+        "switch_inline": "أرسل استعلام Inline، أو /empty.",
+        "switch_inline_current": "أرسل استعلام Inline للمحادثة الحالية، أو /empty.",
+    }
+    await state.set_state(RichEditorStates.editing_button)
+    await state.update_data(
+        current_button_id=button_id,
+        pending_button_action="change_type_value",
+        pending_button_type=button_type,
+    )
+    await _answer_with_button_guide(callback.message, prompts[button_type])
     await callback.answer()
 
 
@@ -1619,7 +1744,15 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
             await message.answer("هذا الزر لم يعد موجودًا.")
             await state.set_state(RichEditorStates.managing)
             return
-        if action == "title":
+        if action == "change_type_value":
+            button_type = str(data.get("pending_button_type") or "")
+            normalized_value, error = _normalize_button_value(button_type, value)
+            if error or normalized_value is None:
+                await message.answer(error or "قيمة الزر غير صالحة.")
+                return
+            change_message_button_type(button, button_type, normalized_value)
+            notice = "✅ تم تغيير نوع الزر."
+        elif action == "title":
             button["text"] = value
             notice = "✅ تم تغيير عنوان الزر."
         elif action == "value":

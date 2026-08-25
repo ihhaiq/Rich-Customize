@@ -48,6 +48,10 @@ def build_message_buttons_keyboard(
             rendered.append(InlineKeyboardButton(
                 **common, copy_text=CopyTextButton(text=value),
             ))
+        elif button_type == "callback_data":
+            rendered.append(InlineKeyboardButton(
+                **common, callback_data=value,
+            ))
         elif button_type == "popup":
             rendered.append(InlineKeyboardButton(
                 **common,
@@ -170,20 +174,21 @@ def build_post_settings_keyboard(
     ])
 
 
-def build_button_type_keyboard() -> InlineKeyboardMarkup:
+def build_button_type_keyboard(callback_prefix: str = "r:bat") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔗 رابط أو @username", callback_data="r:bat:url")],
-        [InlineKeyboardButton(text="📋 نسخ نص", callback_data="r:bat:copy")],
-        [InlineKeyboardButton(text="💬 Popup تنبيه", callback_data="r:bat:popup")],
+        [InlineKeyboardButton(text="🔗 رابط أو @username", callback_data=f"{callback_prefix}:url")],
+        [InlineKeyboardButton(text="⚡ Callback Data", callback_data=f"{callback_prefix}:callback_data")],
+        [InlineKeyboardButton(text="📋 نسخ نص", callback_data=f"{callback_prefix}:copy")],
+        [InlineKeyboardButton(text="💬 Popup تنبيه", callback_data=f"{callback_prefix}:popup")],
         [
-            InlineKeyboardButton(text="🌐 Web App", callback_data="r:bat:web_app"),
-            InlineKeyboardButton(text="🔐 Login URL", callback_data="r:bat:login_url"),
+            InlineKeyboardButton(text="🌐 Web App", callback_data=f"{callback_prefix}:web_app"),
+            InlineKeyboardButton(text="🔐 Login URL", callback_data=f"{callback_prefix}:login_url"),
         ],
         [
-            InlineKeyboardButton(text="🔎 Inline بمحادثة", callback_data="r:bat:switch_inline"),
-            InlineKeyboardButton(text="💬 Inline هنا", callback_data="r:bat:switch_inline_current"),
+            InlineKeyboardButton(text="🔎 Inline بمحادثة", callback_data=f"{callback_prefix}:switch_inline"),
+            InlineKeyboardButton(text="💬 Inline هنا", callback_data=f"{callback_prefix}:switch_inline_current"),
         ],
-        [InlineKeyboardButton(text="🚫 زر معطّل", callback_data="r:bat:disabled")],
+        [InlineKeyboardButton(text="🚫 زر معطّل", callback_data=f"{callback_prefix}:disabled")],
         [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:buttons")],
     ])
 
@@ -205,6 +210,7 @@ def build_buttons_manager_keyboard(
             InlineKeyboardButton(text="🧩 تغيير المحتوى", callback_data="r:bs:value"),
             InlineKeyboardButton(text="✏️ تغيير العنوان", callback_data="r:bs:title"),
         ],
+        [InlineKeyboardButton(text="🔄 تغيير نوع الزر", callback_data="r:bs:type")],
         [InlineKeyboardButton(
             text=f"🔢 عدد الأزرار بالصف: {buttons_per_row}", callback_data="r:brow",
         )],

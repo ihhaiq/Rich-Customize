@@ -1,6 +1,7 @@
 import unittest
 
 from app.keyboards import (
+    build_button_type_keyboard, build_buttons_manager_keyboard,
     build_details_content_keyboard, build_inner_block_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
 )
@@ -8,6 +9,24 @@ from app.services.buttons import add_message_button
 
 
 class ButtonKeyboardTests(unittest.TestCase):
+    def test_button_manager_can_change_button_type(self):
+        buttons = []
+        button = add_message_button(buttons, "زر", "https://example.com", "url")
+        manager = build_buttons_manager_keyboard(buttons)
+        callbacks = {
+            item.callback_data
+            for row in manager.inline_keyboard for item in row
+        }
+        self.assertIn("r:bs:type", callbacks)
+
+        picker = build_button_type_keyboard(f"r:bct:{button['id']}")
+        picker_callbacks = {
+            item.callback_data
+            for row in picker.inline_keyboard for item in row
+        }
+        self.assertIn(f"r:bct:{button['id']}:disabled", picker_callbacks)
+        self.assertIn(f"r:bct:{button['id']}:callback_data", picker_callbacks)
+
     def test_button_types_and_two_per_row(self):
         buttons = []
         add_message_button(buttons, "رابط", "https://t.me/ihhai", "url")

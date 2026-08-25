@@ -436,6 +436,8 @@ def _rich_button_payload(button: dict[str, Any]) -> dict[str, Any]:
 
     if button_type == "copy":
         payload["copy_text"] = CopyTextButton(text=value)
+    elif button_type == "callback_data":
+        payload["callback_data"] = value
     elif button_type == "popup":
         payload["callback_data"] = f"r:popup:{button.get('popup_token') or button['id']}"
     elif button_type == "web_app":

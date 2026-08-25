@@ -210,6 +210,7 @@ EN: dict[str, str] = {
     "🌐 Web App": "🌐 Web App", "🔐 Login URL": "🔐 Login URL",
     "🔎 Inline بمحادثة": "🔎 Inline in another chat",
     "💬 Inline هنا": "💬 Inline in this chat", "🚫 زر معطّل": "🚫 Disabled button",
+    "⚡ Callback Data": "⚡ Callback Data", "🔄 تغيير نوع الزر": "🔄 Change button type",
     "🔗 رابط بلا إطار": "🔗 Borderless link",
     "أرسل ملفًا": "Send a document.",
     "أرسل رابط Web App يبدأ بـ https://": "Send a Web App URL beginning with https://.",

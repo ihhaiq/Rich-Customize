@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 BUTTON_STYLES = {"default", "primary", "success", "danger", "link"}
 BUTTON_TYPES = {
-    "url", "copy", "popup", "web_app", "login_url",
+    "url", "callback_data", "copy", "popup", "web_app", "login_url",
     "switch_inline", "switch_inline_current", "disabled",
 }
 MAX_BUTTONS = 100
@@ -94,6 +94,23 @@ def add_message_button(
         button["url"] = value
     buttons.append(button)
     return button
+
+
+def change_message_button_type(
+    button: dict[str, Any], button_type: str, value: str,
+) -> bool:
+    if button_type not in BUTTON_TYPES:
+        return False
+    button["type"] = button_type
+    button["value"] = value
+    button.pop("popup_token", None)
+    if button_type in {"url", "web_app", "login_url"}:
+        button["url"] = value
+    else:
+        button.pop("url", None)
+    if button.get("style") == "link" and button_type != "popup":
+        button["style"] = "default"
+    return True
 
 
 def delete_message_button(buttons: list[dict[str, Any]], button_id: str) -> bool:

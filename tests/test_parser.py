@@ -10,9 +10,23 @@ from app.services.renderer import build_input_rich_message
 from app.services.inline_buttons import (
     find_user_button_markers, resolve_user_button_marker,
 )
+from app.routers.rich_editor import _button_guide_blocks
 
 
 class FormattedTextParserTests(unittest.TestCase):
+    def test_button_guide_contains_expandable_copyable_examples(self):
+        rich = build_input_rich_message(
+            _button_guide_blocks("أرسل عنوان الزر"),
+        ).model_dump(mode="json", exclude_none=True)
+
+        self.assertEqual([block["type"] for block in rich["blocks"]], ["paragraph", "details"])
+        details = rich["blocks"][1]
+        self.assertEqual(details["type"], "details")
+        self.assertIn("دليل الأزرار", details["summary"])
+        self.assertEqual(details["blocks"][1]["type"], "pre")
+        self.assertIn("{الملف الشخصي:user#p}", details["blocks"][1]["text"])
+        self.assertIn("{تنفيذ:callback_data action:1#r}", details["blocks"][1]["text"])
+
     def test_inline_url_and_callback_buttons_keep_their_text_position(self):
         paragraph = new_block("paragraph", {
             "text": "قبل {الموقع:url https://example.com#p} وسط {نفذ:callback_data action:1#r} بعد",

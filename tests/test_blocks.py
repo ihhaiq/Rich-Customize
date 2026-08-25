@@ -4,7 +4,8 @@ from app.services.blocks import (
     delete_block, move_block, normalize_block_positions,
 )
 from app.services.buttons import (
-    add_message_button, delete_message_button, move_message_button,
+    add_message_button, change_message_button_type,
+    delete_message_button, move_message_button,
     normalize_button_url,
 )
 
@@ -43,6 +44,19 @@ class BlockOperationsTests(unittest.TestCase):
 
 
 class MessageButtonOperationsTests(unittest.TestCase):
+    def test_change_button_type_preserves_title_and_style(self):
+        buttons = []
+        button = add_message_button(buttons, "الموقع", "https://example.com", "url")
+        button["style"] = "danger"
+
+        changed = change_message_button_type(button, "disabled", "")
+
+        self.assertTrue(changed)
+        self.assertEqual(button["text"], "الموقع")
+        self.assertEqual(button["style"], "danger")
+        self.assertEqual(button["type"], "disabled")
+        self.assertNotIn("url", button)
+
     def test_add_move_and_delete_button(self):
         buttons = []
         first = add_message_button(buttons, "الأول", "https://example.com/1")
