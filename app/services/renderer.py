@@ -424,7 +424,9 @@ def _editor_input_blocks(block: dict[str, Any], path: str) -> list[dict[str, Any
     return [{"type": "blockquote", "blocks": nested, "credit": credit}]
 
 
-def _rich_button_payload(button: dict[str, Any]) -> dict[str, Any]:
+def _rich_button_payload(
+    button: dict[str, Any], source_page_id: str | None = None,
+) -> dict[str, Any]:
     button_type = str(button.get("type", "url"))
     value = str(button.get("value", button.get("url", "")))
     style = str(button.get("style", "default"))
@@ -434,7 +436,11 @@ def _rich_button_payload(button: dict[str, Any]) -> dict[str, Any]:
     elif style == "link" and button_type == "popup":
         payload["style"] = "link"
 
-    if button_type == "copy":
+    if button_type == "page":
+        payload["callback_data"] = (
+            f"r:page:{value}:{source_page_id}" if source_page_id else f"r:page:{value}"
+        )
+    elif button_type == "copy":
         payload["copy_text"] = CopyTextButton(text=value)
     elif button_type == "callback_data":
         payload["callback_data"] = value
@@ -459,6 +465,7 @@ def _button_blocks(
     buttons: list[dict[str, Any]] | None,
     buttons_per_row: int,
     align: str,
+    source_page_id: str | None = None,
 ) -> list[dict[str, Any]]:
     if not buttons:
         return []
@@ -468,7 +475,10 @@ def _button_blocks(
     return [
         {
             "type": "buttons",
-            "buttons": [_rich_button_payload(item) for item in ordered[index:index + width]],
+            "buttons": [
+                _rich_button_payload(item, source_page_id)
+                for item in ordered[index:index + width]
+            ],
             "align": safe_align,
         }
         for index in range(0, len(ordered), width)
@@ -480,6 +490,7 @@ def _typed_input_rich_message(
     buttons: list[dict[str, Any]] | None = None,
     buttons_per_row: int = 1,
     buttons_align: str = "center",
+    source_page_id: str | None = None,
 ) -> InputRichMessage:
     if not blocks:
         raise RichMessageRenderError("The rich message has no blocks")
@@ -496,7 +507,9 @@ def _typed_input_rich_message(
     try:
         # Direction is intentionally omitted. Telegram will render Arabic text
         # as RTL and Latin text as LTR instead of forcing every message to RTL.
-        payloads.extend(_button_blocks(buttons, buttons_per_row, buttons_align))
+        payloads.extend(
+            _button_blocks(buttons, buttons_per_row, buttons_align, source_page_id),
+        )
         return InputRichMessage(blocks=payloads)
     except ValidationError as error:
         first = error.errors()[0] if error.errors() else {}
@@ -585,8 +598,11 @@ def build_input_rich_message(
     *,
     buttons_per_row: int = 1,
     buttons_align: str = "center",
+    source_page_id: str | None = None,
 ) -> InputRichMessage:
-    return _typed_input_rich_message(blocks, buttons, buttons_per_row, buttons_align)
+    return _typed_input_rich_message(
+        blocks, buttons, buttons_per_row, buttons_align, source_page_id,
+    )
 
 
 async def send_rich_message_post(
@@ -600,9 +616,11 @@ async def send_rich_message_post(
     *,
     disable_notification: bool = False,
     protect_content: bool = False,
+    source_page_id: str | None = None,
 ):
     rich = build_input_rich_message(
         blocks, buttons, buttons_per_row=buttons_per_row, buttons_align=buttons_align,
+        source_page_id=source_page_id,
     )
     with preserve_user_content():
         try:
@@ -617,6 +635,30 @@ async def send_rich_message_post(
             raise RichMessageRenderError(str(error)) from error
 
 
+async def edit_rich_message_page(
+    bot: Bot,
+    chat_id: int,
+    message_id: int,
+    blocks: list[dict[str, Any]],
+    buttons: list[dict[str, Any]] | None = None,
+    buttons_per_row: int = 1,
+    buttons_align: str = "center",
+    source_page_id: str | None = None,
+):
+    """Edit the current message in place to show a different saved page."""
+    rich = build_input_rich_message(
+        blocks, buttons, buttons_per_row=buttons_per_row, buttons_align=buttons_align,
+        source_page_id=source_page_id,
+    )
+    with preserve_user_content():
+        try:
+            return await bot.edit_message_text(
+                chat_id=chat_id, message_id=message_id, rich_message=rich,
+            )
+        except TelegramBadRequest as error:
+            raise RichMessageRenderError(str(error)) from error
+
+
 async def send_rich_message_preview(
     bot: Bot,
     chat_id: int,
@@ -625,9 +667,11 @@ async def send_rich_message_preview(
     buttons_per_row: int = 1,
     buttons_align: str = "center",
     reply_markup: InlineKeyboardMarkup | None = None,
+    source_page_id: str | None = None,
 ) -> list:
     rich = build_input_rich_message(
         blocks, buttons, buttons_per_row=buttons_per_row, buttons_align=buttons_align,
+        source_page_id=source_page_id,
     )
     with preserve_user_content():
         try:
