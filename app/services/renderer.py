@@ -11,8 +11,9 @@ from typing import Any
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
-    InputMediaAnimation, InputMediaAudio, InputMediaPhoto, InputMediaVideo,
-    InputMediaVoiceNote, InputRichMessage, InputRichMessageMedia, InlineKeyboardMarkup,
+    CopyTextButton, DisabledButton, InputMediaAnimation, InputMediaAudio,
+    InputMediaDocument, InputMediaPhoto, InputMediaVideo, InputMediaVoiceNote,
+    InputRichMessage, InputRichMessageMedia, InlineKeyboardMarkup,
 )
 from pydantic import ValidationError
 
@@ -20,7 +21,7 @@ from app.i18n import preserve_user_content, tr
 
 logger = logging.getLogger(__name__)
 
-RICH_MEDIA = {"photo", "video", "animation", "audio", "voice"}
+RICH_MEDIA = {"photo", "video", "animation", "audio", "voice", "document"}
 HTML_BLOCKS = {
     "text", "paragraph", "heading", "preformatted", "footer", "caption",
     "divider", "list", "table", "mathematical_expression", "anchor",
@@ -60,22 +61,34 @@ def _input_media(block: dict[str, Any], file_id: str):
     file_data = data.get("file", {})
     kind = block["type"]
     if kind == "photo":
-        return InputMediaPhoto(media=file_id, has_spoiler=data.get("has_spoiler"))
+        return InputMediaPhoto(
+            media=file_id, has_spoiler=data.get("has_spoiler"), parse_mode=None,
+            show_caption_above_media=None,
+        )
     if kind == "video":
         return InputMediaVideo(
             media=file_id, width=file_data.get("width"), height=file_data.get("height"),
             duration=file_data.get("duration"), supports_streaming=file_data.get("supports_streaming"),
-            has_spoiler=data.get("has_spoiler"),
+            has_spoiler=data.get("has_spoiler"), parse_mode=None,
+            show_caption_above_media=None,
         )
     if kind == "animation":
         return InputMediaAnimation(
             media=file_id, width=file_data.get("width"), height=file_data.get("height"),
             duration=file_data.get("duration"), has_spoiler=data.get("has_spoiler"),
+            parse_mode=None, show_caption_above_media=None,
         )
     if kind == "audio":
         return InputMediaAudio(
             media=file_id, duration=file_data.get("duration"),
             performer=file_data.get("performer"), title=file_data.get("title"),
+            parse_mode=None,
+        )
+    if kind == "document":
+        return InputMediaDocument(
+            media=file_id,
+            disable_content_type_detection=file_data.get("disable_content_type_detection"),
+            parse_mode=None,
         )
     return InputMediaVoiceNote(media=file_id, duration=file_data.get("duration"))
 
@@ -106,6 +119,7 @@ def _native_input_block(raw: dict[str, Any]) -> dict[str, Any]:
         "video": "video",
         "animation": "animation",
         "audio": "audio",
+        "document": "document",
         "voice_note": "voice_note",
     }.get(kind)
     if media_field is None:
@@ -116,25 +130,36 @@ def _native_input_block(raw: dict[str, Any]) -> dict[str, Any]:
         raise RichMessageRenderError(f"Native {kind} block has no reusable file_id")
     has_spoiler = payload.pop("has_spoiler", None)
     if kind == "photo":
-        payload[media_field] = InputMediaPhoto(media=file_id, has_spoiler=has_spoiler)
+        payload[media_field] = InputMediaPhoto(
+            media=file_id, has_spoiler=has_spoiler, parse_mode=None,
+            show_caption_above_media=None,
+        )
     elif kind == "video":
         payload[media_field] = InputMediaVideo(
             media=file_id,
             width=source.get("width"), height=source.get("height"),
             duration=source.get("duration"), supports_streaming=source.get("supports_streaming"),
-            has_spoiler=has_spoiler,
+            has_spoiler=has_spoiler, parse_mode=None,
+            show_caption_above_media=None,
         )
     elif kind == "animation":
         payload[media_field] = InputMediaAnimation(
             media=file_id,
             width=source.get("width"), height=source.get("height"),
             duration=source.get("duration"), has_spoiler=has_spoiler,
+            parse_mode=None, show_caption_above_media=None,
         )
     elif kind == "audio":
         payload[media_field] = InputMediaAudio(
             media=file_id,
             duration=source.get("duration"), performer=source.get("performer"),
-            title=source.get("title"),
+            title=source.get("title"), parse_mode=None,
+        )
+    elif kind == "document":
+        payload[media_field] = InputMediaDocument(
+            media=file_id,
+            disable_content_type_detection=source.get("disable_content_type_detection"),
+            parse_mode=None,
         )
     else:
         payload[media_field] = InputMediaVoiceNote(
@@ -344,12 +369,12 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
         children = data.get("children", [])
         if not isinstance(children, list) or not children:
             raise RichMessageRenderError(f"{path}: the container has no blocks")
+        nested_blocks: list[dict[str, Any]] = []
+        for index, child in enumerate(sorted(children, key=lambda item: item.get("position", 0))):
+            nested_blocks.extend(_editor_input_blocks(child, f"{path}.blocks[{index}]"))
         payload = {
             "type": kind,
-            "blocks": [
-                _editor_input_block(child, f"{path}.blocks[{index}]")
-                for index, child in enumerate(sorted(children, key=lambda item: item.get("position", 0)))
-            ],
+            "blocks": nested_blocks,
         }
         if kind == "details":
             payload["summary"] = _data_rich_text(data, "summary_rich_text", "summary_html", "summary_text") or tr("تفاصيل")
@@ -374,7 +399,78 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
     raise RichMessageRenderError(f"{path}: unsupported rich block type")
 
 
-def _typed_input_rich_message(blocks: list[dict[str, Any]]) -> InputRichMessage:
+def _editor_input_blocks(block: dict[str, Any], path: str) -> list[dict[str, Any]]:
+    """Return one API block, or an adjacent media + pullquote sequence.
+
+    Bot API 10.3 still defines PullQuotation as text-only.  The editor accepts
+    media for this UX by keeping the media next to the real pullquote instead
+    of emitting an invalid nested payload.
+    """
+    if block.get("type") != "pullquote":
+        return [_editor_input_block(block, path)]
+    attachments = block.get("data", {}).get("media_children") or []
+    payloads: list[dict[str, Any]] = []
+    for index, child in enumerate(attachments):
+        payloads.extend(_editor_input_blocks(child, f"{path}.media[{index}]"))
+    payloads.append(_editor_input_block(block, path))
+    return payloads
+
+
+def _rich_button_payload(button: dict[str, Any]) -> dict[str, Any]:
+    button_type = str(button.get("type", "url"))
+    value = str(button.get("value", button.get("url", "")))
+    style = str(button.get("style", "default"))
+    payload: dict[str, Any] = {"text": str(button.get("text") or "زر")}
+    if style in {"primary", "success", "danger"}:
+        payload["style"] = style
+    elif style == "link" and button_type == "popup":
+        payload["style"] = "link"
+
+    if button_type == "copy":
+        payload["copy_text"] = CopyTextButton(text=value)
+    elif button_type == "popup":
+        payload["callback_data"] = f"r:popup:{button.get('popup_token') or button['id']}"
+    elif button_type == "web_app":
+        payload["web_app"] = {"url": value}
+    elif button_type == "login_url":
+        payload["login_url"] = {"url": value}
+    elif button_type == "switch_inline":
+        payload["switch_inline_query"] = value
+    elif button_type == "switch_inline_current":
+        payload["switch_inline_query_current_chat"] = value
+    elif button_type == "disabled":
+        payload["disabled"] = DisabledButton()
+    else:
+        payload["url"] = value or "https://t.me"
+    return payload
+
+
+def _button_blocks(
+    buttons: list[dict[str, Any]] | None,
+    buttons_per_row: int,
+    align: str,
+) -> list[dict[str, Any]]:
+    if not buttons:
+        return []
+    ordered = sorted(buttons, key=lambda item: int(item.get("position", 0)))
+    width = max(1, min(8, int(buttons_per_row)))
+    safe_align = align if align in {"left", "center", "right"} else "center"
+    return [
+        {
+            "type": "buttons",
+            "buttons": [_rich_button_payload(item) for item in ordered[index:index + width]],
+            "align": safe_align,
+        }
+        for index in range(0, len(ordered), width)
+    ]
+
+
+def _typed_input_rich_message(
+    blocks: list[dict[str, Any]],
+    buttons: list[dict[str, Any]] | None = None,
+    buttons_per_row: int = 1,
+    buttons_align: str = "center",
+) -> InputRichMessage:
     if not blocks:
         raise RichMessageRenderError("The rich message has no blocks")
     payloads: list[dict[str, Any]] = []
@@ -382,7 +478,7 @@ def _typed_input_rich_message(blocks: list[dict[str, Any]]) -> InputRichMessage:
         kind = block.get("type", "unknown")
         path = f"blocks[{index}]<{kind}>"
         try:
-            payloads.append(_editor_input_block(block, path))
+            payloads.extend(_editor_input_blocks(block, path))
         except RichMessageRenderError:
             raise
         except Exception as error:
@@ -390,6 +486,7 @@ def _typed_input_rich_message(blocks: list[dict[str, Any]]) -> InputRichMessage:
     try:
         # Direction is intentionally omitted. Telegram will render Arabic text
         # as RTL and Latin text as LTR instead of forcing every message to RTL.
+        payloads.extend(_button_blocks(buttons, buttons_per_row, buttons_align))
         return InputRichMessage(blocks=payloads)
     except ValidationError as error:
         first = error.errors()[0] if error.errors() else {}
@@ -423,6 +520,8 @@ def _render_rich_blocks(
             fragments.append(_with_caption(f"<{tag}>{''.join(nested_fragments)}</{tag}>", data))
             continue
         if kind in {"blockquote", "pullquote"}:
+            if kind == "pullquote" and data.get("media_children"):
+                _render_rich_blocks(data["media_children"], fragments, media, f"{block_path}.media")
             quote = data.get("quote_html") or data.get("html") or ""
             credit = data.get("credit_html")
             tag = "blockquote" if kind == "blockquote" else "aside"
@@ -455,27 +554,38 @@ def _render_rich_blocks(
             )
         media_id = f"m_{block['id']}"
         media.append(InputRichMessageMedia(id=media_id, media=_input_media(block, file_id)))
-        tag = "img" if kind == "photo" else "audio" if kind in {"audio", "voice"} else "video"
-        link_type = "photo" if kind == "photo" else "audio" if kind in {"audio", "voice"} else "video"
+        tag = "img" if kind == "photo" else "audio" if kind in {"audio", "voice"} else "tg-document" if kind == "document" else "video"
+        link_type = "photo" if kind == "photo" else "audio" if kind in {"audio", "voice"} else "document" if kind == "document" else "video"
         close = "" if tag == "img" else f"</{tag}>"
         media_html = f'<{tag} src="tg://{link_type}?id={media_id}"/>' if tag == "img" else f'<{tag} src="tg://{link_type}?id={media_id}">{close}'
         fragments.append(_with_caption(media_html, data))
 
 
-def build_input_rich_message(blocks: list[dict[str, Any]]) -> InputRichMessage:
-    return _typed_input_rich_message(blocks)
+def build_input_rich_message(
+    blocks: list[dict[str, Any]],
+    buttons: list[dict[str, Any]] | None = None,
+    *,
+    buttons_per_row: int = 1,
+    buttons_align: str = "center",
+) -> InputRichMessage:
+    return _typed_input_rich_message(blocks, buttons, buttons_per_row, buttons_align)
 
 
 async def send_rich_message_post(
     bot: Bot,
     chat_id: int,
     blocks: list[dict[str, Any]],
+    buttons: list[dict[str, Any]] | None = None,
+    buttons_per_row: int = 1,
+    buttons_align: str = "center",
     reply_markup: InlineKeyboardMarkup | None = None,
     *,
     disable_notification: bool = False,
     protect_content: bool = False,
 ):
-    rich = build_input_rich_message(blocks)
+    rich = build_input_rich_message(
+        blocks, buttons, buttons_per_row=buttons_per_row, buttons_align=buttons_align,
+    )
     with preserve_user_content():
         try:
             return await bot.send_rich_message(
@@ -493,9 +603,14 @@ async def send_rich_message_preview(
     bot: Bot,
     chat_id: int,
     blocks: list[dict[str, Any]],
+    buttons: list[dict[str, Any]] | None = None,
+    buttons_per_row: int = 1,
+    buttons_align: str = "center",
     reply_markup: InlineKeyboardMarkup | None = None,
 ) -> list:
-    rich = build_input_rich_message(blocks)
+    rich = build_input_rich_message(
+        blocks, buttons, buttons_per_row=buttons_per_row, buttons_align=buttons_align,
+    )
     with preserve_user_content():
         try:
             await bot.send_rich_message_draft(

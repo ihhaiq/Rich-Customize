@@ -6,8 +6,11 @@ from typing import Any
 from urllib.parse import urlparse
 
 
-BUTTON_STYLES = {"default", "primary", "success", "danger"}
-BUTTON_TYPES = {"url", "copy", "popup"}
+BUTTON_STYLES = {"default", "primary", "success", "danger", "link"}
+BUTTON_TYPES = {
+    "url", "copy", "popup", "web_app", "login_url",
+    "switch_inline", "switch_inline_current", "disabled",
+}
 MAX_BUTTONS = 100
 TELEGRAM_USERNAME_RE = re.compile(r"^@[A-Za-z0-9_]{5,32}$")
 
@@ -56,6 +59,13 @@ def normalize_button_url(value: str) -> str | None:
     return None
 
 
+def normalize_https_url(value: str) -> str | None:
+    url = normalize_button_url(value)
+    if url and urlparse(url).scheme == "https":
+        return url
+    return None
+
+
 def add_message_button(
     buttons: list[dict[str, Any]], text: str, value: str,
     button_type: str = "url",
@@ -70,7 +80,7 @@ def add_message_button(
         "style": "default",
         "position": len(buttons),
     }
-    if button_type == "url":
+    if button_type in {"url", "web_app", "login_url"}:
         button["url"] = value
     buttons.append(button)
     return button

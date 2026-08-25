@@ -3,7 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from aiogram.enums import ButtonStyle
-from aiogram.types import CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import (
+    CopyTextButton, DisabledButton, InlineKeyboardButton, InlineKeyboardMarkup,
+    LoginUrl, WebAppInfo,
+)
 
 from app.services.blocks import BLOCK_LABELS, get_block_button_text, table_rows
 from app.services.buttons import (
@@ -50,11 +53,31 @@ def build_message_buttons_keyboard(
                 **common,
                 callback_data=f"r:popup:{button.get('popup_token') or button['id']}",
             ))
+        elif button_type == "web_app":
+            rendered.append(InlineKeyboardButton(
+                **common, web_app=WebAppInfo(url=value),
+            ))
+        elif button_type == "login_url":
+            rendered.append(InlineKeyboardButton(
+                **common, login_url=LoginUrl(url=value),
+            ))
+        elif button_type == "switch_inline":
+            rendered.append(InlineKeyboardButton(
+                **common, switch_inline_query=value,
+            ))
+        elif button_type == "switch_inline_current":
+            rendered.append(InlineKeyboardButton(
+                **common, switch_inline_query_current_chat=value,
+            ))
+        elif button_type == "disabled":
+            rendered.append(InlineKeyboardButton(
+                **common, disabled=DisabledButton(),
+            ))
         else:
             rendered.append(InlineKeyboardButton(
                 **common, url=value or "https://t.me",
             ))
-    width = max(1, min(4, int(buttons_per_row)))
+    width = max(1, min(8, int(buttons_per_row)))
     rows = [rendered[index:index + width] for index in range(0, len(rendered), width)]
     if include_back:
         rows.append([InlineKeyboardButton(text=back_text, callback_data="r:bpback")])
@@ -152,6 +175,15 @@ def build_button_type_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🔗 رابط أو @username", callback_data="r:bat:url")],
         [InlineKeyboardButton(text="📋 نسخ نص", callback_data="r:bat:copy")],
         [InlineKeyboardButton(text="💬 Popup تنبيه", callback_data="r:bat:popup")],
+        [
+            InlineKeyboardButton(text="🌐 Web App", callback_data="r:bat:web_app"),
+            InlineKeyboardButton(text="🔐 Login URL", callback_data="r:bat:login_url"),
+        ],
+        [
+            InlineKeyboardButton(text="🔎 Inline بمحادثة", callback_data="r:bat:switch_inline"),
+            InlineKeyboardButton(text="💬 Inline هنا", callback_data="r:bat:switch_inline_current"),
+        ],
+        [InlineKeyboardButton(text="🚫 زر معطّل", callback_data="r:bat:disabled")],
         [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:buttons")],
     ])
 
@@ -198,13 +230,17 @@ def build_button_picker_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def build_button_style_keyboard(button_id: str, current_style: str) -> InlineKeyboardMarkup:
+def build_button_style_keyboard(
+    button_id: str, current_style: str, *, allow_link: bool = False,
+) -> InlineKeyboardMarkup:
     choices = [
         ("⚪ شفاف", "default", None),
         ("🔵 أزرق", "primary", ButtonStyle.PRIMARY),
         ("🟢 أخضر", "success", ButtonStyle.SUCCESS),
         ("🔴 أحمر", "danger", ButtonStyle.DANGER),
     ]
+    if allow_link:
+        choices.append(("🔗 رابط بلا إطار", "link", None))
     rows = [[InlineKeyboardButton(
         text=f"{'✅ ' if current_style == value else ''}{text}",
         callback_data=f"r:bsc:{button_id}:{value}",
@@ -308,7 +344,8 @@ def build_add_block_keyboard() -> InlineKeyboardMarkup:
         ("▦ Table", "table"), ("📂 Details", "details"),
         ("🗺 Map", "map"), ("🎞 Animation", "animation"),
         ("🎵 Audio", "audio"), ("🖼 Photo", "photo"),
-        ("🎬 Video", "video"), ("🎙 Voice Note", "voice"),
+        ("📄 Document", "document"), ("🎬 Video", "video"),
+        ("🎙 Voice Note", "voice"),
     ]
     rows = [
         [InlineKeyboardButton(text=text, callback_data=f"r:add:{kind}") for text, kind in choices[index:index + 2]]

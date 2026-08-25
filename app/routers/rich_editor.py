@@ -34,6 +34,7 @@ from app.services.buttons import (
     BUTTON_STYLES, BUTTON_TYPES, MAX_BUTTONS, add_message_button,
     delete_message_button, get_button_type, get_button_value,
     get_message_button, move_message_button, normalize_button_url,
+    normalize_https_url,
 )
 from app.services.chat_registry import managed_chat_registry
 from app.services.factory import (
@@ -61,6 +62,7 @@ CHANNEL_ADMIN_RIGHTS = (
     "post_messages+edit_messages+delete_messages+manage_chat+invite_users+restrict_members"
 )
 GROUP_ADMIN_RIGHTS = "delete_messages+manage_chat+invite_users+restrict_members"
+PULLQUOTE_MEDIA_TYPES = {"photo", "video", "animation", "audio", "voice", "document"}
 
 
 def _status_value(member) -> str:
@@ -118,7 +120,7 @@ async def _bot_add_links(bot: Bot) -> tuple[str, str]:
 
 def _buttons_per_row(data: dict[str, Any]) -> int:
     try:
-        return max(1, min(4, int(data.get("buttons_per_row", 1))))
+        return max(1, min(8, int(data.get("buttons_per_row", 1))))
     except (TypeError, ValueError):
         return 1
 
@@ -133,6 +135,38 @@ async def _prepare_message_buttons(
             button["popup_token"] = token
             await popup_registry.remember(token, get_button_value(button))
     return prepared
+
+
+def _pullquote_media_payload(parsed: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    media = [item for item in parsed if item.get("type") in PULLQUOTE_MEDIA_TYPES]
+    normalize_block_positions(media)
+    caption = next((item for item in parsed if item.get("type") == "caption"), None)
+    return media, caption
+
+
+def _normalize_button_value(button_type: str, value: str) -> tuple[str | None, str | None]:
+    if button_type == "url":
+        normalized = normalize_button_url(value)
+        if normalized is None or len(normalized) > 256:
+            return None, "الرابط غير صالح. أرسل @username أو رابطًا يبدأ بـ http:// أو https:// أو tg://"
+        return normalized, None
+    if button_type in {"web_app", "login_url"}:
+        normalized = normalize_https_url(value)
+        if normalized is None or len(normalized) > 256:
+            return None, "هذا النوع يحتاج إلى رابط HTTPS صالح."
+        return normalized, None
+    if button_type == "copy" and len(value) > 256:
+        return None, "نص النسخ طويل جدًا؛ الحد الأقصى 256 حرفًا."
+    if button_type == "popup" and len(value) > 200:
+        return None, "نص التنبيه طويل جدًا؛ الحد الأقصى 200 حرف."
+    if button_type in {"switch_inline", "switch_inline_current"}:
+        normalized = "" if value.strip().lower() == "/empty" else value
+        if len(normalized) > 256:
+            return None, "استعلام Inline طويل جدًا؛ الحد الأقصى 256 حرفًا."
+        return normalized, None
+    if button_type not in BUTTON_TYPES or button_type == "disabled":
+        return None, "نوع الزر غير صالح لهذه العملية."
+    return value, None
 
 
 def _post_chats_text(chats: list[dict[str, Any]], selected_count: int) -> str:
@@ -225,7 +259,8 @@ async def _open_editor(message: Message, state: FSMContext, blocks: list[dict[st
     sent = await message.answer(MAIN_TEXT, reply_markup=build_rich_editor_keyboard(blocks))
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
-        blocks=blocks, message_buttons=[], buttons_per_row=1, current_block_id=None,
+        blocks=blocks, message_buttons=[], buttons_per_row=1, buttons_align="center",
+        current_block_id=None,
         management_chat_id=sent.chat.id, management_message_id=sent.message_id,
     )
 
@@ -499,13 +534,14 @@ async def choose_add_block(callback: CallbackQuery, state: FSMContext, bot: Bot)
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
         "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
         "blockquote": "أرسل نص الاقتباس",
-        "pullquote": "أرسل نص الاقتباس البارز",
+        "pullquote": "أرسل نص الاقتباس البارز، أو أرسل وسائط/ملفًا لإرفاقه به",
         "details": "أرسل عنوان «تفاصيل» أولًا",
         "collage": "أرسل صور/فيديو أو Album للكولاج",
         "slideshow": "أرسل صور/فيديو أو Album لعرض الشرائح",
         "map": "أرسل موقعًا من مرفقات Telegram",
         "animation": "أرسل GIF أو Animation",
         "audio": "أرسل ملف Audio",
+        "document": "أرسل ملفًا",
         "photo": "أرسل صورة",
         "video": "أرسل فيديو",
         "voice": "أرسل بصمة صوتية",
@@ -652,12 +688,13 @@ async def choose_details_child_type(
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
         "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
         "blockquote": "أرسل نص الاقتباس",
-        "pullquote": "أرسل نص الاقتباس البارز",
+        "pullquote": "أرسل نص الاقتباس البارز، أو وسائط/ملفًا لإرفاقه به",
         "collage": "أرسل صور/فيديو أو Album للكولاج",
         "slideshow": "أرسل صور/فيديو أو Album لعرض الشرائح",
         "map": "أرسل موقعًا من مرفقات Telegram",
         "animation": "أرسل GIF أو Animation",
         "audio": "أرسل ملف Audio",
+        "document": "أرسل ملفًا",
         "photo": "أرسل صورة",
         "video": "أرسل فيديو",
         "voice": "أرسل بصمة صوتية",
@@ -770,6 +807,33 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
         return
 
     if block_type in QUOTE_TYPES and step == "quote_text":
+        if block_type == "pullquote" and not message.text:
+            if message.media_group_id:
+                collected = await albums.collect(message)
+                if collected is None:
+                    return
+                parsed = messages_to_blocks(collected)
+            else:
+                parsed = message_to_blocks(message)
+            media_children, caption = _pullquote_media_payload(parsed)
+            if not media_children:
+                await message.answer("أرسل نصًا أو صورة/فيديو/صوتًا/ملفًا للاقتباس البارز.")
+                return
+            await _delete_add_step_messages(bot, message, data, state)
+            next_payload: dict[str, Any] = {"media_children": media_children}
+            if caption:
+                next_payload.update(
+                    quote_text=caption["data"].get("text", ""),
+                    quote_html=caption["data"].get("html", ""),
+                )
+                next_step = "quote_credit"
+                prompt = "تم إرفاق الوسائط واعتماد وصفها كنص للاقتباس. أرسل اسم الكاتب، أو /skip."
+            else:
+                next_step = "quote_media_text"
+                prompt = "تم إرفاق الوسائط. أرسل الآن نص الاقتباس البارز."
+            await state.update_data(add_step=next_step, add_payload=next_payload)
+            await _send_add_prompt(message, state, prompt)
+            return
         if not message.text:
             await message.answer("نص الاقتباس يجب أن يكون نصًا.")
             return
@@ -777,6 +841,22 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
         await state.update_data(
             add_step="quote_credit",
             add_payload={"quote_text": message.text, "quote_html": message.html_text},
+        )
+        await _send_add_prompt(message, state, "أرسل اسم الكاتب، أو /skip لإضافته بدون كاتب")
+        return
+
+    if block_type == "pullquote" and step == "quote_media_text":
+        if not message.text:
+            await message.answer("أرسل نص الاقتباس البارز بعد الوسائط.")
+            return
+        await _delete_add_step_messages(bot, message, data, state)
+        await state.update_data(
+            add_step="quote_credit",
+            add_payload={
+                **payload,
+                "quote_text": message.text,
+                "quote_html": message.html_text,
+            },
         )
         await _send_add_prompt(message, state, "أرسل اسم الكاتب، أو /skip لإضافته بدون كاتب")
         return
@@ -791,6 +871,32 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
         return
 
     if block_type == "details" and step == "details_child_quote_text":
+        if data.get("pending_child_type") == "pullquote" and not message.text:
+            if message.media_group_id:
+                collected = await albums.collect(message)
+                if collected is None:
+                    return
+                parsed = messages_to_blocks(collected)
+            else:
+                parsed = message_to_blocks(message)
+            media_children, caption = _pullquote_media_payload(parsed)
+            if not media_children:
+                await message.answer("أرسل نصًا أو وسائط/ملفًا للاقتباس البارز.")
+                return
+            await _delete_add_step_messages(bot, message, data, state)
+            updated_payload = dict(payload)
+            updated_payload["child_media_children"] = media_children
+            if caption:
+                updated_payload["child_quote_text"] = caption["data"].get("text", "")
+                updated_payload["child_quote_html"] = caption["data"].get("html", "")
+                next_step = "details_child_quote_credit"
+                prompt = "تم إرفاق الوسائط واعتماد وصفها كنص. أرسل الكاتب، أو /skip."
+            else:
+                next_step = "details_child_pullquote_text"
+                prompt = "تم إرفاق الوسائط. أرسل الآن نص الاقتباس البارز."
+            await state.update_data(add_step=next_step, add_payload=updated_payload)
+            await _send_add_prompt(message, state, prompt, build_inner_block_input_keyboard())
+            return
         if not message.text:
             await message.answer("نص الاقتباس يجب أن يكون نصًا.")
             return
@@ -810,6 +916,22 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
         )
         return
 
+    if block_type == "details" and step == "details_child_pullquote_text":
+        if not message.text:
+            await message.answer("أرسل نص الاقتباس البارز بعد الوسائط.")
+            return
+        updated_payload = dict(payload)
+        updated_payload["child_quote_text"] = message.text
+        updated_payload["child_quote_html"] = message.html_text
+        await state.update_data(
+            add_step="details_child_quote_credit",
+            add_payload=updated_payload,
+        )
+        await _send_add_prompt(
+            message, state, "أرسل اسم الكاتب، أو /skip.", build_inner_block_input_keyboard(),
+        )
+        return
+
     if block_type == "details" and step == "details_child_quote_credit":
         if not message.text:
             await message.answer("أرسل اسم الكاتب كنص، أو /skip.")
@@ -823,6 +945,7 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
             "quote_text": payload.get("child_quote_text", ""),
             "quote_html": payload.get("child_quote_html", ""),
             "credit_html": credit,
+            "media_children": payload.get("child_media_children", []),
         })
         await _store_details_child(message, state, bot, child)
         return
@@ -850,7 +973,7 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
                     "map",
                     map_data(message.location.latitude, message.location.longitude),
                 )
-        elif child_type in {"photo", "video", "animation", "audio", "voice"}:
+        elif child_type in {"photo", "video", "animation", "audio", "voice", "document"}:
             parsed = message_to_blocks(message)
             child = next((item for item in parsed if item["type"] == child_type), None)
             if child is not None:
@@ -928,7 +1051,7 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
         )
         return
 
-    if block_type in {"photo", "video", "animation", "audio", "voice"}:
+    if block_type in {"photo", "video", "animation", "audio", "voice", "document"}:
         parsed = message_to_blocks(message)
         media_block = next((item for item in parsed if item["type"] == block_type), None)
         if media_block is None:
@@ -977,7 +1100,7 @@ async def open_buttons_manager(callback: CallbackQuery, state: FSMContext) -> No
     await state.update_data(current_button_id=None, pending_button_action=None)
     await _edit_ui(
         callback.message,
-        f"إدارة الأزرار الشفافة\n\nعدد الأزرار: {len(buttons)}\nاختر العملية:",
+        f"إدارة أزرار الرسالة الغنية\n\nعدد الأزرار: {len(buttons)}\nاختر العملية:",
         build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
     )
     await callback.answer()
@@ -989,12 +1112,12 @@ async def change_buttons_per_row(callback: CallbackQuery, state: FSMContext) -> 
     if not session or not isinstance(callback.message, Message):
         return
     data, _ = session
-    buttons_per_row = 1 if _buttons_per_row(data) >= 4 else _buttons_per_row(data) + 1
+    buttons_per_row = 1 if _buttons_per_row(data) >= 8 else _buttons_per_row(data) + 1
     await state.update_data(buttons_per_row=buttons_per_row)
     buttons = data.get("message_buttons", [])
     await _edit_ui(
         callback.message,
-        f"إدارة الأزرار الشفافة\n\nعدد الأزرار: {len(buttons)}\nاختر العملية:",
+        f"إدارة أزرار الرسالة الغنية\n\nعدد الأزرار: {len(buttons)}\nاختر العملية:",
         build_buttons_manager_keyboard(buttons, buttons_per_row),
     )
     await callback.answer(f"عدد الأزرار في الصف: {buttons_per_row}")
@@ -1030,7 +1153,31 @@ async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> 
         "url": "أرسل الرابط؛ يقبل @username أو http:// أو https:// أو tg://",
         "copy": "أرسل النص الذي تريد نسخه عند الضغط على الزر؛ الحد الأقصى 256 حرف.",
         "popup": "أرسل نص التنبيه الذي سيظهر عند الضغط؛ الحد الأقصى 200 حرف.",
+        "web_app": "أرسل رابط Web App يبدأ بـ https://",
+        "login_url": "أرسل رابط تسجيل الدخول ويجب أن يبدأ بـ https://",
+        "switch_inline": "أرسل الاستعلام الذي يُكتب بعد اختيار المحادثة؛ يمكن إرسال /empty لتركه فارغًا.",
+        "switch_inline_current": "أرسل الاستعلام الذي يُكتب في المحادثة الحالية؛ يمكن إرسال /empty.",
     }
+    if button_type == "disabled":
+        buttons = data.get("message_buttons", [])
+        button = add_message_button(
+            buttons, str(data.get("pending_button_text", "زر")), "", "disabled",
+        )
+        if button is None:
+            await callback.answer("تعذر إضافة الزر؛ وصلت إلى الحد الأقصى.", show_alert=True)
+            return
+        await state.set_state(RichEditorStates.managing)
+        await state.update_data(
+            message_buttons=buttons, pending_button_action=None,
+            pending_button_text=None, pending_button_type=None,
+        )
+        await _edit_ui(
+            callback.message,
+            "✅ تمت إضافة الزر المعطّل. اختر لونه:",
+            build_button_style_keyboard(button["id"], "default"),
+        )
+        await callback.answer("تمت إضافة الزر")
+        return
     await state.set_state(RichEditorStates.editing_button)
     await state.update_data(
         pending_button_action=f"add_{button_type}",
@@ -1087,7 +1234,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         await state.update_data(message_buttons=buttons, current_button_id=None)
         await _edit_ui(
             callback.message,
-            f"✅ تم إزالة الزر.\n\nإدارة الأزرار الشفافة\nعدد الأزرار: {len(buttons)}",
+            f"✅ تم إزالة الزر.\n\nإدارة أزرار الرسالة الغنية\nعدد الأزرار: {len(buttons)}",
             build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
         )
         await callback.answer("تم إزالة الزر")
@@ -1096,7 +1243,11 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         await _edit_ui(
             callback.message,
             f"تغيير لون الزر: {button['text']}\n\nاختر اللون:",
-            build_button_style_keyboard(button_id, str(button.get("style", "default"))),
+            build_button_style_keyboard(
+                button_id,
+                str(button.get("style", "default")),
+                allow_link=get_button_type(button) == "popup",
+            ),
         )
         await callback.answer()
         return
@@ -1121,6 +1272,11 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
             "url": "أرسل الرابط الجديد للزر؛ يقبل @username أيضاً.",
             "copy": "أرسل النص الجديد الذي سيتم نسخه.",
             "popup": "أرسل نص التنبيه الجديد؛ الحد الأقصى 200 حرف.",
+            "web_app": "أرسل رابط Web App الجديد ويبدأ بـ https://",
+            "login_url": "أرسل رابط تسجيل الدخول الجديد ويبدأ بـ https://",
+            "switch_inline": "أرسل استعلام Inline الجديد، أو /empty.",
+            "switch_inline_current": "أرسل استعلام Inline الحالي الجديد، أو /empty.",
+            "disabled": "الزر المعطّل لا يحتوي قيمة؛ غيّر نوعه بحذفه وإضافته مجددًا.",
         }[get_button_type(button)]
     await callback.message.answer(prompt)
     await callback.answer()
@@ -1139,14 +1295,18 @@ async def change_button_style(callback: CallbackQuery, state: FSMContext) -> Non
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
     button = get_message_button(buttons, button_id)
-    if button is None or style not in BUTTON_STYLES:
+    if (
+        button is None
+        or style not in BUTTON_STYLES
+        or (style == "link" and get_button_type(button) != "popup")
+    ):
         await callback.answer("هذا الزر أو اللون لم يعد موجودًا.", show_alert=True)
         return
     button["style"] = style
     await state.update_data(message_buttons=buttons)
     await _edit_ui(
         callback.message,
-        "✅ تم تغيير لون الزر.\n\nإدارة الأزرار الشفافة",
+        "✅ تم تغيير لون الزر.\n\nإدارة أزرار الرسالة الغنية",
         build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
     )
     await callback.answer("تم تغيير اللون")
@@ -1171,7 +1331,7 @@ async def change_button_position(callback: CallbackQuery, state: FSMContext) -> 
     await state.update_data(message_buttons=buttons)
     await _edit_ui(
         callback.message,
-        "✅ تم تغيير ترتيب الزر.\n\nإدارة الأزرار الشفافة",
+        "✅ تم تغيير ترتيب الزر.\n\nإدارة أزرار الرسالة الغنية",
         build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
     )
     await callback.answer("تم تغيير الترتيب")
@@ -1256,26 +1416,11 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
         )
         return
 
-    if action in {"add_url", "add_copy", "add_popup"}:
+    if isinstance(action, str) and action.startswith("add_") and action != "add_title":
         button_type = str(data.get("pending_button_type") or action.removeprefix("add_"))
-        normalized_value = value
-        if button_type == "url":
-            normalized = normalize_button_url(value)
-            if normalized is None or len(normalized) > 256:
-                await message.answer(
-                    "الرابط غير صالح. أرسل @username أو رابطًا يبدأ بـ http:// أو https:// أو tg://"
-                )
-                return
-            normalized_value = normalized
-        elif button_type == "copy" and len(value) > 256:
-            await message.answer("نص النسخ طويل جدًا؛ الحد الأقصى 256 حرفًا.")
-            return
-        elif button_type == "popup" and len(value) > 200:
-            await message.answer("نص التنبيه طويل جدًا؛ الحد الأقصى 200 حرف.")
-            return
-        elif button_type not in BUTTON_TYPES:
-            await message.answer("نوع الزر غير صالح. ارجع إلى لوحة الإدارة وحاول مجدداً.")
-            await state.set_state(RichEditorStates.managing)
+        normalized_value, error = _normalize_button_value(button_type, value)
+        if error or normalized_value is None:
+            await message.answer(error or "قيمة الزر غير صالحة.")
             return
         button = add_message_button(
             buttons,
@@ -1287,7 +1432,7 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
             await message.answer("تعذر إضافة الزر؛ وصلت إلى الحد الأقصى.")
             await state.set_state(RichEditorStates.managing)
             return
-        notice = "✅ تمت إضافة الزر بنجاح."
+        notice = "✅ تمت إضافة الزر. اختر لونه من لوحة التعديل."
     else:
         button = get_message_button(buttons, str(data.get("current_button_id", "")))
         if button is None:
@@ -1299,23 +1444,12 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
             notice = "✅ تم تغيير عنوان الزر."
         elif action == "value":
             button_type = get_button_type(button)
-            normalized_value = value
-            if button_type == "url":
-                normalized = normalize_button_url(value)
-                if normalized is None or len(normalized) > 256:
-                    await message.answer(
-                        "الرابط غير صالح. أرسل @username أو رابطًا يبدأ بـ http:// أو https:// أو tg://"
-                    )
-                    return
-                normalized_value = normalized
-            elif button_type == "copy" and len(value) > 256:
-                await message.answer("نص النسخ طويل جدًا؛ الحد الأقصى 256 حرفًا.")
-                return
-            elif button_type == "popup" and len(value) > 200:
-                await message.answer("نص التنبيه طويل جدًا؛ الحد الأقصى 200 حرف.")
+            normalized_value, error = _normalize_button_value(button_type, value)
+            if error or normalized_value is None:
+                await message.answer(error or "قيمة الزر غير صالحة.")
                 return
             button["value"] = normalized_value
-            if button_type == "url":
+            if button_type in {"url", "web_app", "login_url"}:
                 button["url"] = normalized_value
                 notice = "✅ تم تغيير رابط الزر."
             elif button_type == "copy":
@@ -1336,7 +1470,7 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
     )
     await _edit_saved_ui(
         bot, state,
-        f"{notice}\n\nإدارة الأزرار الشفافة\nعدد الأزرار: {len(buttons)}",
+        f"{notice}\n\nإدارة أزرار الرسالة الغنية\nعدد الأزرار: {len(buttons)}",
         build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
     )
     await message.answer(notice)
@@ -1492,7 +1626,8 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         "preformatted": "أرسل النص البرمجي الجديد", "footer": "أرسل التذييل الجديد",
         "mathematical_expression": "أرسل معادلة LaTeX الجديدة", "anchor": "أرسل اسم المرساة الجديد",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر", "table": "أرسل صفوف الجدول؛ افصل الأعمدة بعلامة |",
-        "blockquote": "أرسل نص الاقتباس الجديد", "pullquote": "أرسل نص الاقتباس البارز الجديد",
+        "blockquote": "أرسل نص الاقتباس الجديد",
+        "pullquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لإرفاقه به",
         "collage": "أرسل صور/فيديو أو Album جديدًا للكولاج",
         "slideshow": "أرسل صور/فيديو أو Album جديدًا لعرض الشرائح",
         "map": "أرسل الموقع الجديد من مرفقات Telegram",
@@ -1566,7 +1701,28 @@ async def receive_replacement(message: Message, state: FSMContext, bot: Bot) -> 
         else:
             replacement = None
     elif expected in QUOTE_TYPES:
-        replacement = quote_data(message, block.get("data", {}).get("credit_html")) if message.text else None
+        if message.text:
+            replacement = quote_data(message, block.get("data", {}).get("credit_html"))
+            if expected == "pullquote":
+                replacement["media_children"] = block.get("data", {}).get("media_children", [])
+        elif expected == "pullquote":
+            if message.media_group_id:
+                collected = await albums.collect(message)
+                if collected is None:
+                    return
+                parsed = messages_to_blocks(collected)
+            else:
+                parsed = message_to_blocks(message)
+            media_children, caption = _pullquote_media_payload(parsed)
+            if media_children:
+                replacement = {**block.get("data", {}), "media_children": media_children}
+                if caption:
+                    replacement["quote_text"] = caption["data"].get("text", "")
+                    replacement["quote_html"] = caption["data"].get("html", "")
+            else:
+                replacement = None
+        else:
+            replacement = None
     elif expected in {"paragraph", "heading", "preformatted", "footer", "mathematical_expression", "anchor", "list", "table"}:
         replacement = text_data(
             message,
@@ -1854,9 +2010,6 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
         }
         buttons = data.get("message_buttons", [])
         prepared_buttons = await _prepare_message_buttons(buttons)
-        reply_markup = build_message_buttons_keyboard(
-            prepared_buttons, buttons_per_row=_buttons_per_row(data),
-        ) if buttons else None
         succeeded: list[str] = []
         failed: list[str] = []
         for chat_id in selected:
@@ -1870,7 +2023,9 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
                     bot,
                     chat_id,
                     blocks,
-                    reply_markup,
+                    buttons=prepared_buttons,
+                    buttons_per_row=_buttons_per_row(data),
+                    buttons_align=str(data.get("buttons_align", "center")),
                     disable_notification=bool(data.get("post_silent", False)),
                     protect_content=bool(data.get("post_protected", False)),
                 )
@@ -1917,9 +2072,9 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             bot,
             callback.from_user.id,
             blocks,
-            build_message_buttons_keyboard(
-                prepared_buttons, buttons_per_row=_buttons_per_row(data),
-            ) if buttons else None,
+            buttons=prepared_buttons,
+            buttons_per_row=_buttons_per_row(data),
+            buttons_align=str(data.get("buttons_align", "center")),
         ) or []
         if sent_messages:
             for message_id in data.get("preview_message_ids", []):

@@ -30,6 +30,7 @@ BLOCK_LABELS = {
     "collage": "🖼 كولاج",
     "slideshow": "🎞 عرض شرائح",
     "map": "🗺 خريطة",
+    "buttons": "🔘 أزرار غنية",
 }
 
 

@@ -11,11 +11,12 @@ FINAL_RICH_BLOCK_TYPES = (
     "paragraph", "heading", "preformatted", "footer", "divider",
     "mathematical_expression", "anchor", "list", "blockquote", "pullquote",
     "collage", "slideshow", "table", "details", "map", "animation",
-    "audio", "photo", "video", "voice",
+    "audio", "document", "photo", "video", "voice",
 )
 
 MEDIA_CAPTION_TYPES = {
-    "photo", "video", "animation", "audio", "voice", "collage", "slideshow", "map",
+    "photo", "video", "animation", "audio", "voice", "document",
+    "collage", "slideshow", "map",
 }
 QUOTE_TYPES = {"blockquote", "pullquote"}
 
@@ -27,7 +28,7 @@ CONTAINER_CHILD_BLOCK_TYPES: dict[str, tuple[str, ...]] = {
         "paragraph", "heading", "preformatted", "footer", "divider",
         "mathematical_expression", "anchor", "list", "blockquote", "pullquote",
         "table", "collage", "slideshow", "map", "animation", "audio",
-        "photo", "video", "voice",
+        "document", "photo", "video", "voice",
     ),
     "collage": ("photo", "video"),
     "slideshow": ("photo", "video"),

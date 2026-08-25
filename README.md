@@ -1,6 +1,6 @@
 # Telegram Rich Message Editor
 
-محرّر Blocks كامل لرسائل Telegram الغنية باستخدام Python وAiogram 3.30 / Bot API 10+.
+محرّر Blocks كامل لرسائل Telegram الغنية باستخدام Python وAiogram 3.31 / Bot API 10.3.
 
 ## التشغيل
 
@@ -36,9 +36,12 @@ python main.py
   Paragraph، Section Heading، Preformatted، Footer، Divider، Mathematical Expression، Anchor،
   List، Blockquote، Pullquote، Collage، Slideshow، Table، Details، Map، Animation، Audio، Photo،
   Video وVoice Note.
-- زر `🔘 إضافة أزرار` بجانب إضافة الـBlock يفتح لوحة إدارة الأزرار الشفافة: إضافة، إزالة، تغيير اللون
-  (شفاف/أزرق/أخضر/أحمر)، تغيير الترتيب، الرابط والعنوان، ومعاينة قابلة للإغلاق بزر رجوع.
-- الأزرار التي يضيفها المستخدم تظهر أسفل الـRich Message النهائية، وليس في لوحة الإدارة فقط.
+- زر `🔘 إضافة أزرار` ينشئ `InputRichBlockButtons` حقيقيًا داخل الرسالة، مع رابط ونسخ وPopup
+  وWeb App وLogin URL وInline Query وزر معطّل، وتخصيص اللون
+  (افتراضي/أزرق/أخضر/أحمر/Link للـCallback) والترتيب وعدد الأزرار في الصف.
+- يدعم `InputRichBlockDocument` لإضافة الملفات العامة مع التذييل والمصدر.
+- يقبل محرّر Pullquote الوسائط والملفات ويضعها ملاصقة للاقتباس النصي؛ لأن Bot API 10.3
+  يبقي `InputRichBlockPullQuotation` نفسه نصيًا ولا يسمح ببلوكات داخله.
 - زر `📝 إنشاء منشور` بجانب النتيجة يعرض القنوات والمجموعات المسجلة التي يكون فيها المستخدم
   والبوت مشرفين، ويولد روابط Telegram رسمية لإضافة البوت عند عدم وجود محادثات.
 - عند وصول البوت إلى قناة أو مجموعة يرسل إشعارًا في الخاص، ثم يتيح إرسال المنشور بصمت
