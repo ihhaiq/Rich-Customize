@@ -9,8 +9,14 @@ from urllib.parse import urlparse
 BUTTON_STYLES = {"default", "primary", "success", "danger", "link"}
 BUTTON_TYPES = {
     "url", "callback_data", "copy", "popup", "web_app", "login_url",
-    "switch_inline", "switch_inline_current", "disabled",
+    "switch_inline", "switch_inline_current", "disabled", "page",
 }
+PAGE_CODE_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def normalize_page_code(value: str) -> str | None:
+    code = value.strip()
+    return code if PAGE_CODE_RE.fullmatch(code) else None
 MAX_BUTTONS = 100
 TELEGRAM_USERNAME_RE = re.compile(r"^@[A-Za-z0-9_]{5,32}$")
 BARE_TELEGRAM_USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{5,32}$")
