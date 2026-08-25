@@ -250,7 +250,9 @@ async def _defer_text_for_user_buttons(
     await state.set_state(RichEditorStates.selecting_button_user)
     await state.update_data(
         pending_user_resume=resume,
-        pending_user_message=message.model_dump(mode="json", exclude_none=True),
+        pending_user_message=message.model_dump(
+            mode="json", exclude_none=True, exclude_unset=True,
+        ),
         pending_user_markers=markers,
         pending_user_marker_index=0,
         pending_user_resolutions=[],
