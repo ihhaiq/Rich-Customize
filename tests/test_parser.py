@@ -7,9 +7,44 @@ from app.services.factory import details_data, new_block, table_data
 from app.services.buttons import add_message_button
 from app.services.parser import message_to_blocks
 from app.services.renderer import build_input_rich_message
+from app.services.inline_buttons import (
+    find_user_button_markers, resolve_user_button_marker,
+)
 
 
 class FormattedTextParserTests(unittest.TestCase):
+    def test_inline_url_and_callback_buttons_keep_their_text_position(self):
+        paragraph = new_block("paragraph", {
+            "text": "قبل {الموقع:url https://example.com#p} وسط {نفذ:callback_data action:1#r} بعد",
+            "html": "<p>قبل {الموقع:url https://example.com#p} وسط {نفذ:callback_data action:1#r} بعد</p>",
+        })
+        rich = build_input_rich_message([paragraph]).model_dump(mode="json", exclude_none=True)
+        text = rich["blocks"][0]["text"]
+
+        self.assertEqual(text[0], "قبل ")
+        self.assertEqual(text[1]["type"], "button")
+        self.assertEqual(text[1]["button"]["url"], "https://example.com")
+        self.assertEqual(text[1]["button"]["style"], "primary")
+        self.assertEqual(text[3]["button"]["callback_data"], "action:1")
+        self.assertEqual(text[3]["button"]["style"], "danger")
+        self.assertEqual(text[4], " بعد")
+
+    def test_user_marker_is_resolved_before_rendering(self):
+        marker = "{حساب حسين:user#g}"
+        blocks = [new_block("paragraph", {
+            "text": f"قبل {marker} بعد",
+            "html": f"<p>قبل {marker} بعد</p>",
+        })]
+        markers = find_user_button_markers(blocks[0]["data"]["text"])
+        self.assertEqual(markers[0]["title"], "حساب حسين")
+
+        resolve_user_button_marker(blocks, marker, 123456789)
+        rich = build_input_rich_message(blocks).model_dump(mode="json", exclude_none=True)
+        button = rich["blocks"][0]["text"][1]["button"]
+
+        self.assertEqual(button["url"], "tg://user?id=123456789")
+        self.assertEqual(button["style"], "success")
+
     def test_bot_api_10_3_rich_buttons_are_embedded_as_blocks(self):
         paragraph = new_block("paragraph", {"text": "النص", "html": "<p>النص</p>"})
         buttons = []
@@ -47,17 +82,21 @@ class FormattedTextParserTests(unittest.TestCase):
         self.assertEqual(rich["blocks"][0]["document"]["media"], "document-file-id")
         self.assertEqual(rich["blocks"][0]["caption"]["text"], "التقرير")
 
-    def test_pullquote_media_is_kept_adjacent_to_text_only_pullquote(self):
+    def test_pullquote_media_is_nested_inside_a_block_quotation(self):
         photo = new_block("photo", {"file": {"file_id": "photo-file-id"}})
         pullquote = new_block("pullquote", {
             "quote_text": "النص",
             "quote_html": "النص",
+            "credit_html": "الكاتب",
             "media_children": [photo],
         })
         rich = build_input_rich_message([pullquote]).model_dump(mode="json", exclude_none=True)
 
-        self.assertEqual([block["type"] for block in rich["blocks"]], ["photo", "pullquote"])
-        self.assertEqual(rich["blocks"][1]["text"], "النص")
+        quote = rich["blocks"][0]
+        self.assertEqual(quote["type"], "blockquote")
+        self.assertEqual([block["type"] for block in quote["blocks"]], ["photo", "paragraph"])
+        self.assertEqual(quote["blocks"][1]["text"], "النص")
+        self.assertEqual(quote["credit"], "الكاتب")
 
     def test_single_cell_row_automatically_spans_table_width(self):
         data = table_data("النص\nالخلية | الخلية")

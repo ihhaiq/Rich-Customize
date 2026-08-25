@@ -18,6 +18,7 @@ from aiogram.types import (
 from pydantic import ValidationError
 
 from app.i18n import preserve_user_content, tr
+from app.services.inline_buttons import inline_button_rich_text
 
 logger = logging.getLogger(__name__)
 
@@ -285,8 +286,10 @@ def _html_rich_text(value: Any, fallback: str = "") -> Any:
 
 def _data_rich_text(data: dict[str, Any], rich_key: str, html_key: str, text_key: str) -> Any:
     if data.get(rich_key) not in (None, "", []):
-        return data[rich_key]
-    return _html_rich_text(data.get(html_key), str(data.get(text_key, "")))
+        return inline_button_rich_text(data[rich_key])
+    return inline_button_rich_text(
+        _html_rich_text(data.get(html_key), str(data.get(text_key, ""))),
+    )
 
 
 def _caption_payload(data: dict[str, Any]) -> dict[str, Any] | None:
@@ -349,7 +352,8 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
             for cell in row:
                 source = cell if isinstance(cell, dict) else {"text": str(cell)}
                 payload_row.append({
-                    "text": source.get("text", ""), "align": source.get("align") or "left",
+                    "text": inline_button_rich_text(source.get("text", "")),
+                    "align": source.get("align") or "left",
                     "valign": source.get("valign") or "middle", "is_header": source.get("is_header"),
                     "colspan": source.get("colspan"), "rowspan": source.get("rowspan"),
                 })
@@ -400,20 +404,24 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
 
 
 def _editor_input_blocks(block: dict[str, Any], path: str) -> list[dict[str, Any]]:
-    """Return one API block, or an adjacent media + pullquote sequence.
-
-    Bot API 10.3 still defines PullQuotation as text-only.  The editor accepts
-    media for this UX by keeping the media next to the real pullquote instead
-    of emitting an invalid nested payload.
-    """
+    """Return one API block, converting media pullquotes to block quotations."""
     if block.get("type") != "pullquote":
         return [_editor_input_block(block, path)]
-    attachments = block.get("data", {}).get("media_children") or []
-    payloads: list[dict[str, Any]] = []
+    data = block.get("data", {})
+    attachments = data.get("media_children") or []
+    if not attachments:
+        return [_editor_input_block(block, path)]
+
+    nested: list[dict[str, Any]] = []
     for index, child in enumerate(attachments):
-        payloads.extend(_editor_input_blocks(child, f"{path}.media[{index}]"))
-    payloads.append(_editor_input_block(block, path))
-    return payloads
+        nested.extend(_editor_input_blocks(child, f"{path}.blocks[{index}]"))
+    quote = _data_rich_text(data, "quote_rich_text", "quote_html", "quote_text")
+    if quote not in (None, "", []):
+        nested.append({"type": "paragraph", "text": quote})
+    credit = _data_rich_text(
+        data, "credit_rich_text", "credit_html", "credit_text",
+    ) or None
+    return [{"type": "blockquote", "blocks": nested, "credit": credit}]
 
 
 def _rich_button_payload(button: dict[str, Any]) -> dict[str, Any]:
@@ -520,12 +528,20 @@ def _render_rich_blocks(
             fragments.append(_with_caption(f"<{tag}>{''.join(nested_fragments)}</{tag}>", data))
             continue
         if kind in {"blockquote", "pullquote"}:
-            if kind == "pullquote" and data.get("media_children"):
-                _render_rich_blocks(data["media_children"], fragments, media, f"{block_path}.media")
             quote = data.get("quote_html") or data.get("html") or ""
             credit = data.get("credit_html")
-            tag = "blockquote" if kind == "blockquote" else "aside"
-            fragments.append(f"<{tag}>{quote}{f'<cite>{credit}</cite>' if credit else ''}</{tag}>")
+            if kind == "pullquote" and data.get("media_children"):
+                nested_fragments: list[str] = []
+                _render_rich_blocks(
+                    data["media_children"], nested_fragments, media, f"{block_path}.blocks",
+                )
+                fragments.append(
+                    f"<blockquote>{''.join(nested_fragments)}{quote}"
+                    f"{f'<cite>{credit}</cite>' if credit else ''}</blockquote>"
+                )
+            else:
+                tag = "blockquote" if kind == "blockquote" else "aside"
+                fragments.append(f"<{tag}>{quote}{f'<cite>{credit}</cite>' if credit else ''}</{tag}>")
             continue
         if kind == "map":
             if data.get("latitude") is None or data.get("longitude") is None:

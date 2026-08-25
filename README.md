@@ -21,6 +21,31 @@ python main.py
 
 أرسل `/editor` للبوت، ثم أرسل Rich Message أو نصًا أو ملف وسائط أو Album.
 
+### أزرار داخل النص
+
+يمكن وضع الزر في أي موضع داخل النص بهذه الصيغة:
+
+```text
+{اسم الزر:النوع القيمة#اللون}
+```
+
+أمثلة:
+
+```text
+قبل الزر {الموقع:url https://example.com#b} وبعده
+{تنفيذ:callback_data action:1#r}
+{نسخ:copy النص المطلوب#g}
+{الملف الشخصي:user#p}
+```
+
+الأنواع المدعومة: `url` (أو `link`)، و`callback_data`، و`copy`، و`web_app`،
+و`login_url`، و`switch_inline_query`، و`switch_inline_query_current_chat`، و`disabled`.
+الألوان: `#r` أحمر، و`#b` أو `#p` أزرق، و`#g` أخضر، ويمكن حذف اللون لاستعمال الافتراضي.
+
+النوع `user` لا يحتاج إلى قيمة. بعد إرسال النص يوقف البوت العملية ويعرض كيبورد اختيار
+مستخدم، ثم يربط الزر بملفه الشخصي ويكمل فتح المحرّر. عند وجود عدة أزرار `user` يطلب
+اختيار مستخدم لكل زر بالتسلسل.
+
 ## ما يدعمه المشروع
 
 - استقبال `Message.rich_message` الحقيقي وتحويل كل Top-Level Rich Block إلى Block مستقل.
@@ -40,8 +65,9 @@ python main.py
   وWeb App وLogin URL وInline Query وزر معطّل، وتخصيص اللون
   (افتراضي/أزرق/أخضر/أحمر/Link للـCallback) والترتيب وعدد الأزرار في الصف.
 - يدعم `InputRichBlockDocument` لإضافة الملفات العامة مع التذييل والمصدر.
-- يقبل محرّر Pullquote الوسائط والملفات ويضعها ملاصقة للاقتباس النصي؛ لأن Bot API 10.3
-  يبقي `InputRichBlockPullQuotation` نفسه نصيًا ولا يسمح ببلوكات داخله.
+- يقبل محرّر Pullquote الوسائط والملفات ويضعها داخل إطار الاقتباس مع النص والكاتب مثل
+  الصورة المرجعية. يُرسل هذا التركيب كـ`InputRichBlockBlockQuotation` ذي Blocks داخلية؛
+  لأن `InputRichBlockPullQuotation` الرسمي نفسه نصي فقط.
 - زر `📝 إنشاء منشور` بجانب النتيجة يعرض القنوات والمجموعات المسجلة التي يكون فيها المستخدم
   والبوت مشرفين، ويولد روابط Telegram رسمية لإضافة البوت عند عدم وجود محادثات.
 - عند وصول البوت إلى قناة أو مجموعة يرسل إشعارًا في الخاص، ثم يتيح إرسال المنشور بصمت
@@ -59,6 +85,7 @@ python main.py
 - `app/services/parser.py`: تحويل رسائل Telegram إلى Blocks وتحديث بيانات Block.
 - `app/services/blocks.py`: البحث والحذف والنقل وتطبيع المواقع.
 - `app/services/buttons.py`: التحقق من روابط الأزرار وإضافتها وحذفها وإعادة ترتيبها.
+- `app/services/inline_buttons.py`: تحليل أزرار النص وحل أزرار اختيار المستخدم.
 - `app/services/chat_registry.py`: حفظ المحادثات المرتبطة بالمشرف والتحقق منها قبل النشر.
 - `app/services/renderer.py`: إنشاء `InputRichMessage` والمعاينة الاحتياطية.
 - `app/services/factory.py`: إنشاء الأنواع الجديدة وتحويل مدخلات المستخدم إلى بيانات Rich Blocks.
@@ -69,6 +96,7 @@ python main.py
 ## الحالات الجديدة
 
 - `RichEditorStates.waiting_input`
+- `RichEditorStates.selecting_button_user`
 - `RichEditorStates.managing`
 - `RichEditorStates.editing_block`
 - `RichEditorStates.adding_block`

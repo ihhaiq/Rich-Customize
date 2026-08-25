@@ -10,7 +10,10 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
+from aiogram.types import (
+    CallbackQuery, ChatMemberUpdated, KeyboardButton, KeyboardButtonRequestUsers,
+    Message, ReplyKeyboardMarkup, ReplyKeyboardRemove,
+)
 
 from app.keyboards import (
     build_add_block_keyboard, build_block_editor_keyboard, build_block_position_keyboard,
@@ -48,6 +51,9 @@ from app.services.renderer import (
     RichMessageRenderError, send_rich_message_post, send_rich_message_preview,
 )
 from app.services.media_library import SHOWCASE_MEDIA_CHANNEL_ID, showcase_media_library
+from app.services.inline_buttons import (
+    find_user_button_markers, resolve_user_button_marker,
+)
 from app.services.showcase import MEDIA_LABELS, MissingShowcaseMedia, send_all_blocks_showcase
 from app.states import RichEditorStates
 
@@ -135,6 +141,36 @@ async def _prepare_message_buttons(
             button["popup_token"] = token
             await popup_registry.remember(token, get_button_value(button))
     return prepared
+
+
+async def _ask_for_button_user(
+    message: Message,
+    state: FSMContext,
+    marker: dict[str, str | None],
+) -> None:
+    request_id = secrets.randbelow(2_147_483_647) + 1
+    await state.update_data(pending_user_request_id=request_id)
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[[
+            KeyboardButton(
+                text=f"👤 اختيار مستخدم لزر «{marker.get('title') or 'مستخدم'}»",
+                request_users=KeyboardButtonRequestUsers(
+                    request_id=request_id,
+                    max_quantity=1,
+                    request_name=True,
+                    request_username=True,
+                    request_photo=True,
+                ),
+            ),
+        ]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        selective=True,
+    )
+    await message.answer(
+        f"اختر المستخدم الذي سيفتح زر «{marker.get('title') or 'مستخدم'}» ملفه الشخصي:",
+        reply_markup=keyboard,
+    )
 
 
 def _pullquote_media_payload(parsed: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
@@ -460,7 +496,71 @@ async def receive_source(message: Message, state: FSMContext) -> None:
     if not blocks:
         await message.answer("هذا النوع غير مدعوم حاليًا. أرسل نصًا أو وسائط أو Rich Message.")
         return
+    user_markers = find_user_button_markers(message.text)
+    if user_markers:
+        await state.set_state(RichEditorStates.selecting_button_user)
+        await state.update_data(
+            pending_user_blocks=blocks,
+            pending_user_markers=user_markers,
+            pending_user_marker_index=0,
+        )
+        await _ask_for_button_user(message, state, user_markers[0])
+        return
     await _open_editor(message, state, blocks)
+
+
+@router.message(RichEditorStates.selecting_button_user, F.users_shared)
+async def receive_button_user(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    shared = message.users_shared
+    request_id = data.get("pending_user_request_id")
+    blocks = data.get("pending_user_blocks")
+    markers = data.get("pending_user_markers")
+    index = int(data.get("pending_user_marker_index", 0))
+    if (
+        shared is None
+        or shared.request_id != request_id
+        or not shared.users
+        or not isinstance(blocks, list)
+        or not isinstance(markers, list)
+        or not 0 <= index < len(markers)
+    ):
+        await message.answer("اختيار المستخدم لا يخص الزر الحالي. استخدم زر الاختيار الظاهر.")
+        return
+
+    marker = markers[index]
+    resolve_user_button_marker(
+        blocks,
+        str(marker.get("marker", "")),
+        shared.users[0].user_id,
+    )
+    next_index = index + 1
+    if next_index < len(markers):
+        await state.update_data(
+            pending_user_blocks=blocks,
+            pending_user_marker_index=next_index,
+        )
+        await _ask_for_button_user(message, state, markers[next_index])
+        return
+
+    await state.clear()
+    await message.answer(
+        "✅ تم ربط المستخدم بالزر.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await _open_editor(message, state, blocks)
+
+
+@router.message(RichEditorStates.selecting_button_user)
+async def wait_for_button_user(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    markers = data.get("pending_user_markers") or []
+    index = int(data.get("pending_user_marker_index", 0))
+    if 0 <= index < len(markers):
+        await _ask_for_button_user(message, state, markers[index])
+    else:
+        await state.set_state(RichEditorStates.waiting_input)
+        await message.answer("انتهى طلب اختيار المستخدم. أرسل الرسالة مرة أخرى.", reply_markup=ReplyKeyboardRemove())
 
 
 async def _session(callback: CallbackQuery, state: FSMContext) -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
