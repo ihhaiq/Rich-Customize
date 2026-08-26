@@ -80,6 +80,7 @@ BUTTON_SYNTAX_EXAMPLES = """{اسم الزر:url https://example.com#b}
 {الملف الشخصي:user#p}
 {تنفيذ:callback_data action:1#r}
 {الصفحة التالية:cbd a86d3132#b}
+{تنبيه:popup هذا نص التنبيه#r}
 {نسخ:copy النص المطلوب#g}
 {تطبيق:web_app https://example.com/app#b}
 {دخول:login_url https://example.com/login#p}
@@ -215,22 +216,16 @@ def _button_guide_blocks(prompt: str) -> list[dict[str, Any]]:
                     "text": "الصيغة: {اسم الزر:النوع القيمة#اللون}",
                     "html": "<p>الصيغة: {اسم الزر:النوع القيمة#اللون}</p>",
                 }),
-                new_block("preformatted", {
-                    "text": BUTTON_SYNTAX_EXAMPLES,
-                    "html": f"<pre>{BUTTON_SYNTAX_EXAMPLES}</pre>",
+                new_block("blockquote", {
+                    "quote_text": BUTTON_SYNTAX_EXAMPLES,
+                    "quote_html": BUTTON_SYNTAX_EXAMPLES,
+                    "parse_inline_buttons": False,
                 }),
                 new_block("paragraph", {
-                    "text": (
-                        "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون الافتراضي. "
-                        "زر user يعرض كيبورد اختيار مستخدم. cbd يفتح صفحة محفوظة بالكود "
-                        "كرسالة Ephemeral. callback_data مخصص لإجراء برمجي ويحتاج Handler ينفذه. "
-                        "ضع زرين في السطر نفسه حتى يظهرا بجانب بعض."
-                    ),
+                    "text": "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون الافتراضي.",
                     "html": (
-                        "<p>الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون "
-                        "الافتراضي. زر user يعرض كيبورد اختيار مستخدم. cbd يفتح صفحة محفوظة "
-                        "بالكود كرسالة Ephemeral. callback_data مخصص لإجراء برمجي ويحتاج Handler "
-                        "ينفذه. ضع زرين في السطر نفسه حتى يظهرا بجانب بعض.</p>"
+                        "<p>الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز "
+                        "للون الافتراضي.</p>"
                     ),
                 }),
             ],
@@ -1952,6 +1947,12 @@ async def show_popup_button(callback: CallbackQuery) -> None:
         await callback.answer("هذا التنبيه لم يعد متاحاً.", show_alert=True)
         return
     await callback.answer(popup_text[:200], show_alert=True)
+
+
+@router.callback_query(F.data.startswith("r:poptext:"))
+async def show_inline_popup_button(callback: CallbackQuery) -> None:
+    popup_text = callback.data.removeprefix("r:poptext:")
+    await callback.answer(popup_text, show_alert=True)
 
 
 @router.message(RichEditorStates.editing_button)

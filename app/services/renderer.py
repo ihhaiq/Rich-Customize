@@ -286,10 +286,12 @@ def _html_rich_text(value: Any, fallback: str = "") -> Any:
 
 def _data_rich_text(data: dict[str, Any], rich_key: str, html_key: str, text_key: str) -> Any:
     if data.get(rich_key) not in (None, "", []):
-        return inline_button_rich_text(data[rich_key])
-    return inline_button_rich_text(
-        _html_rich_text(data.get(html_key), str(data.get(text_key, ""))),
-    )
+        value = data[rich_key]
+    else:
+        value = _html_rich_text(data.get(html_key), str(data.get(text_key, "")))
+    if data.get("parse_inline_buttons", True) is False:
+        return value
+    return inline_button_rich_text(value)
 
 
 def _caption_payload(data: dict[str, Any]) -> dict[str, Any] | None:

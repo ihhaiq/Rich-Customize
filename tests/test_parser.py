@@ -23,12 +23,16 @@ class FormattedTextParserTests(unittest.TestCase):
         details = rich["blocks"][1]
         self.assertEqual(details["type"], "details")
         self.assertIn("دليل الأزرار", details["summary"])
-        self.assertEqual(details["blocks"][1]["type"], "pre")
-        self.assertIn("{الملف الشخصي:user#p}", details["blocks"][1]["text"])
-        self.assertIn("{تنفيذ:callback_data action:1#r}", details["blocks"][1]["text"])
-        self.assertIn("{الصفحة التالية:cbd a86d3132#b}", details["blocks"][1]["text"])
-        self.assertIn("Ephemeral", details["blocks"][2]["text"])
-        self.assertIn("بجانب بعض", details["blocks"][2]["text"])
+        examples = details["blocks"][1]
+        self.assertEqual(examples["type"], "blockquote")
+        self.assertIn("{الملف الشخصي:user#p}", examples["blocks"][0]["text"])
+        self.assertIn("{تنفيذ:callback_data action:1#r}", examples["blocks"][0]["text"])
+        self.assertIn("{الصفحة التالية:cbd a86d3132#b}", examples["blocks"][0]["text"])
+        self.assertIn("{تنبيه:popup هذا نص التنبيه#r}", examples["blocks"][0]["text"])
+        self.assertEqual(
+            details["blocks"][2]["text"],
+            "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون الافتراضي.",
+        )
 
     def test_inline_url_and_callback_buttons_keep_their_text_position(self):
         paragraph = new_block("paragraph", {
@@ -45,6 +49,20 @@ class FormattedTextParserTests(unittest.TestCase):
         self.assertEqual(text[3]["button"]["callback_data"], "action:1")
         self.assertEqual(text[3]["button"]["style"], "danger")
         self.assertEqual(text[4], " بعد")
+
+    def test_inline_popup_button_uses_the_builtin_alert_handler(self):
+        paragraph = new_block("paragraph", {
+            "text": "{تنبيه:popup هذا نص التنبيه#r}",
+            "html": "<p>{تنبيه:popup هذا نص التنبيه#r}</p>",
+        })
+
+        rich = build_input_rich_message([paragraph]).model_dump(
+            mode="json", exclude_none=True,
+        )
+        button = rich["blocks"][0]["text"]["button"]
+
+        self.assertEqual(button["callback_data"], "r:poptext:هذا نص التنبيه")
+        self.assertEqual(button["style"], "danger")
 
     def test_invalid_short_http_host_is_treated_as_telegram_username(self):
         paragraph = new_block("paragraph", {

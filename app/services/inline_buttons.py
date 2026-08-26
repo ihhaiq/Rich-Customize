@@ -122,9 +122,10 @@ def _button_payload(title: str, button_type: str, value: str, color: str | None)
             return None
         button["copy_text"] = {"text": value}
     elif button_type == "popup":
-        if not 1 <= len(value.encode("utf-8")) <= 64:
+        callback_data = f"r:poptext:{value}"
+        if not value or len(callback_data.encode("utf-8")) > 64:
             return None
-        button["callback_data"] = value
+        button["callback_data"] = callback_data
     elif button_type == "web_app":
         if not value.startswith("https://"):
             return None
