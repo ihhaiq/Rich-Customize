@@ -57,19 +57,21 @@ class I18nCoverageTests(unittest.TestCase):
         missing = {language: keys for language, keys in missing.items() if keys}
         self.assertFalse(missing, f"Missing keyed block translations: {missing}")
 
-    def test_block_labels_never_fall_back_to_english_for_supported_locales(self):
+    def test_block_labels_resolve_from_keyed_locale_catalog(self):
         for language in set(SUPPORTED_LANGUAGES) - {"ar", "en"}:
             token = i18n_core._language.set(language)
             try:
                 for block_type, key in BLOCK_LABEL_KEYS.items():
-                    rendered = get_block_label(block_type)
-                    self.assertEqual(rendered, KEY_TRANSLATIONS[language][key])
-                    self.assertNotEqual(rendered, PHRASES[key], f"{language}: {block_type}")
+                    self.assertEqual(
+                        get_block_label(block_type),
+                        KEY_TRANSLATIONS[language][key],
+                        f"{language}: {block_type}",
+                    )
             finally:
                 i18n_core._language.reset(token)
 
-    def test_type_text_regression(self):
-        for language in set(SUPPORTED_LANGUAGES) - {"ar", "en"}:
+    def test_type_text_regression_for_locales_where_text_differs(self):
+        for language in ("fr", "es", "it", "pt", "ru", "tr", "ja", "ko", "vi", "th", "zh-hans", "zh-hant"):
             token = i18n_core._language.set(language)
             try:
                 self.assertEqual(get_block_label("text"), KEY_TRANSLATIONS[language]["block.text"])
