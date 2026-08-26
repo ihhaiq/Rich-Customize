@@ -1,37 +1,70 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Iterator, Mapping
 from typing import Any
 
+from app.i18n import t
 
-BLOCK_LABELS = {
-    "text": "📝 نص",
-    "paragraph": "📝 فقرة",
-    "heading": "🔠 عنوان قسم",
-    "preformatted": "💻 نص برمجي",
-    "footer": "🔻 تذييل",
-    "caption": "💬 وصف",
-    "photo": "🖼 صورة",
-    "video": "🎬 فيديو",
-    "animation": "🎞 GIF",
-    "audio": "🎵 صوت",
-    "voice": "🎙 بصمة صوتية",
-    "document": "📄 ملف",
-    "sticker": "🏷 ملصق",
-    "video_note": "⭕ فيديو دائري",
-    "divider": "➖ فاصل",
-    "list": "📋 قائمة",
-    "table": "▦ جدول",
-    "blockquote": "❝ اقتباس",
-    "pullquote": "💬 اقتباس بارز",
-    "details": "📂 تفاصيل",
-    "mathematical_expression": "∑ معادلة",
-    "anchor": "⚓ مرساة",
-    "collage": "🖼 كولاج",
-    "slideshow": "🎞 عرض شرائح",
-    "map": "🗺 خريطة",
-    "buttons": "🔘 أزرار غنية",
+
+BLOCK_LABEL_KEYS: dict[str, str] = {
+    "text": "block.text",
+    "paragraph": "block.paragraph",
+    "heading": "block.heading",
+    "preformatted": "block.preformatted",
+    "footer": "block.footer",
+    "caption": "block.caption",
+    "photo": "block.photo",
+    "video": "block.video",
+    "animation": "block.animation",
+    "audio": "block.audio",
+    "voice": "block.voice",
+    "document": "block.document",
+    "sticker": "block.sticker",
+    "video_note": "block.video_note",
+    "divider": "block.divider",
+    "list": "block.list",
+    "table": "block.table",
+    "blockquote": "block.blockquote",
+    "pullquote": "block.pullquote",
+    "details": "block.details",
+    "mathematical_expression": "block.mathematical_expression",
+    "anchor": "block.anchor",
+    "collage": "block.collage",
+    "slideshow": "block.slideshow",
+    "map": "block.map",
+    "buttons": "block.buttons",
 }
+
+
+class _LocalizedBlockLabels(Mapping[str, str]):
+    """Backward-compatible mapping whose values follow the active locale.
+
+    Existing callers can keep using ``BLOCK_LABELS.get(...)`` while all label
+    data is now keyed centrally. This removes the old static Arabic dictionary
+    without forcing every router to change in the same commit.
+    """
+
+    def __getitem__(self, block_type: str) -> str:
+        return t(BLOCK_LABEL_KEYS[block_type])
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(BLOCK_LABEL_KEYS)
+
+    def __len__(self) -> int:
+        return len(BLOCK_LABEL_KEYS)
+
+    def get(self, block_type: str, default: str | None = None) -> str | None:
+        key = BLOCK_LABEL_KEYS.get(block_type)
+        return t(key) if key else default
+
+
+BLOCK_LABELS: Mapping[str, str] = _LocalizedBlockLabels()
+
+
+def get_block_label(block_type: str) -> str:
+    key = BLOCK_LABEL_KEYS.get(block_type)
+    return t(key) if key else t("block.content")
 
 
 def normalize_block_positions(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -157,4 +190,4 @@ def set_all_table_cells_style(
 
 
 def get_block_button_text(block: dict[str, Any], index: int) -> str:
-    return f"{BLOCK_LABELS.get(block.get('type', ''), '📦 محتوى')} #{index + 1}"
+    return f"{get_block_label(str(block.get('type', '')))} #{index + 1}"
