@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.locales.asia import PROFILES as ASIA_PROFILES, TRANSLATIONS as ASIA_TRANSLATIONS
+from app.locales.guide import GUIDE_TRANSLATIONS
 from app.locales.regional import PROFILES as REGIONAL_PROFILES, TRANSLATIONS as REGIONAL_TRANSLATIONS
 from app.locales.western import PROFILES as WESTERN_PROFILES, TRANSLATIONS as WESTERN_TRANSLATIONS
 from app.translations_zh import ZH_HANS, ZH_HANT
@@ -12,6 +13,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     "zh-hans": ZH_HANS,
     "zh-hant": ZH_HANT,
 }
+
+for language_code, overrides in GUIDE_TRANSLATIONS.items():
+    TRANSLATIONS.setdefault(language_code, {}).update(overrides)
 
 PROFILES = {
     **WESTERN_PROFILES,
