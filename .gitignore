@@ -6,3 +6,5 @@ __pycache__/
 data/managed_chats.json
 data/bot_profile_state_*.json
 data/showcase_media.json
+data/rich_pages.json
+data/guest_messages.json

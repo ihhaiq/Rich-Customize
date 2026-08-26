@@ -103,6 +103,8 @@ python main.py
 - `app/services/inline_buttons.py`: تحليل أزرار النص وحل أزرار اختيار المستخدم.
 - `app/services/chat_registry.py`: حفظ المحادثات المرتبطة بالمشرف والتحقق منها قبل النشر.
 - `app/services/page_registry.py`: حفظ الصفحات المسماة وأكواد استدعائها وروابط التنقل بينها.
+- `app/services/guest_message_registry.py`: ربط رسالة Guest المؤقتة بالمحادثة حتى تعمل
+  أزرار الصفحات كـEphemeral بعد وصول Callback الذي يحتوي `inline_message_id` فقط.
 - `app/services/renderer.py`: إنشاء `InputRichMessage` والمعاينة الاحتياطية.
 - `app/services/factory.py`: إنشاء الأنواع الجديدة وتحويل مدخلات المستخدم إلى بيانات Rich Blocks.
 - `app/services/albums.py`: تجميع الألبومات بصورة متزامنة وآمنة.
@@ -124,6 +126,8 @@ python main.py
 لا توجد Migration. جلسة التحرير الحالية مؤقتة في `MemoryStorage` وتُفقد عند إعادة التشغيل،
 لكن الصفحات المحفوظة تبقى افتراضيًا في `data/rich_pages.json`. يمكن تغيير مسارها بمتغير
 البيئة `RICH_PAGES_STATE`. للإنتاج متعدد النسخ استبدل `MemoryStorage` وملف JSON بمخزن مشترك.
+يُحفظ ربط رسائل Guest افتراضيًا في `data/guest_messages.json`، ويمكن تغيير مساره بمتغير
+البيئة `GUEST_MESSAGES_STATE`.
 
 ### خطأ `BOT_DOMAIN_INVALID`
 

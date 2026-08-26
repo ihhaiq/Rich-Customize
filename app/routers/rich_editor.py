@@ -43,6 +43,7 @@ from app.services.buttons import (
     normalize_https_url, normalize_page_code,
 )
 from app.services.chat_registry import managed_chat_registry
+from app.services.guest_message_registry import guest_message_registry
 from app.services.page_registry import page_registry
 from app.services.factory import (
     FINAL_RICH_BLOCK_TYPES, MEDIA_CAPTION_TYPES, QUOTE_TYPES, container_data,
@@ -570,9 +571,14 @@ async def summon_saved_rich_page(message: Message, bot: Bot) -> None:
                     break
         if result is None:
             return
-        await bot.answer_guest_query(
+        sent = await bot.answer_guest_query(
             guest_query_id=message.guest_query_id,
             result=result,
+        )
+        await guest_message_registry.remember(
+            sent.inline_message_id,
+            message.chat.id,
+            _chat_type_value(message.chat),
         )
     except (RichMessageRenderError, TelegramAPIError, ValueError):
         logger.exception("Failed to answer guest query with a saved rich page")
@@ -2674,12 +2680,24 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("r:page:"))
 async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
-    if not isinstance(callback.message, Message):
-        await callback.answer(
-            "التنقل الخاص بالصفحات يحتاج رسالة Guest أو رسالة أرسلها البوت داخل المحادثة.",
-            show_alert=True,
-        )
+    callback_message = callback.message if isinstance(callback.message, Message) else None
+    guest_context = (
+        await guest_message_registry.get(callback.inline_message_id or "")
+        if callback_message is None else None
+    )
+    if callback_message is None and guest_context is None:
+        await callback.answer("تعذر تحديد محادثة رسالة Guest.", show_alert=True)
         return
+    chat_id = (
+        callback_message.chat.id
+        if callback_message is not None
+        else int(guest_context["chat_id"])
+    )
+    chat_type = (
+        _chat_type_value(callback_message.chat)
+        if callback_message is not None
+        else str(guest_context.get("chat_type", ""))
+    )
     parts = callback.data.split(":")
     target_id = parts[2] if len(parts) > 2 else ""
     source_id = parts[3] if len(parts) > 3 and parts[3] else None
@@ -2703,17 +2721,19 @@ async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
             buttons_align=str(page.get("buttons_align", "center")),
             source_page_id=target_id,
         )
-        ephemeral_message_id = callback.message.ephemeral_message_id
+        ephemeral_message_id = (
+            callback_message.ephemeral_message_id if callback_message is not None else None
+        )
         if ephemeral_message_id:
             await bot.edit_ephemeral_message_text(
-                chat_id=callback.message.chat.id,
+                chat_id=chat_id,
                 receiver_user_id=callback.from_user.id,
                 ephemeral_message_id=ephemeral_message_id,
                 rich_message=rich_message,
             )
-        elif _chat_type_value(callback.message.chat) in {"group", "supergroup"}:
+        elif chat_type in {"group", "supergroup"}:
             await bot.send_rich_message(
-                chat_id=callback.message.chat.id,
+                chat_id=chat_id,
                 rich_message=rich_message,
                 ephemeral_message_parameters=EphemeralMessageParameters(
                     receiver_user_id=callback.from_user.id,
@@ -2729,7 +2749,7 @@ async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
                 chat_id=callback.from_user.id,
                 rich_message=rich_message,
             )
-            if _chat_type_value(callback.message.chat) == "channel":
+            if chat_type == "channel":
                 callback_notice = "فتحت الصفحة في الخاص؛ Ephemeral غير مدعوم بالقنوات."
     except (RichMessageRenderError, TelegramAPIError, ValueError) as error:
         logger.exception(
