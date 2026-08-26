@@ -29,6 +29,8 @@ class FormattedTextParserTests(unittest.TestCase):
         self.assertIn("{تنفيذ:callback_data action:1#r}", examples["blocks"][0]["text"])
         self.assertIn("{الصفحة التالية:cbd a86d3132#b}", examples["blocks"][0]["text"])
         self.assertIn("{تنبيه:popup هذا نص التنبيه#r}", examples["blocks"][0]["text"])
+        self.assertNotIn("web_app", examples["blocks"][0]["text"])
+        self.assertNotIn("login_url", examples["blocks"][0]["text"])
         self.assertEqual(
             details["blocks"][2]["text"],
             "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون الافتراضي.",

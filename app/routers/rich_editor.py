@@ -82,8 +82,6 @@ BUTTON_SYNTAX_EXAMPLES = """{اسم الزر:url https://example.com#b}
 {الصفحة التالية:cbd a86d3132#b}
 {تنبيه:popup هذا نص التنبيه#r}
 {نسخ:copy النص المطلوب#g}
-{تطبيق:web_app https://example.com/app#b}
-{دخول:login_url https://example.com/login#p}
 {بحث:switch_inline_query كلمة البحث}
 {بحث هنا:switch_inline_query_current_chat كلمة البحث}
 {معطّل:disabled#r}
