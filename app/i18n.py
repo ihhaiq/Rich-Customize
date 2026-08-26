@@ -18,6 +18,7 @@ EN.update({
     "جاري إنشاء معاينة الجزء…": "Generating block preview…",
     "تعذرت معاينة هذا الجزء.": "Couldn't preview this block.",
     "تعذرت معاينة هذا الجزء وحده.": "Couldn't preview this block by itself.",
+    "📚 صفحاتي": "📚 My Pages",
 })
 
 preserve_user_content = _core.preserve_user_content
