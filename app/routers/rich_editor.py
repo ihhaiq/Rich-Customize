@@ -79,6 +79,7 @@ PULLQUOTE_MEDIA_TYPES = {"photo", "video", "animation", "audio", "voice", "docum
 BUTTON_SYNTAX_EXAMPLES = """{اسم الزر:url https://example.com#b}
 {الملف الشخصي:user#p}
 {تنفيذ:callback_data action:1#r}
+{الصفحة التالية:cbd a86d3132#b}
 {نسخ:copy النص المطلوب#g}
 {تطبيق:web_app https://example.com/app#b}
 {دخول:login_url https://example.com/login#p}
@@ -1497,13 +1498,13 @@ async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> 
         pages = await page_registry.list_for_user(callback.from_user.id)
         if not pages:
             await callback.answer(
-                "احفظ صفحة أولاً، بعدها تقدر تربطها بهذا الزر.", show_alert=True,
+            "احفظ صفحة أولاً، بعدها تقدر تربطها بزر CBD.", show_alert=True,
             )
             return
         await state.update_data(pending_button_type="page")
         await _edit_ui(
             callback.message,
-            "اختر الصفحة التي يفتحها الزر كرسالة Ephemeral خاصة بالضاغط:",
+            "اختر الصفحة التي يفتحها زر CBD كرسالة Ephemeral خاصة بالضاغط:",
             build_page_target_keyboard(pages, "add"),
         )
         await callback.answer()
@@ -2622,7 +2623,8 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
         else "✅ تم حفظ الصفحة.\n\nالكود: "
     )
     await message.answer(
-        f"{prefix}{code}\n\nمن نوع الزر «ربط بصفحة» اختَر الصفحة بالاسم؛ ما تحتاج تنسخ الكود."
+        f"{prefix}{code}\n\nتقدر تستعمله داخل النص هكذا:\n"
+        f"{{التالي:cbd {code}#b}}\n\nأو اختَر «CBD — فتح صفحة» من قائمة الأزرار."
     )
     await _edit_saved_ui(
         bot,

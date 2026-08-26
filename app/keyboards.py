@@ -197,7 +197,7 @@ def build_button_type_keyboard(callback_prefix: str = "r:bat") -> InlineKeyboard
             InlineKeyboardButton(text="💬 Inline هنا", callback_data=f"{callback_prefix}:switch_inline_current"),
         ],
         [InlineKeyboardButton(text="🚫 زر معطّل", callback_data=f"{callback_prefix}:disabled")],
-        [InlineKeyboardButton(text="📄 ربط بصفحة", callback_data=f"{callback_prefix}:page")],
+        [InlineKeyboardButton(text="⚡ CBD — فتح صفحة", callback_data=f"{callback_prefix}:page")],
         [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:buttons")],
     ])
 

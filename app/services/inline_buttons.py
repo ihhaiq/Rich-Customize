@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from app.services.buttons import normalize_button_url
+from app.services.buttons import normalize_button_url, normalize_page_code
 
 
 MARKER_RE = re.compile(r"\{([^{}\n]+)\}")
@@ -20,6 +20,8 @@ TYPE_ALIASES = {
     "login": "login_url",
     "inline": "switch_inline_query",
     "current": "switch_inline_query_current_chat",
+    "cbd": "page_callback",
+    "page": "page_callback",
 }
 
 
@@ -109,6 +111,12 @@ def _button_payload(title: str, button_type: str, value: str, color: str | None)
         if not 1 <= len(value.encode("utf-8")) <= 64:
             return None
         button["callback_data"] = value
+    elif button_type == "page_callback":
+        page_code = normalize_page_code(value)
+        if page_code is None:
+            return None
+        # The renderer adds the current saved page as navigation source.
+        button["callback_data"] = f"r:cbd:{page_code}"
     elif button_type == "copy":
         if not value or len(value) > 256:
             return None

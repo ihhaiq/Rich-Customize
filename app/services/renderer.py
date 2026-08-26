@@ -485,6 +485,26 @@ def _button_blocks(
     ]
 
 
+def _resolve_inline_page_callbacks(value: Any, source_page_id: str | None) -> Any:
+    """Turn the simple ``cbd`` marker into the internal page callback format."""
+    if isinstance(value, list):
+        return [_resolve_inline_page_callbacks(item, source_page_id) for item in value]
+    if not isinstance(value, dict):
+        return value
+    payload = {
+        key: _resolve_inline_page_callbacks(item, source_page_id)
+        for key, item in value.items()
+    }
+    callback_data = payload.get("callback_data")
+    if isinstance(callback_data, str) and callback_data.startswith("r:cbd:"):
+        target_page_id = callback_data.removeprefix("r:cbd:")
+        payload["callback_data"] = (
+            f"r:page:{target_page_id}:{source_page_id}"
+            if source_page_id else f"r:page:{target_page_id}"
+        )
+    return payload
+
+
 def _typed_input_rich_message(
     blocks: list[dict[str, Any]],
     buttons: list[dict[str, Any]] | None = None,
@@ -510,6 +530,7 @@ def _typed_input_rich_message(
         payloads.extend(
             _button_blocks(buttons, buttons_per_row, buttons_align, source_page_id),
         )
+        payloads = _resolve_inline_page_callbacks(payloads, source_page_id)
         return InputRichMessage(blocks=payloads)
     except ValidationError as error:
         first = error.errors()[0] if error.errors() else {}

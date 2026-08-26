@@ -134,6 +134,24 @@ class FormattedTextParserTests(unittest.TestCase):
             len(rich["blocks"][1]["buttons"][0]["callback_data"].encode()), 64,
         )
 
+    def test_cbd_is_simple_inline_saved_page_navigation(self):
+        paragraph = new_block("paragraph", {
+            "text": "قبل {التالي:cbd a86d3132#g} بعد",
+            "html": "<p>قبل {التالي:cbd a86d3132#g} بعد</p>",
+        })
+
+        rich = build_input_rich_message(
+            [paragraph], source_page_id="c0ffee00",
+        ).model_dump(mode="json", exclude_none=True)
+        button = rich["blocks"][0]["text"][1]["button"]
+
+        self.assertEqual(button["text"], "التالي")
+        self.assertEqual(button["style"], "success")
+        self.assertEqual(
+            button["callback_data"],
+            "r:page:a86d3132:c0ffee00",
+        )
+
     def test_domain_error_explains_botfather_fix(self):
         reason = _friendly_rich_error(ValueError("Bad Request: BOT_DOMAIN_INVALID"))
         self.assertIn("/setdomain", reason)
