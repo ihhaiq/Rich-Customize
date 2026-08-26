@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+
 PHRASES: dict[str, str] = {
     "customize": "Customize message",
     "choose_block": "Choose the block you want to edit:",
@@ -58,6 +59,101 @@ PHRASES: dict[str, str] = {
     "send_video": "Send a video.",
     "send_audio": "Send an audio file.",
     "send_voice": "Send a voice note.",
+
+    # Canonical Rich Block keys. These are deliberately semantic keys rather
+    # than source-language strings so block names can never get stuck midway
+    # in the old Arabic -> English -> locale replacement chain.
+    "block.content": "📦 Content",
+    "block.text": "📝 Text",
+    "block.paragraph": "📝 Paragraph",
+    "block.heading": "🔠 Section heading",
+    "block.preformatted": "💻 Preformatted",
+    "block.footer": "🔻 Footer",
+    "block.caption": "💬 Caption",
+    "block.photo": "🖼 Photo",
+    "block.video": "🎬 Video",
+    "block.animation": "🎞 GIF",
+    "block.audio": "🎵 Audio",
+    "block.voice": "🎙 Voice note",
+    "block.document": "📄 Document",
+    "block.sticker": "🏷 Sticker",
+    "block.video_note": "⭕ Video note",
+    "block.divider": "➖ Divider",
+    "block.list": "📋 List",
+    "block.table": "▦ Table",
+    "block.blockquote": "❝ Blockquote",
+    "block.pullquote": "💬 Pull quote",
+    "block.details": "📂 Details",
+    "block.mathematical_expression": "∑ Formula",
+    "block.anchor": "⚓ Anchor",
+    "block.collage": "🖼 Collage",
+    "block.slideshow": "🎞 Slideshow",
+    "block.map": "🗺 Map",
+    "block.buttons": "🔘 Rich buttons",
+}
+
+
+AR_PHRASES: dict[str, str] = {
+    "block.content": "📦 محتوى",
+    "block.text": "📝 نص",
+    "block.paragraph": "📝 فقرة",
+    "block.heading": "🔠 عنوان قسم",
+    "block.preformatted": "💻 نص برمجي",
+    "block.footer": "🔻 تذييل",
+    "block.caption": "💬 وصف",
+    "block.photo": "🖼 صورة",
+    "block.video": "🎬 فيديو",
+    "block.animation": "🎞 GIF",
+    "block.audio": "🎵 صوت",
+    "block.voice": "🎙 بصمة صوتية",
+    "block.document": "📄 ملف",
+    "block.sticker": "🏷 ملصق",
+    "block.video_note": "⭕ فيديو دائري",
+    "block.divider": "➖ فاصل",
+    "block.list": "📋 قائمة",
+    "block.table": "▦ جدول",
+    "block.blockquote": "❝ اقتباس",
+    "block.pullquote": "💬 اقتباس بارز",
+    "block.details": "📂 تفاصيل",
+    "block.mathematical_expression": "∑ معادلة",
+    "block.anchor": "⚓ مرساة",
+    "block.collage": "🖼 كولاج",
+    "block.slideshow": "🎞 عرض شرائح",
+    "block.map": "🗺 خريطة",
+    "block.buttons": "🔘 أزرار غنية",
+}
+
+
+# Keyed translations for labels that were missing from the legacy locale packs.
+# Keeping these in one place guarantees complete parity for every supported
+# locale and avoids having to duplicate the same semantic keys across files.
+BLOCK_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {"content":"📦 Contenido","text":"📝 Texto","paragraph":"📝 Párrafo","heading":"🔠 Encabezado de sección","preformatted":"💻 Preformateado","footer":"🔻 Pie","caption":"💬 Descripción","photo":"🖼 Foto","video":"🎬 Vídeo","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Nota de voz","document":"📄 Documento","sticker":"🏷 Sticker","video_note":"⭕ Nota de vídeo","divider":"➖ Separador","list":"📋 Lista","table":"▦ Tabla","blockquote":"❝ Cita","pullquote":"💬 Cita destacada","details":"📂 Detalles","mathematical_expression":"∑ Fórmula","anchor":"⚓ Ancla","collage":"🖼 Collage","slideshow":"🎞 Presentación","map":"🗺 Mapa","buttons":"🔘 Botones enriquecidos"},
+    "fr": {"content":"📦 Contenu","text":"📝 Texte","paragraph":"📝 Paragraphe","heading":"🔠 Titre de section","preformatted":"💻 Préformaté","footer":"🔻 Pied de page","caption":"💬 Légende","photo":"🖼 Photo","video":"🎬 Vidéo","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Message vocal","document":"📄 Document","sticker":"🏷 Sticker","video_note":"⭕ Message vidéo","divider":"➖ Séparateur","list":"📋 Liste","table":"▦ Tableau","blockquote":"❝ Citation","pullquote":"💬 Citation mise en avant","details":"📂 Détails","mathematical_expression":"∑ Formule","anchor":"⚓ Ancre","collage":"🖼 Collage","slideshow":"🎞 Diaporama","map":"🗺 Carte","buttons":"🔘 Boutons enrichis"},
+    "de": {"content":"📦 Inhalt","text":"📝 Text","paragraph":"📝 Absatz","heading":"🔠 Abschnittsüberschrift","preformatted":"💻 Vorformatiert","footer":"🔻 Fußzeile","caption":"💬 Beschriftung","photo":"🖼 Foto","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Sprachnachricht","document":"📄 Dokument","sticker":"🏷 Sticker","video_note":"⭕ Videonachricht","divider":"➖ Trennlinie","list":"📋 Liste","table":"▦ Tabelle","blockquote":"❝ Zitat","pullquote":"💬 Hervorgehobenes Zitat","details":"📂 Details","mathematical_expression":"∑ Formel","anchor":"⚓ Anker","collage":"🖼 Collage","slideshow":"🎞 Diashow","map":"🗺 Karte","buttons":"🔘 Rich-Buttons"},
+    "it": {"content":"📦 Contenuto","text":"📝 Testo","paragraph":"📝 Paragrafo","heading":"🔠 Titolo di sezione","preformatted":"💻 Preformattato","footer":"🔻 Piè di pagina","caption":"💬 Didascalia","photo":"🖼 Foto","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Messaggio vocale","document":"📄 Documento","sticker":"🏷 Sticker","video_note":"⭕ Videomessaggio","divider":"➖ Divisore","list":"📋 Elenco","table":"▦ Tabella","blockquote":"❝ Citazione","pullquote":"💬 Citazione in evidenza","details":"📂 Dettagli","mathematical_expression":"∑ Formula","anchor":"⚓ Ancora","collage":"🖼 Collage","slideshow":"🎞 Presentazione","map":"🗺 Mappa","buttons":"🔘 Pulsanti avanzati"},
+    "pt": {"content":"📦 Conteúdo","text":"📝 Texto","paragraph":"📝 Parágrafo","heading":"🔠 Título de seção","preformatted":"💻 Pré-formatado","footer":"🔻 Rodapé","caption":"💬 Legenda","photo":"🖼 Foto","video":"🎬 Vídeo","animation":"🎞 GIF","audio":"🎵 Áudio","voice":"🎙 Mensagem de voz","document":"📄 Documento","sticker":"🏷 Sticker","video_note":"⭕ Mensagem de vídeo","divider":"➖ Divisor","list":"📋 Lista","table":"▦ Tabela","blockquote":"❝ Citação","pullquote":"💬 Citação destacada","details":"📂 Detalhes","mathematical_expression":"∑ Fórmula","anchor":"⚓ Âncora","collage":"🖼 Colagem","slideshow":"🎞 Apresentação","map":"🗺 Mapa","buttons":"🔘 Botões ricos"},
+    "nl": {"content":"📦 Inhoud","text":"📝 Tekst","paragraph":"📝 Alinea","heading":"🔠 Sectiekop","preformatted":"💻 Vooraf opgemaakt","footer":"🔻 Voettekst","caption":"💬 Bijschrift","photo":"🖼 Foto","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Spraakbericht","document":"📄 Document","sticker":"🏷 Sticker","video_note":"⭕ Videobericht","divider":"➖ Scheiding","list":"📋 Lijst","table":"▦ Tabel","blockquote":"❝ Citaat","pullquote":"💬 Uitgelicht citaat","details":"📂 Details","mathematical_expression":"∑ Formule","anchor":"⚓ Anker","collage":"🖼 Collage","slideshow":"🎞 Diavoorstelling","map":"🗺 Kaart","buttons":"🔘 Rich-knoppen"},
+    "pl": {"content":"📦 Treść","text":"📝 Tekst","paragraph":"📝 Akapit","heading":"🔠 Nagłówek sekcji","preformatted":"💻 Tekst preformatowany","footer":"🔻 Stopka","caption":"💬 Podpis","photo":"🖼 Zdjęcie","video":"🎬 Wideo","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Wiadomość głosowa","document":"📄 Dokument","sticker":"🏷 Naklejka","video_note":"⭕ Wiadomość wideo","divider":"➖ Separator","list":"📋 Lista","table":"▦ Tabela","blockquote":"❝ Cytat","pullquote":"💬 Wyróżniony cytat","details":"📂 Szczegóły","mathematical_expression":"∑ Wzór","anchor":"⚓ Kotwica","collage":"🖼 Kolaż","slideshow":"🎞 Pokaz slajdów","map":"🗺 Mapa","buttons":"🔘 Przyciski Rich"},
+    "uk": {"content":"📦 Вміст","text":"📝 Текст","paragraph":"📝 Абзац","heading":"🔠 Заголовок розділу","preformatted":"💻 Форматований текст","footer":"🔻 Нижній колонтитул","caption":"💬 Підпис","photo":"🖼 Фото","video":"🎬 Відео","animation":"🎞 GIF","audio":"🎵 Аудіо","voice":"🎙 Голосове повідомлення","document":"📄 Документ","sticker":"🏷 Стікер","video_note":"⭕ Відеоповідомлення","divider":"➖ Роздільник","list":"📋 Список","table":"▦ Таблиця","blockquote":"❝ Цитата","pullquote":"💬 Виділена цитата","details":"📂 Деталі","mathematical_expression":"∑ Формула","anchor":"⚓ Якір","collage":"🖼 Колаж","slideshow":"🎞 Слайд-шоу","map":"🗺 Мапа","buttons":"🔘 Rich-кнопки"},
+    "ru": {"content":"📦 Содержимое","text":"📝 Текст","paragraph":"📝 Абзац","heading":"🔠 Заголовок раздела","preformatted":"💻 Форматированный текст","footer":"🔻 Подвал","caption":"💬 Подпись","photo":"🖼 Фото","video":"🎬 Видео","animation":"🎞 GIF","audio":"🎵 Аудио","voice":"🎙 Голосовое сообщение","document":"📄 Документ","sticker":"🏷 Стикер","video_note":"⭕ Видеосообщение","divider":"➖ Разделитель","list":"📋 Список","table":"▦ Таблица","blockquote":"❝ Цитата","pullquote":"💬 Выделенная цитата","details":"📂 Детали","mathematical_expression":"∑ Формула","anchor":"⚓ Якорь","collage":"🖼 Коллаж","slideshow":"🎞 Слайд-шоу","map":"🗺 Карта","buttons":"🔘 Rich-кнопки"},
+    "tr": {"content":"📦 İçerik","text":"📝 Metin","paragraph":"📝 Paragraf","heading":"🔠 Bölüm başlığı","preformatted":"💻 Ön biçimli metin","footer":"🔻 Alt bilgi","caption":"💬 Açıklama","photo":"🖼 Fotoğraf","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Ses","voice":"🎙 Sesli mesaj","document":"📄 Belge","sticker":"🏷 Çıkartma","video_note":"⭕ Video mesajı","divider":"➖ Ayırıcı","list":"📋 Liste","table":"▦ Tablo","blockquote":"❝ Alıntı","pullquote":"💬 Vurgulu alıntı","details":"📂 Detaylar","mathematical_expression":"∑ Formül","anchor":"⚓ Çapa","collage":"🖼 Kolaj","slideshow":"🎞 Slayt gösterisi","map":"🗺 Harita","buttons":"🔘 Zengin düğmeler"},
+    "fa": {"content":"📦 محتوا","text":"📝 متن","paragraph":"📝 پاراگراف","heading":"🔠 عنوان بخش","preformatted":"💻 متن قالب‌بندی‌شده","footer":"🔻 پاورقی","caption":"💬 توضیح","photo":"🖼 عکس","video":"🎬 ویدیو","animation":"🎞 GIF","audio":"🎵 صدا","voice":"🎙 پیام صوتی","document":"📄 فایل","sticker":"🏷 استیکر","video_note":"⭕ پیام ویدیویی","divider":"➖ جداکننده","list":"📋 فهرست","table":"▦ جدول","blockquote":"❝ نقل‌قول","pullquote":"💬 نقل‌قول برجسته","details":"📂 جزئیات","mathematical_expression":"∑ فرمول","anchor":"⚓ لنگر","collage":"🖼 کلاژ","slideshow":"🎞 نمایش اسلاید","map":"🗺 نقشه","buttons":"🔘 دکمه‌های غنی"},
+    "ku": {"content":"📦 Naverok","text":"📝 Nivîs","paragraph":"📝 Paragraf","heading":"🔠 Sernavê beşê","preformatted":"💻 Nivîsa pêş-formatkirî","footer":"🔻 Binpê","caption":"💬 Şirove","photo":"🖼 Wêne","video":"🎬 Vîdyo","animation":"🎞 GIF","audio":"🎵 Deng","voice":"🎙 Peyama dengî","document":"📄 Belge","sticker":"🏷 Sticker","video_note":"⭕ Peyama vîdyoyî","divider":"➖ Dabeşker","list":"📋 Lîste","table":"▦ Tablo","blockquote":"❝ Vegotin","pullquote":"💬 Vegotina derketî","details":"📂 Hûragahî","mathematical_expression":"∑ Formul","anchor":"⚓ Lenger","collage":"🖼 Kolaj","slideshow":"🎞 Pêşandan","map":"🗺 Nexşe","buttons":"🔘 Bişkokên dewlemend"},
+    "ur": {"content":"📦 مواد","text":"📝 متن","paragraph":"📝 پیراگراف","heading":"🔠 حصے کی سرخی","preformatted":"💻 پہلے سے فارمیٹ شدہ متن","footer":"🔻 فٹر","caption":"💬 کیپشن","photo":"🖼 تصویر","video":"🎬 ویڈیو","animation":"🎞 GIF","audio":"🎵 آڈیو","voice":"🎙 صوتی پیغام","document":"📄 دستاویز","sticker":"🏷 اسٹیکر","video_note":"⭕ ویڈیو پیغام","divider":"➖ جداکار","list":"📋 فہرست","table":"▦ جدول","blockquote":"❝ اقتباس","pullquote":"💬 نمایاں اقتباس","details":"📂 تفصیلات","mathematical_expression":"∑ فارمولا","anchor":"⚓ اینکر","collage":"🖼 کولاج","slideshow":"🎞 سلائیڈ شو","map":"🗺 نقشہ","buttons":"🔘 رِچ بٹن"},
+    "hi": {"content":"📦 सामग्री","text":"📝 टेक्स्ट","paragraph":"📝 अनुच्छेद","heading":"🔠 सेक्शन शीर्षक","preformatted":"💻 पूर्व-स्वरूपित टेक्स्ट","footer":"🔻 फ़ुटर","caption":"💬 कैप्शन","photo":"🖼 फ़ोटो","video":"🎬 वीडियो","animation":"🎞 GIF","audio":"🎵 ऑडियो","voice":"🎙 वॉइस नोट","document":"📄 दस्तावेज़","sticker":"🏷 स्टिकर","video_note":"⭕ वीडियो संदेश","divider":"➖ विभाजक","list":"📋 सूची","table":"▦ तालिका","blockquote":"❝ उद्धरण","pullquote":"💬 प्रमुख उद्धरण","details":"📂 विवरण","mathematical_expression":"∑ सूत्र","anchor":"⚓ एंकर","collage":"🖼 कोलाज","slideshow":"🎞 स्लाइडशो","map":"🗺 मानचित्र","buttons":"🔘 रिच बटन"},
+    "id": {"content":"📦 Konten","text":"📝 Teks","paragraph":"📝 Paragraf","heading":"🔠 Judul bagian","preformatted":"💻 Teks terformat","footer":"🔻 Footer","caption":"💬 Keterangan","photo":"🖼 Foto","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Pesan suara","document":"📄 Dokumen","sticker":"🏷 Stiker","video_note":"⭕ Pesan video","divider":"➖ Pemisah","list":"📋 Daftar","table":"▦ Tabel","blockquote":"❝ Kutipan","pullquote":"💬 Kutipan sorotan","details":"📂 Detail","mathematical_expression":"∑ Rumus","anchor":"⚓ Jangkar","collage":"🖼 Kolase","slideshow":"🎞 Tayangan slide","map":"🗺 Peta","buttons":"🔘 Tombol kaya"},
+    "ja": {"content":"📦 コンテンツ","text":"📝 テキスト","paragraph":"📝 段落","heading":"🔠 セクション見出し","preformatted":"💻 整形済みテキスト","footer":"🔻 フッター","caption":"💬 キャプション","photo":"🖼 写真","video":"🎬 動画","animation":"🎞 GIF","audio":"🎵 音声","voice":"🎙 ボイスメッセージ","document":"📄 ドキュメント","sticker":"🏷 ステッカー","video_note":"⭕ ビデオメッセージ","divider":"➖ 区切り","list":"📋 リスト","table":"▦ 表","blockquote":"❝ 引用","pullquote":"💬 強調引用","details":"📂 詳細","mathematical_expression":"∑ 数式","anchor":"⚓ アンカー","collage":"🖼 コラージュ","slideshow":"🎞 スライドショー","map":"🗺 地図","buttons":"🔘 リッチボタン"},
+    "ko": {"content":"📦 콘텐츠","text":"📝 텍스트","paragraph":"📝 문단","heading":"🔠 섹션 제목","preformatted":"💻 서식 지정 텍스트","footer":"🔻 바닥글","caption":"💬 캡션","photo":"🖼 사진","video":"🎬 동영상","animation":"🎞 GIF","audio":"🎵 오디오","voice":"🎙 음성 메시지","document":"📄 문서","sticker":"🏷 스티커","video_note":"⭕ 비디오 메시지","divider":"➖ 구분선","list":"📋 목록","table":"▦ 표","blockquote":"❝ 인용","pullquote":"💬 강조 인용","details":"📂 세부정보","mathematical_expression":"∑ 수식","anchor":"⚓ 앵커","collage":"🖼 콜라주","slideshow":"🎞 슬라이드쇼","map":"🗺 지도","buttons":"🔘 리치 버튼"},
+    "vi": {"content":"📦 Nội dung","text":"📝 Văn bản","paragraph":"📝 Đoạn văn","heading":"🔠 Tiêu đề phần","preformatted":"💻 Văn bản định dạng sẵn","footer":"🔻 Chân trang","caption":"💬 Chú thích","photo":"🖼 Ảnh","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Âm thanh","voice":"🎙 Tin nhắn thoại","document":"📄 Tài liệu","sticker":"🏷 Nhãn dán","video_note":"⭕ Tin nhắn video","divider":"➖ Dấu phân cách","list":"📋 Danh sách","table":"▦ Bảng","blockquote":"❝ Trích dẫn","pullquote":"💬 Trích dẫn nổi bật","details":"📂 Chi tiết","mathematical_expression":"∑ Công thức","anchor":"⚓ Neo","collage":"🖼 Ảnh ghép","slideshow":"🎞 Trình chiếu","map":"🗺 Bản đồ","buttons":"🔘 Nút phong phú"},
+    "th": {"content":"📦 เนื้อหา","text":"📝 ข้อความ","paragraph":"📝 ย่อหน้า","heading":"🔠 หัวข้อส่วน","preformatted":"💻 ข้อความจัดรูปแบบ","footer":"🔻 ส่วนท้าย","caption":"💬 คำอธิบาย","photo":"🖼 รูปภาพ","video":"🎬 วิดีโอ","animation":"🎞 GIF","audio":"🎵 เสียง","voice":"🎙 ข้อความเสียง","document":"📄 เอกสาร","sticker":"🏷 สติกเกอร์","video_note":"⭕ ข้อความวิดีโอ","divider":"➖ ตัวแบ่ง","list":"📋 รายการ","table":"▦ ตาราง","blockquote":"❝ คำอ้างอิง","pullquote":"💬 คำอ้างอิงเด่น","details":"📂 รายละเอียด","mathematical_expression":"∑ สูตร","anchor":"⚓ จุดยึด","collage":"🖼 ภาพตัดปะ","slideshow":"🎞 สไลด์โชว์","map":"🗺 แผนที่","buttons":"🔘 ปุ่ม Rich"},
+    "zh-hans": {"content":"📦 内容","text":"📝 文本","paragraph":"📝 段落","heading":"🔠 章节标题","preformatted":"💻 预格式化","footer":"🔻 页脚","caption":"💬 说明","photo":"🖼 照片","video":"🎬 视频","animation":"🎞 GIF","audio":"🎵 音频","voice":"🎙 语音消息","document":"📄 文件","sticker":"🏷 贴纸","video_note":"⭕ 视频消息","divider":"➖ 分隔线","list":"📋 列表","table":"▦ 表格","blockquote":"❝ 引用块","pullquote":"💬 醒目引用","details":"📂 详情","mathematical_expression":"∑ 公式","anchor":"⚓ 锚点","collage":"🖼 拼贴","slideshow":"🎞 幻灯片","map":"🗺 地图","buttons":"🔘 富按钮"},
+    "zh-hant": {"content":"📦 內容","text":"📝 文字","paragraph":"📝 段落","heading":"🔠 章節標題","preformatted":"💻 預格式化","footer":"🔻 頁尾","caption":"💬 說明","photo":"🖼 照片","video":"🎬 影片","animation":"🎞 GIF","audio":"🎵 音訊","voice":"🎙 語音訊息","document":"📄 文件","sticker":"🏷 貼圖","video_note":"⭕ 影片訊息","divider":"➖ 分隔線","list":"📋 列表","table":"▦ 表格","blockquote":"❝ 引用區塊","pullquote":"💬 醒目引用","details":"📂 詳情","mathematical_expression":"∑ 公式","anchor":"⚓ 錨點","collage":"🖼 拼貼","slideshow":"🎞 幻燈片","map":"🗺 地圖","buttons":"🔘 富按鈕"},
+}
+
+KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
+    language: {f"block.{name}": value for name, value in values.items()}
+    for language, values in BLOCK_KEY_TRANSLATIONS.items()
 }
 
 
