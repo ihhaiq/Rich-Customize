@@ -222,12 +222,15 @@ def _button_guide_blocks(prompt: str) -> list[dict[str, Any]]:
                 new_block("paragraph", {
                     "text": (
                         "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون الافتراضي. "
-                        "زر user يعرض كيبورد اختيار مستخدم. callback_data يحتاج Handler ينفذ الإجراء."
+                        "زر user يعرض كيبورد اختيار مستخدم. cbd يفتح صفحة محفوظة بالكود "
+                        "كرسالة Ephemeral. callback_data مخصص لإجراء برمجي ويحتاج Handler ينفذه. "
+                        "ضع زرين في السطر نفسه حتى يظهرا بجانب بعض."
                     ),
                     "html": (
                         "<p>الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون "
-                        "الافتراضي. زر user يعرض كيبورد اختيار مستخدم. callback_data يحتاج "
-                        "Handler ينفذ الإجراء.</p>"
+                        "الافتراضي. زر user يعرض كيبورد اختيار مستخدم. cbd يفتح صفحة محفوظة "
+                        "بالكود كرسالة Ephemeral. callback_data مخصص لإجراء برمجي ويحتاج Handler "
+                        "ينفذه. ضع زرين في السطر نفسه حتى يظهرا بجانب بعض.</p>"
                     ),
                 }),
             ],
@@ -377,6 +380,21 @@ async def _edit_ui(message: Message, text: str, reply_markup) -> None:
             raise
 
 
+async def _edit_button_ui(message: Message, text: str, reply_markup) -> None:
+    """Keep the inline-button syntax guide visible throughout button management."""
+    try:
+        await message.bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            rich_message=build_input_rich_message(_button_guide_blocks(text)),
+            reply_markup=reply_markup,
+        )
+    except TelegramAPIError as error:
+        if "message is not modified" in str(error).lower():
+            return
+        await _edit_ui(message, text, reply_markup)
+
+
 async def _edit_saved_ui(bot: Bot, state: FSMContext, text: str, reply_markup) -> None:
     data = await state.get_data()
     try:
@@ -387,6 +405,37 @@ async def _edit_saved_ui(bot: Bot, state: FSMContext, text: str, reply_markup) -
     except (KeyError, TelegramBadRequest):
         sent = await bot.send_message(data.get("management_chat_id"), text, reply_markup=reply_markup)
         await state.update_data(management_chat_id=sent.chat.id, management_message_id=sent.message_id)
+
+
+async def _edit_saved_button_ui(
+    bot: Bot, state: FSMContext, text: str, reply_markup,
+) -> None:
+    """Edit the saved management panel while retaining the expandable button guide."""
+    data = await state.get_data()
+    try:
+        await bot.edit_message_text(
+            chat_id=data["management_chat_id"],
+            message_id=data["management_message_id"],
+            rich_message=build_input_rich_message(_button_guide_blocks(text)),
+            reply_markup=reply_markup,
+        )
+    except (KeyError, TelegramAPIError) as error:
+        if "message is not modified" in str(error).lower():
+            return
+        try:
+            sent = await bot.send_rich_message(
+                chat_id=data.get("management_chat_id"),
+                rich_message=build_input_rich_message(_button_guide_blocks(text)),
+                reply_markup=reply_markup,
+            )
+        except TelegramAPIError:
+            sent = await bot.send_message(
+                data.get("management_chat_id"), text, reply_markup=reply_markup,
+            )
+        await state.update_data(
+            management_chat_id=sent.chat.id,
+            management_message_id=sent.message_id,
+        )
 
 
 async def _repost_saved_ui(bot: Bot, state: FSMContext, text: str, reply_markup) -> Message:
@@ -589,7 +638,10 @@ async def summon_saved_rich_page(message: Message, bot: Bot) -> None:
 async def new_editor(message: Message, state: FSMContext) -> None:
     await state.clear()
     await state.set_state(RichEditorStates.waiting_input)
-    await message.answer("أرسل الرسالة التي تريد تخصيصها")
+    await _answer_with_button_guide(
+        message,
+        "أرسل الرسالة التي تريد تخصيصها. تقدر تكتب تنسيق الزر داخل النص بأي مكان.",
+    )
 
 
 @router.message(Command("draft"))
@@ -803,7 +855,11 @@ async def wait_for_button_user(message: Message, state: FSMContext) -> None:
         await _ask_for_button_user(message, state, markers[index])
     else:
         await state.set_state(RichEditorStates.waiting_input)
-        await message.answer("انتهى طلب اختيار المستخدم. أرسل الرسالة مرة أخرى.", reply_markup=ReplyKeyboardRemove())
+        await _answer_with_button_guide(
+            message,
+            "انتهى طلب اختيار المستخدم. أرسل الرسالة مرة أخرى.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
 
 
 async def _session(callback: CallbackQuery, state: FSMContext) -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
@@ -1443,7 +1499,7 @@ async def open_buttons_manager(callback: CallbackQuery, state: FSMContext) -> No
     buttons = data.get("message_buttons", [])
     await state.set_state(RichEditorStates.managing)
     await state.update_data(current_button_id=None, pending_button_action=None)
-    await _edit_ui(
+    await _edit_button_ui(
         callback.message,
         f"إدارة أزرار الرسالة الغنية\n\nعدد الأزرار: {len(buttons)}\nاختر العملية:",
         build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
@@ -1460,7 +1516,7 @@ async def change_buttons_per_row(callback: CallbackQuery, state: FSMContext) -> 
     buttons_per_row = 1 if _buttons_per_row(data) >= 8 else _buttons_per_row(data) + 1
     await state.update_data(buttons_per_row=buttons_per_row)
     buttons = data.get("message_buttons", [])
-    await _edit_ui(
+    await _edit_button_ui(
         callback.message,
         f"إدارة أزرار الرسالة الغنية\n\nعدد الأزرار: {len(buttons)}\nاختر العملية:",
         build_buttons_manager_keyboard(buttons, buttons_per_row),
@@ -1502,7 +1558,7 @@ async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> 
             )
             return
         await state.update_data(pending_button_type="page")
-        await _edit_ui(
+        await _edit_button_ui(
             callback.message,
             "اختر الصفحة التي يفتحها زر CBD كرسالة Ephemeral خاصة بالضاغط:",
             build_page_target_keyboard(pages, "add"),
@@ -1534,7 +1590,7 @@ async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> 
             message_buttons=buttons, pending_button_action=None,
             pending_button_text=None, pending_button_type=None,
         )
-        await _edit_ui(
+        await _edit_button_ui(
             callback.message,
             "✅ تمت إضافة الزر المعطّل. اختر لونه:",
             build_button_style_keyboard(button["id"], "default"),
@@ -1573,7 +1629,9 @@ async def choose_button_action(callback: CallbackQuery, state: FSMContext) -> No
         "title": "اختر الزر الذي تريد تغيير عنوانه:",
         "type": "اختر الزر الذي تريد تغيير نوعه:",
     }
-    await _edit_ui(callback.message, labels[action], build_button_picker_keyboard(buttons, action))
+    await _edit_button_ui(
+        callback.message, labels[action], build_button_picker_keyboard(buttons, action),
+    )
     await callback.answer()
 
 
@@ -1596,7 +1654,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
     if action == "delete":
         delete_message_button(buttons, button_id)
         await state.update_data(message_buttons=buttons, current_button_id=None)
-        await _edit_ui(
+        await _edit_button_ui(
             callback.message,
             f"✅ تم إزالة الزر.\n\nإدارة أزرار الرسالة الغنية\nعدد الأزرار: {len(buttons)}",
             build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
@@ -1604,7 +1662,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         await callback.answer("تم إزالة الزر")
         return
     if action == "style":
-        await _edit_ui(
+        await _edit_button_ui(
             callback.message,
             f"تغيير لون الزر: {button['text']}\n\nاختر اللون:",
             build_button_style_keyboard(
@@ -1616,7 +1674,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         await callback.answer()
         return
     if action == "move":
-        await _edit_ui(
+        await _edit_button_ui(
             callback.message,
             f"تغيير ترتيب الزر: {button['text']}\n\nاختر الموقع الجديد:",
             build_button_position_keyboard(buttons, button_id),
@@ -1625,7 +1683,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         return
     if action == "type":
         await state.update_data(current_button_id=button_id)
-        await _edit_ui(
+        await _edit_button_ui(
             callback.message,
             f"تغيير نوع الزر: {button['text']}\n\nاختر النوع الجديد:",
             build_button_type_keyboard(f"r:bct:{button_id}"),
@@ -1640,7 +1698,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         if not pages:
             await callback.answer("ما عندك صفحات محفوظة للاختيار.", show_alert=True)
             return
-        await _edit_ui(
+        await _edit_button_ui(
             callback.message,
             f"اختر الصفحة الجديدة للزر: {button['text']}",
             build_page_target_keyboard(pages, "change", button_id),
@@ -1690,7 +1748,7 @@ async def change_button_type(callback: CallbackQuery, state: FSMContext) -> None
         change_message_button_type(button, "disabled", "")
         await state.set_state(RichEditorStates.managing)
         await state.update_data(message_buttons=buttons, current_button_id=None)
-        await _edit_ui(
+        await _edit_button_ui(
             callback.message,
             "✅ تم تغيير نوع الزر إلى زر معطّل.\n\nإدارة أزرار الرسالة الغنية",
             build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
@@ -1702,7 +1760,7 @@ async def change_button_type(callback: CallbackQuery, state: FSMContext) -> None
         if not pages:
             await callback.answer("احفظ صفحة أولاً حتى تربط الزر بها.", show_alert=True)
             return
-        await _edit_ui(
+        await _edit_button_ui(
             callback.message,
             f"اختر الصفحة التي يفتحها الزر: {button['text']}",
             build_page_target_keyboard(pages, "change", button_id),
@@ -1777,7 +1835,7 @@ async def select_button_page(callback: CallbackQuery, state: FSMContext) -> None
         pending_button_text=None,
         pending_button_type=None,
     )
-    await _edit_ui(
+    await _edit_button_ui(
         callback.message,
         f"✅ تم ربط الزر بالصفحة «{page.get('title') or page_id}».\n\n"
         "إدارة أزرار الرسالة الغنية",
@@ -1808,7 +1866,7 @@ async def change_button_style(callback: CallbackQuery, state: FSMContext) -> Non
         return
     button["style"] = style
     await state.update_data(message_buttons=buttons)
-    await _edit_ui(
+    await _edit_button_ui(
         callback.message,
         "✅ تم تغيير لون الزر.\n\nإدارة أزرار الرسالة الغنية",
         build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
@@ -1833,7 +1891,7 @@ async def change_button_position(callback: CallbackQuery, state: FSMContext) -> 
         await callback.answer("تعذر تغيير ترتيب الزر.", show_alert=True)
         return
     await state.update_data(message_buttons=buttons)
-    await _edit_ui(
+    await _edit_button_ui(
         callback.message,
         "✅ تم تغيير ترتيب الزر.\n\nإدارة أزرار الرسالة الغنية",
         build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
@@ -1861,9 +1919,11 @@ async def preview_message_buttons(callback: CallbackQuery, state: FSMContext, bo
         except TelegramBadRequest:
             pass
     with preserve_user_content():
-        sent = await bot.send_message(
-            callback.from_user.id,
-            tr("معاينة الأزرار:"),
+        sent = await bot.send_rich_message(
+            chat_id=callback.from_user.id,
+            rich_message=build_input_rich_message(
+                _button_guide_blocks(tr("معاينة الأزرار:")),
+            ),
             reply_markup=build_message_buttons_keyboard(
                 prepared_buttons, buttons_per_row=_buttons_per_row(data),
                 include_back=True, back_text=tr("🔙 رجوع"),
@@ -1912,7 +1972,7 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
             pending_button_text=value,
             pending_button_type=None,
         )
-        await _edit_saved_ui(
+        await _edit_saved_button_ui(
             bot,
             state,
             f"نوع الزر الجديد: {value}\n\nاختر وظيفة الزر:",
@@ -1980,7 +2040,7 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
         pending_button_action=None, pending_button_text=None,
         pending_button_type=None,
     )
-    await _edit_saved_ui(
+    await _edit_saved_button_ui(
         bot, state,
         f"{notice}\n\nإدارة أزرار الرسالة الغنية\nعدد الأزرار: {len(buttons)}",
         build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),

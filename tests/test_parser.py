@@ -26,6 +26,9 @@ class FormattedTextParserTests(unittest.TestCase):
         self.assertEqual(details["blocks"][1]["type"], "pre")
         self.assertIn("{الملف الشخصي:user#p}", details["blocks"][1]["text"])
         self.assertIn("{تنفيذ:callback_data action:1#r}", details["blocks"][1]["text"])
+        self.assertIn("{الصفحة التالية:cbd a86d3132#b}", details["blocks"][1]["text"])
+        self.assertIn("Ephemeral", details["blocks"][2]["text"])
+        self.assertIn("بجانب بعض", details["blocks"][2]["text"])
 
     def test_inline_url_and_callback_buttons_keep_their_text_position(self):
         paragraph = new_block("paragraph", {
