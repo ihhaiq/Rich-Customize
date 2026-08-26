@@ -9,6 +9,7 @@ from aiogram.types import BotCommand
 
 from app import i18n_core as _core
 from app.locales import PROFILES as LOCALE_PROFILES, TRANSLATIONS
+from app.locales.catalog import CATALOG_AR, CATALOG_EN, CATALOG_TRANSLATIONS
 from app.locales.common import AR_PHRASES, KEY_TRANSLATIONS, PHRASES
 
 logger = logging.getLogger(__name__)
@@ -66,11 +67,19 @@ def t(key: str, **values: Any) -> str:
     strings in routers/keyboards. Legacy ``tr`` remains available only so old
     flows can be migrated without a flag day.
     """
-    if key not in PHRASES:
+    is_catalog_key = key in CATALOG_EN
+    if key not in PHRASES and not is_catalog_key:
         raise KeyError(f"Unknown i18n key: {key}")
 
     language = _core._language.get()
-    if language == "ar":
+    if is_catalog_key:
+        if language == "ar":
+            text = CATALOG_AR.get(key, CATALOG_EN[key])
+        elif language == "en":
+            text = CATALOG_EN[key]
+        else:
+            text = CATALOG_TRANSLATIONS.get(language, {}).get(key, CATALOG_EN[key])
+    elif language == "ar":
         text = AR_PHRASES.get(key, PHRASES[key])
     elif language == "en":
         text = PHRASES[key]
