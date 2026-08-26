@@ -8,6 +8,8 @@ import secrets
 from pathlib import Path
 from typing import Any
 
+from app.services.media import media_store
+
 
 def _registry_path() -> Path:
     configured = os.getenv("RICH_PAGES_STATE", "").strip()
@@ -69,6 +71,8 @@ class PageRegistry:
                 "buttons_align": buttons_align,
             }
             self._write(pages)
+            media_store.remember_blocks(blocks)
+            media_store.pin_page(code, blocks)
             return code
 
     async def get(self, page_id: str) -> dict[str, Any] | None:
@@ -97,7 +101,17 @@ class PageRegistry:
                 return False
             pages.pop(page_id, None)
             self._write(pages)
+            media_store.unpin_page(page_id)
             return True
+
+    async def rebuild_media_pins(self) -> None:
+        """Rebuild pins at startup so existing page codes survive cache cleanup."""
+        async with self._lock:
+            pages = self._read()
+            for page_id, page in pages.items():
+                if isinstance(page, dict):
+                    media_store.remember_blocks(page.get("blocks") or [])
+                    media_store.pin_page(page_id, page.get("blocks") or [])
 
 
 page_registry = PageRegistry()
