@@ -175,6 +175,47 @@ class FormattedTextParserTests(unittest.TestCase):
             "r:page:a86d3132:c0ffee00",
         )
 
+    def test_cbd_sub_audience_is_gated_via_r_cbds_prefix(self):
+        paragraph = new_block("paragraph", {
+            "text": "قبل {للمشتركين:cbd a86d3132#g sub} بعد",
+            "html": "<p>قبل {للمشتركين:cbd a86d3132#g sub} بعد</p>",
+        })
+
+        rich = build_input_rich_message(
+            [paragraph], source_page_id="c0ffee00",
+        ).model_dump(mode="json", exclude_none=True)
+        button = rich["blocks"][0]["text"][1]["button"]
+
+        self.assertEqual(button["callback_data"], "r:spage:a86d3132:c0ffee00")
+
+    def test_cbd_all_audience_matches_default_public_behavior(self):
+        paragraph = new_block("paragraph", {
+            "text": "{عام:cbd a86d3132 all}",
+            "html": "<p>{عام:cbd a86d3132 all}</p>",
+        })
+
+        rich = build_input_rich_message(
+            [paragraph], source_page_id="c0ffee00",
+        ).model_dump(mode="json", exclude_none=True)
+        button = rich["blocks"][0]["text"]["button"]
+
+        self.assertEqual(button["callback_data"], "r:page:a86d3132:c0ffee00")
+
+    def test_page_button_with_subscribers_audience_flag(self):
+        paragraph = new_block("paragraph", {"text": "الأولى", "html": "<p>الأولى</p>"})
+        buttons = []
+        add_message_button(buttons, "للمشتركين", "deadbeef", "page")
+        buttons[0]["audience"] = "subscribers"
+
+        rich = build_input_rich_message(
+            [paragraph], buttons, source_page_id="c0ffee00",
+        ).model_dump(mode="json", exclude_none=True)
+
+        self.assertEqual(
+            rich["blocks"][1]["buttons"][0]["callback_data"],
+            "r:spage:deadbeef:c0ffee00",
+        )
+
     def test_domain_error_explains_botfather_fix(self):
         reason = _friendly_rich_error(ValueError("Bad Request: BOT_DOMAIN_INVALID"))
         self.assertIn("/setdomain", reason)
