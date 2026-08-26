@@ -80,6 +80,7 @@ BUTTON_SYNTAX_EXAMPLES = """{اسم الزر:url https://example.com#b}
 {الملف الشخصي:user#p}
 {تنفيذ:callback_data action:1#r}
 {الصفحة التالية:cbd a86d3132#b}
+{للمشتركين فقط:cbd a86d3132#b sub}
 {تنبيه:popup هذا نص التنبيه#r}
 {نسخ:copy النص المطلوب#g}
 {بحث:switch_inline_query كلمة البحث}
@@ -109,6 +110,17 @@ def _status_value(member) -> str:
 
 def _is_administrator(member) -> bool:
     return _status_value(member) in ADMIN_STATUSES
+
+
+SUBSCRIBER_STATUSES = {"member", "administrator", "creator"}
+
+
+async def _is_chat_subscriber(bot: Bot, chat_id: int, user_id: int) -> bool:
+    try:
+        member = await bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+    except (TelegramBadRequest, TelegramForbiddenError):
+        return False
+    return _status_value(member) in SUBSCRIBER_STATUSES
 
 
 def _chat_type_value(chat) -> str:
@@ -2741,6 +2753,17 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("r:page:"))
 async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
+    await _open_page_link(callback, bot, require_subscription=False)
+
+
+@router.callback_query(F.data.startswith("r:spage:"))
+async def open_gated_page_link(callback: CallbackQuery, bot: Bot) -> None:
+    await _open_page_link(callback, bot, require_subscription=True)
+
+
+async def _open_page_link(
+    callback: CallbackQuery, bot: Bot, require_subscription: bool,
+) -> None:
     callback_message = callback.message if isinstance(callback.message, Message) else None
     guest_context = (
         await guest_message_registry.get(callback.inline_message_id or "")
@@ -2759,6 +2782,14 @@ async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
         if callback_message is not None
         else str(guest_context.get("chat_type", ""))
     )
+    if require_subscription and not await _is_chat_subscriber(
+        bot, chat_id, callback.from_user.id,
+    ):
+        await callback.answer(
+            "هذا الزر مخصص لمشتركي القناة فقط. اشترك بالقناة وحاول مرة ثانية.",
+            show_alert=True,
+        )
+        return
     parts = callback.data.split(":")
     target_id = parts[2] if len(parts) > 2 else ""
     source_id = parts[3] if len(parts) > 3 and parts[3] else None
