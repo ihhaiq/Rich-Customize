@@ -9,6 +9,7 @@ from aiogram.types import Message
 
 from app.i18n import tr
 from app.services.blocks import normalize_block_positions
+from app.services.media import media_store, native_file_data
 
 
 TEXT_NATIVE_TYPES = {
@@ -18,14 +19,6 @@ BLOCKQUOTE_HTML_RE = re.compile(
     r"<blockquote(?:\s+[^>]*)?>(.*?)</blockquote>",
     flags=re.IGNORECASE | re.DOTALL,
 )
-MEDIA_NATIVE_FIELDS = {
-    "photo": "photo",
-    "video": "video",
-    "animation": "animation",
-    "audio": "audio",
-    "document": "document",
-    "voice": "voice_note",
-}
 
 
 def _new_block(block_type: str, position: int, data: dict[str, Any]) -> dict[str, Any]:
@@ -191,32 +184,6 @@ def _caption_parts(raw: dict[str, Any]) -> tuple[str | None, str | None]:
     )
 
 
-def _native_media_file_data(raw: dict[str, Any], block_type: str) -> dict[str, Any] | None:
-    """Normalize reusable Telegram media metadata into ``data.file``.
-
-    Received Rich Message media uses native fields such as ``audio`` and
-    ``voice_note``. Keeping a copy in the editor's stable ``data.file`` schema
-    makes later previews independent from the original message object.
-    """
-    field = MEDIA_NATIVE_FIELDS.get(block_type)
-    if field is None:
-        return None
-    value = raw.get(field)
-    if isinstance(value, list):
-        candidates = [item for item in value if isinstance(item, dict)]
-        if not candidates:
-            return None
-        value = candidates[-1]
-    if not isinstance(value, dict):
-        return None
-    file_id = value.get("file_id")
-    if not file_id:
-        return None
-    result = dict(value)
-    result["file_id"] = str(file_id)
-    return result
-
-
 def _native_raw_to_block(raw: dict[str, Any], position: int) -> dict[str, Any]:
     raw_type = str(raw.get("type", "content"))
     block_type = _native_type(raw_type)
@@ -229,7 +196,7 @@ def _native_raw_to_block(raw: dict[str, Any], position: int) -> dict[str, Any]:
         "caption_html": caption_html,
         "credit_html": credit_html,
     }
-    media_file = _native_media_file_data(raw, block_type)
+    media_file = native_file_data(raw, block_type)
     if media_file is not None:
         data["file"] = media_file
     if block_type == "details":
@@ -259,12 +226,17 @@ def _parse_native_rich(message: Message) -> list[dict[str, Any]]:
     ]
 
 
+def _remember(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    media_store.remember_blocks(blocks)
+    return blocks
+
+
 def message_to_blocks(message: Message, start_position: int = 0) -> list[dict[str, Any]]:
     if message.rich_message:
         blocks = _parse_native_rich(message)
         for block in blocks:
             block["position"] += start_position
-        return blocks
+        return _remember(blocks)
 
     blocks: list[dict[str, Any]] = []
     position = start_position
@@ -292,18 +264,19 @@ def message_to_blocks(message: Message, start_position: int = 0) -> list[dict[st
     if message.caption:
         blocks.append(_new_block("caption", position, {
             "text": message.caption,
-            # Aiogram exposes one formatter for both message text and captions.
             "html": message.html_text,
             "entities": _dump_entities(message.caption_entities),
         }))
-    return blocks
+    return _remember(blocks)
 
 
 def messages_to_blocks(messages: list[Message]) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
     for message in sorted(messages, key=lambda item: item.message_id):
         blocks.extend(message_to_blocks(message, len(blocks)))
-    return normalize_block_positions(blocks)
+    normalized = normalize_block_positions(blocks)
+    media_store.remember_blocks(normalized)
+    return normalized
 
 
 def replacement_data(message: Message, block_type: str) -> dict[str, Any] | None:
