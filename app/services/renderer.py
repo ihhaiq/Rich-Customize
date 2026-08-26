@@ -439,8 +439,9 @@ def _rich_button_payload(
         payload["style"] = "link"
 
     if button_type == "page":
+        prefix = "r:spage" if button.get("audience") == "subscribers" else "r:page"
         payload["callback_data"] = (
-            f"r:page:{value}:{source_page_id}" if source_page_id else f"r:page:{value}"
+            f"{prefix}:{value}:{source_page_id}" if source_page_id else f"{prefix}:{value}"
         )
     elif button_type == "copy":
         payload["copy_text"] = CopyTextButton(text=value)
@@ -503,6 +504,14 @@ def _resolve_inline_page_callbacks(value: Any, source_page_id: str | None) -> An
         payload["callback_data"] = (
             f"r:page:{target_page_id}:{source_page_id}"
             if source_page_id else f"r:page:{target_page_id}"
+        )
+    elif isinstance(callback_data, str) and callback_data.startswith("r:cbds:"):
+        # Subscribers-only page navigation: gated by the r:spage: handler,
+        # which checks channel membership before opening the target page.
+        target_page_id = callback_data.removeprefix("r:cbds:")
+        payload["callback_data"] = (
+            f"r:spage:{target_page_id}:{source_page_id}"
+            if source_page_id else f"r:spage:{target_page_id}"
         )
     return payload
 

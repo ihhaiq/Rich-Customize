@@ -23,9 +23,22 @@ TYPE_ALIASES = {
     "cbd": "page_callback",
     "page": "page_callback",
 }
+# Trailing audience word for {title:cbd code#color audience} markers.
+# Only meaningful for page_callback (cbd/page) buttons; ignored otherwise.
+AUDIENCE_ALIASES = {
+    "all": "all",
+    "public": "all",
+    "عام": "all",
+    "sub": "subscribers",
+    "subs": "subscribers",
+    "members": "subscribers",
+    "مشتركين": "subscribers",
+}
 
 
-def _marker_parts(marker: str) -> tuple[str, str, str, str | None] | None:
+def _marker_parts(
+    marker: str,
+) -> tuple[str, str, str, str | None, str] | None:
     if not marker.startswith("{") or not marker.endswith("}"):
         return None
     body = marker[1:-1].strip()
@@ -37,6 +50,14 @@ def _marker_parts(marker: str) -> tuple[str, str, str, str | None] | None:
     if not title or len(title) > 64 or not specification:
         return None
 
+    # Trailing audience word (e.g. "all" / "sub") comes after the color, so
+    # strip it first: {title:cbd code#r sub}
+    audience = "all"
+    audience_match = re.search(r"\s+(\S+)\s*$", specification)
+    if audience_match and audience_match.group(1).lower() in AUDIENCE_ALIASES:
+        audience = AUDIENCE_ALIASES[audience_match.group(1).lower()]
+        specification = specification[:audience_match.start()].rstrip()
+
     color: str | None = None
     color_match = re.search(r"#([rbpg])\s*$", specification, flags=re.IGNORECASE)
     if color_match:
@@ -46,7 +67,7 @@ def _marker_parts(marker: str) -> tuple[str, str, str, str | None] | None:
     pieces = specification.split(maxsplit=1)
     button_type = TYPE_ALIASES.get(pieces[0].lower(), pieces[0].lower())
     value = pieces[1].strip() if len(pieces) == 2 else ""
-    return title, button_type, value, color
+    return title, button_type, value, color, audience
 
 
 def find_user_button_markers(text: str | None) -> list[dict[str, str | None]]:
@@ -56,7 +77,7 @@ def find_user_button_markers(text: str | None) -> list[dict[str, str | None]]:
         parts = _marker_parts(marker)
         if not parts:
             continue
-        title, button_type, value, color = parts
+        title, button_type, value, color, _audience = parts
         if button_type == "user" and not value:
             markers.append({"marker": marker, "title": title, "color": color})
     return markers
@@ -69,7 +90,7 @@ def resolve_user_button_marker(
     replacement_parts = _marker_parts(marker)
     if not replacement_parts:
         return
-    title, _, _, color = replacement_parts
+    title, _, _, color, _audience = replacement_parts
     suffix = f"#{color}" if color else ""
     clean_username = (username or "").strip().lstrip("@")
     target = (
@@ -92,7 +113,10 @@ def resolve_user_button_marker(
         blocks[index] = replace(block)
 
 
-def _button_payload(title: str, button_type: str, value: str, color: str | None) -> dict[str, Any] | None:
+def _button_payload(
+    title: str, button_type: str, value: str, color: str | None,
+    audience: str = "all",
+) -> dict[str, Any] | None:
     style = COLOR_STYLES.get(color or "")
     button: dict[str, Any] = {"text": title}
     if style:
@@ -116,7 +140,10 @@ def _button_payload(title: str, button_type: str, value: str, color: str | None)
         if page_code is None:
             return None
         # The renderer adds the current saved page as navigation source.
-        button["callback_data"] = f"r:cbd:{page_code}"
+        # "subscribers" audience is gated at click-time by the callback
+        # handler (r:cbds: instead of r:cbd:) before the page is opened.
+        prefix = "r:cbds" if audience == "subscribers" else "r:cbd"
+        button["callback_data"] = f"{prefix}:{page_code}"
     elif button_type == "copy":
         if not value or len(value) > 256:
             return None
@@ -171,7 +198,7 @@ def inline_button_rich_text(value: Any) -> Any:
         parts = _marker_parts(match.group(0))
         if not parts:
             continue
-        payload = _button_payload(*parts)
+        payload = _button_payload(*parts)  # (title, type, value, color, audience)
         if payload is None:
             continue
         if match.start() > cursor:
