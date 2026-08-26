@@ -7,7 +7,8 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
-from app.services.blocks import BLOCK_LABELS, get_block_by_id
+from app.i18n import t
+from app.services.blocks import get_block_by_id, get_block_label
 from app.services.media import media_store
 from app.services.renderer import RichMessageRenderError, send_rich_message_preview
 
@@ -22,10 +23,10 @@ async def preview_one_block(callback: CallbackQuery, state: FSMContext, bot: Bot
     block_id = callback.data.rsplit(":", 1)[-1]
     block = get_block_by_id(blocks, block_id)
     if block is None:
-        await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
+        await callback.answer(t("editor.block_missing"), show_alert=True)
         return
 
-    await callback.answer("جاري إنشاء معاينة الجزء…")
+    await callback.answer(t("editor.preview_generating"))
     media_store.remember_blocks([block])
 
     preview_ids = dict(data.get("block_preview_message_ids") or {})
@@ -56,7 +57,7 @@ async def preview_one_block(callback: CallbackQuery, state: FSMContext, bot: Bot
         )
         await bot.send_message(
             callback.from_user.id,
-            f"تعذرت معاينة هذا الجزء وحده.\nالسبب: {error}",
+            f"{t('editor.preview_failed_single')}\n{t('common.reason', reason=error)}",
         )
         return
     except Exception:
@@ -65,13 +66,13 @@ async def preview_one_block(callback: CallbackQuery, state: FSMContext, bot: Bot
             block_id,
             callback.from_user.id,
         )
-        await bot.send_message(callback.from_user.id, "تعذرت معاينة هذا الجزء.")
+        await bot.send_message(callback.from_user.id, t("editor.preview_failed"))
         return
 
     preview_ids[block_id] = [message.message_id for message in sent]
     await state.update_data(block_preview_message_ids=preview_ids)
-    label = BLOCK_LABELS.get(str(block.get("type")), "📦 محتوى")
+    label = get_block_label(str(block.get("type")))
     await bot.send_message(
         callback.from_user.id,
-        f"👁 معاينة {label} فقط.\nالمعاينة الشاملة ما تغيرت وتبقى من زر «✅ النتيجة».",
+        t("editor.preview_single_notice", label=label),
     )
