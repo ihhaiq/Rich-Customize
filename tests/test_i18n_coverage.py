@@ -6,10 +6,12 @@ import unittest
 from pathlib import Path
 
 from app import i18n_core
-from app.i18n import EN, tr
-from app.locales import TRANSLATIONS
+from app.i18n import EN, t, tr
+from app.locales import SUPPORTED_LANGUAGES, TRANSLATIONS
+from app.locales.common import AR_PHRASES, KEY_TRANSLATIONS, PHRASES
 from app.locales.pages import PAGE_AR_TO_EN
 from app.locales.recent_ui import RECENT_AR_TO_EN
+from app.services.blocks import BLOCK_LABEL_KEYS, get_block_label
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +41,46 @@ def _arabic_literals() -> list[tuple[str, int, str]]:
 
 
 class I18nCoverageTests(unittest.TestCase):
+    def test_every_block_uses_a_registered_semantic_key(self):
+        self.assertTrue(BLOCK_LABEL_KEYS)
+        for block_type, key in BLOCK_LABEL_KEYS.items():
+            self.assertIn(key, PHRASES, f"{block_type}: missing {key}")
+            self.assertIn(key, AR_PHRASES, f"{block_type}: Arabic missing {key}")
+
+    def test_every_supported_locale_has_every_block_key(self):
+        required = set(BLOCK_LABEL_KEYS.values())
+        expected_languages = set(SUPPORTED_LANGUAGES) - {"ar", "en"}
+        missing = {
+            language: sorted(required - set(KEY_TRANSLATIONS.get(language, {})))
+            for language in expected_languages
+        }
+        missing = {language: keys for language, keys in missing.items() if keys}
+        self.assertFalse(missing, f"Missing keyed block translations: {missing}")
+
+    def test_block_labels_never_fall_back_to_english_for_supported_locales(self):
+        for language in set(SUPPORTED_LANGUAGES) - {"ar", "en"}:
+            token = i18n_core._language.set(language)
+            try:
+                for block_type, key in BLOCK_LABEL_KEYS.items():
+                    rendered = get_block_label(block_type)
+                    self.assertEqual(rendered, KEY_TRANSLATIONS[language][key])
+                    self.assertNotEqual(rendered, PHRASES[key], f"{language}: {block_type}")
+            finally:
+                i18n_core._language.reset(token)
+
+    def test_type_text_regression(self):
+        for language in set(SUPPORTED_LANGUAGES) - {"ar", "en"}:
+            token = i18n_core._language.set(language)
+            try:
+                self.assertEqual(get_block_label("text"), KEY_TRANSLATIONS[language]["block.text"])
+                self.assertNotEqual(get_block_label("text"), "📝 Text")
+            finally:
+                i18n_core._language.reset(token)
+
+    def test_unknown_semantic_key_fails_fast(self):
+        with self.assertRaises(KeyError):
+            t("missing.key.that.must.not.silently.fallback")
+
     def test_registered_recent_ui_has_english_normalization(self):
         for source in {**PAGE_AR_TO_EN, **RECENT_AR_TO_EN}:
             normalized = _english_normalize(source)
@@ -47,8 +89,6 @@ class I18nCoverageTests(unittest.TestCase):
     def test_recent_ui_never_leaks_arabic_in_non_arabic_locales(self):
         sources = list(PAGE_AR_TO_EN) + list(RECENT_AR_TO_EN)
         for language in TRANSLATIONS:
-            if language in {"ar"}:
-                continue
             token = i18n_core._language.set(language)
             try:
                 for source in sources:
@@ -60,11 +100,19 @@ class I18nCoverageTests(unittest.TestCase):
             finally:
                 i18n_core._language.reset(token)
 
+    def test_block_service_contains_no_hardcoded_arabic_ui(self):
+        path = ROOT / "app" / "services" / "blocks.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        leaked = [
+            (getattr(node, "lineno", 0), node.value)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and ARABIC_RE.search(node.value)
+        ]
+        self.assertFalse(leaked, f"blocks.py must use semantic keys only: {leaked}")
+
     def test_source_audit_reports_only_registered_or_legacy_ui(self):
-        # This is intentionally a diagnostic inventory rather than a blanket
-        # ban on Arabic literals: editor_core still contains the Arabic source
-        # copy of the button-syntax guide, and showcase.py has an intentional
-        # Arabic-only branch. New feature strings must be registered in EN.
         uncovered = []
         recent_sources = set(PAGE_AR_TO_EN) | set(RECENT_AR_TO_EN)
         for path, line, text in _arabic_literals():
@@ -73,12 +121,10 @@ class I18nCoverageTests(unittest.TestCase):
             normalized = _english_normalize(text)
             if ARABIC_RE.search(normalized):
                 uncovered.append(f"{path}:{line}: {text!r}")
-        # Keep the inventory bounded. A sudden increase means new hard-coded UI
-        # was added without localization and should be moved to a locale bundle.
         self.assertLess(
             len(uncovered),
             80,
-            "Too many uncovered Arabic UI literals; register new strings in i18n.\n"
+            "Too many uncovered Arabic UI literals; new UI must use semantic i18n keys.\n"
             + "\n".join(uncovered),
         )
 
