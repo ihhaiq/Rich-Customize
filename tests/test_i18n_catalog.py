@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import ast
+import re
 import string
 import unittest
+from pathlib import Path
 
 from app import i18n_core
 from app.i18n import t
 from app.locales import SUPPORTED_LANGUAGES
 from app.locales.catalog import CATALOG_AR, CATALOG_EN, CATALOG_TRANSLATIONS
+
+ROOT = Path(__file__).resolve().parents[1]
+ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 
 
 def _fields(value: str) -> set[str]:
@@ -52,6 +58,30 @@ class SemanticCatalogTests(unittest.TestCase):
                     self.assertTrue(rendered, f"{language}:{key}")
             finally:
                 i18n_core._language.reset(token)
+
+    def test_migrated_block_preview_contains_no_arabic_ui_literals(self):
+        path = ROOT / "app" / "routers" / "block_preview.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        leaked = [
+            (getattr(node, "lineno", 0), node.value)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and ARABIC_RE.search(node.value)
+        ]
+        self.assertFalse(leaked, f"block_preview.py must use t(key): {leaked}")
+
+    def test_migrated_block_preview_does_not_call_legacy_tr(self):
+        path = ROOT / "app" / "routers" / "block_preview.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        legacy_calls = [
+            getattr(node, "lineno", 0)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "tr"
+        ]
+        self.assertFalse(legacy_calls, f"Legacy tr() calls found at {legacy_calls}")
 
 
 if __name__ == "__main__":
