@@ -311,7 +311,12 @@ def build_result_keyboard() -> InlineKeyboardMarkup:
 
 def build_block_editor_keyboard(block: dict[str, Any]) -> InlineKeyboardMarkup:
     block_id = block["id"]
-    rows: list[list[InlineKeyboardButton]] = []
+    rows: list[list[InlineKeyboardButton]] = [
+        [InlineKeyboardButton(
+            text="👁 معاينة هذا الـBlock", callback_data=f"r:pv:{block_id}",
+            style=ButtonStyle.PRIMARY,
+        )],
+    ]
     if block["type"] != "divider":
         label = "✏️ تعديل المحتوى" if block["type"] == "details" else "✏️ تعديل"
         rows.append([InlineKeyboardButton(text=label, callback_data=f"r:e:{block_id}")])
