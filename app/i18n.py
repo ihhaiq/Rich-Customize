@@ -9,6 +9,7 @@ from aiogram.types import BotCommand
 
 from app import i18n_core as _core
 from app.locales import PROFILES as LOCALE_PROFILES, TRANSLATIONS
+from app.locales.common import AR_PHRASES, KEY_TRANSLATIONS, PHRASES
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ def resolve_language(language_code: str | None) -> str:
 
 
 def tr(text: str) -> str:
+    """Legacy source-text translator kept for compatibility during migration."""
     language = _core._language.get()
     if language == "ar":
         return text
@@ -55,6 +57,32 @@ def tr(text: str) -> str:
         for source, target in sorted(locale.items(), key=lambda item: len(item[0]), reverse=True):
             translated = translated.replace(source, target)
     return translated
+
+
+def t(key: str, **values: Any) -> str:
+    """Translate a semantic UI key for the current locale.
+
+    New UI must use this function instead of embedding Arabic or English source
+    strings in routers/keyboards. Legacy ``tr`` remains available only so old
+    flows can be migrated without a flag day.
+    """
+    if key not in PHRASES:
+        raise KeyError(f"Unknown i18n key: {key}")
+
+    language = _core._language.get()
+    if language == "ar":
+        text = AR_PHRASES.get(key, PHRASES[key])
+    elif language == "en":
+        text = PHRASES[key]
+    else:
+        keyed = KEY_TRANSLATIONS.get(language, {})
+        if key in keyed:
+            text = keyed[key]
+        else:
+            english = PHRASES[key]
+            text = TRANSLATIONS.get(language, {}).get(english, english)
+
+    return text.format(**values) if values else text
 
 
 _core.resolve_language = resolve_language
@@ -187,5 +215,6 @@ __all__ = [
     "current_language",
     "preserve_user_content",
     "resolve_language",
+    "t",
     "tr",
 ]
