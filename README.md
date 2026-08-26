@@ -68,6 +68,17 @@ python main.py
   `Preformatted` جاهزة للنسخ لكل صيغ الأزرار داخل النص.
 - يمكن تغيير نوع زر موجود مع إبقاء عنوانه ولونه وترتيبه؛ مثل تحويل الرابط إلى زر معطّل
   أو `callback_data` أو نسخ أو Popup أو بقية الأنواع المدعومة.
+- يمكن حفظ الرسالة كصفحة باسم واضح من `💾 حفظ الصفحة`، وفتحها لاحقًا من `📚 صفحاتي`،
+  ثم ربط أي زر بها من `📄 ربط بصفحة` باختيار الاسم مباشرةً بدل نسخ الكود يدويًا.
+- عند الضغط على زر صفحة في مجموعة أو Supergroup، يرسل البوت الصفحة كـEphemeral Message
+  لا يراها إلا المستخدم الضاغط، وتُفتح الصفحات التالية وزر الرجوع داخل الرسالة الخاصة نفسها.
+  Telegram لا يدعم Ephemeral Messages في القنوات؛ لذلك يرسل البوت الصفحة إلى خاص الضاغط هناك.
+- يمكن استدعاء صفحة محفوظة بصيغة `@BotUsername كود_الصفحة`، فيرد البوت نفسه برسالة
+  غنية عبر Guest Mode حتى لو لم يكن عضوًا في المحادثة. فعّل `Guest Mode` من إعدادات البوت
+  داخل Mini App الخاص بـ`@BotFather`. يدعم المشروع أيضًا نفس الصيغة عبر Inline Mode؛
+  لتفعيل طريقة الاختيار التقليدية نفّذ `/setinline` في `@BotFather`.
+- إذا احتوت رسالة Guest الغنية زر صفحة، فالضغط عليه يعرض محتوى الصفحة التالية كـRich
+  Ephemeral Message للضاغط فقط، ثم تُعدّل نفس الرسالة المؤقتة عند التنقل أو الرجوع.
 - يدعم `InputRichBlockDocument` لإضافة الملفات العامة مع التذييل والمصدر.
 - يقبل محرّر Pullquote الوسائط والملفات ويضعها داخل إطار الاقتباس مع النص والكاتب مثل
   الصورة المرجعية. يُرسل هذا التركيب كـ`InputRichBlockBlockQuotation` ذي Blocks داخلية؛
@@ -91,6 +102,7 @@ python main.py
 - `app/services/buttons.py`: التحقق من روابط الأزرار وإضافتها وحذفها وإعادة ترتيبها.
 - `app/services/inline_buttons.py`: تحليل أزرار النص وحل أزرار اختيار المستخدم.
 - `app/services/chat_registry.py`: حفظ المحادثات المرتبطة بالمشرف والتحقق منها قبل النشر.
+- `app/services/page_registry.py`: حفظ الصفحات المسماة وأكواد استدعائها وروابط التنقل بينها.
 - `app/services/renderer.py`: إنشاء `InputRichMessage` والمعاينة الاحتياطية.
 - `app/services/factory.py`: إنشاء الأنواع الجديدة وتحويل مدخلات المستخدم إلى بيانات Rich Blocks.
 - `app/services/albums.py`: تجميع الألبومات بصورة متزامنة وآمنة.
@@ -101,6 +113,7 @@ python main.py
 
 - `RichEditorStates.waiting_input`
 - `RichEditorStates.selecting_button_user`
+- `RichEditorStates.saving_page_name`
 - `RichEditorStates.managing`
 - `RichEditorStates.editing_block`
 - `RichEditorStates.adding_block`
@@ -108,7 +121,16 @@ python main.py
 
 ## قاعدة البيانات
 
-لا توجد Migration. الجلسات مؤقتة في `MemoryStorage` وتُفقد عند إعادة التشغيل. للإنتاج متعدد النسخ استبدلها بـRedisStorage من Aiogram من دون تغيير منطق المحرّر.
+لا توجد Migration. جلسة التحرير الحالية مؤقتة في `MemoryStorage` وتُفقد عند إعادة التشغيل،
+لكن الصفحات المحفوظة تبقى افتراضيًا في `data/rich_pages.json`. يمكن تغيير مسارها بمتغير
+البيئة `RICH_PAGES_STATE`. للإنتاج متعدد النسخ استبدل `MemoryStorage` وملف JSON بمخزن مشترك.
+
+### خطأ `BOT_DOMAIN_INVALID`
+
+هذا الخطأ يخص زر `login_url` عندما لا يطابق دومين الرابط الدومين المسجل للبوت. افتح
+`@BotFather`، اختر البوت، نفّذ `/setdomain` وسجّل الدومين فقط مثل `example.com`، ثم استعمل
+رابط `https://example.com/...`. إذا لا تحتاج تسجيل دخول Telegram، غيّر نوع الزر إلى `url`
+عادي ولا يحتاج `/setdomain`.
 
 ## الاختبارات
 

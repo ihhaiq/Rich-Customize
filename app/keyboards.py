@@ -105,6 +105,7 @@ def build_rich_editor_keyboard(
     ])
     rows.append([
         InlineKeyboardButton(text="💾 حفظ الصفحة", callback_data="r:savepage"),
+        InlineKeyboardButton(text="📚 صفحاتي", callback_data="r:pages"),
     ])
     rows.append([
         InlineKeyboardButton(
@@ -196,9 +197,30 @@ def build_button_type_keyboard(callback_prefix: str = "r:bat") -> InlineKeyboard
             InlineKeyboardButton(text="💬 Inline هنا", callback_data=f"{callback_prefix}:switch_inline_current"),
         ],
         [InlineKeyboardButton(text="🚫 زر معطّل", callback_data=f"{callback_prefix}:disabled")],
-        [InlineKeyboardButton(text="🔗 ربط بصفحة", callback_data=f"{callback_prefix}:page")],
+        [InlineKeyboardButton(text="📄 ربط بصفحة", callback_data=f"{callback_prefix}:page")],
         [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:buttons")],
     ])
+
+
+def build_pages_keyboard(pages: list[dict[str, Any]]) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(
+        text=f"📄 {page.get('title') or page['page_id']}",
+        callback_data=f"r:pageopen:{page['page_id']}",
+    )] for page in pages]
+    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_page_target_keyboard(
+    pages: list[dict[str, Any]], action: str, button_id: str | None = None,
+) -> InlineKeyboardMarkup:
+    prefix = f"r:bpg:{action}" + (f":{button_id}" if button_id else "")
+    rows = [[InlineKeyboardButton(
+        text=f"📄 {page.get('title') or page['page_id']}",
+        callback_data=f"{prefix}:{page['page_id']}",
+    )] for page in pages]
+    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:buttons")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def build_buttons_manager_keyboard(

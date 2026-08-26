@@ -130,6 +130,7 @@ async def main() -> None:
 
     dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.message.outer_middleware(LocaleMiddleware())
+    dispatcher.guest_message.outer_middleware(LocaleMiddleware())
     dispatcher.callback_query.outer_middleware(LocaleMiddleware())
     dispatcher.my_chat_member.outer_middleware(LocaleMiddleware())
     dispatcher.include_router(router)

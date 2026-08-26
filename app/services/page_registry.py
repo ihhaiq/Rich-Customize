@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import os
 import secrets
@@ -40,6 +41,7 @@ class PageRegistry:
     async def save(
         self,
         owner_id: int,
+        title: str,
         blocks: list[dict[str, Any]],
         buttons: list[dict[str, Any]],
         buttons_per_row: int,
@@ -60,8 +62,9 @@ class PageRegistry:
                 code = secrets.token_hex(4)
             pages[code] = {
                 "owner_id": owner_id,
-                "blocks": blocks,
-                "buttons": buttons,
+                "title": title.strip()[:64] or "صفحة بلا اسم",
+                "blocks": copy.deepcopy(blocks),
+                "buttons": copy.deepcopy(buttons),
                 "buttons_per_row": buttons_per_row,
                 "buttons_align": buttons_align,
             }
@@ -71,7 +74,20 @@ class PageRegistry:
     async def get(self, page_id: str) -> dict[str, Any] | None:
         async with self._lock:
             page = self._read().get(page_id)
-            return page if isinstance(page, dict) else None
+            return copy.deepcopy(page) if isinstance(page, dict) else None
+
+    async def list_for_user(self, owner_id: int) -> list[dict[str, Any]]:
+        async with self._lock:
+            pages = self._read()
+            result = [
+                {"page_id": code, **copy.deepcopy(page)}
+                for code, page in pages.items()
+                if isinstance(page, dict) and int(page.get("owner_id", 0)) == owner_id
+            ]
+            return sorted(
+                result,
+                key=lambda page: str(page.get("title") or page["page_id"]).casefold(),
+            )
 
     async def delete(self, page_id: str, owner_id: int) -> bool:
         async with self._lock:

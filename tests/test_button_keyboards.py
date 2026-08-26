@@ -4,6 +4,7 @@ from app.keyboards import (
     build_button_type_keyboard, build_buttons_manager_keyboard,
     build_details_content_keyboard, build_inner_block_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
+    build_pages_keyboard, build_page_target_keyboard,
 )
 from app.services.buttons import add_message_button
 
@@ -57,6 +58,23 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertTrue(keyboard.inline_keyboard[0][0].text.startswith("⬜"))
         self.assertTrue(keyboard.inline_keyboard[1][0].text.startswith("✅"))
         self.assertIn("(1)", keyboard.inline_keyboard[2][0].text)
+
+    def test_saved_pages_are_selected_by_name(self):
+        pages = [{"page_id": "a1b2c3d4", "title": "الصفحة الثانية"}]
+
+        own_pages = build_pages_keyboard(pages)
+        add_target = build_page_target_keyboard(pages, "add")
+        change_target = build_page_target_keyboard(pages, "change", "button1")
+
+        self.assertEqual(own_pages.inline_keyboard[0][0].text, "📄 الصفحة الثانية")
+        self.assertEqual(
+            add_target.inline_keyboard[0][0].callback_data,
+            "r:bpg:add:a1b2c3d4",
+        )
+        self.assertEqual(
+            change_target.inline_keyboard[0][0].callback_data,
+            "r:bpg:change:button1:a1b2c3d4",
+        )
 
     def test_details_builder_only_finishes_after_an_inner_block(self):
         empty = build_details_content_keyboard(0)

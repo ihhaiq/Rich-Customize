@@ -10,7 +10,7 @@ from app.services.renderer import build_input_rich_message
 from app.services.inline_buttons import (
     find_user_button_markers, resolve_user_button_marker,
 )
-from app.routers.rich_editor import _button_guide_blocks
+from app.routers.rich_editor import _button_guide_blocks, _friendly_rich_error
 
 
 class FormattedTextParserTests(unittest.TestCase):
@@ -116,6 +116,28 @@ class FormattedTextParserTests(unittest.TestCase):
         self.assertEqual(rich["blocks"][2]["buttons"][0]["style"], "link")
         self.assertTrue(rich["blocks"][2]["buttons"][0]["callback_data"].startswith("r:popup:"))
         self.assertEqual(rich["blocks"][2]["buttons"][1]["disabled"], {})
+
+    def test_page_button_keeps_source_for_ephemeral_back_navigation(self):
+        paragraph = new_block("paragraph", {"text": "الأولى", "html": "<p>الأولى</p>"})
+        buttons = []
+        add_message_button(buttons, "التالي", "deadbeef", "page")
+
+        rich = build_input_rich_message(
+            [paragraph], buttons, source_page_id="c0ffee00",
+        ).model_dump(mode="json", exclude_none=True)
+
+        self.assertEqual(
+            rich["blocks"][1]["buttons"][0]["callback_data"],
+            "r:page:deadbeef:c0ffee00",
+        )
+        self.assertLessEqual(
+            len(rich["blocks"][1]["buttons"][0]["callback_data"].encode()), 64,
+        )
+
+    def test_domain_error_explains_botfather_fix(self):
+        reason = _friendly_rich_error(ValueError("Bad Request: BOT_DOMAIN_INVALID"))
+        self.assertIn("/setdomain", reason)
+        self.assertIn("URL عادي", reason)
 
     def test_document_is_a_native_rich_block(self):
         document = new_block("document", {
