@@ -18,6 +18,8 @@ from aiogram.utils.token import TokenValidationError
 from app.config import Settings
 from app.i18n import LocaleMiddleware, LocalizedBot, configure_bot_profile
 from app.routers import router
+from app.services.media import cleanup_interval_seconds, media_store
+from app.services.page_registry import page_registry
 
 
 logger = logging.getLogger(__name__)
@@ -113,6 +115,16 @@ async def prepare_telegram(bot: LocalizedBot) -> bool:
         retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
 
 
+async def _media_cleanup_loop() -> None:
+    interval = cleanup_interval_seconds()
+    while True:
+        try:
+            media_store.cleanup()
+        except Exception:
+            logger.exception("Rich-media cleanup failed")
+        await asyncio.sleep(interval)
+
+
 async def main() -> None:
     settings = Settings.from_env()
     logging.basicConfig(
@@ -135,9 +147,13 @@ async def main() -> None:
     dispatcher.my_chat_member.outer_middleware(LocaleMiddleware())
     dispatcher.include_router(router)
 
+    cleanup_task: asyncio.Task[None] | None = None
     try:
         if not await prepare_telegram(bot):
             return
+        await page_registry.rebuild_media_pins()
+        media_store.cleanup()
+        cleanup_task = asyncio.create_task(_media_cleanup_loop(), name="rich-media-cleanup")
         await configure_bot_profile(bot)
         logger.info("Starting Telegram polling")
         await dispatcher.start_polling(
@@ -145,6 +161,12 @@ async def main() -> None:
             allowed_updates=dispatcher.resolve_used_update_types(),
         )
     finally:
+        if cleanup_task is not None:
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                pass
         await bot.session.close()
         logger.info("Telegram HTTP session closed")
 
