@@ -2786,7 +2786,7 @@ async def _open_page_link(
         bot, chat_id, callback.from_user.id,
     ):
         await callback.answer(
-            "هذا الزر مخصص لمشتركي القناة فقط. اشترك بالقناة وحاول مرة ثانية.",
+            "انت مو من المقربين ابتعد عني .... ",
             show_alert=True,
         )
         return
