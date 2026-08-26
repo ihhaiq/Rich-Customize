@@ -2766,11 +2766,20 @@ async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
     if page is None:
         await callback.answer("هذه الصفحة لم تعد موجودة أو انتهت صلاحيتها.", show_alert=True)
         return
+    ephemeral_message_id = (
+        callback_message.ephemeral_message_id if callback_message is not None else None
+    )
     buttons = list(page.get("buttons") or [])
-    if source_id:
+    if ephemeral_message_id and source_id:
         buttons = buttons + [{
             "id": "back", "text": "🔙 رجوع", "type": "page",
             "value": source_id, "position": len(buttons), "style": "default",
+        }]
+    elif not ephemeral_message_id:
+        buttons = buttons + [{
+            "id": "restore", "text": "🔙 رجوع", "type": "callback_data",
+            "value": "r:ephemeral:restore", "position": len(buttons),
+            "style": "default",
         }]
     prepared_buttons = await _prepare_message_buttons(buttons)
     callback_notice: str | None = None
@@ -2782,9 +2791,6 @@ async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
             buttons_align=str(page.get("buttons_align", "center")),
             source_page_id=target_id,
         )
-        ephemeral_message_id = (
-            callback_message.ephemeral_message_id if callback_message is not None else None
-        )
         if ephemeral_message_id:
             await bot.edit_ephemeral_message_text(
                 chat_id=chat_id,
@@ -2792,7 +2798,7 @@ async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
                 ephemeral_message_id=ephemeral_message_id,
                 rich_message=rich_message,
             )
-        elif chat_type in {"group", "supergroup"}:
+        elif chat_type in {"group", "supergroup", "channel"}:
             await bot.send_rich_message(
                 chat_id=chat_id,
                 rich_message=rich_message,
@@ -2803,15 +2809,12 @@ async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
                 ),
             )
         else:
-            # Telegram limits outgoing ephemeral messages to groups and supergroups.
-            # In private chats (and for channel-origin callbacks), deliver the same
-            # page privately so a public post is never replaced for all readers.
+            # Ephemeral replacement is a shared-chat feature. Keep the ordinary
+            # private-chat behavior for callbacks that don't belong to a shared chat.
             await bot.send_rich_message(
                 chat_id=callback.from_user.id,
                 rich_message=rich_message,
             )
-            if chat_type == "channel":
-                callback_notice = "فتحت الصفحة في الخاص؛ Ephemeral غير مدعوم بالقنوات."
     except (RichMessageRenderError, TelegramAPIError, ValueError) as error:
         logger.exception(
             "Failed to open page_id=%s for user_id=%s", target_id, callback.from_user.id,
@@ -2823,6 +2826,36 @@ async def open_page_link(callback: CallbackQuery, bot: Bot) -> None:
         return
     try:
         await callback.answer(callback_notice)
+    except TelegramBadRequest:
+        pass
+
+
+@router.callback_query(F.data == "r:ephemeral:restore")
+async def restore_original_message(callback: CallbackQuery, bot: Bot) -> None:
+    callback_message = callback.message
+    chat = getattr(callback_message, "chat", None)
+    ephemeral_message_id = getattr(callback_message, "ephemeral_message_id", None)
+    if chat is None or not ephemeral_message_id:
+        await callback.answer("الرسالة الأصلية غير متاحة.", show_alert=True)
+        return
+    try:
+        await bot.delete_ephemeral_message(
+            chat_id=chat.id,
+            receiver_user_id=callback.from_user.id,
+            ephemeral_message_id=ephemeral_message_id,
+        )
+    except TelegramAPIError as error:
+        logger.exception(
+            "Failed to restore original message for user_id=%s",
+            callback.from_user.id,
+        )
+        await callback.answer(
+            f"تعذر الرجوع إلى الرسالة الأصلية: {_friendly_rich_error(error)[:140]}",
+            show_alert=True,
+        )
+        return
+    try:
+        await callback.answer()
     except TelegramBadRequest:
         pass
 
