@@ -15,11 +15,21 @@ from app.services.buttons import (
 from app.services.factory import (
     MEDIA_CAPTION_TYPES, QUOTE_TYPES, compatible_child_block_types,
 )
+from app.i18n import t
 
 
 def build_welcome_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🧩 قالب كل البلوكات", callback_data="r:showcase"),
+    ]])
+
+
+def build_start_editor_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=t("editor.start_button"),
+            callback_data="r:starteditor",
+        ),
     ]])
 
 
@@ -95,6 +105,11 @@ def build_message_buttons_keyboard(
 def build_rich_editor_keyboard(
     blocks: list[dict[str, Any]], buttons: list[dict[str, Any]] | None = None,
 ) -> InlineKeyboardMarkup:
+    if not blocks:
+        return InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="➕ إضافة Block", callback_data="r:addmenu"),
+            InlineKeyboardButton(text="📚 صفحاتي", callback_data="r:pages"),
+        ]])
     rows = [
         [InlineKeyboardButton(text=get_block_button_text(block, index), callback_data=f"r:b:{block['id']}")]
         for index, block in enumerate(sorted(blocks, key=lambda item: item["position"]))
