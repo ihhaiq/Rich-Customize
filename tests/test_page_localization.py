@@ -6,12 +6,14 @@ from unittest.mock import AsyncMock, patch
 from app import i18n_core
 from app.i18n import t, tr
 from app.locales import TRANSLATIONS
-from app.locales.common import EDITOR_UX_KEYS, KEY_TRANSLATIONS, LIST_UI_KEYS
+from app.locales.common import (
+    EDITOR_UX_KEYS, KEY_TRANSLATIONS, LIST_UI_KEYS, RICH_IMPORT_KEYS,
+)
 from app.routers.editor_core import (
     _ask_for_button_user, _block_page, _code_input_prompt,
     _delete_stored_block_prompt, _math_input_prompt,
-    _opened_page_text, _page_screen, _saved_pages_text, _session, new_editor,
-    _pages_for_user,
+    _editor_overview_text, _opened_page_text, _page_screen, _saved_pages_text,
+    _session, import_rich_message_into_editor, new_editor, _pages_for_user,
 )
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
@@ -119,6 +121,28 @@ class SavedPagesLocalizationTests(unittest.TestCase):
             missing = set(LIST_UI_KEYS) - set(KEY_TRANSLATIONS.get(language, {}))
             self.assertFalse(missing, f"{language}: {sorted(missing)}")
 
+    def test_every_locale_translates_rich_import_keys(self):
+        for language in TRANSLATIONS:
+            if language == "ar":
+                continue
+            missing = set(RICH_IMPORT_KEYS) - set(KEY_TRANSLATIONS.get(language, {}))
+            self.assertFalse(missing, f"{language}: {sorted(missing)}")
+
+    def test_imported_rich_message_overview_lists_blocks_in_order(self):
+        blocks = [
+            {"id": "photo", "type": "photo", "position": 1, "data": {}},
+            {"id": "text", "type": "paragraph", "position": 0, "data": {}},
+        ]
+        token = i18n_core._language.set("ar")
+        try:
+            rendered = _editor_overview_text(blocks)
+        finally:
+            i18n_core._language.reset(token)
+
+        self.assertIn("تم استيراد الرسالة الغنية", rendered)
+        self.assertIn("عدد البلوكات: 2", rendered)
+        self.assertLess(rendered.index("📝 فقرة"), rendered.index("🖼 صورة"))
+
     def test_saved_pages_text_leaves_titles_and_codes_to_buttons(self):
         rendered = _saved_pages_text()
 
@@ -186,6 +210,38 @@ class SavedPagesLocalizationTests(unittest.TestCase):
 
 
 class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_forwarded_rich_message_replaces_editor_source(self):
+        old_blocks = [{"id": "old", "type": "paragraph", "position": 0}]
+        new_blocks = [{"id": "new", "type": "photo", "position": 0}]
+        message = SimpleNamespace(answer=AsyncMock())
+        state = SimpleNamespace(
+            get_data=AsyncMock(return_value={"blocks": old_blocks}),
+            update_data=AsyncMock(),
+        )
+        bot = SimpleNamespace()
+        with (
+            patch(
+                "app.routers.editor_core.message_to_blocks",
+                return_value=new_blocks,
+            ),
+            patch(
+                "app.routers.editor_core._delete_input_message",
+                AsyncMock(),
+            ) as delete_input,
+            patch(
+                "app.routers.editor_core._edit_saved_ui",
+                AsyncMock(),
+            ) as edit_ui,
+        ):
+            await import_rich_message_into_editor(message, state, bot)
+
+        update = state.update_data.await_args.kwargs
+        self.assertEqual(update["blocks"], new_blocks)
+        self.assertEqual(update["undo_blocks"], old_blocks)
+        self.assertEqual(update["message_buttons"], [])
+        delete_input.assert_awaited_once_with(message)
+        edit_ui.assert_awaited_once()
+
     async def test_user_marker_offers_user_and_public_channel_choices(self):
         message = SimpleNamespace(answer=AsyncMock())
         state = SimpleNamespace(update_data=AsyncMock())
