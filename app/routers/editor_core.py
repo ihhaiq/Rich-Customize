@@ -84,7 +84,6 @@ def _math_input_prompt(*, editing: bool = False) -> str:
 
 
 def _saved_pages_text(
-    pages: list[dict[str, Any]],
     page_index: int = 0,
     total_pages: int = 1,
 ) -> str:
@@ -93,17 +92,12 @@ def _saved_pages_text(
         f"{page_index + 1}/{total_pages}",
         "",
         "اختر صفحة لفتحها وتعديلها:",
-        "",
     ]
-    for page in pages:
-        title = html.escape(str(page.get("title") or page["page_id"]))
-        lines.append(f"📄 {title}")
     return "\n".join(lines)
 
 
-def _opened_page_text(page: dict[str, Any]) -> str:
-    title = html.escape(str(page.get("title") or "صفحة بلا اسم"))
-    return f"📄 {title}\n\n{MAIN_TEXT}"
+def _opened_page_text() -> str:
+    return MAIN_TEXT
 
 
 def _page_screen(
@@ -2859,7 +2853,7 @@ async def list_pages(callback: CallbackQuery, state: FSMContext) -> None:
         return
     await _edit_ui(
         callback.message,
-        _saved_pages_text(visible, page_index, total_pages),
+        _saved_pages_text(page_index, total_pages),
         build_pages_keyboard(visible, page_index, total_pages),
         parse_mode="HTML",
     )
@@ -2918,7 +2912,7 @@ async def receive_page_rename(message: Message, state: FSMContext, bot: Bot) -> 
     await _edit_saved_ui(
         bot,
         state,
-        _saved_pages_text(visible, page_index, total_pages),
+        _saved_pages_text(page_index, total_pages),
         build_pages_keyboard(visible, page_index, total_pages),
         parse_mode="HTML",
     )
@@ -2976,7 +2970,7 @@ async def delete_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     else:
         await _edit_ui(
             callback.message,
-            _saved_pages_text(visible, page_index, total_pages),
+            _saved_pages_text(page_index, total_pages),
             build_pages_keyboard(visible, page_index, total_pages),
             parse_mode="HTML",
         )
@@ -3009,7 +3003,7 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     )
     await _edit_ui(
         callback.message,
-        _opened_page_text(page),
+        _opened_page_text(),
         build_rich_editor_keyboard(blocks),
         parse_mode="HTML",
     )
