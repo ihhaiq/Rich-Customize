@@ -107,7 +107,7 @@ _core.EN = EN
 def _base_profiles() -> dict[str | None, dict[str, Any]]:
     return {
         None: {
-            "name": "Rich Message Editor",
+            "name": "Rich Message Editor - BETA",
             "description": "Create and customize Telegram Rich Messages with structured blocks, media, details, quotations, lists, tables, and previews.",
             "short": "Create and customize Telegram Rich Messages.",
             "commands": [
@@ -117,7 +117,7 @@ def _base_profiles() -> dict[str | None, dict[str, Any]]:
             ],
         },
         "en": {
-            "name": "Rich Message Editor",
+            "name": "Rich Message Editor - BETA",
             "description": "Create and customize Telegram Rich Messages with structured blocks, media, details, quotations, lists, tables, and previews.",
             "short": "Create and customize Telegram Rich Messages.",
             "commands": [
@@ -127,7 +127,7 @@ def _base_profiles() -> dict[str | None, dict[str, Any]]:
             ],
         },
         "ar": {
-            "name": "محرّر الرسائل الغنية",
+            "name": "محرّر الرسائل الغنية - اصدار تجريبي",
             "description": "أنشئ وخصّص رسائل Telegram الغنية باستخدام البلوكات والوسائط والتفاصيل والاقتباسات والقوائم والجداول والمعاينة.",
             "short": "إنشاء وتخصيص رسائل Telegram الغنية.",
             "commands": [
@@ -137,7 +137,7 @@ def _base_profiles() -> dict[str | None, dict[str, Any]]:
             ],
         },
         "zh": {
-            "name": "富消息编辑器",
+            "name": "富消息编辑器 - BETA",
             "description": "使用结构化区块、媒体、详情、引用、列表、表格和预览来创建并自定义 Telegram 富消息。",
             "short": "创建并自定义 Telegram 富消息。",
             "commands": [
@@ -153,8 +153,9 @@ def _profiles() -> dict[str | None, dict[str, Any]]:
     profiles = _base_profiles()
     for language_code, profile in LOCALE_PROFILES.items():
         commands = profile.get("commands") or {}
+        beta_name = f"{profile['name']} - BETA"
         profiles[language_code] = {
-            "name": str(profile["name"]),
+            "name": beta_name[:64],
             "description": str(profile["description"]),
             "short": str(profile["short"]),
             "commands": [
