@@ -27,6 +27,8 @@ from app.keyboards import (
     build_delete_confirmation_keyboard, build_heading_level_keyboard,
     build_details_content_keyboard, build_inner_block_input_keyboard,
     build_inner_block_keyboard, build_list_type_keyboard,
+    build_details_inner_block_keyboard, build_details_inner_blocks_keyboard,
+    build_details_inner_delete_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
     build_editor_tools_keyboard,
     build_pages_keyboard, build_page_delete_confirmation_keyboard,
@@ -452,6 +454,49 @@ def _block_page(block: dict[str, Any], blocks: list[dict[str, Any]]) -> str:
                 continue
             status = "☑️" if item.get("is_checked") else "☐"
             lines.append(f"{task_index}. {status} {item.get('text', '')}")
+    lines.extend(["", t("common.choose_action")])
+    return "\n".join(lines)
+
+
+def _details_children(details: dict[str, Any]) -> list[dict[str, Any]]:
+    children = details.get("data", {}).get("children", [])
+    if not isinstance(children, list):
+        return []
+    normalize_block_positions(children)
+    return children
+
+
+def _details_child(
+    details: dict[str, Any], child_id: str,
+) -> dict[str, Any] | None:
+    return get_block_by_id(_details_children(details), child_id)
+
+
+def _details_inner_list_text(details: dict[str, Any]) -> str:
+    children = _details_children(details)
+    lines = [
+        t("details.inner_list_title"),
+        t("details.inner_count", count=len(children)),
+        "",
+    ]
+    for position, child in enumerate(children, start=1):
+        label = BLOCK_LABELS.get(str(child.get("type", "")), t("block.content"))
+        lines.append(f"{position}. {label}")
+    lines.extend(["", t("common.choose_action")])
+    return "\n".join(lines)
+
+
+def _details_inner_page(
+    details: dict[str, Any], child: dict[str, Any],
+) -> str:
+    children = _details_children(details)
+    position = children.index(child) + 1
+    label = BLOCK_LABELS.get(str(child.get("type", "")), t("block.content"))
+    lines = [
+        t("details.inner_settings_title"),
+        t("details.inner_type", name=label),
+        t("details.inner_position", current=position, total=len(children)),
+    ]
     lines.extend(["", t("common.choose_action")])
     return "\n".join(lines)
 
@@ -1795,6 +1840,7 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         pending_button_action=None, pending_button_text=None,
         pending_add_type=None, pending_child_type=None,
         add_step=None, add_payload=None,
+        nested_details_id=None, nested_child_id=None, nested_action=None,
     )
     await managed_chat_registry.clear_panel(callback.from_user.id)
     await callback.answer()
@@ -2424,6 +2470,232 @@ async def open_block(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("r:dim:"))
+async def open_details_inner_manager(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    _, blocks = session
+    details_id = callback.data.rsplit(":", 1)[-1]
+    details = get_block_by_id(blocks, details_id)
+    if details is None or details.get("type") != "details":
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    await _edit_ui(
+        callback.message,
+        _details_inner_list_text(details),
+        build_details_inner_blocks_keyboard(details),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:di:"))
+async def open_details_inner_block(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    _, blocks = session
+    try:
+        _, _, details_id, child_id = callback.data.split(":", 3)
+    except ValueError:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    details = get_block_by_id(blocks, details_id)
+    child = _details_child(details, child_id) if details else None
+    if details is None or details.get("type") != "details" or child is None:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    await _edit_ui(
+        callback.message,
+        _details_inner_page(details, child),
+        build_details_inner_block_keyboard(details, child),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:dip:"))
+async def preview_details_inner_block(
+    callback: CallbackQuery, state: FSMContext, bot: Bot,
+) -> None:
+    session = await _session(callback, state)
+    if not session:
+        return
+    _, blocks = session
+    try:
+        _, _, details_id, child_id = callback.data.split(":", 3)
+    except ValueError:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    details = get_block_by_id(blocks, details_id)
+    child = _details_child(details, child_id) if details else None
+    if child is None:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+        await callback.answer(t("preview_generating"))
+    try:
+        await send_rich_message_preview(bot, callback.from_user.id, [child])
+    except (RichMessageRenderError, TelegramAPIError):
+        logger.exception("Failed to preview nested block %s", child_id)
+        await bot.send_message(callback.from_user.id, t("preview_failed"))
+
+
+@router.callback_query(F.data.startswith("r:die:"))
+async def edit_details_inner_block(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    _, blocks = session
+    try:
+        _, _, details_id, child_id = callback.data.split(":", 3)
+    except ValueError:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    details = get_block_by_id(blocks, details_id)
+    child = _details_child(details, child_id) if details else None
+    if child is None or child.get("type") == "divider":
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    await state.update_data(
+        nested_details_id=details_id,
+        nested_child_id=child_id,
+        nested_action="content",
+        expected_type=child.get("type"),
+        edit_field=None,
+    )
+    await state.set_state(RichEditorStates.editing_block)
+    await _send_add_prompt(callback.message, state, t("details.inner_send_content"))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:dif:"))
+async def edit_details_inner_field(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    _, blocks = session
+    try:
+        _, _, details_id, child_id, action = callback.data.split(":", 4)
+    except ValueError:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    details = get_block_by_id(blocks, details_id)
+    child = _details_child(details, child_id) if details else None
+    allowed = (
+        action == "add_footer" and child and child.get("type") not in {"footer", "divider", "anchor"}
+        or action == "caption" and child and child.get("type") in MEDIA_CAPTION_TYPES
+        or action == "credit" and child and child.get("type") in MEDIA_CAPTION_TYPES | QUOTE_TYPES
+    )
+    if child is None or not allowed:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    await state.update_data(
+        nested_details_id=details_id,
+        nested_child_id=child_id,
+        nested_action=action,
+        expected_type=child.get("type"),
+        edit_field=None,
+    )
+    await state.set_state(RichEditorStates.editing_block)
+    prompt_key = {
+        "caption": "details.inner_send_caption",
+        "credit": "details.inner_send_credit",
+        "add_footer": "details.inner_send_footer",
+    }[action]
+    await _send_add_prompt(callback.message, state, t(prompt_key))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:did:"))
+async def ask_delete_details_inner(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    _, blocks = session
+    try:
+        _, _, details_id, child_id = callback.data.split(":", 3)
+    except ValueError:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    details = get_block_by_id(blocks, details_id)
+    if details is None or _details_child(details, child_id) is None:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    await _edit_ui(
+        callback.message,
+        t("details.inner_delete_question"),
+        build_details_inner_delete_keyboard(details_id, child_id),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:didok:"))
+async def confirm_delete_details_inner(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    _, blocks = session
+    try:
+        _, _, details_id, child_id = callback.data.split(":", 3)
+    except ValueError:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    details = get_block_by_id(blocks, details_id)
+    if details is None or details.get("type") != "details":
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    children = _details_children(details)
+    await _remember_blocks_for_undo(state, blocks)
+    if not delete_block(children, child_id):
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    details["data"]["native"] = False
+    details["data"].pop("native_data", None)
+    await state.update_data(blocks=blocks)
+    await _edit_ui(
+        callback.message,
+        _details_inner_list_text(details),
+        build_details_inner_blocks_keyboard(details),
+    )
+    await callback.answer(t("details.inner_deleted"))
+
+
+@router.callback_query(F.data.startswith("r:dimu:"))
+@router.callback_query(F.data.startswith("r:dimd:"))
+async def move_details_inner(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    _, blocks = session
+    try:
+        prefix, details_id, child_id = callback.data.rsplit(":", 2)
+    except ValueError:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    details = get_block_by_id(blocks, details_id)
+    child = _details_child(details, child_id) if details else None
+    if details is None or child is None:
+        await callback.answer(t("missing_block"), show_alert=True)
+        return
+    children = _details_children(details)
+    current = children.index(child)
+    target = current - 1 if prefix == "r:dimu" else current + 1
+    if not 0 <= target < len(children):
+        await callback.answer(t("details.inner_current_position"))
+        return
+    await _remember_blocks_for_undo(state, blocks)
+    move_block(children, child_id, target)
+    details["data"]["native"] = False
+    details["data"].pop("native_data", None)
+    await state.update_data(blocks=blocks)
+    moved = _details_child(details, child_id)
+    await _edit_ui(
+        callback.message,
+        _details_inner_page(details, moved),
+        build_details_inner_block_keyboard(details, moved),
+    )
+    await callback.answer(t("details.inner_moved"))
+
+
 TABLE_CELL_ACTIONS = {
     "sh": (True, None, "تم تظليل الخلية"),
     "uh": (False, None, "تم إلغاء تظليل الخلية"),
@@ -2583,11 +2855,123 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+async def _receive_nested_replacement(
+    message: Message,
+    state: FSMContext,
+    bot: Bot,
+    data: dict[str, Any],
+) -> bool:
+    details_id = data.get("nested_details_id")
+    child_id = data.get("nested_child_id")
+    action = data.get("nested_action")
+    if not details_id or not child_id or not action:
+        return False
+    blocks = data.get("blocks", [])
+    details = get_block_by_id(blocks, str(details_id))
+    child = _details_child(details, str(child_id)) if details else None
+    if details is None or child is None:
+        await message.answer(t("missing_block"))
+        await state.set_state(RichEditorStates.managing)
+        return True
+
+    if action in {"caption", "credit", "add_footer"} and not message.text:
+        await message.answer(t("details.inner_text_required"))
+        return True
+
+    selected = child
+    if action == "add_footer":
+        await _remember_blocks_for_undo(state, blocks)
+        footer = new_block("footer", text_data(message, "footer"))
+        children = _details_children(details)
+        position = children.index(child) + 1
+        children.insert(position, footer)
+        normalize_block_positions(children)
+        selected = footer
+    elif action in {"caption", "credit"}:
+        await _remember_blocks_for_undo(state, blocks)
+        remove = message.text.strip().casefold() == "/remove"
+        key = "caption_html" if action == "caption" else "credit_html"
+        child.setdefault("data", {})[key] = None if remove else message.html_text
+        child["data"]["native"] = False
+        child["data"].pop("native_data", None)
+    else:
+        expected = str(child.get("type", ""))
+        replacement: dict[str, Any] | None = None
+        if expected in {
+            "text", "paragraph", "heading", "preformatted", "footer",
+            "mathematical_expression", "anchor", "list", "table",
+        } and message.text:
+            replacement = text_data(
+                message,
+                expected,
+                int(child.get("data", {}).get("size", 2)),
+                str(child.get("data", {}).get("kind", "bullet")),
+            )
+            if expected == "list" and not replacement.get("items"):
+                replacement = None
+        elif expected in QUOTE_TYPES and message.text:
+            replacement = quote_data(message, child.get("data", {}).get("credit_html"))
+            replacement["media_children"] = child.get("data", {}).get("media_children", [])
+        elif expected == "map" and message.location:
+            replacement = map_data(message.location.latitude, message.location.longitude)
+            replacement["caption_html"] = child.get("data", {}).get("caption_html")
+            replacement["credit_html"] = child.get("data", {}).get("credit_html")
+        elif expected in {"collage", "slideshow"}:
+            if message.media_group_id:
+                collected = await albums.collect(message)
+                if collected is None:
+                    return True
+                children = messages_to_blocks(collected)
+            else:
+                children = message_to_blocks(message)
+            media_children = [
+                item for item in children if item.get("type") in {"photo", "video"}
+            ]
+            if media_children:
+                replacement = {
+                    **child.get("data", {}),
+                    "children": media_children,
+                }
+        else:
+            replacement = replacement_data(message, expected)
+            if replacement is not None and expected in MEDIA_CAPTION_TYPES:
+                replacement["caption_html"] = child.get("data", {}).get("caption_html")
+                replacement["credit_html"] = child.get("data", {}).get("credit_html")
+        if replacement is None:
+            await message.answer(t("details.inner_wrong_content"))
+            return True
+        await _remember_blocks_for_undo(state, blocks)
+        replacement["native"] = False
+        replacement.pop("native_data", None)
+        child["data"] = replacement
+
+    details["data"]["native"] = False
+    details["data"].pop("native_data", None)
+    await _delete_add_step_messages(bot, message, data, state)
+    await state.update_data(
+        blocks=blocks,
+        nested_details_id=None,
+        nested_child_id=None,
+        nested_action=None,
+        expected_type=None,
+    )
+    await state.set_state(RichEditorStates.managing)
+    await _edit_saved_ui(
+        bot,
+        state,
+        _details_inner_page(details, selected),
+        build_details_inner_block_keyboard(details, selected),
+    )
+    return True
+
+
 @router.message(RichEditorStates.editing_block)
 async def receive_replacement(message: Message, state: FSMContext, bot: Bot) -> None:
     if await _defer_text_for_user_buttons(message, state, "editing_block"):
         return
     data = await state.get_data()
+    if await _receive_nested_replacement(message, state, bot, data):
+        return
     blocks = data.get("blocks", [])
     block_id = data.get("current_block_id")
     expected = data.get("expected_type")
