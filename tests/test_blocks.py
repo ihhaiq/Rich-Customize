@@ -8,7 +8,7 @@ from app.services.buttons import (
     delete_message_button, move_message_button,
     normalize_button_url,
 )
-from app.services.factory import new_block
+from app.services.factory import new_block, preformatted_data
 from app.services.renderer import build_input_rich_message
 
 
@@ -22,6 +22,26 @@ def sample_blocks():
 
 
 class BlockOperationsTests(unittest.TestCase):
+    def test_preformatted_language_can_be_set_with_lang_header(self):
+        data = preformatted_data("/lang python\nprint('<ok>')")
+
+        self.assertEqual(data["language"], "python")
+        self.assertEqual(data["text"], "print('<ok>')")
+        self.assertIn('class="language-python"', data["html"])
+        self.assertIn("&lt;ok&gt;", data["html"])
+
+        rich = build_input_rich_message([
+            new_block("preformatted", data),
+        ]).model_dump(mode="json", exclude_none=True)
+        self.assertEqual(rich["blocks"][0]["language"], "python")
+        self.assertEqual(rich["blocks"][0]["text"], "print('<ok>')")
+
+    def test_preformatted_language_can_be_set_with_code_fence(self):
+        data = preformatted_data("```javascript\nconsole.log('ok')\n```")
+
+        self.assertEqual(data["language"], "javascript")
+        self.assertEqual(data["text"], "console.log('ok')")
+
     def test_math_expression_preserves_escaped_space(self):
         expression = r"\text{Huge\ Pony}"
         block = new_block("mathematical_expression", {"text": expression})
