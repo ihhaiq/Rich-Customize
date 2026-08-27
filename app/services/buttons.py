@@ -56,7 +56,7 @@ def normalize_button_url(value: str) -> str | None:
     url = value.strip()
     if TELEGRAM_USERNAME_RE.fullmatch(url):
         return f"https://t.me/{url[1:]}"
-    if url.startswith(("t.me/", "telegram.me/")):
+    if url.casefold().startswith(("t.me/", "telegram.me/")):
         url = f"https://{url}"
     parsed = urlparse(url)
     if parsed.scheme in {"http", "https"} and parsed.netloc:
