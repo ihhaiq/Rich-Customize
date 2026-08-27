@@ -26,7 +26,7 @@ from app.keyboards import (
     build_buttons_manager_keyboard, build_chat_reached_keyboard,
     build_delete_confirmation_keyboard, build_heading_level_keyboard,
     build_details_content_keyboard, build_inner_block_input_keyboard,
-    build_inner_block_keyboard,
+    build_inner_block_keyboard, build_list_type_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
     build_editor_tools_keyboard,
     build_pages_keyboard, build_page_delete_confirmation_keyboard,
@@ -445,6 +445,13 @@ def _block_page(block: dict[str, Any], blocks: list[dict[str, Any]]) -> str:
         label = BLOCK_LABELS.get(item["type"], "📦 محتوى")
         marker = "◀️ " if item["id"] == block["id"] else ""
         lines.append(f"{marker}{position}. {label}")
+    if block.get("type") == "list" and block.get("data", {}).get("kind") == "checklist":
+        lines.extend(["", t("list.tasks_title")])
+        for task_index, item in enumerate(block.get("data", {}).get("items", []), start=1):
+            if not isinstance(item, dict):
+                continue
+            status = "☑️" if item.get("is_checked") else "☐"
+            lines.append(f"{task_index}. {status} {item.get('text', '')}")
     lines.extend(["", t("common.choose_action")])
     return "\n".join(lines)
 
@@ -1070,6 +1077,38 @@ async def add_block_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "r:add:listmenu")
+async def open_list_type_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    await _edit_ui(
+        callback.message,
+        t("list.menu_title"),
+        build_list_type_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:addlist:"))
+async def choose_list_type(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    list_kind = callback.data.rsplit(":", 1)[-1]
+    if list_kind not in {"bullet", "numbered", "checklist"}:
+        await callback.answer(t("list.invalid"), show_alert=True)
+        return
+    await state.set_state(RichEditorStates.adding_block)
+    await state.update_data(
+        pending_add_type="list",
+        add_step="content",
+        add_payload={"list_kind": list_kind},
+    )
+    await _send_add_prompt(message=callback.message, state=state, text=t(f"list.{list_kind}_prompt"))
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("r:add:"))
 async def choose_add_block(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     session = await _session(callback, state)
@@ -1264,6 +1303,17 @@ async def choose_details_child_type(
         )
         await callback.answer()
         return
+    if child_type == "list":
+        await _edit_ui(
+            callback.message,
+            t("list.menu_title"),
+            build_list_type_keyboard(
+                callback_prefix="r:details:list",
+                back_data="r:details:add",
+            ),
+        )
+        await callback.answer()
+        return
     prompts = {
         "paragraph": "أرسل نص الفقرة",
         "preformatted": _code_input_prompt(),
@@ -1289,6 +1339,32 @@ async def choose_details_child_type(
     await _edit_ui(
         callback.message,
         prompts[child_type],
+        build_inner_block_input_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:details:list:"))
+async def choose_details_list_type(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    list_kind = callback.data.rsplit(":", 1)[-1]
+    if (
+        data.get("pending_add_type") != "details"
+        or list_kind not in {"bullet", "numbered", "checklist"}
+        or not isinstance(callback.message, Message)
+    ):
+        await callback.answer(t("list.invalid"), show_alert=True)
+        return
+    payload = dict(data.get("add_payload") or {})
+    payload["child_list_kind"] = list_kind
+    await state.update_data(
+        add_step="details_child_content",
+        pending_child_type="list",
+        add_payload=payload,
+    )
+    await _edit_ui(
+        callback.message,
+        t(f"list.{list_kind}_prompt"),
         build_inner_block_input_keyboard(),
     )
     await callback.answer()
@@ -1580,13 +1656,18 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
             "paragraph", "heading", "preformatted", "footer",
             "mathematical_expression", "anchor", "list", "table",
         } and message.text:
+            child_data = text_data(
+                message,
+                child_type,
+                int(payload.get("child_heading_size", 2)),
+                str(payload.get("child_list_kind", "bullet")),
+            )
+            if child_type == "list" and not child_data.get("items"):
+                await message.answer(t("list.empty"))
+                return
             child = new_block(
                 child_type,
-                text_data(
-                    message,
-                    child_type,
-                    int(payload.get("child_heading_size", 2)),
-                ),
+                child_data,
             )
         if child is None:
             await message.answer("نوع المحتوى غير صحيح للبلوك الداخلي المحدد.")
@@ -1662,10 +1743,16 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
     if not message.text:
         await message.answer("هذا النوع يحتاج إلى نص.")
         return
-    await _finish_add(
-        message, state, bot,
-        new_block(block_type, text_data(message, block_type, payload.get("heading_size", 2))),
+    prepared = text_data(
+        message,
+        block_type,
+        payload.get("heading_size", 2),
+        str(payload.get("list_kind", "bullet")),
     )
+    if block_type == "list" and not prepared.get("items"):
+        await message.answer(t("list.empty"))
+        return
+    await _finish_add(message, state, bot, new_block(block_type, prepared))
 
 
 @router.callback_query(F.data == "r:back")
@@ -2461,6 +2548,9 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         "sticker": "أرسل الملصق الجديد", "video_note": "أرسل فيديو دائريًا جديدًا",
         "details": "أرسل المحتوى الجديد داخل «تفاصيل»؛ يقبل نصًا أو وسائط أو ألبومًا",
     }
+    if block["type"] == "list":
+        list_kind = str(block.get("data", {}).get("kind", "bullet"))
+        prompts["list"] = t(f"list.{list_kind}_prompt")
     await state.update_data(current_block_id=block_id, expected_type=block["type"], edit_field=None)
     await state.set_state(RichEditorStates.editing_block)
     if isinstance(callback.message, Message):
@@ -2559,7 +2649,11 @@ async def receive_replacement(message: Message, state: FSMContext, bot: Bot) -> 
             message,
             expected,
             data.get("heading_size", block.get("data", {}).get("size", 2)),
+            str(block.get("data", {}).get("kind", "bullet")),
         ) if message.text else None
+        if expected == "list" and replacement is not None and not replacement.get("items"):
+            await message.answer(t("list.empty"))
+            return
     else:
         replacement = replacement_data(message, expected)
         if replacement is not None and expected in MEDIA_CAPTION_TYPES:
@@ -2581,6 +2675,46 @@ async def receive_replacement(message: Message, state: FSMContext, bot: Bot) -> 
         state,
         _block_page(block, blocks),
         build_block_editor_keyboard(block, blocks),
+    )
+
+
+@router.callback_query(F.data.startswith("r:ct:"))
+async def toggle_checklist_task(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    _, blocks = session
+    try:
+        _, _, block_id, raw_index = callback.data.split(":", 3)
+        item_index = int(raw_index)
+    except (TypeError, ValueError):
+        await callback.answer(t("list.invalid"), show_alert=True)
+        return
+    block = get_block_by_id(blocks, block_id)
+    items = block.get("data", {}).get("items", []) if block else []
+    if (
+        block is None
+        or block.get("type") != "list"
+        or block.get("data", {}).get("kind") != "checklist"
+        or not 0 <= item_index < len(items)
+        or not isinstance(items[item_index], dict)
+    ):
+        await callback.answer(t("list.missing_task"), show_alert=True)
+        return
+    await _remember_blocks_for_undo(state, blocks)
+    item = items[item_index]
+    item["has_checkbox"] = True
+    item["is_checked"] = not bool(item.get("is_checked"))
+    block["data"]["native"] = False
+    block["data"].pop("native_data", None)
+    await state.update_data(blocks=blocks)
+    await _edit_ui(
+        callback.message,
+        _block_page(block, blocks),
+        build_block_editor_keyboard(block, blocks),
+    )
+    await callback.answer(
+        t("list.marked_done") if item["is_checked"] else t("list.marked_pending"),
     )
 
 
