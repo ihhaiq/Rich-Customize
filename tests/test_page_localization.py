@@ -84,27 +84,19 @@ class SavedPagesLocalizationTests(unittest.TestCase):
             for key, value in rendered.items():
                 self.assertNotEqual(value, english[key], f"{language}: {key}")
 
-    def test_saved_pages_text_shows_titles_without_codes(self):
-        pages = [
-            {"page_id": "a86d3132", "title": "الأولى"},
-            {"page_id": "b1234567", "title": "<صفحة>"},
-        ]
+    def test_saved_pages_text_leaves_titles_and_codes_to_buttons(self):
+        rendered = _saved_pages_text()
 
-        rendered = _saved_pages_text(pages)
-
-        self.assertIn("📄 الأولى", rendered)
-        self.assertIn("📄 &lt;صفحة&gt;", rendered)
+        self.assertNotIn("الأولى", rendered)
+        self.assertNotIn("&lt;صفحة&gt;", rendered)
         self.assertNotIn("a86d3132", rendered)
         self.assertNotIn("b1234567", rendered)
         self.assertNotIn("<code>", rendered)
 
-    def test_opened_page_editor_shows_title_without_code(self):
-        rendered = _opened_page_text({"title": "الأولى"})
+    def test_opened_page_editor_shows_only_editor_text(self):
+        rendered = _opened_page_text()
 
-        self.assertIn("📄 الأولى", rendered)
-        self.assertNotIn("a86d3132", rendered)
-        self.assertNotIn("<code>", rendered)
-        self.assertIn("تخصيص الرسالة", rendered)
+        self.assertEqual(rendered, "تخصيص الرسالة\n\nاختر الجزء الذي تريد تعديله:")
 
     def test_saved_pages_are_paginated_and_out_of_range_is_clamped(self):
         pages = [{"page_id": str(index)} for index in range(10)]
