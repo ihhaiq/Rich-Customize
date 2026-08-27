@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import html
 import logging
 import secrets
@@ -18,7 +19,7 @@ from aiogram.types import (
 )
 
 from app.keyboards import (
-    build_add_block_keyboard, build_block_editor_keyboard, build_block_position_keyboard,
+    build_add_block_keyboard, build_block_editor_keyboard,
     build_button_picker_keyboard, build_button_position_keyboard,
     build_button_style_keyboard, build_button_type_keyboard,
     build_buttons_manager_keyboard, build_chat_reached_keyboard,
@@ -26,7 +27,9 @@ from app.keyboards import (
     build_details_content_keyboard, build_inner_block_input_keyboard,
     build_inner_block_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
+    build_editor_tools_keyboard,
     build_pages_keyboard, build_page_delete_confirmation_keyboard,
+    build_page_sort_keyboard,
     build_page_target_keyboard,
     build_post_settings_keyboard, build_rich_editor_keyboard,
     build_start_editor_keyboard,
@@ -407,9 +410,28 @@ def _missing_media_text(error: MissingShowcaseMedia) -> str:
 
 
 def _block_page(block: dict[str, Any], blocks: list[dict[str, Any]]) -> str:
-    index = sorted(blocks, key=lambda item: item["position"]).index(block) + 1
+    ordered = sorted(blocks, key=lambda item: item["position"])
+    index = ordered.index(block) + 1
     name = BLOCK_LABELS.get(block["type"], "📦 محتوى")
-    return f"إدارة {name} #{index}\nالنوع: {name.split(' ', 1)[-1]}\n\nاختر العملية:"
+    lines = [
+        t("block.manage_title", name=name),
+        t("block.position_text", current=index, total=len(ordered)),
+        "",
+        t("block.order_text"),
+    ]
+    for position, item in enumerate(ordered, start=1):
+        label = BLOCK_LABELS.get(item["type"], "📦 محتوى")
+        marker = "◀️ " if item["id"] == block["id"] else ""
+        lines.append(f"{marker}{position}. {label}")
+    lines.extend(["", t("common.choose_action")])
+    return "\n".join(lines)
+
+
+async def _remember_blocks_for_undo(
+    state: FSMContext,
+    blocks: list[dict[str, Any]],
+) -> None:
+    await state.update_data(undo_blocks=copy.deepcopy(blocks))
 
 
 async def _edit_ui(
@@ -517,6 +539,7 @@ async def _open_editor(message: Message, state: FSMContext, blocks: list[dict[st
     await state.update_data(
         blocks=blocks, message_buttons=[], buttons_per_row=1, buttons_align="center",
         current_block_id=None, current_page_id=None, current_page_title=None,
+        undo_blocks=None, pages_search_query="", pages_sort_mode="updated",
         management_chat_id=sent.chat.id, management_message_id=sent.message_id,
     )
 
@@ -620,6 +643,7 @@ async def _delete_add_step_messages(
 async def _finish_add(message: Message, state: FSMContext, bot: Bot, block: dict[str, Any]) -> None:
     data = await state.get_data()
     blocks = data.get("blocks", [])
+    undo_blocks = copy.deepcopy(blocks)
     block["position"] = len(blocks)
     blocks.append(block)
     normalize_block_positions(blocks)
@@ -627,6 +651,7 @@ async def _finish_add(message: Message, state: FSMContext, bot: Bot, block: dict
     await state.update_data(
         blocks=blocks, current_block_id=None, pending_add_type=None,
         add_step=None, add_payload=None, add_prompt_chat_id=None, add_prompt_message_id=None,
+        undo_blocks=undo_blocks,
     )
     await _delete_add_step_messages(bot, message, data, state)
     await _repost_saved_ui(
@@ -1007,11 +1032,12 @@ async def choose_add_block(callback: CallbackQuery, state: FSMContext, bot: Bot)
         await callback.answer()
         return
     if block_type == "divider":
+        undo_blocks = copy.deepcopy(blocks)
         block = new_block("divider", {"html": "<hr/>"})
         block["position"] = len(blocks)
         blocks.append(block)
         normalize_block_positions(blocks)
-        await state.update_data(blocks=blocks)
+        await state.update_data(blocks=blocks, undo_blocks=undo_blocks)
         await callback.answer("تمت إضافة الفاصل")
         await _repost_saved_ui(
             bot,
@@ -1603,6 +1629,44 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
     await callback.answer()
 
 
+@router.callback_query(F.data == "r:tools")
+async def open_editor_tools(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await _session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    await _edit_ui(
+        callback.message,
+        t("editor.tools_text"),
+        build_editor_tools_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "r:undo")
+async def undo_last_block_action(callback: CallbackQuery, state: FSMContext) -> None:
+    if not isinstance(callback.message, Message):
+        return
+    data = await state.get_data()
+    undo_blocks = data.get("undo_blocks")
+    if not isinstance(undo_blocks, list):
+        await callback.answer(t("editor.undo_empty"), show_alert=True)
+        return
+    blocks = copy.deepcopy(undo_blocks)
+    normalize_block_positions(blocks)
+    await state.set_state(RichEditorStates.managing)
+    await state.update_data(
+        blocks=blocks,
+        undo_blocks=None,
+        current_block_id=None,
+    )
+    await _edit_ui(
+        callback.message,
+        t("editor.empty_hint") if not blocks else MAIN_TEXT,
+        build_rich_editor_keyboard(blocks),
+    )
+    await callback.answer(t("editor.undo_done"))
+
+
 @router.callback_query(F.data == "r:buttons")
 async def open_buttons_manager(callback: CallbackQuery, state: FSMContext) -> None:
     session = await _session(callback, state)
@@ -2181,7 +2245,11 @@ async def open_block(callback: CallbackQuery, state: FSMContext) -> None:
         await _edit_ui(callback.message, MAIN_TEXT, build_rich_editor_keyboard(blocks))
         return
     await state.update_data(current_block_id=block_id)
-    await _edit_ui(callback.message, _block_page(block, blocks), build_block_editor_keyboard(block))
+    await _edit_ui(
+        callback.message,
+        _block_page(block, blocks),
+        build_block_editor_keyboard(block, blocks),
+    )
     await callback.answer()
 
 
@@ -2445,7 +2513,12 @@ async def receive_replacement(message: Message, state: FSMContext, bot: Bot) -> 
     await _delete_add_step_messages(bot, message, data, state)
     await state.update_data(blocks=blocks)
     await state.set_state(RichEditorStates.managing)
-    await _edit_saved_ui(bot, state, _block_page(block, blocks), build_block_editor_keyboard(block))
+    await _edit_saved_ui(
+        bot,
+        state,
+        _block_page(block, blocks),
+        build_block_editor_keyboard(block, blocks),
+    )
 
 
 @router.callback_query(F.data.startswith("r:f:"))
@@ -2500,16 +2573,25 @@ async def confirm_delete(callback: CallbackQuery, state: FSMContext) -> None:
             return
         _, blocks = session
         block_id = callback.data.rsplit(":", 1)[-1]
+        undo_blocks = copy.deepcopy(blocks)
         if not delete_block(blocks, block_id):
             await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
         else:
-            await state.update_data(blocks=blocks, current_block_id=None)
+            await state.update_data(
+                blocks=blocks,
+                undo_blocks=undo_blocks,
+                current_block_id=None,
+            )
             await callback.answer("تم الحذف")
         if blocks:
             await _edit_ui(callback.message, MAIN_TEXT, build_rich_editor_keyboard(blocks))
         else:
-            await _edit_ui(callback.message, "لا توجد أجزاء. أرسل /editor لإنشاء رسالة جديدة.", None)
-            await state.clear()
+            await state.set_state(RichEditorStates.managing)
+            await _edit_ui(
+                callback.message,
+                t("editor.empty_hint"),
+                build_rich_editor_keyboard(blocks),
+            )
 
 
 @router.callback_query(F.data.startswith("r:m:"))
@@ -2526,6 +2608,41 @@ async def move_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("r:mu:"))
+@router.callback_query(F.data.startswith("r:md:"))
+async def move_one_step(callback: CallbackQuery, state: FSMContext) -> None:
+    if not callback.from_user or not isinstance(callback.message, Message):
+        return
+    async with user_locks[callback.from_user.id]:
+        session = await _session(callback, state)
+        if not session:
+            return
+        _, blocks = session
+        block_id = callback.data.rsplit(":", 1)[-1]
+        ordered = sorted(blocks, key=lambda item: item["position"])
+        block = get_block_by_id(ordered, block_id)
+        if block is None:
+            await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
+            return
+        current_index = ordered.index(block)
+        target_index = current_index - 1 if callback.data.startswith("r:mu:") else current_index + 1
+        if not 0 <= target_index < len(ordered):
+            await callback.answer("هذا الجزء وصل إلى نهاية الترتيب.")
+            return
+        undo_blocks = copy.deepcopy(blocks)
+        if not move_block(blocks, block_id, target_index):
+            await callback.answer("تعذر نقل الجزء.", show_alert=True)
+            return
+        await state.update_data(blocks=blocks, undo_blocks=undo_blocks)
+        moved = get_block_by_id(blocks, block_id)
+        await _edit_ui(
+            callback.message,
+            _block_page(moved, blocks),
+            build_block_editor_keyboard(moved, blocks),
+        )
+        await callback.answer("تم تغيير الموقع")
+
+
 @router.callback_query(F.data.startswith("r:mt:"))
 async def move_to(callback: CallbackQuery, state: FSMContext) -> None:
     if not callback.from_user:
@@ -2536,10 +2653,15 @@ async def move_to(callback: CallbackQuery, state: FSMContext) -> None:
             return
         _, blocks = session
         _, _, block_id, raw_index = callback.data.split(":", 3)
+        undo_blocks = copy.deepcopy(blocks)
         if not move_block(blocks, block_id, int(raw_index)):
             await callback.answer("تعذر نقل الجزء؛ ربما تغيرت الجلسة.", show_alert=True)
             return
-        await state.update_data(blocks=blocks, current_block_id=None)
+        await state.update_data(
+            blocks=blocks,
+            undo_blocks=undo_blocks,
+            current_block_id=None,
+        )
         await _edit_ui(callback.message, MAIN_TEXT, build_rich_editor_keyboard(blocks))
         await callback.answer("تم تغيير الموقع")
 
@@ -2828,36 +2950,146 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
 async def _pages_for_user(
     user_id: int,
     requested_index: int,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, int]:
+    query: str = "",
+    sort_mode: str = "updated",
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, int, int]:
     pages = await page_registry.list_for_user(user_id)
+    total_count = len(pages)
+    normalized_query = query.strip().casefold()
+    if normalized_query:
+        pages = [
+            page for page in pages
+            if normalized_query in str(page.get("title") or "").casefold()
+            or normalized_query in str(page.get("page_id") or "").casefold()
+        ]
+    if sort_mode == "title":
+        pages.sort(key=lambda page: str(page.get("title") or page["page_id"]).casefold())
+    elif sort_mode == "oldest":
+        pages.sort(key=lambda page: (int(page.get("created_at", 0)), str(page["page_id"])))
+    elif sort_mode == "newest":
+        pages.sort(key=lambda page: (int(page.get("created_at", 0)), str(page["page_id"])), reverse=True)
+    else:
+        pages.sort(key=lambda page: (int(page.get("updated_at", 0)), str(page["page_id"])), reverse=True)
     visible, page_index, total_pages = _page_screen(pages, requested_index)
-    return pages, visible, page_index, total_pages
+    return pages, visible, page_index, total_pages, total_count
+
+
+async def _render_pages_screen(
+    message: Message,
+    state: FSMContext,
+    user_id: int,
+    requested_index: int = 0,
+    *,
+    saved: bool = False,
+) -> bool:
+    data = await state.get_data()
+    query = str(data.get("pages_search_query") or "")
+    sort_mode = str(data.get("pages_sort_mode") or "updated")
+    pages, visible, page_index, total_pages, total_count = await _pages_for_user(
+        user_id,
+        requested_index,
+        query,
+        sort_mode,
+    )
+    if not pages and not query:
+        return False
+    if pages:
+        text = _saved_pages_text(page_index, total_pages)
+        if query:
+            text += "\n\n" + t("pages.search_results", query=html.escape(query))
+    else:
+        text = t("pages.search_none", query=html.escape(query))
+    keyboard = build_pages_keyboard(
+        visible,
+        page_index,
+        total_pages,
+        show_controls=total_count > 1,
+        pagination_prefix="r:presults" if query else "r:pages",
+    )
+    if saved:
+        await _edit_saved_ui(bot=message.bot, state=state, text=text, reply_markup=keyboard, parse_mode="HTML")
+    else:
+        await _edit_ui(message, text, keyboard, parse_mode="HTML")
+    return True
 
 
 @router.callback_query(F.data == "r:pages")
 @router.callback_query(F.data.startswith("r:pages:"))
+@router.callback_query(F.data.startswith("r:presults:"))
 async def list_pages(callback: CallbackQuery, state: FSMContext) -> None:
     session = await _session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
+    if callback.data == "r:pages":
+        await state.update_data(pages_search_query="")
     try:
         requested_index = int(callback.data.rsplit(":", 1)[-1]) if callback.data != "r:pages" else 0
     except ValueError:
         requested_index = 0
-    pages, visible, page_index, total_pages = await _pages_for_user(
+    rendered = await _render_pages_screen(
+        callback.message,
+        state,
         callback.from_user.id,
         requested_index,
     )
-    if not pages:
+    if not rendered:
         await callback.answer("ما عندك صفحات محفوظة بعد.", show_alert=True)
         return
-    await _edit_ui(
+    await callback.answer()
+
+
+@router.callback_query(F.data == "r:psearch")
+async def request_page_search(callback: CallbackQuery, state: FSMContext) -> None:
+    if not isinstance(callback.message, Message):
+        return
+    await state.set_state(RichEditorStates.searching_page)
+    await _send_add_prompt(
         callback.message,
-        _saved_pages_text(page_index, total_pages),
-        build_pages_keyboard(visible, page_index, total_pages),
-        parse_mode="HTML",
+        state,
+        t("pages.search_prompt"),
     )
     await callback.answer()
+
+
+@router.message(RichEditorStates.searching_page)
+async def receive_page_search(message: Message, state: FSMContext, bot: Bot) -> None:
+    query = (message.text or "").strip()
+    if not query:
+        await message.answer("أرسل كلمة بحث صحيحة.")
+        return
+    data = await state.get_data()
+    query = "" if query.casefold() == "/all" else query[:64]
+    await _delete_add_step_messages(bot, message, data, state)
+    await state.set_state(RichEditorStates.managing)
+    await state.update_data(pages_search_query=query)
+    await _render_pages_screen(message, state, message.from_user.id, saved=True)
+
+
+@router.callback_query(F.data == "r:psort")
+async def open_page_sort(callback: CallbackQuery, state: FSMContext) -> None:
+    if not isinstance(callback.message, Message):
+        return
+    data = await state.get_data()
+    current_sort = str(data.get("pages_sort_mode") or "updated")
+    await _edit_ui(
+        callback.message,
+        t("pages.sort_text"),
+        build_page_sort_keyboard(current_sort),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:psortset:"))
+async def set_page_sort(callback: CallbackQuery, state: FSMContext) -> None:
+    if not isinstance(callback.message, Message):
+        return
+    sort_mode = callback.data.rsplit(":", 1)[-1]
+    if sort_mode not in {"updated", "newest", "oldest", "title"}:
+        await callback.answer("اختيار غير صالح.", show_alert=True)
+        return
+    await state.update_data(pages_sort_mode=sort_mode)
+    await _render_pages_screen(callback.message, state, callback.from_user.id)
+    await callback.answer(t("pages.sort_done"))
 
 
 @router.callback_query(F.data.startswith("r:prename:"))
@@ -2905,16 +3137,12 @@ async def receive_page_rename(message: Message, state: FSMContext, bot: Bot) -> 
         rename_page_id=None,
         current_page_title=title if data.get("current_page_id") == page_id else data.get("current_page_title"),
     )
-    _, visible, page_index, total_pages = await _pages_for_user(
+    await _render_pages_screen(
+        message,
+        state,
         message.from_user.id,
         int(data.get("pages_page_index", 0)),
-    )
-    await _edit_saved_ui(
-        bot,
-        state,
-        _saved_pages_text(page_index, total_pages),
-        build_pages_keyboard(visible, page_index, total_pages),
-        parse_mode="HTML",
+        saved=True,
     )
 
 
@@ -2955,12 +3183,14 @@ async def delete_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     if not await page_registry.delete(page_id, callback.from_user.id):
         await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
         return
-    pages, visible, page_index, total_pages = await _pages_for_user(
+    data = await state.get_data()
+    _, _, _, _, total_count = await _pages_for_user(
         callback.from_user.id,
         requested_index,
+        str(data.get("pages_search_query") or ""),
+        str(data.get("pages_sort_mode") or "updated"),
     )
-    if not pages:
-        data = await state.get_data()
+    if total_count == 0:
         blocks = data.get("blocks") or []
         await _edit_ui(
             callback.message,
@@ -2968,13 +3198,12 @@ async def delete_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
             build_rich_editor_keyboard(blocks),
         )
     else:
-        await _edit_ui(
+        await _render_pages_screen(
             callback.message,
-            _saved_pages_text(page_index, total_pages),
-            build_pages_keyboard(visible, page_index, total_pages),
-            parse_mode="HTML",
+            state,
+            callback.from_user.id,
+            requested_index,
         )
-    data = await state.get_data()
     if data.get("current_page_id") == page_id:
         await state.update_data(current_page_id=None, current_page_title=None)
     await callback.answer(t("pages.deleted"))
