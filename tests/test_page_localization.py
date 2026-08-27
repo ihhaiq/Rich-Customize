@@ -13,12 +13,23 @@ class SavedPagesLocalizationTests(unittest.TestCase):
     def test_arabic_math_prompt_explains_escaped_space(self):
         token = i18n_core._language.set("ar")
         try:
-            prompt = _math_input_prompt("أرسل المعادلة بصيغة LaTeX")
+            prompt = _math_input_prompt()
         finally:
             i18n_core._language.reset(token)
 
         self.assertIn("لإضافة مسافة بين النصوص", prompt)
         self.assertTrue(prompt.endswith("\\ "))
+
+    def test_every_locale_translates_math_space_hint(self):
+        for language in TRANSLATIONS:
+            token = i18n_core._language.set(language)
+            try:
+                prompt = _math_input_prompt()
+            finally:
+                i18n_core._language.reset(token)
+
+            self.assertTrue(prompt.endswith("\\ "), language)
+            self.assertNotEqual(prompt, "Send the formula in LaTeX.\n\nTo add a space between text, use: \\ ", language)
 
     def test_saved_pages_show_copyable_codes_in_message_text(self):
         pages = [
