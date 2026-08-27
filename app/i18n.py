@@ -49,7 +49,12 @@ def tr(text: str) -> str:
     """Legacy source-text translator kept for compatibility during migration."""
     language = _core._language.get()
     if language == "ar":
-        return text
+        translated = text
+        locale = TRANSLATIONS.get("ar")
+        if locale:
+            for source, target in sorted(locale.items(), key=lambda item: len(item[0]), reverse=True):
+                translated = translated.replace(source, target)
+        return translated
     translated = text
     for source, target in sorted(EN.items(), key=lambda item: len(item[0]), reverse=True):
         translated = translated.replace(source, target)
