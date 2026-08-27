@@ -561,8 +561,29 @@ async def _repost_saved_ui(bot: Bot, state: FSMContext, text: str, reply_markup)
     return sent
 
 
+def _editor_overview_text(blocks: list[dict[str, Any]]) -> str:
+    lines = [
+        t("editor.imported_title"),
+        t("editor.block_count", count=len(blocks)),
+        "",
+        t("editor.imported_blocks_title"),
+    ]
+    for position, block in enumerate(
+        sorted(blocks, key=lambda item: int(item.get("position", 0))),
+        start=1,
+    ):
+        label = BLOCK_LABELS.get(str(block.get("type", "")), t("block.content"))
+        lines.append(f"{position}. {label}")
+    lines.extend(["", t("editor.imported_choose_block")])
+    return "\n".join(lines)
+
+
 async def _open_editor(message: Message, state: FSMContext, blocks: list[dict[str, Any]]) -> None:
-    text = t("editor.empty_hint") if not blocks else MAIN_TEXT
+    text = (
+        f"{t('editor.empty_hint')}\n\n{t('editor.forward_hint')}"
+        if not blocks
+        else _editor_overview_text(blocks)
+    )
     sent = await message.answer(text, reply_markup=build_rich_editor_keyboard(blocks))
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
@@ -3626,6 +3647,37 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             except TelegramBadRequest:
                 pass
     await _repost_saved_ui(bot, state, panel_text, build_rich_editor_keyboard(blocks))
+
+
+@router.message(RichEditorStates.managing, F.rich_message)
+async def import_rich_message_into_editor(
+    message: Message,
+    state: FSMContext,
+    bot: Bot,
+) -> None:
+    blocks = message_to_blocks(message)
+    if not blocks:
+        await message.answer(t("editor.rich_import_failed"))
+        return
+    data = await state.get_data()
+    previous_blocks = data.get("blocks", [])
+    await state.update_data(
+        blocks=blocks,
+        message_buttons=[],
+        buttons_per_row=1,
+        buttons_align="center",
+        current_block_id=None,
+        current_page_id=None,
+        current_page_title=None,
+        undo_blocks=copy.deepcopy(previous_blocks),
+    )
+    await _delete_input_message(message)
+    await _edit_saved_ui(
+        bot,
+        state,
+        _editor_overview_text(blocks),
+        build_rich_editor_keyboard(blocks),
+    )
 
 
 @router.message(StateFilter(RichEditorStates.managing))
