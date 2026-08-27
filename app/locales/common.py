@@ -115,6 +115,24 @@ PHRASES: dict[str, str] = {
     "list.missing_task": "This task no longer exists.",
     "list.marked_done": "Task marked as completed",
     "list.marked_pending": "Task marked as pending",
+    "details.inner_manage_button": "🧩 Inner blocks",
+    "details.inner_credit": "✍️ Source / credit",
+    "details.inner_add_footer": "➕ Add footer / source",
+    "details.inner_list_title": "🧩 Blocks inside Details",
+    "details.inner_count": "Inner blocks: {count}",
+    "details.inner_settings_title": "⚙️ Inner block settings",
+    "details.inner_type": "Type: {name}",
+    "details.inner_position": "Position inside Details: {current} of {total}",
+    "details.inner_send_content": "Send the new content for this inner block.",
+    "details.inner_send_caption": "Send the caption, or /remove to clear it.",
+    "details.inner_send_credit": "Send the source or credit, or /remove to clear it.",
+    "details.inner_send_footer": "Send the footer or source text. It will be inserted directly after this block.",
+    "details.inner_delete_question": "Delete this inner block from Details?",
+    "details.inner_deleted": "Inner block deleted",
+    "details.inner_current_position": "The block is already at that edge.",
+    "details.inner_moved": "Inner block moved",
+    "details.inner_text_required": "Send text for this field.",
+    "details.inner_wrong_content": "Send content of the same type as this inner block.",
 
     # Canonical Rich Block keys. These are deliberately semantic keys rather
     # than source-language strings so block names can never get stuck midway
@@ -206,6 +224,24 @@ AR_PHRASES: dict[str, str] = {
     "list.missing_task": "هذه المهمة لم تعد موجودة.",
     "list.marked_done": "تم تحديد المهمة كمنجزة",
     "list.marked_pending": "تم تحديد المهمة كغير منجزة",
+    "details.inner_manage_button": "🧩 البلوكات الداخلية",
+    "details.inner_credit": "✍️ المصدر / النسبة",
+    "details.inner_add_footer": "➕ إضافة تذييل / مصدر",
+    "details.inner_list_title": "🧩 البلوكات داخل التفاصيل",
+    "details.inner_count": "عدد البلوكات الداخلية: {count}",
+    "details.inner_settings_title": "⚙️ إعدادات البلوك الداخلي",
+    "details.inner_type": "النوع: {name}",
+    "details.inner_position": "الموقع داخل التفاصيل: {current} من {total}",
+    "details.inner_send_content": "أرسل المحتوى الجديد لهذا البلوك الداخلي.",
+    "details.inner_send_caption": "أرسل الوصف، أو /remove لحذفه.",
+    "details.inner_send_credit": "أرسل المصدر أو النسبة، أو /remove لحذفها.",
+    "details.inner_send_footer": "أرسل نص التذييل أو المصدر؛ راح ينضاف مباشرة بعد هذا البلوك.",
+    "details.inner_delete_question": "تحذف هذا البلوك من داخل التفاصيل؟",
+    "details.inner_deleted": "تم حذف البلوك الداخلي",
+    "details.inner_current_position": "البلوك موجود بهذا الطرف بالفعل.",
+    "details.inner_moved": "تم نقل البلوك الداخلي",
+    "details.inner_text_required": "أرسل نصًا لهذا الحقل.",
+    "details.inner_wrong_content": "أرسل محتوى من نفس نوع هذا البلوك الداخلي.",
     "block.content": "📦 محتوى",
     "block.text": "📝 نص",
     "block.paragraph": "📝 فقرة",
@@ -682,6 +718,191 @@ RICH_IMPORT_TRANSLATIONS = {
     for language, values in RICH_IMPORT_VALUES.items()
 }
 
+DETAILS_INNER_KEYS = (
+    "details.inner_manage_button", "details.inner_credit", "details.inner_add_footer",
+    "details.inner_list_title", "details.inner_count", "details.inner_settings_title",
+    "details.inner_type", "details.inner_position", "details.inner_send_content",
+    "details.inner_send_caption", "details.inner_send_credit", "details.inner_send_footer",
+    "details.inner_delete_question", "details.inner_deleted", "details.inner_current_position",
+    "details.inner_moved", "details.inner_text_required", "details.inner_wrong_content",
+)
+
+DETAILS_INNER_VALUES = {
+    "es": (
+        "🧩 Bloques internos", "✍️ Fuente / crédito", "➕ Añadir pie / fuente",
+        "🧩 Bloques dentro de Detalles", "Bloques internos: {count}", "⚙️ Ajustes del bloque interno",
+        "Tipo: {name}", "Posición en Detalles: {current} de {total}", "Envía el nuevo contenido de este bloque interno.",
+        "Envía el pie de foto o /remove para borrarlo.", "Envía la fuente o crédito, o /remove para borrarlo.", "Envía el texto del pie o la fuente. Se insertará justo después de este bloque.",
+        "¿Eliminar este bloque interno de Detalles?", "Bloque interno eliminado", "El bloque ya está en ese extremo.",
+        "Bloque interno movido", "Envía texto para este campo.", "Envía contenido del mismo tipo que este bloque interno.",
+    ),
+    "fr": (
+        "🧩 Blocs internes", "✍️ Source / crédit", "➕ Ajouter un pied / une source",
+        "🧩 Blocs dans Détails", "Blocs internes : {count}", "⚙️ Paramètres du bloc interne",
+        "Type : {name}", "Position dans Détails : {current} sur {total}", "Envoyez le nouveau contenu de ce bloc interne.",
+        "Envoyez la légende, ou /remove pour l’effacer.", "Envoyez la source ou le crédit, ou /remove pour l’effacer.", "Envoyez le texte du pied ou de la source. Il sera inséré juste après ce bloc.",
+        "Supprimer ce bloc interne de Détails ?", "Bloc interne supprimé", "Le bloc est déjà à cette extrémité.",
+        "Bloc interne déplacé", "Envoyez du texte pour ce champ.", "Envoyez un contenu du même type que ce bloc interne.",
+    ),
+    "de": (
+        "🧩 Innere Blöcke", "✍️ Quelle / Urheber", "➕ Fußzeile / Quelle hinzufügen",
+        "🧩 Blöcke in Details", "Innere Blöcke: {count}", "⚙️ Einstellungen des inneren Blocks",
+        "Typ: {name}", "Position in Details: {current} von {total}", "Sende den neuen Inhalt für diesen inneren Block.",
+        "Sende die Beschriftung oder /remove zum Entfernen.", "Sende Quelle oder Urheber, oder /remove zum Entfernen.", "Sende den Text für Fußzeile oder Quelle. Er wird direkt nach diesem Block eingefügt.",
+        "Diesen inneren Block aus Details löschen?", "Innerer Block gelöscht", "Der Block befindet sich bereits an diesem Rand.",
+        "Inneren Block verschoben", "Sende Text für dieses Feld.", "Sende Inhalt vom selben Typ wie dieser innere Block.",
+    ),
+    "it": (
+        "🧩 Blocchi interni", "✍️ Fonte / credito", "➕ Aggiungi piè di pagina / fonte",
+        "🧩 Blocchi in Dettagli", "Blocchi interni: {count}", "⚙️ Impostazioni del blocco interno",
+        "Tipo: {name}", "Posizione in Dettagli: {current} di {total}", "Invia il nuovo contenuto per questo blocco interno.",
+        "Invia la didascalia o /remove per rimuoverla.", "Invia la fonte o il credito, oppure /remove per rimuoverlo.", "Invia il testo del piè di pagina o della fonte. Verrà inserito subito dopo questo blocco.",
+        "Eliminare questo blocco interno da Dettagli?", "Blocco interno eliminato", "Il blocco è già a questa estremità.",
+        "Blocco interno spostato", "Invia del testo per questo campo.", "Invia contenuto dello stesso tipo di questo blocco interno.",
+    ),
+    "pt": (
+        "🧩 Blocos internos", "✍️ Fonte / crédito", "➕ Adicionar rodapé / fonte",
+        "🧩 Blocos em Detalhes", "Blocos internos: {count}", "⚙️ Configurações do bloco interno",
+        "Tipo: {name}", "Posição em Detalhes: {current} de {total}", "Envie o novo conteúdo deste bloco interno.",
+        "Envie a legenda ou /remove para apagá-la.", "Envie a fonte ou crédito, ou /remove para apagar.", "Envie o texto do rodapé ou da fonte. Ele será inserido logo após este bloco.",
+        "Excluir este bloco interno de Detalhes?", "Bloco interno excluído", "O bloco já está nessa extremidade.",
+        "Bloco interno movido", "Envie texto para este campo.", "Envie conteúdo do mesmo tipo deste bloco interno.",
+    ),
+    "nl": (
+        "🧩 Interne blokken", "✍️ Bron / vermelding", "➕ Voettekst / bron toevoegen",
+        "🧩 Blokken in Details", "Interne blokken: {count}", "⚙️ Instellingen intern blok",
+        "Type: {name}", "Positie in Details: {current} van {total}", "Stuur de nieuwe inhoud voor dit interne blok.",
+        "Stuur het bijschrift, of /remove om het te wissen.", "Stuur de bron of vermelding, of /remove om die te wissen.", "Stuur de voettekst of bron. Deze wordt direct na dit blok ingevoegd.",
+        "Dit interne blok uit Details verwijderen?", "Intern blok verwijderd", "Het blok staat al aan die rand.",
+        "Intern blok verplaatst", "Stuur tekst voor dit veld.", "Stuur inhoud van hetzelfde type als dit interne blok.",
+    ),
+    "pl": (
+        "🧩 Bloki wewnętrzne", "✍️ Źródło / autor", "➕ Dodaj stopkę / źródło",
+        "🧩 Bloki w Szczegółach", "Bloki wewnętrzne: {count}", "⚙️ Ustawienia bloku wewnętrznego",
+        "Typ: {name}", "Pozycja w Szczegółach: {current} z {total}", "Wyślij nową zawartość tego bloku wewnętrznego.",
+        "Wyślij podpis lub /remove, aby go usunąć.", "Wyślij źródło lub autora, albo /remove, aby usunąć.", "Wyślij tekst stopki lub źródła. Zostanie wstawiony bezpośrednio po tym bloku.",
+        "Usunąć ten blok wewnętrzny ze Szczegółów?", "Usunięto blok wewnętrzny", "Blok jest już na tej krawędzi.",
+        "Przeniesiono blok wewnętrzny", "Wyślij tekst dla tego pola.", "Wyślij zawartość tego samego typu co ten blok wewnętrzny.",
+    ),
+    "uk": (
+        "🧩 Внутрішні блоки", "✍️ Джерело / автор", "➕ Додати підвал / джерело",
+        "🧩 Блоки в Деталях", "Внутрішніх блоків: {count}", "⚙️ Налаштування внутрішнього блоку",
+        "Тип: {name}", "Позиція в Деталях: {current} з {total}", "Надішліть новий вміст цього внутрішнього блоку.",
+        "Надішліть підпис або /remove, щоб видалити його.", "Надішліть джерело чи автора або /remove, щоб видалити.", "Надішліть текст підвалу або джерела. Його буде вставлено одразу після цього блоку.",
+        "Видалити цей внутрішній блок із Деталей?", "Внутрішній блок видалено", "Блок уже розташований на цьому краю.",
+        "Внутрішній блок переміщено", "Надішліть текст для цього поля.", "Надішліть вміст того самого типу, що й цей внутрішній блок.",
+    ),
+    "ru": (
+        "🧩 Внутренние блоки", "✍️ Источник / автор", "➕ Добавить подвал / источник",
+        "🧩 Блоки в Деталях", "Внутренних блоков: {count}", "⚙️ Настройки внутреннего блока",
+        "Тип: {name}", "Позиция в Деталях: {current} из {total}", "Отправьте новое содержимое этого внутреннего блока.",
+        "Отправьте подпись или /remove, чтобы удалить её.", "Отправьте источник или автора либо /remove, чтобы удалить.", "Отправьте текст подвала или источника. Он будет вставлен сразу после этого блока.",
+        "Удалить этот внутренний блок из Деталей?", "Внутренний блок удалён", "Блок уже находится с этого края.",
+        "Внутренний блок перемещён", "Отправьте текст для этого поля.", "Отправьте содержимое того же типа, что и этот внутренний блок.",
+    ),
+    "tr": (
+        "🧩 İç bloklar", "✍️ Kaynak / atıf", "➕ Alt bilgi / kaynak ekle",
+        "🧩 Detaylar içindeki bloklar", "İç bloklar: {count}", "⚙️ İç blok ayarları",
+        "Tür: {name}", "Detaylar içindeki konum: {current}/{total}", "Bu iç blok için yeni içeriği gönderin.",
+        "Açıklamayı gönderin veya silmek için /remove yazın.", "Kaynak veya atfı gönderin ya da silmek için /remove yazın.", "Alt bilgi veya kaynak metnini gönderin. Bu bloktan hemen sonra eklenecektir.",
+        "Bu iç blok Detaylar'dan silinsin mi?", "İç blok silindi", "Blok zaten o uçta.",
+        "İç blok taşındı", "Bu alan için metin gönderin.", "Bu iç blokla aynı türde içerik gönderin.",
+    ),
+    "fa": (
+        "🧩 بلوک‌های داخلی", "✍️ منبع / اعتبار", "➕ افزودن پاورقی / منبع",
+        "🧩 بلوک‌های داخل جزئیات", "بلوک‌های داخلی: {count}", "⚙️ تنظیمات بلوک داخلی",
+        "نوع: {name}", "جایگاه در جزئیات: {current} از {total}", "محتوای جدید این بلوک داخلی را بفرستید.",
+        "توضیح را بفرستید یا برای حذف /remove را ارسال کنید.", "منبع یا اعتبار را بفرستید یا برای حذف /remove را ارسال کنید.", "متن پاورقی یا منبع را بفرستید؛ بلافاصله پس از این بلوک درج می‌شود.",
+        "این بلوک داخلی از جزئیات حذف شود؟", "بلوک داخلی حذف شد", "بلوک از قبل در این انتهاست.",
+        "بلوک داخلی جابه‌جا شد", "برای این فیلد متن بفرستید.", "محتوایی هم‌نوع با این بلوک داخلی بفرستید.",
+    ),
+    "ku": (
+        "🧩 Blokên hundirîn", "✍️ Çavkanî / nav", "➕ Binpê / çavkanî lê zêde bike",
+        "🧩 Blokên di Hûragahiyan de", "Blokên hundirîn: {count}", "⚙️ Mîhengên bloka hundirîn",
+        "Cure: {name}", "Cih di Hûragahiyan de: {current} ji {total}", "Naveroka nû ya vê bloka hundirîn bişîne.",
+        "Şiroveyê bişîne an ji bo jêbirinê /remove bişîne.", "Çavkanî an navê bişîne; ji bo jêbirinê /remove bişîne.", "Nivîsa binpê an çavkaniyê bişîne. Ew rasterast piştî vê blokê tê danîn.",
+        "Vê bloka hundirîn ji Hûragahiyan jê bibî?", "Bloka hundirîn hate jêbirin", "Blok jixwe li wê dawiyê ye.",
+        "Bloka hundirîn hate veguhastin", "Ji bo vê qadê nivîs bişîne.", "Naverokeke ji heman cureya vê bloka hundirîn bişîne.",
+    ),
+    "ur": (
+        "🧩 اندرونی بلاکس", "✍️ ماخذ / کریڈٹ", "➕ فٹر / ماخذ شامل کریں",
+        "🧩 تفصیلات کے اندر بلاکس", "اندرونی بلاکس: {count}", "⚙️ اندرونی بلاک کی ترتیبات",
+        "قسم: {name}", "تفصیلات میں مقام: {current} از {total}", "اس اندرونی بلاک کا نیا مواد بھیجیں۔",
+        "کیپشن بھیجیں، یا ہٹانے کے لیے /remove۔", "ماخذ یا کریڈٹ بھیجیں، یا ہٹانے کے لیے /remove۔", "فٹر یا ماخذ کا متن بھیجیں۔ یہ اس بلاک کے فوراً بعد شامل ہوگا۔",
+        "یہ اندرونی بلاک تفصیلات سے حذف کریں؟", "اندرونی بلاک حذف ہوگیا", "بلاک پہلے ہی اس کنارے پر ہے۔",
+        "اندرونی بلاک منتقل ہوگیا", "اس خانے کے لیے متن بھیجیں۔", "اسی قسم کا مواد بھیجیں جو اس اندرونی بلاک کا ہے۔",
+    ),
+    "hi": (
+        "🧩 अंदरूनी ब्लॉक", "✍️ स्रोत / श्रेय", "➕ फ़ुटर / स्रोत जोड़ें",
+        "🧩 विवरण के अंदर ब्लॉक", "अंदरूनी ब्लॉक: {count}", "⚙️ अंदरूनी ब्लॉक सेटिंग",
+        "प्रकार: {name}", "विवरण में स्थान: {current} / {total}", "इस अंदरूनी ब्लॉक की नई सामग्री भेजें।",
+        "कैप्शन भेजें, या हटाने के लिए /remove भेजें।", "स्रोत या श्रेय भेजें, या हटाने के लिए /remove भेजें।", "फ़ुटर या स्रोत का टेक्स्ट भेजें। यह इस ब्लॉक के ठीक बाद जोड़ा जाएगा।",
+        "इस अंदरूनी ब्लॉक को विवरण से हटाएँ?", "अंदरूनी ब्लॉक हटा दिया गया", "ब्लॉक पहले से उस किनारे पर है।",
+        "अंदरूनी ब्लॉक खिसकाया गया", "इस फ़ील्ड के लिए टेक्स्ट भेजें।", "इस अंदरूनी ब्लॉक के समान प्रकार की सामग्री भेजें।",
+    ),
+    "id": (
+        "🧩 Blok internal", "✍️ Sumber / kredit", "➕ Tambah footer / sumber",
+        "🧩 Blok di dalam Detail", "Blok internal: {count}", "⚙️ Pengaturan blok internal",
+        "Jenis: {name}", "Posisi di Detail: {current} dari {total}", "Kirim konten baru untuk blok internal ini.",
+        "Kirim keterangan, atau /remove untuk menghapusnya.", "Kirim sumber atau kredit, atau /remove untuk menghapusnya.", "Kirim teks footer atau sumber. Teks akan disisipkan tepat setelah blok ini.",
+        "Hapus blok internal ini dari Detail?", "Blok internal dihapus", "Blok sudah berada di ujung tersebut.",
+        "Blok internal dipindahkan", "Kirim teks untuk bidang ini.", "Kirim konten dengan jenis yang sama seperti blok internal ini.",
+    ),
+    "ja": (
+        "🧩 内部ブロック", "✍️ 出典 / クレジット", "➕ フッター / 出典を追加",
+        "🧩 詳細内のブロック", "内部ブロック数：{count}", "⚙️ 内部ブロック設定",
+        "種類：{name}", "詳細内の位置：{current}/{total}", "この内部ブロックの新しい内容を送信してください。",
+        "キャプションを送信するか、/remove で削除してください。", "出典またはクレジットを送信するか、/remove で削除してください。", "フッターまたは出典のテキストを送信してください。このブロックの直後に挿入されます。",
+        "この内部ブロックを詳細から削除しますか？", "内部ブロックを削除しました", "ブロックはすでにその端にあります。",
+        "内部ブロックを移動しました", "この項目のテキストを送信してください。", "この内部ブロックと同じ種類の内容を送信してください。",
+    ),
+    "ko": (
+        "🧩 내부 블록", "✍️ 출처 / 크레딧", "➕ 바닥글 / 출처 추가",
+        "🧩 세부정보 안의 블록", "내부 블록: {count}개", "⚙️ 내부 블록 설정",
+        "유형: {name}", "세부정보 내 위치: {current}/{total}", "이 내부 블록의 새 내용을 보내세요.",
+        "캡션을 보내거나 /remove로 삭제하세요.", "출처 또는 크레딧을 보내거나 /remove로 삭제하세요.", "바닥글 또는 출처 텍스트를 보내세요. 이 블록 바로 뒤에 삽입됩니다.",
+        "이 내부 블록을 세부정보에서 삭제할까요?", "내부 블록을 삭제했습니다", "블록이 이미 해당 끝에 있습니다.",
+        "내부 블록을 이동했습니다", "이 필드에 사용할 텍스트를 보내세요.", "이 내부 블록과 같은 유형의 내용을 보내세요.",
+    ),
+    "vi": (
+        "🧩 Khối bên trong", "✍️ Nguồn / ghi công", "➕ Thêm chân trang / nguồn",
+        "🧩 Các khối trong Chi tiết", "Số khối bên trong: {count}", "⚙️ Cài đặt khối bên trong",
+        "Loại: {name}", "Vị trí trong Chi tiết: {current}/{total}", "Gửi nội dung mới cho khối bên trong này.",
+        "Gửi chú thích hoặc /remove để xóa.", "Gửi nguồn hoặc ghi công, hoặc /remove để xóa.", "Gửi văn bản chân trang hoặc nguồn. Nội dung sẽ được chèn ngay sau khối này.",
+        "Xóa khối bên trong này khỏi Chi tiết?", "Đã xóa khối bên trong", "Khối đã ở đầu đó.",
+        "Đã di chuyển khối bên trong", "Gửi văn bản cho trường này.", "Gửi nội dung cùng loại với khối bên trong này.",
+    ),
+    "th": (
+        "🧩 บล็อกภายใน", "✍️ แหล่งที่มา / เครดิต", "➕ เพิ่มส่วนท้าย / แหล่งที่มา",
+        "🧩 บล็อกในรายละเอียด", "บล็อกภายใน: {count}", "⚙️ การตั้งค่าบล็อกภายใน",
+        "ประเภท: {name}", "ตำแหน่งในรายละเอียด: {current} จาก {total}", "ส่งเนื้อหาใหม่สำหรับบล็อกภายในนี้",
+        "ส่งคำอธิบาย หรือ /remove เพื่อลบ", "ส่งแหล่งที่มาหรือเครดิต หรือ /remove เพื่อลบ", "ส่งข้อความส่วนท้ายหรือแหล่งที่มา ข้อความจะถูกแทรกต่อจากบล็อกนี้ทันที",
+        "ลบบล็อกภายในนี้ออกจากรายละเอียดหรือไม่?", "ลบบล็อกภายในแล้ว", "บล็อกอยู่ที่ขอบนั้นแล้ว",
+        "ย้ายบล็อกภายในแล้ว", "ส่งข้อความสำหรับช่องนี้", "ส่งเนื้อหาประเภทเดียวกับบล็อกภายในนี้",
+    ),
+    "zh-hans": (
+        "🧩 内部区块", "✍️ 来源 / 署名", "➕ 添加页脚 / 来源",
+        "🧩 详情中的区块", "内部区块：{count}", "⚙️ 内部区块设置",
+        "类型：{name}", "在详情中的位置：{current}/{total}", "请发送此内部区块的新内容。",
+        "请发送说明，或用 /remove 清除。", "请发送来源或署名，或用 /remove 清除。", "请发送页脚或来源文字，它会紧接在此区块之后插入。",
+        "从详情中删除此内部区块？", "内部区块已删除", "区块已经位于该端。",
+        "内部区块已移动", "请为此字段发送文字。", "请发送与此内部区块相同类型的内容。",
+    ),
+    "zh-hant": (
+        "🧩 內部區塊", "✍️ 來源 / 署名", "➕ 新增頁尾 / 來源",
+        "🧩 詳情中的區塊", "內部區塊：{count}", "⚙️ 內部區塊設定",
+        "類型：{name}", "在詳情中的位置：{current}/{total}", "請傳送此內部區塊的新內容。",
+        "請傳送說明，或用 /remove 清除。", "請傳送來源或署名，或用 /remove 清除。", "請傳送頁尾或來源文字，它會緊接在此區塊之後插入。",
+        "從詳情中刪除此內部區塊？", "內部區塊已刪除", "區塊已經位於該端。",
+        "內部區塊已移動", "請為此欄位傳送文字。", "請傳送與此內部區塊相同類型的內容。",
+    ),
+}
+
+DETAILS_INNER_TRANSLATIONS = {
+    language: dict(zip(DETAILS_INNER_KEYS, values, strict=True))
+    for language, values in DETAILS_INNER_VALUES.items()
+}
+
 KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     language: {f"block.{name}": value for name, value in values.items()}
     for language, values in BLOCK_KEY_TRANSLATIONS.items()
@@ -706,6 +927,9 @@ for language, translations in LIST_UI_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 for language, translations in RICH_IMPORT_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in DETAILS_INNER_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 
