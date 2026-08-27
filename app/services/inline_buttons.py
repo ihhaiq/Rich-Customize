@@ -30,6 +30,11 @@ TYPE_ALIASES = {
     "page": "page_callback",
     "inline-here": "switch_inline_query_current_chat",
 }
+BUTTON_TYPES = {
+    "user", "disabled", "url", "callback_data", "page_callback", "copy",
+    "popup", "web_app", "login_url", "switch_inline_query",
+    "switch_inline_query_current_chat",
+}
 # Trailing audience word for {title:cbd code#color audience} markers.
 # Only meaningful for page_callback (cbd/page) buttons; ignored otherwise.
 AUDIENCE_ALIASES = {
@@ -92,18 +97,16 @@ def _marker_parts(
         break
 
     typed_match = re.match(r"^([\w-]+)\s*:\s*(.*)$", specification, flags=re.DOTALL)
-    if typed_match:
+    typed_name = typed_match.group(1).casefold() if typed_match else ""
+    typed_type = TYPE_ALIASES.get(typed_name, typed_name)
+    if typed_match and typed_type in BUTTON_TYPES:
         raw_type = typed_match.group(1).casefold()
         button_type = TYPE_ALIASES.get(raw_type, raw_type)
         value = typed_match.group(2).strip()
     elif new_syntax:
         raw_type = specification.casefold()
         known_type = TYPE_ALIASES.get(raw_type, raw_type)
-        if known_type in {
-            "user", "disabled", "url", "callback_data", "page_callback", "copy",
-            "popup", "web_app", "login_url", "switch_inline_query",
-            "switch_inline_query_current_chat",
-        }:
+        if known_type in BUTTON_TYPES:
             button_type, value = known_type, ""
         else:
             button_type, value = "url", specification.strip()
