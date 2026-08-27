@@ -26,7 +26,8 @@ from app.keyboards import (
     build_details_content_keyboard, build_inner_block_input_keyboard,
     build_inner_block_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
-    build_pages_keyboard, build_page_target_keyboard,
+    build_pages_keyboard, build_page_delete_confirmation_keyboard,
+    build_page_target_keyboard,
     build_post_settings_keyboard, build_rich_editor_keyboard,
     build_start_editor_keyboard,
     build_table_cell_keyboard, build_table_options_keyboard, build_welcome_keyboard,
@@ -71,6 +72,7 @@ albums = AlbumCollector()
 user_locks: defaultdict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 MAIN_TEXT = "تخصيص الرسالة\n\nاختر الجزء الذي تريد تعديله:"
+PAGES_PER_SCREEN = 4
 ADMIN_STATUSES = {"administrator", "creator"}
 CHANNEL_ADMIN_RIGHTS = (
     "post_messages+edit_messages+delete_messages+manage_chat+invite_users+restrict_members"
@@ -81,8 +83,18 @@ def _math_input_prompt(*, editing: bool = False) -> str:
     return t("math.edit_prompt" if editing else "math.add_prompt")
 
 
-def _saved_pages_text(pages: list[dict[str, Any]]) -> str:
-    lines = ["📚 صفحاتك المحفوظة", "", "اختر صفحة لفتحها وتعديلها:", ""]
+def _saved_pages_text(
+    pages: list[dict[str, Any]],
+    page_index: int = 0,
+    total_pages: int = 1,
+) -> str:
+    lines = [
+        "📚 صفحاتك المحفوظة",
+        f"{page_index + 1}/{total_pages}",
+        "",
+        "اختر صفحة لفتحها وتعديلها:",
+        "",
+    ]
     for page in pages:
         page_id = html.escape(str(page["page_id"]))
         title = html.escape(str(page.get("title") or page["page_id"]))
@@ -94,6 +106,16 @@ def _opened_page_text(page_id: str, page: dict[str, Any]) -> str:
     code = html.escape(page_id)
     title = html.escape(str(page.get("title") or page_id))
     return f"📄 {title} — <code>{code}</code>\n\n{MAIN_TEXT}"
+
+
+def _page_screen(
+    pages: list[dict[str, Any]],
+    requested_index: int,
+) -> tuple[list[dict[str, Any]], int, int]:
+    total_pages = max(1, (len(pages) + PAGES_PER_SCREEN - 1) // PAGES_PER_SCREEN)
+    page_index = max(0, min(requested_index, total_pages - 1))
+    start = page_index * PAGES_PER_SCREEN
+    return pages[start:start + PAGES_PER_SCREEN], page_index, total_pages
 GROUP_ADMIN_RIGHTS = "delete_messages+manage_chat+invite_users+restrict_members"
 PULLQUOTE_MEDIA_TYPES = {"photo", "video", "animation", "audio", "voice", "document"}
 
@@ -430,15 +452,24 @@ async def _edit_button_ui(message: Message, text: str, reply_markup) -> None:
         await _edit_ui(message, text, reply_markup)
 
 
-async def _edit_saved_ui(bot: Bot, state: FSMContext, text: str, reply_markup) -> None:
+async def _edit_saved_ui(
+    bot: Bot,
+    state: FSMContext,
+    text: str,
+    reply_markup,
+    parse_mode: str | None = None,
+) -> None:
     data = await state.get_data()
     try:
         await bot.edit_message_text(
             chat_id=data["management_chat_id"], message_id=data["management_message_id"],
-            text=text, reply_markup=reply_markup,
+            text=text, reply_markup=reply_markup, parse_mode=parse_mode,
         )
     except (KeyError, TelegramBadRequest):
-        sent = await bot.send_message(data.get("management_chat_id"), text, reply_markup=reply_markup)
+        sent = await bot.send_message(
+            data.get("management_chat_id"), text,
+            reply_markup=reply_markup, parse_mode=parse_mode,
+        )
         await state.update_data(management_chat_id=sent.chat.id, management_message_id=sent.message_id)
 
 
@@ -526,6 +557,13 @@ async def _delete_stored_block_prompt(
         except TelegramBadRequest as error:
             logger.debug("Could not delete block prompt %s: %s", prompt_id, error)
     await state.update_data(add_prompt_chat_id=None, add_prompt_message_id=None)
+
+
+async def _delete_input_message(message: Message) -> None:
+    try:
+        await message.delete()
+    except TelegramBadRequest as error:
+        logger.debug("Could not delete input message %s: %s", message.message_id, error)
 
 
 def _details_builder_text(payload: dict[str, Any]) -> str:
@@ -2067,6 +2105,7 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
             f"نوع الزر الجديد: {value}\n\nاختر وظيفة الزر:",
             build_button_type_keyboard(),
         )
+        await _delete_input_message(message)
         return
 
     if isinstance(action, str) and action.startswith("add_") and action != "add_title":
@@ -2134,7 +2173,7 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
         f"{notice}\n\nإدارة أزرار الرسالة الغنية\nعدد الأزرار: {len(buttons)}",
         build_buttons_manager_keyboard(buttons, _buttons_per_row(data)),
     )
-    await message.answer(notice)
+    await _delete_input_message(message)
 
 
 @router.callback_query(F.data.startswith("r:b:"))
@@ -2411,10 +2450,10 @@ async def receive_replacement(message: Message, state: FSMContext, bot: Bot) -> 
     replacement["native"] = False
     replacement.pop("native_data", None)
     block["data"] = replacement
+    await _delete_add_step_messages(bot, message, data, state)
     await state.update_data(blocks=blocks)
     await state.set_state(RichEditorStates.managing)
     await _edit_saved_ui(bot, state, _block_page(block, blocks), build_block_editor_keyboard(block))
-    await message.answer("تم تحديث الجزء بنجاح.")
 
 
 @router.callback_query(F.data.startswith("r:f:"))
@@ -2441,7 +2480,7 @@ async def edit_block_field(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(current_block_id=block_id, expected_type=block["type"], edit_field=field)
     await state.set_state(RichEditorStates.editing_block)
     if isinstance(callback.message, Message):
-        await callback.message.answer(prompts[field])
+        await _send_add_prompt(callback.message, state, prompts[field])
     await callback.answer()
 
 
@@ -2741,7 +2780,11 @@ async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer("لا توجد أجزاء لحفظها.", show_alert=True)
         return
     await state.set_state(RichEditorStates.saving_page_name)
-    await callback.message.answer("أرسل اسم الصفحة لحفظها؛ الحد الأقصى 64 حرفًا.")
+    await _send_add_prompt(
+        callback.message,
+        state,
+        "أرسل اسم الصفحة لحفظها؛ الحد الأقصى 64 حرفًا.",
+    )
     await callback.answer()
 
 
@@ -2770,6 +2813,7 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
         str(data.get("buttons_align", "center")),
         page_id=existing_id,
     )
+    await _delete_add_step_messages(bot, message, data, state)
     await state.set_state(RichEditorStates.managing)
     await state.update_data(current_page_id=code, current_page_title=title)
     prefix = (
@@ -2789,22 +2833,159 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
     )
 
 
+async def _pages_for_user(
+    user_id: int,
+    requested_index: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, int]:
+    pages = await page_registry.list_for_user(user_id)
+    visible, page_index, total_pages = _page_screen(pages, requested_index)
+    return pages, visible, page_index, total_pages
+
+
 @router.callback_query(F.data == "r:pages")
+@router.callback_query(F.data.startswith("r:pages:"))
 async def list_pages(callback: CallbackQuery, state: FSMContext) -> None:
     session = await _session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
-    pages = await page_registry.list_for_user(callback.from_user.id)
+    try:
+        requested_index = int(callback.data.rsplit(":", 1)[-1]) if callback.data != "r:pages" else 0
+    except ValueError:
+        requested_index = 0
+    pages, visible, page_index, total_pages = await _pages_for_user(
+        callback.from_user.id,
+        requested_index,
+    )
     if not pages:
         await callback.answer("ما عندك صفحات محفوظة بعد.", show_alert=True)
         return
     await _edit_ui(
         callback.message,
-        _saved_pages_text(pages),
-        build_pages_keyboard(pages),
+        _saved_pages_text(visible, page_index, total_pages),
+        build_pages_keyboard(visible, page_index, total_pages),
         parse_mode="HTML",
     )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:prename:"))
+async def request_page_rename(callback: CallbackQuery, state: FSMContext) -> None:
+    if not isinstance(callback.message, Message):
+        return
+    try:
+        _, _, page_id, raw_index = callback.data.split(":", 3)
+        page_index = max(0, int(raw_index))
+    except (ValueError, TypeError):
+        await callback.answer("اختيار غير صالح.", show_alert=True)
+        return
+    page = await page_registry.get(page_id)
+    if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
+        await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
+        return
+    await state.set_state(RichEditorStates.renaming_page)
+    await state.update_data(rename_page_id=page_id, pages_page_index=page_index)
+    await _send_add_prompt(
+        callback.message,
+        state,
+        t("pages.rename_prompt", title=str(page.get("title") or page_id)),
+    )
+    await callback.answer()
+
+
+@router.message(RichEditorStates.renaming_page)
+async def receive_page_rename(message: Message, state: FSMContext, bot: Bot) -> None:
+    title = (message.text or "").strip()
+    if not title:
+        await message.answer("اسم الصفحة يجب أن يكون نصًا.")
+        return
+    if len(title) > 64:
+        await message.answer("اسم الصفحة طويل جدًا؛ الحد الأقصى 64 حرفًا.")
+        return
+    data = await state.get_data()
+    page_id = str(data.get("rename_page_id") or "")
+    if not await page_registry.rename(page_id, message.from_user.id, title):
+        await state.set_state(RichEditorStates.managing)
+        await message.answer("الصفحة محذوفة أو لا تخصك.")
+        return
+    await _delete_add_step_messages(bot, message, data, state)
+    await state.set_state(RichEditorStates.managing)
+    await state.update_data(
+        rename_page_id=None,
+        current_page_title=title if data.get("current_page_id") == page_id else data.get("current_page_title"),
+    )
+    _, visible, page_index, total_pages = await _pages_for_user(
+        message.from_user.id,
+        int(data.get("pages_page_index", 0)),
+    )
+    await _edit_saved_ui(
+        bot,
+        state,
+        _saved_pages_text(visible, page_index, total_pages),
+        build_pages_keyboard(visible, page_index, total_pages),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data.startswith("r:pdelete:"))
+async def confirm_page_delete(callback: CallbackQuery, state: FSMContext) -> None:
+    if not isinstance(callback.message, Message):
+        return
+    try:
+        _, _, page_id, raw_index = callback.data.split(":", 3)
+        page_index = max(0, int(raw_index))
+    except (ValueError, TypeError):
+        await callback.answer("اختيار غير صالح.", show_alert=True)
+        return
+    page = await page_registry.get(page_id)
+    if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
+        await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
+        return
+    title = html.escape(str(page.get("title") or page_id))
+    await _edit_ui(
+        callback.message,
+        t("pages.delete_confirm", title=title),
+        build_page_delete_confirmation_keyboard(page_id, page_index),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:pdeleteok:"))
+async def delete_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
+    if not isinstance(callback.message, Message):
+        return
+    try:
+        _, _, page_id, raw_index = callback.data.split(":", 3)
+        requested_index = max(0, int(raw_index))
+    except (ValueError, TypeError):
+        await callback.answer("اختيار غير صالح.", show_alert=True)
+        return
+    if not await page_registry.delete(page_id, callback.from_user.id):
+        await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
+        return
+    pages, visible, page_index, total_pages = await _pages_for_user(
+        callback.from_user.id,
+        requested_index,
+    )
+    if not pages:
+        data = await state.get_data()
+        blocks = data.get("blocks") or []
+        await _edit_ui(
+            callback.message,
+            t("editor.empty_hint") if not blocks else MAIN_TEXT,
+            build_rich_editor_keyboard(blocks),
+        )
+    else:
+        await _edit_ui(
+            callback.message,
+            _saved_pages_text(visible, page_index, total_pages),
+            build_pages_keyboard(visible, page_index, total_pages),
+            parse_mode="HTML",
+        )
+    data = await state.get_data()
+    if data.get("current_page_id") == page_id:
+        await state.update_data(current_page_id=None, current_page_title=None)
+    await callback.answer(t("pages.deleted"))
 
 
 @router.callback_query(F.data.startswith("r:pageopen:"))
