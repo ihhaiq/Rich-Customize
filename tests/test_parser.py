@@ -25,15 +25,15 @@ class FormattedTextParserTests(unittest.TestCase):
         self.assertIn("دليل الأزرار", details["summary"])
         examples = details["blocks"][1]
         self.assertEqual(examples["type"], "blockquote")
-        self.assertIn("{الملف الشخصي:user#p}", examples["blocks"][0]["text"])
-        self.assertIn("{تنفيذ:callback_data action:1#r}", examples["blocks"][0]["text"])
-        self.assertIn("{الصفحة التالية:cbd a86d3132#b}", examples["blocks"][0]["text"])
-        self.assertIn("{تنبيه:popup هذا نص التنبيه#r}", examples["blocks"][0]["text"])
+        self.assertIn("{الملف الشخصي - USER #p}", examples["blocks"][0]["text"])
+        self.assertIn("{تنفيذ - callback_data: action:1 #r}", examples["blocks"][0]["text"])
+        self.assertIn("{الصفحة التالية - CBD:a86d3132 #b}", examples["blocks"][0]["text"])
+        self.assertIn("{تنبيه - popup: هذا نص التنبيه #r}", examples["blocks"][0]["text"])
         self.assertNotIn("web_app", examples["blocks"][0]["text"])
         self.assertNotIn("login_url", examples["blocks"][0]["text"])
         self.assertEqual(
             details["blocks"][2]["text"],
-            "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون الافتراضي.",
+            "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر. يقبل أيضًا RED وBLUE وGREEN وأسماء الألوان العربية.",
         )
 
     def test_inline_url_and_callback_buttons_keep_their_text_position(self):
