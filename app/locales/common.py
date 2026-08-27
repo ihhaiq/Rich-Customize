@@ -61,6 +61,8 @@ PHRASES: dict[str, str] = {
     "send_voice": "Send a voice note.",
     "math.add_prompt": "Send the formula in LaTeX.\n\nTo add a space between text, use: \\ ",
     "math.edit_prompt": "Send the new LaTeX formula.\n\nTo add a space between text, use: \\ ",
+    "code.add_prompt": "Send the code.\n\nTo set its language, start with /lang python, then put the code on the following lines. You can also use a fenced block such as ```python ... ```.",
+    "code.edit_prompt": "Send the new code.\n\nTo set its language, start with /lang python, then put the code on the following lines. You can also use a fenced block such as ```python ... ```.",
     "editor.closed_hint": "Use the editor buttons, or send /editor to start a new message.",
     "editor.start_button": "▶️ Start editor",
     "editor.new_button": "➕ Start editor",
@@ -129,6 +131,8 @@ PHRASES: dict[str, str] = {
 AR_PHRASES: dict[str, str] = {
     "math.add_prompt": "أرسل المعادلة بصيغة LaTeX.\n\nلإضافة مسافة بين النصوص استخدم: \\ ",
     "math.edit_prompt": "أرسل معادلة LaTeX الجديدة.\n\nلإضافة مسافة بين النصوص استخدم: \\ ",
+    "code.add_prompt": "أرسل النص البرمجي.\n\nلتحديد لغة الكود اكتب في أول سطر: /lang python ثم اكتب الكود في الأسطر التالية. وتكدر أيضًا تستخدم: ```python ... ```.",
+    "code.edit_prompt": "أرسل النص البرمجي الجديد.\n\nلتحديد لغة الكود اكتب في أول سطر: /lang python ثم اكتب الكود في الأسطر التالية. وتكدر أيضًا تستخدم: ```python ... ```.",
     "editor.closed_hint": "استخدم أزرار المحرّر، أو أرسل /editor لبدء رسالة جديدة.",
     "editor.start_button": "▶️ بدء المحرّر",
     "editor.new_button": "➕ بدء المحرّر",
@@ -303,6 +307,30 @@ MATH_PROMPT_TRANSLATIONS: dict[str, dict[str, str]] = {
         "math.add_prompt": "請傳送 LaTeX 公式。\n\n若要在文字之間加入空格，請使用：\\ ",
         "math.edit_prompt": "請傳送新的 LaTeX 公式。\n\n若要在文字之間加入空格，請使用：\\ ",
     },
+}
+
+CODE_PROMPT_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {"code.add_prompt": "Envía el código.\n\nPara indicar el lenguaje, comienza con /lang python y escribe el código en las líneas siguientes. También puedes usar ```python ... ```.", "code.edit_prompt": "Envía el código nuevo.\n\nPara indicar el lenguaje, comienza con /lang python y escribe el código en las líneas siguientes. También puedes usar ```python ... ```."},
+    "fr": {"code.add_prompt": "Envoyez le code.\n\nPour définir le langage, commencez par /lang python puis écrivez le code sur les lignes suivantes. Vous pouvez aussi utiliser ```python ... ```.", "code.edit_prompt": "Envoyez le nouveau code.\n\nPour définir le langage, commencez par /lang python puis écrivez le code sur les lignes suivantes. Vous pouvez aussi utiliser ```python ... ```."},
+    "de": {"code.add_prompt": "Sende den Code.\n\nBeginne zur Sprachauswahl mit /lang python und schreibe den Code in die folgenden Zeilen. Du kannst auch ```python ... ``` verwenden.", "code.edit_prompt": "Sende den neuen Code.\n\nBeginne zur Sprachauswahl mit /lang python und schreibe den Code in die folgenden Zeilen. Du kannst auch ```python ... ``` verwenden."},
+    "it": {"code.add_prompt": "Invia il codice.\n\nPer impostare il linguaggio, inizia con /lang python e scrivi il codice nelle righe successive. Puoi anche usare ```python ... ```.", "code.edit_prompt": "Invia il nuovo codice.\n\nPer impostare il linguaggio, inizia con /lang python e scrivi il codice nelle righe successive. Puoi anche usare ```python ... ```."},
+    "pt": {"code.add_prompt": "Envie o código.\n\nPara definir a linguagem, comece com /lang python e escreva o código nas linhas seguintes. Você também pode usar ```python ... ```.", "code.edit_prompt": "Envie o novo código.\n\nPara definir a linguagem, comece com /lang python e escreva o código nas linhas seguintes. Você também pode usar ```python ... ```."},
+    "nl": {"code.add_prompt": "Stuur de code.\n\nBegin met /lang python om de taal in te stellen en zet de code op de volgende regels. Je kunt ook ```python ... ``` gebruiken.", "code.edit_prompt": "Stuur de nieuwe code.\n\nBegin met /lang python om de taal in te stellen en zet de code op de volgende regels. Je kunt ook ```python ... ``` gebruiken."},
+    "pl": {"code.add_prompt": "Wyślij kod.\n\nAby ustawić język, zacznij od /lang python i wpisz kod w kolejnych wierszach. Możesz też użyć ```python ... ```.", "code.edit_prompt": "Wyślij nowy kod.\n\nAby ustawić język, zacznij od /lang python i wpisz kod w kolejnych wierszach. Możesz też użyć ```python ... ```."},
+    "uk": {"code.add_prompt": "Надішліть код.\n\nЩоб указати мову, почніть з /lang python і напишіть код у наступних рядках. Також можна використати ```python ... ```.", "code.edit_prompt": "Надішліть новий код.\n\nЩоб указати мову, почніть з /lang python і напишіть код у наступних рядках. Також можна використати ```python ... ```."},
+    "ru": {"code.add_prompt": "Отправьте код.\n\nЧтобы указать язык, начните с /lang python и напишите код в следующих строках. Также можно использовать ```python ... ```.", "code.edit_prompt": "Отправьте новый код.\n\nЧтобы указать язык, начните с /lang python и напишите код в следующих строках. Также можно использовать ```python ... ```."},
+    "tr": {"code.add_prompt": "Kodu gönderin.\n\nDili belirlemek için /lang python ile başlayın ve kodu sonraki satırlara yazın. ```python ... ``` da kullanabilirsiniz.", "code.edit_prompt": "Yeni kodu gönderin.\n\nDili belirlemek için /lang python ile başlayın ve kodu sonraki satırlara yazın. ```python ... ``` da kullanabilirsiniz."},
+    "fa": {"code.add_prompt": "کد را ارسال کنید.\n\nبرای تعیین زبان، با /lang python شروع کنید و کد را در خط‌های بعد بنویسید. می‌توانید از ```python ... ``` نیز استفاده کنید.", "code.edit_prompt": "کد جدید را ارسال کنید.\n\nبرای تعیین زبان، با /lang python شروع کنید و کد را در خط‌های بعد بنویسید. می‌توانید از ```python ... ``` نیز استفاده کنید."},
+    "ku": {"code.add_prompt": "Kodê bişîne.\n\nJi bo diyarkirina zimanî bi /lang python dest pê bike û kodê li rêzên paşîn binivîse. ```python ... ``` jî dikarî bikar bînî.", "code.edit_prompt": "Koda nû bişîne.\n\nJi bo diyarkirina zimanî bi /lang python dest pê bike û kodê li rêzên paşîn binivîse. ```python ... ``` jî dikarî bikar bînî."},
+    "ur": {"code.add_prompt": "کوڈ بھیجیں۔\n\nزبان مقرر کرنے کے لیے /lang python سے شروع کریں اور اگلی سطروں میں کوڈ لکھیں۔ آپ ```python ... ``` بھی استعمال کر سکتے ہیں۔", "code.edit_prompt": "نیا کوڈ بھیجیں۔\n\nزبان مقرر کرنے کے لیے /lang python سے شروع کریں اور اگلی سطروں میں کوڈ لکھیں۔ آپ ```python ... ``` بھی استعمال کر سکتے ہیں۔"},
+    "hi": {"code.add_prompt": "कोड भेजें।\n\nभाषा तय करने के लिए /lang python से शुरू करें और अगली पंक्तियों में कोड लिखें। आप ```python ... ``` भी इस्तेमाल कर सकते हैं।", "code.edit_prompt": "नया कोड भेजें।\n\nभाषा तय करने के लिए /lang python से शुरू करें और अगली पंक्तियों में कोड लिखें। आप ```python ... ``` भी इस्तेमाल कर सकते हैं।"},
+    "id": {"code.add_prompt": "Kirim kode.\n\nUntuk menentukan bahasa, mulai dengan /lang python lalu tulis kode di baris berikutnya. Anda juga dapat memakai ```python ... ```.", "code.edit_prompt": "Kirim kode baru.\n\nUntuk menentukan bahasa, mulai dengan /lang python lalu tulis kode di baris berikutnya. Anda juga dapat memakai ```python ... ```."},
+    "ja": {"code.add_prompt": "コードを送信してください。\n\n言語を指定するには /lang python で始め、次の行からコードを書きます。```python ... ``` も使用できます。", "code.edit_prompt": "新しいコードを送信してください。\n\n言語を指定するには /lang python で始め、次の行からコードを書きます。```python ... ``` も使用できます。"},
+    "ko": {"code.add_prompt": "코드를 보내세요.\n\n언어를 지정하려면 /lang python으로 시작하고 다음 줄부터 코드를 작성하세요. ```python ... ```도 사용할 수 있습니다.", "code.edit_prompt": "새 코드를 보내세요.\n\n언어를 지정하려면 /lang python으로 시작하고 다음 줄부터 코드를 작성하세요. ```python ... ```도 사용할 수 있습니다."},
+    "vi": {"code.add_prompt": "Gửi mã.\n\nĐể chọn ngôn ngữ, hãy bắt đầu bằng /lang python rồi viết mã ở các dòng tiếp theo. Bạn cũng có thể dùng ```python ... ```.", "code.edit_prompt": "Gửi mã mới.\n\nĐể chọn ngôn ngữ, hãy bắt đầu bằng /lang python rồi viết mã ở các dòng tiếp theo. Bạn cũng có thể dùng ```python ... ```."},
+    "th": {"code.add_prompt": "ส่งโค้ด\n\nหากต้องการระบุภาษา ให้เริ่มด้วย /lang python แล้วเขียนโค้ดในบรรทัดถัดไป หรือใช้ ```python ... ```", "code.edit_prompt": "ส่งโค้ดใหม่\n\nหากต้องการระบุภาษา ให้เริ่มด้วย /lang python แล้วเขียนโค้ดในบรรทัดถัดไป หรือใช้ ```python ... ```"},
+    "zh-hans": {"code.add_prompt": "请发送代码。\n\n要指定语言，请以 /lang python 开头，并在后续行中编写代码。也可以使用 ```python ... ```。", "code.edit_prompt": "请发送新代码。\n\n要指定语言，请以 /lang python 开头，并在后续行中编写代码。也可以使用 ```python ... ```。"},
+    "zh-hant": {"code.add_prompt": "請傳送程式碼。\n\n若要指定語言，請以 /lang python 開頭，並在後續行中撰寫程式碼。也可以使用 ```python ... ```。", "code.edit_prompt": "請傳送新程式碼。\n\n若要指定語言，請以 /lang python 開頭，並在後續行中撰寫程式碼。也可以使用 ```python ... ```。"},
 }
 
 
@@ -546,6 +574,9 @@ KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
 }
 
 for language, translations in MATH_PROMPT_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in CODE_PROMPT_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 for language, translations in EDITOR_START_TRANSLATIONS.items():
