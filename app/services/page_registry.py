@@ -104,6 +104,16 @@ class PageRegistry:
             media_store.unpin_page(page_id)
             return True
 
+    async def rename(self, page_id: str, owner_id: int, title: str) -> bool:
+        async with self._lock:
+            pages = self._read()
+            page = pages.get(page_id)
+            if not isinstance(page, dict) or int(page.get("owner_id", 0)) != owner_id:
+                return False
+            page["title"] = title.strip()[:64] or "صفحة بلا اسم"
+            self._write(pages)
+            return True
+
     async def rebuild_media_pins(self) -> None:
         """Rebuild pins at startup so existing page codes survive cache cleanup."""
         async with self._lock:
