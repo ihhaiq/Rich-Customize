@@ -1,10 +1,15 @@
 import re
 import unittest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 from app import i18n_core
 from app.i18n import tr
 from app.locales import TRANSLATIONS
-from app.routers.editor_core import _math_input_prompt, _opened_page_text, _saved_pages_text
+from app.routers.editor_core import (
+    _delete_stored_block_prompt, _math_input_prompt,
+    _opened_page_text, _saved_pages_text,
+)
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 
@@ -72,6 +77,46 @@ class SavedPagesLocalizationTests(unittest.TestCase):
             self.assertIn("📚 Your saved pages", pack, language)
             self.assertIn("Choose a page to open and edit:", pack, language)
             self.assertIn("You don't have any saved pages yet.", pack, language)
+
+
+class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_back_cleanup_deletes_only_the_separate_prompt(self):
+        bot = SimpleNamespace(delete_message=AsyncMock())
+        state = SimpleNamespace(update_data=AsyncMock())
+        management = SimpleNamespace(
+            chat=SimpleNamespace(id=10),
+            message_id=20,
+        )
+
+        await _delete_stored_block_prompt(
+            bot,
+            state,
+            {"add_prompt_chat_id": 10, "add_prompt_message_id": 21},
+            protected_message=management,
+        )
+
+        bot.delete_message.assert_awaited_once_with(chat_id=10, message_id=21)
+        state.update_data.assert_awaited_once_with(
+            add_prompt_chat_id=None,
+            add_prompt_message_id=None,
+        )
+
+    async def test_back_cleanup_never_deletes_management_message(self):
+        bot = SimpleNamespace(delete_message=AsyncMock())
+        state = SimpleNamespace(update_data=AsyncMock())
+        management = SimpleNamespace(
+            chat=SimpleNamespace(id=10),
+            message_id=20,
+        )
+
+        await _delete_stored_block_prompt(
+            bot,
+            state,
+            {"add_prompt_chat_id": 10, "add_prompt_message_id": 20},
+            protected_message=management,
+        )
+
+        bot.delete_message.assert_not_awaited()
 
 
 if __name__ == "__main__":
