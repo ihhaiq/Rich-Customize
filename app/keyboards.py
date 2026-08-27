@@ -21,7 +21,10 @@ from app.i18n import t
 def build_welcome_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🧩 قالب كل البلوكات", callback_data="r:showcase"),
-        InlineKeyboardButton(text=t("editor.new_button"), callback_data="r:starteditor"),
+        InlineKeyboardButton(
+            text=t("editor.new_button"), callback_data="r:starteditor",
+            style=ButtonStyle.SUCCESS,
+        ),
     ]])
 
 
@@ -30,6 +33,7 @@ def build_start_editor_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(
             text=t("editor.start_button"),
             callback_data="r:starteditor",
+            style=ButtonStyle.SUCCESS,
         ),
     ]])
 
@@ -108,20 +112,32 @@ def build_rich_editor_keyboard(
 ) -> InlineKeyboardMarkup:
     if not blocks:
         return InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="➕ إضافة Block", callback_data="r:addmenu"),
-            InlineKeyboardButton(text="📚 صفحاتي", callback_data="r:pages"),
+            InlineKeyboardButton(
+                text="➕ إضافة Block", callback_data="r:addmenu", style=ButtonStyle.PRIMARY,
+            ),
+            InlineKeyboardButton(
+                text="📚 صفحاتي", callback_data="r:pages", style=ButtonStyle.PRIMARY,
+            ),
         ]])
     rows = [
         [InlineKeyboardButton(text=get_block_button_text(block, index), callback_data=f"r:b:{block['id']}")]
         for index, block in enumerate(sorted(blocks, key=lambda item: item["position"]))
     ]
     rows.append([
-        InlineKeyboardButton(text="➕ إضافة Block", callback_data="r:addmenu"),
-        InlineKeyboardButton(text="🔘 إضافة أزرار", callback_data="r:buttons"),
+        InlineKeyboardButton(
+            text="➕ إضافة Block", callback_data="r:addmenu", style=ButtonStyle.PRIMARY,
+        ),
+        InlineKeyboardButton(
+            text="🔘 إضافة أزرار", callback_data="r:buttons", style=ButtonStyle.PRIMARY,
+        ),
     ])
     rows.append([
-        InlineKeyboardButton(text="💾 حفظ الصفحة", callback_data="r:savepage"),
-        InlineKeyboardButton(text="📚 صفحاتي", callback_data="r:pages"),
+        InlineKeyboardButton(
+            text="💾 حفظ الصفحة", callback_data="r:savepage", style=ButtonStyle.SUCCESS,
+        ),
+        InlineKeyboardButton(
+            text="📚 صفحاتي", callback_data="r:pages", style=ButtonStyle.PRIMARY,
+        ),
     ])
     rows.append([
         InlineKeyboardButton(
@@ -218,13 +234,58 @@ def build_button_type_keyboard(callback_prefix: str = "r:bat") -> InlineKeyboard
     ])
 
 
-def build_pages_keyboard(pages: list[dict[str, Any]]) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton(
-        text=f"📄 {page.get('title') or page['page_id']}",
-        callback_data=f"r:pageopen:{page['page_id']}",
-    )] for page in pages]
+def build_pages_keyboard(
+    pages: list[dict[str, Any]],
+    page_index: int = 0,
+    total_pages: int = 1,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for page in pages:
+        page_id = str(page["page_id"])
+        title = str(page.get("title") or page_id)[:24]
+        rows.append([InlineKeyboardButton(
+            text=f"📄 {title}",
+            callback_data=f"r:pageopen:{page_id}",
+            style=ButtonStyle.PRIMARY,
+        )])
+        rows.append([
+            InlineKeyboardButton(
+                text=f"📋 {page_id}",
+                copy_text=CopyTextButton(text=page_id),
+                style=ButtonStyle.SUCCESS,
+            ),
+            InlineKeyboardButton(
+                text="✏️", callback_data=f"r:prename:{page_id}:{page_index}",
+            ),
+            InlineKeyboardButton(
+                text="🗑", callback_data=f"r:pdelete:{page_id}:{page_index}",
+                style=ButtonStyle.DANGER,
+            ),
+        ])
+    if total_pages > 1:
+        rows.append([
+            InlineKeyboardButton(
+                text="◀️",
+                callback_data="r:no" if page_index <= 0 else f"r:pages:{page_index - 1}",
+            ),
+            InlineKeyboardButton(text=f"{page_index + 1}/{total_pages}", callback_data="r:no"),
+            InlineKeyboardButton(
+                text="▶️",
+                callback_data="r:no" if page_index >= total_pages - 1 else f"r:pages:{page_index + 1}",
+            ),
+        ])
     rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_page_delete_confirmation_keyboard(page_id: str, page_index: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=t("pages.delete_yes"), callback_data=f"r:pdeleteok:{page_id}:{page_index}",
+            style=ButtonStyle.DANGER,
+        ),
+        InlineKeyboardButton(text=t("common.cancel"), callback_data=f"r:pages:{page_index}"),
+    ]])
 
 
 def build_page_target_keyboard(
@@ -245,8 +306,12 @@ def build_buttons_manager_keyboard(
     count = len(buttons)
     rows = [
         [
-            InlineKeyboardButton(text="➕ إضافة", callback_data="r:ba"),
-            InlineKeyboardButton(text="➖ إزالة", callback_data="r:bs:delete"),
+            InlineKeyboardButton(
+                text="➕ إضافة", callback_data="r:ba", style=ButtonStyle.PRIMARY,
+            ),
+            InlineKeyboardButton(
+                text="➖ إزالة", callback_data="r:bs:delete", style=ButtonStyle.DANGER,
+            ),
         ],
         [
             InlineKeyboardButton(text="🎨 تغيير اللون", callback_data="r:bs:style"),
@@ -262,6 +327,7 @@ def build_buttons_manager_keyboard(
         )],
         [InlineKeyboardButton(
             text=f"👁 معاينة الأزرار ({count})", callback_data="r:bpreview",
+            style=ButtonStyle.PRIMARY,
         )],
         [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")],
     ]
