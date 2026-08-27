@@ -21,6 +21,7 @@ from app.i18n import t
 def build_welcome_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🧩 قالب كل البلوكات", callback_data="r:showcase"),
+        InlineKeyboardButton(text=t("editor.new_button"), callback_data="r:starteditor"),
     ]])
 
 
