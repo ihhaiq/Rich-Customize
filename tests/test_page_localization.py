@@ -8,7 +8,8 @@ from app.i18n import t, tr
 from app.locales import TRANSLATIONS
 from app.locales.common import EDITOR_UX_KEYS, KEY_TRANSLATIONS
 from app.routers.editor_core import (
-    _block_page, _code_input_prompt, _delete_stored_block_prompt, _math_input_prompt,
+    _ask_for_button_user, _block_page, _code_input_prompt,
+    _delete_stored_block_prompt, _math_input_prompt,
     _opened_page_text, _page_screen, _saved_pages_text, _session, new_editor,
     _pages_for_user,
 )
@@ -178,6 +179,27 @@ class SavedPagesLocalizationTests(unittest.TestCase):
 
 
 class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_user_marker_offers_user_and_public_channel_choices(self):
+        message = SimpleNamespace(answer=AsyncMock())
+        state = SimpleNamespace(update_data=AsyncMock())
+
+        await _ask_for_button_user(
+            message,
+            state,
+            {"title": "الوجهة", "marker": "{الوجهة - USER}"},
+        )
+
+        keyboard = message.answer.await_args.kwargs["reply_markup"]
+        self.assertIsNotNone(keyboard.keyboard[0][0].request_users)
+        channel_request = keyboard.keyboard[1][0].request_chat
+        self.assertTrue(channel_request.chat_is_channel)
+        self.assertTrue(channel_request.chat_has_username)
+        stored = state.update_data.await_args.kwargs
+        self.assertNotEqual(
+            stored["pending_user_request_id"],
+            stored["pending_chat_request_id"],
+        )
+
     async def test_pages_can_be_searched_and_sorted_by_latest_update(self):
         pages = [
             {"page_id": "a", "title": "Alpha", "updated_at": 10},
