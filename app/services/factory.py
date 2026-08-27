@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import re
 import uuid
 from typing import Any
 
@@ -19,6 +20,7 @@ MEDIA_CAPTION_TYPES = {
     "collage", "slideshow", "map",
 }
 QUOTE_TYPES = {"blockquote", "pullquote"}
+CODE_LANGUAGE_RE = re.compile(r"^[A-Za-z0-9_+.#-]{1,32}$")
 
 # Only container blocks may expose the inner-block builder.  Keep the
 # compatibility rules in the data layer so future containers can reuse the
@@ -81,6 +83,34 @@ def table_data(plain: str) -> dict[str, Any]:
     }
 
 
+def preformatted_data(plain: str) -> dict[str, Any]:
+    """Parse an optional code language from /lang or a Markdown code fence."""
+    code = plain
+    language: str | None = None
+    lines = plain.splitlines()
+    if lines and lines[0].startswith("```"):
+        candidate = lines[0][3:].strip()
+        if candidate and CODE_LANGUAGE_RE.fullmatch(candidate):
+            language = candidate
+        body = lines[1:]
+        if body and body[-1].strip() == "```":
+            body.pop()
+        code = "\n".join(body)
+    elif lines and lines[0].casefold().startswith("/lang "):
+        candidate = lines[0][6:].strip()
+        if CODE_LANGUAGE_RE.fullmatch(candidate):
+            language = candidate
+            code = "\n".join(lines[1:])
+
+    escaped_code = html.escape(code)
+    if language:
+        escaped_language = html.escape(language, quote=True)
+        rendered = f'<pre><code class="language-{escaped_language}">{escaped_code}</code></pre>'
+    else:
+        rendered = f"<pre>{escaped_code}</pre>"
+    return {"text": code, "html": rendered, "language": language}
+
+
 def text_data(message: Message, block_type: str, heading_size: int = 2) -> dict[str, Any]:
     plain = message.text or ""
     rich = message.html_text
@@ -90,7 +120,7 @@ def text_data(message: Message, block_type: str, heading_size: int = 2) -> dict[
         size = max(1, min(6, heading_size))
         return {"text": plain, "html": f"<h{size}>{rich}</h{size}>", "size": size}
     if block_type == "preformatted":
-        return {"text": plain, "html": f"<pre>{html.escape(plain)}</pre>"}
+        return preformatted_data(plain)
     if block_type == "footer":
         return {"text": plain, "html": f"<footer>{rich}</footer>"}
     if block_type == "mathematical_expression":
