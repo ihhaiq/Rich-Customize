@@ -8,7 +8,7 @@ from app.i18n import t, tr
 from app.locales import TRANSLATIONS
 from app.routers.editor_core import (
     _delete_stored_block_prompt, _math_input_prompt,
-    _opened_page_text, _saved_pages_text, _session, new_editor,
+    _opened_page_text, _page_screen, _saved_pages_text, _session, new_editor,
 )
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
@@ -60,6 +60,30 @@ class SavedPagesLocalizationTests(unittest.TestCase):
                 language,
             )
 
+    def test_every_locale_translates_page_management_actions(self):
+        english = {
+            "pages.rename_prompt": "Send a new name for “Demo”; maximum 64 characters.",
+            "pages.delete_confirm": "Permanently delete “Demo”?",
+            "pages.delete_yes": "🗑 Yes, delete",
+            "common.cancel": "Cancel",
+            "pages.deleted": "Page deleted",
+        }
+        for language in TRANSLATIONS:
+            token = i18n_core._language.set(language)
+            try:
+                rendered = {
+                    "pages.rename_prompt": t("pages.rename_prompt", title="Demo"),
+                    "pages.delete_confirm": t("pages.delete_confirm", title="Demo"),
+                    "pages.delete_yes": t("pages.delete_yes"),
+                    "common.cancel": t("common.cancel"),
+                    "pages.deleted": t("pages.deleted"),
+                }
+            finally:
+                i18n_core._language.reset(token)
+
+            for key, value in rendered.items():
+                self.assertNotEqual(value, english[key], f"{language}: {key}")
+
     def test_saved_pages_show_copyable_codes_in_message_text(self):
         pages = [
             {"page_id": "a86d3132", "title": "الأولى"},
@@ -76,6 +100,15 @@ class SavedPagesLocalizationTests(unittest.TestCase):
 
         self.assertIn("📄 الأولى — <code>a86d3132</code>", rendered)
         self.assertIn("تخصيص الرسالة", rendered)
+
+    def test_saved_pages_are_paginated_and_out_of_range_is_clamped(self):
+        pages = [{"page_id": str(index)} for index in range(10)]
+
+        visible, page_index, total_pages = _page_screen(pages, 99)
+
+        self.assertEqual([page["page_id"] for page in visible], ["8", "9"])
+        self.assertEqual(page_index, 2)
+        self.assertEqual(total_pages, 3)
 
     def test_french_saved_pages_screen_has_no_arabic(self):
         token = i18n_core._language.set("fr")
