@@ -59,6 +59,8 @@ PHRASES: dict[str, str] = {
     "send_video": "Send a video.",
     "send_audio": "Send an audio file.",
     "send_voice": "Send a voice note.",
+    "math.add_prompt": "Send the formula in LaTeX.\n\nTo add a space between text, use: \\ ",
+    "math.edit_prompt": "Send the new LaTeX formula.\n\nTo add a space between text, use: \\ ",
 
     # Canonical Rich Block keys. These are deliberately semantic keys rather
     # than source-language strings so block names can never get stuck midway
@@ -94,6 +96,8 @@ PHRASES: dict[str, str] = {
 
 
 AR_PHRASES: dict[str, str] = {
+    "math.add_prompt": "أرسل المعادلة بصيغة LaTeX.\n\nلإضافة مسافة بين النصوص استخدم: \\ ",
+    "math.edit_prompt": "أرسل معادلة LaTeX الجديدة.\n\nلإضافة مسافة بين النصوص استخدم: \\ ",
     "block.content": "📦 محتوى",
     "block.text": "📝 نص",
     "block.paragraph": "📝 فقرة",
@@ -151,10 +155,101 @@ BLOCK_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     "zh-hant": {"content":"📦 內容","text":"📝 文字","paragraph":"📝 段落","heading":"🔠 章節標題","preformatted":"💻 預格式化","footer":"🔻 頁尾","caption":"💬 說明","photo":"🖼 照片","video":"🎬 影片","animation":"🎞 GIF","audio":"🎵 音訊","voice":"🎙 語音訊息","document":"📄 文件","sticker":"🏷 貼圖","video_note":"⭕ 影片訊息","divider":"➖ 分隔線","list":"📋 列表","table":"▦ 表格","blockquote":"❝ 引用區塊","pullquote":"💬 醒目引用","details":"📂 詳情","mathematical_expression":"∑ 公式","anchor":"⚓ 錨點","collage":"🖼 拼貼","slideshow":"🎞 幻燈片","map":"🗺 地圖","buttons":"🔘 富按鈕"},
 }
 
+
+MATH_PROMPT_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {
+        "math.add_prompt": "Envía la fórmula en LaTeX.\n\nPara añadir un espacio entre textos, usa: \\ ",
+        "math.edit_prompt": "Envía la nueva fórmula en LaTeX.\n\nPara añadir un espacio entre textos, usa: \\ ",
+    },
+    "fr": {
+        "math.add_prompt": "Envoyez la formule en LaTeX.\n\nPour ajouter un espace entre les textes, utilisez : \\ ",
+        "math.edit_prompt": "Envoyez la nouvelle formule en LaTeX.\n\nPour ajouter un espace entre les textes, utilisez : \\ ",
+    },
+    "de": {
+        "math.add_prompt": "Sende die Formel in LaTeX.\n\nFür ein Leerzeichen zwischen Texten verwende: \\ ",
+        "math.edit_prompt": "Sende die neue LaTeX-Formel.\n\nFür ein Leerzeichen zwischen Texten verwende: \\ ",
+    },
+    "it": {
+        "math.add_prompt": "Invia la formula in LaTeX.\n\nPer aggiungere uno spazio tra i testi, usa: \\ ",
+        "math.edit_prompt": "Invia la nuova formula in LaTeX.\n\nPer aggiungere uno spazio tra i testi, usa: \\ ",
+    },
+    "pt": {
+        "math.add_prompt": "Envie a fórmula em LaTeX.\n\nPara adicionar um espaço entre textos, use: \\ ",
+        "math.edit_prompt": "Envie a nova fórmula em LaTeX.\n\nPara adicionar um espaço entre textos, use: \\ ",
+    },
+    "nl": {
+        "math.add_prompt": "Stuur de formule in LaTeX.\n\nGebruik voor een spatie tussen teksten: \\ ",
+        "math.edit_prompt": "Stuur de nieuwe LaTeX-formule.\n\nGebruik voor een spatie tussen teksten: \\ ",
+    },
+    "pl": {
+        "math.add_prompt": "Wyślij formułę w LaTeX.\n\nAby dodać odstęp między tekstami, użyj: \\ ",
+        "math.edit_prompt": "Wyślij nową formułę w LaTeX.\n\nAby dodać odstęp między tekstami, użyj: \\ ",
+    },
+    "uk": {
+        "math.add_prompt": "Надішліть формулу у форматі LaTeX.\n\nЩоб додати пробіл між текстами, використайте: \\ ",
+        "math.edit_prompt": "Надішліть нову формулу у форматі LaTeX.\n\nЩоб додати пробіл між текстами, використайте: \\ ",
+    },
+    "ru": {
+        "math.add_prompt": "Отправьте формулу в формате LaTeX.\n\nЧтобы добавить пробел между текстами, используйте: \\ ",
+        "math.edit_prompt": "Отправьте новую формулу в формате LaTeX.\n\nЧтобы добавить пробел между текстами, используйте: \\ ",
+    },
+    "tr": {
+        "math.add_prompt": "Formülü LaTeX biçiminde gönderin.\n\nMetinler arasına boşluk eklemek için şunu kullanın: \\ ",
+        "math.edit_prompt": "Yeni LaTeX formülünü gönderin.\n\nMetinler arasına boşluk eklemek için şunu kullanın: \\ ",
+    },
+    "fa": {
+        "math.add_prompt": "فرمول را با قالب LaTeX ارسال کنید.\n\nبرای افزودن فاصله بین متن‌ها از این استفاده کنید: \\ ",
+        "math.edit_prompt": "فرمول جدید LaTeX را ارسال کنید.\n\nبرای افزودن فاصله بین متن‌ها از این استفاده کنید: \\ ",
+    },
+    "ku": {
+        "math.add_prompt": "Formulê bi formata LaTeX bişînin.\n\nJi bo zêdekirina valahiyê di navbera nivîsan de, vê bikar bînin: \\ ",
+        "math.edit_prompt": "Formula nû ya LaTeX bişînin.\n\nJi bo zêdekirina valahiyê di navbera nivîsan de, vê bikar bînin: \\ ",
+    },
+    "ur": {
+        "math.add_prompt": "فارمولا LaTeX میں بھیجیں۔\n\nمتن کے درمیان فاصلہ شامل کرنے کے لیے استعمال کریں: \\ ",
+        "math.edit_prompt": "نیا LaTeX فارمولا بھیجیں۔\n\nمتن کے درمیان فاصلہ شامل کرنے کے لیے استعمال کریں: \\ ",
+    },
+    "hi": {
+        "math.add_prompt": "सूत्र LaTeX में भेजें।\n\nटेक्स्ट के बीच स्पेस जोड़ने के लिए इसका उपयोग करें: \\ ",
+        "math.edit_prompt": "नया LaTeX सूत्र भेजें।\n\nटेक्स्ट के बीच स्पेस जोड़ने के लिए इसका उपयोग करें: \\ ",
+    },
+    "id": {
+        "math.add_prompt": "Kirim rumus dalam LaTeX.\n\nUntuk menambahkan spasi di antara teks, gunakan: \\ ",
+        "math.edit_prompt": "Kirim rumus LaTeX yang baru.\n\nUntuk menambahkan spasi di antara teks, gunakan: \\ ",
+    },
+    "ja": {
+        "math.add_prompt": "LaTeX形式で数式を送信してください。\n\nテキスト間に空白を追加するには、次を使用します: \\ ",
+        "math.edit_prompt": "新しいLaTeX数式を送信してください。\n\nテキスト間に空白を追加するには、次を使用します: \\ ",
+    },
+    "ko": {
+        "math.add_prompt": "LaTeX 형식으로 수식을 보내세요.\n\n텍스트 사이에 공백을 추가하려면 다음을 사용하세요: \\ ",
+        "math.edit_prompt": "새 LaTeX 수식을 보내세요.\n\n텍스트 사이에 공백을 추가하려면 다음을 사용하세요: \\ ",
+    },
+    "vi": {
+        "math.add_prompt": "Gửi công thức ở định dạng LaTeX.\n\nĐể thêm khoảng trắng giữa các đoạn văn bản, hãy dùng: \\ ",
+        "math.edit_prompt": "Gửi công thức LaTeX mới.\n\nĐể thêm khoảng trắng giữa các đoạn văn bản, hãy dùng: \\ ",
+    },
+    "th": {
+        "math.add_prompt": "ส่งสูตรในรูปแบบ LaTeX\n\nหากต้องการเพิ่มช่องว่างระหว่างข้อความ ให้ใช้: \\ ",
+        "math.edit_prompt": "ส่งสูตร LaTeX ใหม่\n\nหากต้องการเพิ่มช่องว่างระหว่างข้อความ ให้ใช้: \\ ",
+    },
+    "zh-hans": {
+        "math.add_prompt": "请发送 LaTeX 公式。\n\n要在文本之间添加空格，请使用：\\ ",
+        "math.edit_prompt": "请发送新的 LaTeX 公式。\n\n要在文本之间添加空格，请使用：\\ ",
+    },
+    "zh-hant": {
+        "math.add_prompt": "請傳送 LaTeX 公式。\n\n若要在文字之間加入空格，請使用：\\ ",
+        "math.edit_prompt": "請傳送新的 LaTeX 公式。\n\n若要在文字之間加入空格，請使用：\\ ",
+    },
+}
+
 KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     language: {f"block.{name}": value for name, value in values.items()}
     for language, values in BLOCK_KEY_TRANSLATIONS.items()
 }
+
+for language, translations in MATH_PROMPT_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 
 def pack(**values: str) -> dict[str, str]:
