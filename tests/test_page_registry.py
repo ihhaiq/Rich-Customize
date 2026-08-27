@@ -39,7 +39,10 @@ class PageRegistryTests(unittest.IsolatedAsyncioTestCase):
             )
 
             self.assertEqual(updated, code)
-            self.assertEqual((await registry.get(code))["title"], "جديد")
+            updated_page = await registry.get(code)
+            self.assertEqual(updated_page["title"], "جديد")
+            self.assertIn("created_at", updated_page)
+            self.assertIn("updated_at", updated_page)
             self.assertFalse(await registry.delete(code, 99))
             self.assertTrue(await registry.delete(code, 5))
             self.assertIsNone(await registry.get(code))
