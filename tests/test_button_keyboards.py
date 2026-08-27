@@ -7,6 +7,7 @@ from app.keyboards import (
     build_pages_keyboard, build_page_target_keyboard,
     build_rich_editor_keyboard,
     build_start_editor_keyboard,
+    build_welcome_keyboard,
 )
 from app.services.buttons import add_message_button
 
@@ -28,6 +29,12 @@ class ButtonKeyboardTests(unittest.TestCase):
 
         self.assertEqual(button.callback_data, "r:starteditor")
         self.assertTrue(button.text)
+
+    def test_welcome_places_start_editor_next_to_showcase(self):
+        keyboard = build_welcome_keyboard()
+        callbacks = [button.callback_data for button in keyboard.inline_keyboard[0]]
+
+        self.assertEqual(callbacks, ["r:showcase", "r:starteditor"])
 
     def test_button_manager_can_change_button_type(self):
         buttons = []
