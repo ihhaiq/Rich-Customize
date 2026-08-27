@@ -338,8 +338,20 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
                 ]
                 payload_items.append({
                     "blocks": item_blocks,
-                    "has_checkbox": item.get("has_checkbox"), "is_checked": item.get("is_checked"),
+                    "has_checkbox": True if item.get("has_checkbox") else None,
+                    "is_checked": True if item.get("is_checked") else None,
                     "value": item.get("value"), "type": item.get("type"),
+                })
+            elif isinstance(item, dict):
+                payload_items.append({
+                    "blocks": [{
+                        "type": "paragraph",
+                        "text": inline_button_rich_text(str(item.get("text", ""))),
+                    }],
+                    "has_checkbox": True if item.get("has_checkbox") else None,
+                    "is_checked": True if item.get("is_checked") else None,
+                    "value": item.get("value"),
+                    "type": item.get("type"),
                 })
             else:
                 payload_items.append({
