@@ -96,16 +96,14 @@ def _saved_pages_text(
         "",
     ]
     for page in pages:
-        page_id = html.escape(str(page["page_id"]))
         title = html.escape(str(page.get("title") or page["page_id"]))
-        lines.append(f"📄 {title} — <code>{page_id}</code>")
+        lines.append(f"📄 {title}")
     return "\n".join(lines)
 
 
-def _opened_page_text(page_id: str, page: dict[str, Any]) -> str:
-    code = html.escape(page_id)
-    title = html.escape(str(page.get("title") or page_id))
-    return f"📄 {title} — <code>{code}</code>\n\n{MAIN_TEXT}"
+def _opened_page_text(page: dict[str, Any]) -> str:
+    title = html.escape(str(page.get("title") or "صفحة بلا اسم"))
+    return f"📄 {title}\n\n{MAIN_TEXT}"
 
 
 def _page_screen(
@@ -3011,7 +3009,7 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     )
     await _edit_ui(
         callback.message,
-        _opened_page_text(page_id, page),
+        _opened_page_text(page),
         build_rich_editor_keyboard(blocks),
         parse_mode="HTML",
     )
