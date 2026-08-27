@@ -1,5 +1,7 @@
 import unittest
 
+from aiogram.enums import ButtonStyle
+
 from app.keyboards import (
     build_button_type_keyboard, build_buttons_manager_keyboard,
     build_details_content_keyboard, build_inner_block_keyboard,
@@ -101,6 +103,41 @@ class ButtonKeyboardTests(unittest.TestCase):
             change_target.inline_keyboard[0][0].callback_data,
             "r:bpg:change:button1:a1b2c3d4",
         )
+
+    def test_saved_pages_offer_copy_rename_and_delete_actions(self):
+        keyboard = build_pages_keyboard(
+            [{"page_id": "a1b2c3d4", "title": "صفحة مهمة"}],
+            page_index=2,
+            total_pages=4,
+        )
+        open_button = keyboard.inline_keyboard[0][0]
+        copy_button, rename_button, delete_button = keyboard.inline_keyboard[1]
+        previous_button, counter_button, next_button = keyboard.inline_keyboard[2]
+
+        self.assertEqual(open_button.style, ButtonStyle.PRIMARY)
+        self.assertEqual(copy_button.copy_text.text, "a1b2c3d4")
+        self.assertEqual(copy_button.style, ButtonStyle.SUCCESS)
+        self.assertEqual(rename_button.callback_data, "r:prename:a1b2c3d4:2")
+        self.assertEqual(delete_button.callback_data, "r:pdelete:a1b2c3d4:2")
+        self.assertEqual(delete_button.style, ButtonStyle.DANGER)
+        self.assertEqual(previous_button.callback_data, "r:pages:1")
+        self.assertEqual(counter_button.text, "3/4")
+        self.assertEqual(next_button.callback_data, "r:pages:3")
+
+    def test_key_editor_actions_are_colored(self):
+        keyboard = build_rich_editor_keyboard([
+            {"id": "b1", "type": "paragraph", "position": 0, "data": {}},
+        ])
+        by_callback = {
+            button.callback_data: button
+            for row in keyboard.inline_keyboard
+            for button in row
+            if button.callback_data
+        }
+
+        self.assertEqual(by_callback["r:addmenu"].style, ButtonStyle.PRIMARY)
+        self.assertEqual(by_callback["r:savepage"].style, ButtonStyle.SUCCESS)
+        self.assertEqual(by_callback["r:pages"].style, ButtonStyle.PRIMARY)
 
     def test_details_builder_only_finishes_after_an_inner_block(self):
         empty = build_details_content_keyboard(0)
