@@ -342,7 +342,12 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
                     "value": item.get("value"), "type": item.get("type"),
                 })
             else:
-                payload_items.append({"blocks": [{"type": "paragraph", "text": str(item)}]})
+                payload_items.append({
+                    "blocks": [{
+                        "type": "paragraph",
+                        "text": inline_button_rich_text(str(item)),
+                    }],
+                })
         return {"type": "list", "items": payload_items}
     if kind == "table":
         rows = data.get("rows", [])
