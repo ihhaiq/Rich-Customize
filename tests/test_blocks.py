@@ -40,6 +40,23 @@ class BlockOperationsTests(unittest.TestCase):
 
         self.assertEqual(button["button"]["style"], "success")
 
+    def test_direct_http_button_works_inside_list_block(self):
+        text = (
+            "الخطوة الاولى الدخول الى تطبيق بوت فاذر المصغر "
+            "{اضغط هنا - http://t.me/botfather?startapp #b }"
+        )
+        rich = build_input_rich_message([
+            new_block("list", {"items": [text]}),
+        ]).model_dump(mode="json", exclude_none=True)
+
+        rendered = rich["blocks"][0]["items"][0]["blocks"][0]["text"]
+        self.assertEqual(rendered[0], "الخطوة الاولى الدخول الى تطبيق بوت فاذر المصغر ")
+        self.assertEqual(
+            rendered[1]["button"]["url"],
+            "http://t.me/botfather?startapp",
+        )
+        self.assertEqual(rendered[1]["button"]["style"], "primary")
+
     def test_user_marker_needs_no_content_and_ignores_case(self):
         markers = find_user_button_markers("{اختيار الوجهة - UsEr #P}")
 
