@@ -21,6 +21,7 @@ MEDIA_CAPTION_TYPES = {
 }
 QUOTE_TYPES = {"blockquote", "pullquote"}
 CODE_LANGUAGE_RE = re.compile(r"^[A-Za-z0-9_+.#-]{1,32}$")
+LIST_KINDS = {"bullet", "numbered", "checklist"}
 
 # Only container blocks may expose the inner-block builder.  Keep the
 # compatibility rules in the data layer so future containers can reuse the
@@ -111,7 +112,58 @@ def preformatted_data(plain: str) -> dict[str, Any]:
     return {"text": code, "html": rendered, "language": language}
 
 
-def text_data(message: Message, block_type: str, heading_size: int = 2) -> dict[str, Any]:
+def list_data(plain: str, kind: str = "bullet") -> dict[str, Any]:
+    """Build native rich-list items from the editor's line-based input."""
+    safe_kind = kind if kind in LIST_KINDS else "bullet"
+    items: list[dict[str, Any]] = []
+    for raw_line in plain.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        checked = False
+        if safe_kind == "checklist":
+            completed = re.match(r"^(?:\[\s*[xX]\s*\]|✅|☑️?)\s*", line)
+            pending = re.match(r"^(?:\[\s*\]|⬜|☐)\s*", line)
+            marker = completed or pending
+            if marker:
+                checked = completed is not None
+                line = line[marker.end():].strip()
+        elif safe_kind == "numbered":
+            line = re.sub(r"^\d+\s*[.)-]\s*", "", line).strip()
+        else:
+            line = line.lstrip("-• ").strip()
+        if not line:
+            continue
+        item: dict[str, Any] = {"text": line}
+        if safe_kind == "checklist":
+            item.update(has_checkbox=True, is_checked=checked)
+        elif safe_kind == "numbered":
+            item.update(value=len(items) + 1, type="1")
+        items.append(item)
+
+    if safe_kind == "numbered":
+        body = "".join(f"<li>{html.escape(item['text'])}</li>" for item in items)
+        rendered = f"<ol>{body}</ol>"
+    elif safe_kind == "checklist":
+        body = "".join(
+            "<li><input type=\"checkbox\""
+            f"{' checked' if item['is_checked'] else ''}>"
+            f"{html.escape(item['text'])}</li>"
+            for item in items
+        )
+        rendered = f"<ul>{body}</ul>"
+    else:
+        body = "".join(f"<li>{html.escape(item['text'])}</li>" for item in items)
+        rendered = f"<ul>{body}</ul>"
+    return {"items": items, "kind": safe_kind, "text": plain, "html": rendered}
+
+
+def text_data(
+    message: Message,
+    block_type: str,
+    heading_size: int = 2,
+    list_kind: str = "bullet",
+) -> dict[str, Any]:
     plain = message.text or ""
     rich = message.html_text
     if block_type in {"paragraph", "text"}:
@@ -129,12 +181,7 @@ def text_data(message: Message, block_type: str, heading_size: int = 2) -> dict[
         name = "".join(ch for ch in plain.strip().replace(" ", "_") if ch.isalnum() or ch in "_-")[:64]
         return {"text": name, "html": f'<a name="{html.escape(name, quote=True)}"></a>'}
     if block_type == "list":
-        items = [line.strip().lstrip("-• ").strip() for line in plain.splitlines() if line.strip()]
-        return {
-            "items": items,
-            "text": plain,
-            "html": "<ul>" + "".join(f"<li>{html.escape(item)}</li>" for item in items) + "</ul>",
-        }
+        return list_data(plain, list_kind)
     if block_type == "table":
         return table_data(plain)
     return {"text": plain, "html": rich}
