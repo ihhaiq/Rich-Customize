@@ -8,6 +8,8 @@ from app.services.buttons import (
     delete_message_button, move_message_button,
     normalize_button_url,
 )
+from app.services.factory import new_block
+from app.services.renderer import build_input_rich_message
 
 
 def sample_blocks():
@@ -20,6 +22,16 @@ def sample_blocks():
 
 
 class BlockOperationsTests(unittest.TestCase):
+    def test_math_expression_preserves_escaped_space(self):
+        expression = r"\text{Huge\ Pony}"
+        block = new_block("mathematical_expression", {"text": expression})
+
+        rich = build_input_rich_message([block]).model_dump(
+            mode="json", exclude_none=True,
+        )
+
+        self.assertEqual(rich["blocks"][0]["expression"], expression)
+
     def test_move_preserves_relative_order(self):
         blocks = sample_blocks()
         self.assertTrue(move_block(blocks, "d", 1))
