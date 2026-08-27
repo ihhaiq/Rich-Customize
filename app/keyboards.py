@@ -23,7 +23,7 @@ def build_welcome_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🧩 قالب كل البلوكات", callback_data="r:showcase"),
         InlineKeyboardButton(
             text=t("editor.new_button"), callback_data="r:starteditor",
-            style=ButtonStyle.SUCCESS,
+            style=ButtonStyle.PRIMARY,
         ),
     ]])
 
@@ -33,7 +33,7 @@ def build_start_editor_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(
             text=t("editor.start_button"),
             callback_data="r:starteditor",
-            style=ButtonStyle.SUCCESS,
+            style=ButtonStyle.PRIMARY,
         ),
     ]])
 
@@ -124,12 +124,10 @@ def build_rich_editor_keyboard(
         for index, block in enumerate(sorted(blocks, key=lambda item: item["position"]))
     ]
     rows.append([
-        InlineKeyboardButton(text="🔘 إضافة أزرار", callback_data="r:buttons"),
-        InlineKeyboardButton(text="➕ إضافة Block", callback_data="r:addmenu"),
-    ])
-    rows.append([
-        InlineKeyboardButton(text="📚 صفحاتي", callback_data="r:pages"),
-        InlineKeyboardButton(text="💾 حفظ الصفحة", callback_data="r:savepage"),
+        InlineKeyboardButton(text=t("editor.tools_button"), callback_data="r:tools"),
+        InlineKeyboardButton(
+            text="➕ إضافة Block", callback_data="r:addmenu", style=ButtonStyle.PRIMARY,
+        ),
     ])
     rows.append([
         InlineKeyboardButton(
@@ -140,6 +138,23 @@ def build_rich_editor_keyboard(
         ),
     ])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_editor_tools_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🔘 إضافة أزرار", callback_data="r:buttons"),
+            InlineKeyboardButton(
+                text="💾 حفظ الصفحة", callback_data="r:savepage",
+                style=ButtonStyle.SUCCESS,
+            ),
+        ],
+        [
+            InlineKeyboardButton(text="📚 صفحاتي", callback_data="r:pages"),
+            InlineKeyboardButton(text=t("editor.undo_button"), callback_data="r:undo"),
+        ],
+        [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")],
+    ])
 
 
 def build_post_chats_keyboard(
@@ -230,6 +245,9 @@ def build_pages_keyboard(
     pages: list[dict[str, Any]],
     page_index: int = 0,
     total_pages: int = 1,
+    *,
+    show_controls: bool = False,
+    pagination_prefix: str = "r:pages",
 ) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for page in pages:
@@ -244,7 +262,6 @@ def build_pages_keyboard(
             InlineKeyboardButton(
                 text=f"📋 {page_id}",
                 copy_text=CopyTextButton(text=page_id),
-                style=ButtonStyle.SUCCESS,
             ),
             InlineKeyboardButton(
                 text="✏️", callback_data=f"r:prename:{page_id}:{page_index}",
@@ -258,15 +275,36 @@ def build_pages_keyboard(
         rows.append([
             InlineKeyboardButton(
                 text="◀️",
-                callback_data="r:no" if page_index <= 0 else f"r:pages:{page_index - 1}",
+                callback_data="r:no" if page_index <= 0 else f"{pagination_prefix}:{page_index - 1}",
             ),
             InlineKeyboardButton(text=f"{page_index + 1}/{total_pages}", callback_data="r:no"),
             InlineKeyboardButton(
                 text="▶️",
-                callback_data="r:no" if page_index >= total_pages - 1 else f"r:pages:{page_index + 1}",
+                callback_data="r:no" if page_index >= total_pages - 1 else f"{pagination_prefix}:{page_index + 1}",
             ),
         ])
+    if show_controls:
+        rows.append([
+            InlineKeyboardButton(text=t("pages.search_button"), callback_data="r:psearch"),
+            InlineKeyboardButton(text=t("pages.sort_button"), callback_data="r:psort"),
+        ])
     rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_page_sort_keyboard(current_sort: str) -> InlineKeyboardMarkup:
+    choices = [
+        (t("pages.sort_updated"), "updated"),
+        (t("pages.sort_newest"), "newest"),
+        (t("pages.sort_oldest"), "oldest"),
+        (t("pages.sort_title"), "title"),
+    ]
+    rows = [[InlineKeyboardButton(
+        text=f"{'✅ ' if current_sort == value else ''}{label}",
+        callback_data=f"r:psortset:{value}",
+        style=ButtonStyle.PRIMARY if current_sort == value else None,
+    )] for label, value in choices]
+    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:pages:0")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -383,8 +421,12 @@ def build_result_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
-def build_block_editor_keyboard(block: dict[str, Any]) -> InlineKeyboardMarkup:
+def build_block_editor_keyboard(
+    block: dict[str, Any], blocks: list[dict[str, Any]],
+) -> InlineKeyboardMarkup:
     block_id = block["id"]
+    ordered = sorted(blocks, key=lambda item: item["position"])
+    position = ordered.index(block)
     rows: list[list[InlineKeyboardButton]] = [
         [InlineKeyboardButton(
             text="👁 معاينة هذا الـBlock", callback_data=f"r:pv:{block_id}",
@@ -407,7 +449,16 @@ def build_block_editor_keyboard(block: dict[str, Any]) -> InlineKeyboardMarkup:
         rows.append([InlineKeyboardButton(text="✍️ تعديل الكاتب", callback_data=f"r:f:{block_id}:credit")])
     rows.extend([
         [InlineKeyboardButton(text="🗑 حذف", callback_data=f"r:d:{block_id}", style=ButtonStyle.DANGER)],
-        [InlineKeyboardButton(text="↕️ تغيير الموقع", callback_data=f"r:m:{block_id}")],
+        [
+            InlineKeyboardButton(
+                text=t("block.move_up"),
+                callback_data="r:no" if position <= 0 else f"r:mu:{block_id}",
+            ),
+            InlineKeyboardButton(
+                text=t("block.move_down"),
+                callback_data="r:no" if position >= len(ordered) - 1 else f"r:md:{block_id}",
+            ),
+        ],
         [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")],
     ])
     return InlineKeyboardMarkup(inline_keyboard=rows)
