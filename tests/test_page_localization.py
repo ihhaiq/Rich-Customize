@@ -7,13 +7,16 @@ from app import i18n_core
 from app.i18n import t, tr
 from app.locales import TRANSLATIONS
 from app.locales.common import (
-    EDITOR_UX_KEYS, KEY_TRANSLATIONS, LIST_UI_KEYS, RICH_IMPORT_KEYS,
+    DETAILS_INNER_KEYS, EDITOR_UX_KEYS, KEY_TRANSLATIONS, LIST_UI_KEYS,
+    RICH_IMPORT_KEYS,
 )
 from app.routers.editor_core import (
     _ask_for_button_user, _block_page, _code_input_prompt,
     _delete_stored_block_prompt, _math_input_prompt,
     _editor_overview_text, _opened_page_text, _page_screen, _saved_pages_text,
-    _session, import_rich_message_into_editor, new_editor, _pages_for_user,
+    _details_inner_list_text, _details_inner_page, _receive_nested_replacement,
+    _session,
+    import_rich_message_into_editor, new_editor, _pages_for_user,
 )
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
@@ -128,6 +131,31 @@ class SavedPagesLocalizationTests(unittest.TestCase):
             missing = set(RICH_IMPORT_KEYS) - set(KEY_TRANSLATIONS.get(language, {}))
             self.assertFalse(missing, f"{language}: {sorted(missing)}")
 
+    def test_every_locale_translates_details_inner_editor_keys(self):
+        for language in TRANSLATIONS:
+            if language == "ar":
+                continue
+            missing = set(DETAILS_INNER_KEYS) - set(KEY_TRANSLATIONS.get(language, {}))
+            self.assertFalse(missing, f"{language}: {sorted(missing)}")
+
+    def test_details_inner_overview_shows_names_and_live_positions(self):
+        details = {
+            "id": "details", "type": "details", "position": 0,
+            "data": {"children": [
+                {"id": "photo", "type": "photo", "position": 1, "data": {}},
+                {"id": "text", "type": "paragraph", "position": 0, "data": {}},
+            ]},
+        }
+        token = i18n_core._language.set("ar")
+        try:
+            overview = _details_inner_list_text(details)
+            page = _details_inner_page(details, details["data"]["children"][1])
+        finally:
+            i18n_core._language.reset(token)
+
+        self.assertLess(overview.index("1. 📝 فقرة"), overview.index("2. 🖼 صورة"))
+        self.assertIn("الموقع داخل التفاصيل: 2 من 2", page)
+
     def test_imported_rich_message_overview_lists_blocks_in_order(self):
         blocks = [
             {"id": "photo", "type": "photo", "position": 1, "data": {}},
@@ -210,6 +238,38 @@ class SavedPagesLocalizationTests(unittest.TestCase):
 
 
 class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_footer_is_inserted_directly_after_selected_inner_block(self):
+        children = [
+            {"id": "first", "type": "paragraph", "position": 0, "data": {}},
+            {"id": "second", "type": "photo", "position": 1, "data": {}},
+        ]
+        details = {
+            "id": "details", "type": "details", "position": 0,
+            "data": {"children": children, "native": True, "native_data": {}},
+        }
+        data = {
+            "blocks": [details], "nested_details_id": "details",
+            "nested_child_id": "first", "nested_action": "add_footer",
+        }
+        message = SimpleNamespace(text="المصدر", html_text="المصدر")
+        state = SimpleNamespace(update_data=AsyncMock(), set_state=AsyncMock())
+        with (
+            patch("app.routers.editor_core._delete_add_step_messages", AsyncMock()),
+            patch("app.routers.editor_core._edit_saved_ui", AsyncMock()),
+        ):
+            handled = await _receive_nested_replacement(
+                message, state, SimpleNamespace(), data,
+            )
+
+        self.assertTrue(handled)
+        self.assertEqual(
+            [child["type"] for child in details["data"]["children"]],
+            ["paragraph", "footer", "photo"],
+        )
+        self.assertEqual(details["data"]["children"][1]["data"]["text"], "المصدر")
+        self.assertFalse(details["data"]["native"])
+        self.assertNotIn("native_data", details["data"])
+
     async def test_forwarded_rich_message_replaces_editor_source(self):
         old_blocks = [{"id": "old", "type": "paragraph", "position": 0}]
         new_blocks = [{"id": "new", "type": "photo", "position": 0}]
