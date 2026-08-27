@@ -70,6 +70,28 @@ PHRASES: dict[str, str] = {
     "pages.delete_yes": "🗑 Yes, delete",
     "common.cancel": "Cancel",
     "pages.deleted": "Page deleted",
+    "editor.tools_button": "🛠 More tools",
+    "editor.tools_text": "🛠 More tools\n\nChoose the tool you need:",
+    "editor.undo_button": "↩️ Undo",
+    "editor.undo_empty": "There is no action to undo.",
+    "editor.undo_done": "Undone",
+    "block.move_up": "⬆️ Move up",
+    "block.move_down": "⬇️ Move down",
+    "block.manage_title": "Manage {name}",
+    "block.position_text": "Current position: {current} of {total}",
+    "block.order_text": "Block order:",
+    "common.choose_action": "Choose an action:",
+    "pages.search_button": "🔎 Search",
+    "pages.sort_button": "⚙️ Sort",
+    "pages.search_prompt": "Send the page name or code to search. Send /all to show every page.",
+    "pages.search_results": "🔎 Results: {query}",
+    "pages.search_none": "🔎 No pages match “{query}”.",
+    "pages.sort_text": "⚙️ Sort pages\n\nChoose how to order the pages:",
+    "pages.sort_updated": "🕘 Last updated",
+    "pages.sort_newest": "🆕 Newest created",
+    "pages.sort_oldest": "🗓 Oldest created",
+    "pages.sort_title": "🔤 By name",
+    "pages.sort_done": "Page order changed",
 
     # Canonical Rich Block keys. These are deliberately semantic keys rather
     # than source-language strings so block names can never get stuck midway
@@ -116,6 +138,28 @@ AR_PHRASES: dict[str, str] = {
     "pages.delete_yes": "🗑 نعم، حذف",
     "common.cancel": "إلغاء",
     "pages.deleted": "تم حذف الصفحة",
+    "editor.tools_button": "🛠 أدوات إضافية",
+    "editor.tools_text": "🛠 أدوات إضافية\n\nاختر الأداة التي تحتاجها:",
+    "editor.undo_button": "↩️ تراجع",
+    "editor.undo_empty": "ماكو إجراء يمكن التراجع عنه.",
+    "editor.undo_done": "تم التراجع",
+    "block.move_up": "⬆️ للأعلى",
+    "block.move_down": "⬇️ للأسفل",
+    "block.manage_title": "إدارة {name}",
+    "block.position_text": "الموقع الحالي: {current} من {total}",
+    "block.order_text": "ترتيب البلوكات:",
+    "common.choose_action": "اختر العملية:",
+    "pages.search_button": "🔎 بحث",
+    "pages.sort_button": "⚙️ فرز",
+    "pages.search_prompt": "أرسل اسم الصفحة أو كودها للبحث. أرسل /all لإظهار جميع الصفحات.",
+    "pages.search_results": "🔎 نتائج: {query}",
+    "pages.search_none": "🔎 لا توجد صفحات تطابق «{query}».",
+    "pages.sort_text": "⚙️ فرز الصفحات\n\nاختر طريقة ترتيب الصفحات:",
+    "pages.sort_updated": "🕘 آخر تعديل",
+    "pages.sort_newest": "🆕 الأحدث إنشاءً",
+    "pages.sort_oldest": "🗓 الأقدم إنشاءً",
+    "pages.sort_title": "🔤 حسب الاسم",
+    "pages.sort_done": "تم تغيير ترتيب الصفحات",
     "block.content": "📦 محتوى",
     "block.text": "📝 نص",
     "block.paragraph": "📝 فقرة",
@@ -310,6 +354,192 @@ PAGE_MANAGEMENT_TRANSLATIONS: dict[str, dict[str, str]] = {
     "zh-hant": {"pages.rename_prompt": "請傳送「{title}」的新名稱，最多 64 個字元。", "pages.delete_confirm": "永久刪除「{title}」？", "pages.delete_yes": "🗑 是，刪除", "common.cancel": "取消", "pages.deleted": "頁面已刪除"},
 }
 
+EDITOR_UX_KEYS = (
+    "editor.tools_button", "editor.tools_text", "editor.undo_button",
+    "editor.undo_empty", "editor.undo_done", "block.move_up", "block.move_down",
+    "block.manage_title", "block.position_text", "block.order_text",
+    "common.choose_action", "pages.search_button", "pages.sort_button",
+    "pages.search_prompt", "pages.search_results", "pages.search_none",
+    "pages.sort_text", "pages.sort_updated", "pages.sort_newest",
+    "pages.sort_oldest", "pages.sort_title", "pages.sort_done",
+)
+
+EDITOR_UX_VALUES: dict[str, tuple[str, ...]] = {
+    "es": (
+        "🛠 Más herramientas", "🛠 Más herramientas\n\nElige la herramienta que necesitas:", "↩️ Deshacer",
+        "No hay ninguna acción que deshacer.", "Acción deshecha", "⬆️ Subir", "⬇️ Bajar",
+        "Administrar {name}", "Posición actual: {current} de {total}", "Orden de los bloques:",
+        "Elige una acción:", "🔎 Buscar", "⚙️ Ordenar", "Envía el nombre o código de la página. Envía /all para mostrar todas.",
+        "🔎 Resultados: {query}", "🔎 No hay páginas que coincidan con «{query}».", "⚙️ Ordenar páginas\n\nElige cómo ordenar las páginas:",
+        "🕘 Última actualización", "🆕 Más recientes", "🗓 Más antiguas", "🔤 Por nombre", "Orden de páginas actualizado",
+    ),
+    "fr": (
+        "🛠 Plus d’outils", "🛠 Plus d’outils\n\nChoisissez l’outil nécessaire :", "↩️ Annuler",
+        "Aucune action à annuler.", "Action annulée", "⬆️ Monter", "⬇️ Descendre",
+        "Gérer {name}", "Position actuelle : {current} sur {total}", "Ordre des blocs :",
+        "Choisissez une action :", "🔎 Rechercher", "⚙️ Trier", "Envoyez le nom ou le code de la page. Envoyez /all pour tout afficher.",
+        "🔎 Résultats : {query}", "🔎 Aucune page ne correspond à « {query} ».", "⚙️ Trier les pages\n\nChoisissez l’ordre des pages :",
+        "🕘 Dernière modification", "🆕 Plus récentes", "🗓 Plus anciennes", "🔤 Par nom", "Ordre des pages modifié",
+    ),
+    "de": (
+        "🛠 Weitere Werkzeuge", "🛠 Weitere Werkzeuge\n\nWähle das benötigte Werkzeug:", "↩️ Rückgängig",
+        "Keine Aktion zum Rückgängigmachen.", "Rückgängig gemacht", "⬆️ Nach oben", "⬇️ Nach unten",
+        "{name} verwalten", "Aktuelle Position: {current} von {total}", "Blockreihenfolge:",
+        "Wähle eine Aktion:", "🔎 Suchen", "⚙️ Sortieren", "Sende Seitenname oder Code. Sende /all für alle Seiten.",
+        "🔎 Ergebnisse: {query}", "🔎 Keine Seiten entsprechen „{query}“.", "⚙️ Seiten sortieren\n\nWähle die Reihenfolge:",
+        "🕘 Zuletzt geändert", "🆕 Neueste", "🗓 Älteste", "🔤 Nach Name", "Seitenreihenfolge geändert",
+    ),
+    "it": (
+        "🛠 Altri strumenti", "🛠 Altri strumenti\n\nScegli lo strumento necessario:", "↩️ Annulla",
+        "Nessuna azione da annullare.", "Azione annullata", "⬆️ Sposta su", "⬇️ Sposta giù",
+        "Gestisci {name}", "Posizione attuale: {current} di {total}", "Ordine dei blocchi:",
+        "Scegli un’azione:", "🔎 Cerca", "⚙️ Ordina", "Invia il nome o il codice della pagina. Invia /all per mostrarle tutte.",
+        "🔎 Risultati: {query}", "🔎 Nessuna pagina corrisponde a «{query}».", "⚙️ Ordina pagine\n\nScegli come ordinare le pagine:",
+        "🕘 Ultima modifica", "🆕 Più recenti", "🗓 Più vecchie", "🔤 Per nome", "Ordine delle pagine modificato",
+    ),
+    "pt": (
+        "🛠 Mais ferramentas", "🛠 Mais ferramentas\n\nEscolha a ferramenta necessária:", "↩️ Desfazer",
+        "Não há ação para desfazer.", "Ação desfeita", "⬆️ Mover para cima", "⬇️ Mover para baixo",
+        "Gerenciar {name}", "Posição atual: {current} de {total}", "Ordem dos blocos:",
+        "Escolha uma ação:", "🔎 Pesquisar", "⚙️ Ordenar", "Envie o nome ou código da página. Envie /all para mostrar todas.",
+        "🔎 Resultados: {query}", "🔎 Nenhuma página corresponde a “{query}”.", "⚙️ Ordenar páginas\n\nEscolha a ordem das páginas:",
+        "🕘 Última atualização", "🆕 Mais recentes", "🗓 Mais antigas", "🔤 Por nome", "Ordem das páginas alterada",
+    ),
+    "nl": (
+        "🛠 Meer hulpmiddelen", "🛠 Meer hulpmiddelen\n\nKies het benodigde hulpmiddel:", "↩️ Ongedaan maken",
+        "Er is geen actie om ongedaan te maken.", "Ongedaan gemaakt", "⬆️ Omhoog", "⬇️ Omlaag",
+        "{name} beheren", "Huidige positie: {current} van {total}", "Blokvolgorde:",
+        "Kies een actie:", "🔎 Zoeken", "⚙️ Sorteren", "Stuur de paginanaam of code. Stuur /all om alles te tonen.",
+        "🔎 Resultaten: {query}", "🔎 Geen pagina’s gevonden voor ‘{query}’.", "⚙️ Pagina’s sorteren\n\nKies de volgorde:",
+        "🕘 Laatst bijgewerkt", "🆕 Nieuwste", "🗓 Oudste", "🔤 Op naam", "Paginavolgorde gewijzigd",
+    ),
+    "pl": (
+        "🛠 Więcej narzędzi", "🛠 Więcej narzędzi\n\nWybierz potrzebne narzędzie:", "↩️ Cofnij",
+        "Brak działania do cofnięcia.", "Cofnięto", "⬆️ Przenieś wyżej", "⬇️ Przenieś niżej",
+        "Zarządzaj {name}", "Bieżąca pozycja: {current} z {total}", "Kolejność bloków:",
+        "Wybierz działanie:", "🔎 Szukaj", "⚙️ Sortuj", "Wyślij nazwę lub kod strony. Wyślij /all, aby pokazać wszystkie.",
+        "🔎 Wyniki: {query}", "🔎 Brak stron pasujących do „{query}”.", "⚙️ Sortuj strony\n\nWybierz kolejność stron:",
+        "🕘 Ostatnio zmienione", "🆕 Najnowsze", "🗓 Najstarsze", "🔤 Według nazwy", "Zmieniono kolejność stron",
+    ),
+    "uk": (
+        "🛠 Інші інструменти", "🛠 Інші інструменти\n\nВиберіть потрібний інструмент:", "↩️ Скасувати",
+        "Немає дії для скасування.", "Дію скасовано", "⬆️ Перемістити вгору", "⬇️ Перемістити вниз",
+        "Керування {name}", "Поточна позиція: {current} з {total}", "Порядок блоків:",
+        "Виберіть дію:", "🔎 Пошук", "⚙️ Сортування", "Надішліть назву або код сторінки. Надішліть /all, щоб показати всі.",
+        "🔎 Результати: {query}", "🔎 Немає сторінок за запитом «{query}».", "⚙️ Сортування сторінок\n\nВиберіть порядок:",
+        "🕘 Остання зміна", "🆕 Найновіші", "🗓 Найстаріші", "🔤 За назвою", "Порядок сторінок змінено",
+    ),
+    "ru": (
+        "🛠 Другие инструменты", "🛠 Другие инструменты\n\nВыберите нужный инструмент:", "↩️ Отменить",
+        "Нет действия для отмены.", "Действие отменено", "⬆️ Переместить выше", "⬇️ Переместить ниже",
+        "Управление {name}", "Текущая позиция: {current} из {total}", "Порядок блоков:",
+        "Выберите действие:", "🔎 Поиск", "⚙️ Сортировка", "Отправьте название или код страницы. Отправьте /all, чтобы показать все.",
+        "🔎 Результаты: {query}", "🔎 Нет страниц по запросу «{query}».", "⚙️ Сортировка страниц\n\nВыберите порядок:",
+        "🕘 Последнее изменение", "🆕 Самые новые", "🗓 Самые старые", "🔤 По имени", "Порядок страниц изменён",
+    ),
+    "tr": (
+        "🛠 Diğer araçlar", "🛠 Diğer araçlar\n\nİhtiyacınız olan aracı seçin:", "↩️ Geri al",
+        "Geri alınacak işlem yok.", "Geri alındı", "⬆️ Yukarı taşı", "⬇️ Aşağı taşı",
+        "{name} yönetimi", "Geçerli konum: {current}/{total}", "Blok sırası:",
+        "Bir işlem seçin:", "🔎 Ara", "⚙️ Sırala", "Sayfa adını veya kodunu gönderin. Tümünü göstermek için /all gönderin.",
+        "🔎 Sonuçlar: {query}", "🔎 “{query}” ile eşleşen sayfa yok.", "⚙️ Sayfaları sırala\n\nSıralama yöntemini seçin:",
+        "🕘 Son güncellenen", "🆕 En yeni", "🗓 En eski", "🔤 Ada göre", "Sayfa sırası değiştirildi",
+    ),
+    "fa": (
+        "🛠 ابزارهای بیشتر", "🛠 ابزارهای بیشتر\n\nابزار موردنیاز را انتخاب کنید:", "↩️ واگرد",
+        "عملی برای واگرد وجود ندارد.", "واگرد انجام شد", "⬆️ انتقال به بالا", "⬇️ انتقال به پایین",
+        "مدیریت {name}", "جایگاه فعلی: {current} از {total}", "ترتیب بلوک‌ها:",
+        "یک عملیات انتخاب کنید:", "🔎 جستجو", "⚙️ مرتب‌سازی", "نام یا کد صفحه را بفرستید. برای نمایش همه /all را ارسال کنید.",
+        "🔎 نتایج: {query}", "🔎 صفحه‌ای مطابق «{query}» نیست.", "⚙️ مرتب‌سازی صفحه‌ها\n\nروش مرتب‌سازی را انتخاب کنید:",
+        "🕘 آخرین ویرایش", "🆕 جدیدترین", "🗓 قدیمی‌ترین", "🔤 بر اساس نام", "ترتیب صفحه‌ها تغییر کرد",
+    ),
+    "ku": (
+        "🛠 Amûrên din", "🛠 Amûrên din\n\nAmûra pêwîst hilbijêre:", "↩️ Vegerîne",
+        "Çalakiyek ji bo vegerandinê tune.", "Hat vegerandin", "⬆️ Bibe jor", "⬇️ Bibe jêr",
+        "{name} bi rê ve bibe", "Cihê niha: {current} ji {total}", "Rêza blokan:",
+        "Çalakiyek hilbijêre:", "🔎 Lêgerîn", "⚙️ Rêzkirin", "Nav an koda rûpelê bişîne. Ji bo hemûyan /all bişîne.",
+        "🔎 Encam: {query}", "🔎 Rûpelek bi “{query}” re tune.", "⚙️ Rûpelan rêz bike\n\nAwayê rêzkirinê hilbijêre:",
+        "🕘 Guherandina dawî", "🆕 Nûtirîn", "🗓 Kevintirîn", "🔤 Li gor navî", "Rêza rûpelan hat guhertin",
+    ),
+    "ur": (
+        "🛠 مزید ٹولز", "🛠 مزید ٹولز\n\nضروری ٹول منتخب کریں:", "↩️ واپس کریں",
+        "واپس کرنے کے لیے کوئی عمل نہیں۔", "عمل واپس ہوگیا", "⬆️ اوپر لے جائیں", "⬇️ نیچے لے جائیں",
+        "{name} کا انتظام", "موجودہ مقام: {current} از {total}", "بلاکس کی ترتیب:",
+        "ایک عمل منتخب کریں:", "🔎 تلاش", "⚙️ ترتیب", "صفحے کا نام یا کوڈ بھیجیں۔ سب دکھانے کے لیے /all بھیجیں۔",
+        "🔎 نتائج: {query}", "🔎 “{query}” سے کوئی صفحہ نہیں ملا۔", "⚙️ صفحات ترتیب دیں\n\nترتیب کا طریقہ منتخب کریں:",
+        "🕘 آخری ترمیم", "🆕 تازہ ترین", "🗓 قدیم ترین", "🔤 نام کے مطابق", "صفحات کی ترتیب بدل گئی",
+    ),
+    "hi": (
+        "🛠 अधिक टूल", "🛠 अधिक टूल\n\nज़रूरी टूल चुनें:", "↩️ पूर्ववत करें",
+        "पूर्ववत करने के लिए कोई कार्रवाई नहीं है।", "पूर्ववत किया गया", "⬆️ ऊपर ले जाएँ", "⬇️ नीचे ले जाएँ",
+        "{name} प्रबंधित करें", "वर्तमान स्थान: {current}/{total}", "ब्लॉक क्रम:",
+        "एक कार्रवाई चुनें:", "🔎 खोजें", "⚙️ क्रमबद्ध करें", "पेज का नाम या कोड भेजें। सभी दिखाने के लिए /all भेजें।",
+        "🔎 परिणाम: {query}", "🔎 “{query}” से मिलता कोई पेज नहीं।", "⚙️ पेज क्रमबद्ध करें\n\nक्रम चुनें:",
+        "🕘 अंतिम अपडेट", "🆕 नवीनतम", "🗓 सबसे पुराने", "🔤 नाम से", "पेज क्रम बदल गया",
+    ),
+    "id": (
+        "🛠 Alat lainnya", "🛠 Alat lainnya\n\nPilih alat yang diperlukan:", "↩️ Urungkan",
+        "Tidak ada tindakan untuk diurungkan.", "Tindakan diurungkan", "⬆️ Pindah ke atas", "⬇️ Pindah ke bawah",
+        "Kelola {name}", "Posisi saat ini: {current} dari {total}", "Urutan blok:",
+        "Pilih tindakan:", "🔎 Cari", "⚙️ Urutkan", "Kirim nama atau kode halaman. Kirim /all untuk menampilkan semua.",
+        "🔎 Hasil: {query}", "🔎 Tidak ada halaman yang cocok dengan “{query}”.", "⚙️ Urutkan halaman\n\nPilih urutan halaman:",
+        "🕘 Terakhir diperbarui", "🆕 Terbaru", "🗓 Terlama", "🔤 Berdasarkan nama", "Urutan halaman diubah",
+    ),
+    "ja": (
+        "🛠 その他のツール", "🛠 その他のツール\n\n必要なツールを選択してください：", "↩️ 元に戻す",
+        "元に戻せる操作はありません。", "元に戻しました", "⬆️ 上へ", "⬇️ 下へ",
+        "{name}を管理", "現在の位置：{current}/{total}", "ブロックの順序：",
+        "操作を選択：", "🔎 検索", "⚙️ 並べ替え", "ページ名またはコードを送信してください。すべて表示するには /all を送信します。",
+        "🔎 結果：{query}", "🔎「{query}」に一致するページはありません。", "⚙️ ページを並べ替え\n\n順序を選択してください：",
+        "🕘 最終更新", "🆕 新しい順", "🗓 古い順", "🔤 名前順", "ページの順序を変更しました",
+    ),
+    "ko": (
+        "🛠 추가 도구", "🛠 추가 도구\n\n필요한 도구를 선택하세요:", "↩️ 실행 취소",
+        "취소할 작업이 없습니다.", "실행 취소됨", "⬆️ 위로", "⬇️ 아래로",
+        "{name} 관리", "현재 위치: {current}/{total}", "블록 순서:",
+        "작업 선택:", "🔎 검색", "⚙️ 정렬", "페이지 이름이나 코드를 보내세요. 모두 보려면 /all을 보내세요.",
+        "🔎 결과: {query}", "🔎 ‘{query}’와 일치하는 페이지가 없습니다.", "⚙️ 페이지 정렬\n\n정렬 방식을 선택하세요:",
+        "🕘 최근 수정", "🆕 최신 생성", "🗓 오래된 생성", "🔤 이름순", "페이지 순서가 변경되었습니다",
+    ),
+    "vi": (
+        "🛠 Công cụ khác", "🛠 Công cụ khác\n\nChọn công cụ bạn cần:", "↩️ Hoàn tác",
+        "Không có thao tác để hoàn tác.", "Đã hoàn tác", "⬆️ Di chuyển lên", "⬇️ Di chuyển xuống",
+        "Quản lý {name}", "Vị trí hiện tại: {current}/{total}", "Thứ tự Block:",
+        "Chọn thao tác:", "🔎 Tìm kiếm", "⚙️ Sắp xếp", "Gửi tên hoặc mã trang. Gửi /all để hiển thị tất cả.",
+        "🔎 Kết quả: {query}", "🔎 Không có trang khớp “{query}”.", "⚙️ Sắp xếp trang\n\nChọn thứ tự:",
+        "🕘 Cập nhật gần nhất", "🆕 Mới nhất", "🗓 Cũ nhất", "🔤 Theo tên", "Đã đổi thứ tự trang",
+    ),
+    "th": (
+        "🛠 เครื่องมือเพิ่มเติม", "🛠 เครื่องมือเพิ่มเติม\n\nเลือกเครื่องมือที่ต้องการ:", "↩️ เลิกทำ",
+        "ไม่มีการทำงานให้เลิกทำ", "เลิกทำแล้ว", "⬆️ เลื่อนขึ้น", "⬇️ เลื่อนลง",
+        "จัดการ {name}", "ตำแหน่งปัจจุบัน: {current}/{total}", "ลำดับ Block:",
+        "เลือกการทำงาน:", "🔎 ค้นหา", "⚙️ จัดเรียง", "ส่งชื่อหรือรหัสหน้า ส่ง /all เพื่อแสดงทั้งหมด",
+        "🔎 ผลลัพธ์: {query}", "🔎 ไม่พบหน้าที่ตรงกับ “{query}”", "⚙️ จัดเรียงหน้า\n\nเลือกลำดับ:",
+        "🕘 แก้ไขล่าสุด", "🆕 สร้างล่าสุด", "🗓 สร้างเก่าสุด", "🔤 ตามชื่อ", "เปลี่ยนลำดับหน้าแล้ว",
+    ),
+    "zh-hans": (
+        "🛠 更多工具", "🛠 更多工具\n\n请选择所需工具：", "↩️ 撤销",
+        "没有可撤销的操作。", "已撤销", "⬆️ 上移", "⬇️ 下移",
+        "管理{name}", "当前位置：{current}/{total}", "Block 顺序：",
+        "请选择操作：", "🔎 搜索", "⚙️ 排序", "请发送页面名称或代码。发送 /all 显示全部页面。",
+        "🔎 结果：{query}", "🔎 没有与“{query}”匹配的页面。", "⚙️ 页面排序\n\n请选择排序方式：",
+        "🕘 最近修改", "🆕 最新创建", "🗓 最早创建", "🔤 按名称", "页面顺序已更改",
+    ),
+    "zh-hant": (
+        "🛠 更多工具", "🛠 更多工具\n\n請選擇所需工具：", "↩️ 復原",
+        "沒有可復原的操作。", "已復原", "⬆️ 上移", "⬇️ 下移",
+        "管理{name}", "目前位置：{current}/{total}", "Block 順序：",
+        "請選擇操作：", "🔎 搜尋", "⚙️ 排序", "請傳送頁面名稱或代碼。傳送 /all 顯示全部頁面。",
+        "🔎 結果：{query}", "🔎 沒有與「{query}」相符的頁面。", "⚙️ 頁面排序\n\n請選擇排序方式：",
+        "🕘 最近修改", "🆕 最新建立", "🗓 最早建立", "🔤 按名稱", "頁面順序已變更",
+    ),
+}
+
+EDITOR_UX_TRANSLATIONS = {
+    language: dict(zip(EDITOR_UX_KEYS, values, strict=True))
+    for language, values in EDITOR_UX_VALUES.items()
+}
+
 KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     language: {f"block.{name}": value for name, value in values.items()}
     for language, values in BLOCK_KEY_TRANSLATIONS.items()
@@ -322,6 +552,9 @@ for language, translations in EDITOR_START_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 for language, translations in PAGE_MANAGEMENT_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in EDITOR_UX_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 
