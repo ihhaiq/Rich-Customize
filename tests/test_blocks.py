@@ -9,6 +9,7 @@ from app.services.buttons import (
     normalize_button_url,
 )
 from app.services.factory import new_block, preformatted_data
+from app.services.inline_buttons import find_user_button_markers, inline_button_rich_text
 from app.services.renderer import build_input_rich_message
 
 
@@ -22,6 +23,40 @@ def sample_blocks():
 
 
 class BlockOperationsTests(unittest.TestCase):
+    def test_new_inline_button_syntax_is_case_and_space_tolerant(self):
+        callback = inline_button_rich_text(
+            "{تنفيذ - CALLBACK_DATA :  action:1  }",
+        )
+        copy = inline_button_rich_text("{نسخ - CoPy: النص #R }")
+        link = inline_button_rich_text("{قناتي-T.ME/IHHAI}")
+
+        self.assertEqual(callback["button"]["callback_data"], "action:1")
+        self.assertEqual(copy["button"]["copy_text"]["text"], "النص")
+        self.assertEqual(copy["button"]["style"], "danger")
+        self.assertEqual(link["button"]["url"], "https://T.ME/IHHAI")
+
+    def test_new_inline_button_syntax_accepts_named_colors(self):
+        button = inline_button_rich_text("{نسخ - copy: النص - GrEeN}")
+
+        self.assertEqual(button["button"]["style"], "success")
+
+    def test_user_marker_needs_no_content_and_ignores_case(self):
+        markers = find_user_button_markers("{اختيار الوجهة - UsEr #P}")
+
+        self.assertEqual(markers, [{
+            "marker": "{اختيار الوجهة - UsEr #P}",
+            "title": "اختيار الوجهة",
+            "color": "p",
+        }])
+
+    def test_legacy_inline_button_syntax_remains_supported(self):
+        button = inline_button_rich_text(
+            "{قديم:url https://foo-bar.com#b}",
+        )
+
+        self.assertEqual(button["button"]["url"], "https://foo-bar.com")
+        self.assertEqual(button["button"]["style"], "primary")
+
     def test_preformatted_language_can_be_set_with_lang_header(self):
         data = preformatted_data("/lang python\nprint('<ok>')")
 
