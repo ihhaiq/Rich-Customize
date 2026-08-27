@@ -44,6 +44,19 @@ class PageRegistryTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await registry.delete(code, 5))
             self.assertIsNone(await registry.get(code))
 
+    async def test_rename_is_persistent_and_checks_owner(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pages.json"
+            registry = PageRegistry(path)
+            code = await registry.save(5, "قديم", [{"id": "a"}], [], 1, "center")
+
+            self.assertFalse(await registry.rename(code, 99, "غير مسموح"))
+            self.assertEqual((await registry.get(code))["title"], "قديم")
+            self.assertTrue(await registry.rename(code, 5, "الاسم الجديد"))
+
+            self.assertEqual((await registry.get(code))["title"], "الاسم الجديد")
+            self.assertEqual((await PageRegistry(path).get(code))["title"], "الاسم الجديد")
+
 
 if __name__ == "__main__":
     unittest.main()
