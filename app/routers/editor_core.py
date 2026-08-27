@@ -28,6 +28,7 @@ from app.keyboards import (
     build_message_buttons_keyboard, build_post_chats_keyboard,
     build_pages_keyboard, build_page_target_keyboard,
     build_post_settings_keyboard, build_rich_editor_keyboard,
+    build_start_editor_keyboard,
     build_table_cell_keyboard, build_table_options_keyboard, build_welcome_keyboard,
 )
 from app.i18n import preserve_user_content, t, tr
@@ -487,7 +488,8 @@ async def _repost_saved_ui(bot: Bot, state: FSMContext, text: str, reply_markup)
 
 
 async def _open_editor(message: Message, state: FSMContext, blocks: list[dict[str, Any]]) -> None:
-    sent = await message.answer(MAIN_TEXT, reply_markup=build_rich_editor_keyboard(blocks))
+    text = t("editor.empty_hint") if not blocks else MAIN_TEXT
+    sent = await message.answer(text, reply_markup=build_rich_editor_keyboard(blocks))
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
         blocks=blocks, message_buttons=[], buttons_per_row=1, buttons_align="center",
@@ -692,11 +694,21 @@ async def summon_saved_rich_page(message: Message, bot: Bot) -> None:
 @router.message(Command("editor"))
 async def new_editor(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await state.set_state(RichEditorStates.waiting_input)
-    await _answer_with_button_guide(
-        message,
-        "أرسل الرسالة التي تريد تخصيصها. تقدر تكتب تنسيق الزر داخل النص بأي مكان.",
-    )
+    await _open_editor(message, state, [])
+
+
+@router.callback_query(F.data == "r:starteditor")
+async def start_editor_from_button(callback: CallbackQuery, state: FSMContext) -> None:
+    if not isinstance(callback.message, Message):
+        await callback.answer()
+        return
+    await state.clear()
+    await _open_editor(callback.message, state, [])
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest:
+        pass
+    await callback.answer()
 
 
 @router.message(Command("draft"))
@@ -920,7 +932,7 @@ async def wait_for_button_user(message: Message, state: FSMContext) -> None:
 async def _session(callback: CallbackQuery, state: FSMContext) -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
     data = await state.get_data()
     blocks = data.get("blocks")
-    if not blocks:
+    if not isinstance(blocks, list):
         await callback.answer("انتهت الجلسة. أرسل /editor للبدء من جديد.", show_alert=True)
         return None
     return data, blocks
@@ -3015,5 +3027,9 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
 
 
 @router.message(StateFilter(RichEditorStates.managing))
+@router.message(StateFilter(None), F.chat.type == "private")
 async def managing_extra_message(message: Message) -> None:
-    await message.answer("استخدم أزرار المحرّر، أو أرسل /editor لبدء رسالة جديدة.")
+    await message.answer(
+        t("editor.closed_hint"),
+        reply_markup=build_start_editor_keyboard(),
+    )
