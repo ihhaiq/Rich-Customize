@@ -42,6 +42,7 @@ class SavedPagesLocalizationTests(unittest.TestCase):
             try:
                 hint = t("editor.closed_hint")
                 button = t("editor.start_button")
+                new_button = t("editor.new_button")
                 empty = t("editor.empty_hint")
             finally:
                 i18n_core._language.reset(token)
@@ -52,6 +53,7 @@ class SavedPagesLocalizationTests(unittest.TestCase):
                 language,
             )
             self.assertNotEqual(button, "▶️ Start editor", language)
+            self.assertNotEqual(new_button, "➕ Start editor", language)
             self.assertNotEqual(
                 empty,
                 "Customize message\n\nAdd a Block or open one of your saved pages:",
