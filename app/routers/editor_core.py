@@ -505,6 +505,27 @@ async def _send_add_prompt(message: Message, state: FSMContext, text: str, reply
     return sent
 
 
+async def _delete_stored_block_prompt(
+    bot: Bot,
+    state: FSMContext,
+    data: dict[str, Any],
+    protected_message: Message | None = None,
+) -> None:
+    prompt_id = data.get("add_prompt_message_id")
+    prompt_chat_id = data.get("add_prompt_chat_id")
+    is_management_message = bool(
+        protected_message
+        and prompt_id == protected_message.message_id
+        and prompt_chat_id == protected_message.chat.id
+    )
+    if prompt_id and prompt_chat_id and not is_management_message:
+        try:
+            await bot.delete_message(chat_id=prompt_chat_id, message_id=prompt_id)
+        except TelegramBadRequest as error:
+            logger.debug("Could not delete block prompt %s: %s", prompt_id, error)
+    await state.update_data(add_prompt_chat_id=None, add_prompt_message_id=None)
+
+
 def _details_builder_text(payload: dict[str, Any]) -> str:
     count = len(payload.get("children") or [])
     return (
@@ -1209,7 +1230,15 @@ async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> No
             edit_field=None,
             heading_size=heading_size,
         )
-        await callback.message.answer(f"اخترت H{heading_size}. أرسل نص العنوان الجديد الآن.")
+        await _send_add_prompt(
+            callback.message,
+            state,
+            f"اخترت H{heading_size}. أرسل نص العنوان الجديد الآن.",
+        )
+        try:
+            await callback.message.delete()
+        except TelegramBadRequest:
+            pass
     await callback.answer()
 
 
@@ -1509,16 +1538,24 @@ async def receive_added_block(message: Message, state: FSMContext, bot: Bot) -> 
 
 
 @router.callback_query(F.data == "r:back")
-async def back_to_main(callback: CallbackQuery, state: FSMContext) -> None:
+async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     session = await _session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
-    _, blocks = session
+    data, blocks = session
+    await _delete_stored_block_prompt(
+        bot,
+        state,
+        data,
+        protected_message=callback.message,
+    )
     await _edit_ui(callback.message, MAIN_TEXT, build_rich_editor_keyboard(blocks))
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
         current_block_id=None, current_button_id=None,
         pending_button_action=None, pending_button_text=None,
+        pending_add_type=None, pending_child_type=None,
+        add_step=None, add_payload=None,
     )
     await managed_chat_registry.clear_panel(callback.from_user.id)
     await callback.answer()
@@ -2226,7 +2263,9 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         return
     if block["type"] == "heading":
         if isinstance(callback.message, Message):
-            await callback.message.answer(
+            await _send_add_prompt(
+                callback.message,
+                state,
                 "اختر مستوى العنوان الجديد:",
                 reply_markup=build_heading_level_keyboard("edit", block_id),
             )
@@ -2251,7 +2290,11 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(current_block_id=block_id, expected_type=block["type"], edit_field=None)
     await state.set_state(RichEditorStates.editing_block)
     if isinstance(callback.message, Message):
-        await callback.message.answer(prompts.get(block["type"], "أرسل المحتوى الجديد من النوع نفسه"))
+        await _send_add_prompt(
+            callback.message,
+            state,
+            prompts.get(block["type"], "أرسل المحتوى الجديد من النوع نفسه"),
+        )
     await callback.answer()
 
 
