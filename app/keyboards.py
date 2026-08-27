@@ -113,10 +113,10 @@ def build_rich_editor_keyboard(
     if not blocks:
         return InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(
-                text="➕ إضافة Block", callback_data="r:addmenu", style=ButtonStyle.PRIMARY,
+                text="📚 صفحاتي", callback_data="r:pages",
             ),
             InlineKeyboardButton(
-                text="📚 صفحاتي", callback_data="r:pages", style=ButtonStyle.PRIMARY,
+                text="➕ إضافة Block", callback_data="r:addmenu", style=ButtonStyle.PRIMARY,
             ),
         ]])
     rows = [
@@ -124,20 +124,12 @@ def build_rich_editor_keyboard(
         for index, block in enumerate(sorted(blocks, key=lambda item: item["position"]))
     ]
     rows.append([
-        InlineKeyboardButton(
-            text="➕ إضافة Block", callback_data="r:addmenu", style=ButtonStyle.PRIMARY,
-        ),
-        InlineKeyboardButton(
-            text="🔘 إضافة أزرار", callback_data="r:buttons", style=ButtonStyle.PRIMARY,
-        ),
+        InlineKeyboardButton(text="🔘 إضافة أزرار", callback_data="r:buttons"),
+        InlineKeyboardButton(text="➕ إضافة Block", callback_data="r:addmenu"),
     ])
     rows.append([
-        InlineKeyboardButton(
-            text="💾 حفظ الصفحة", callback_data="r:savepage", style=ButtonStyle.SUCCESS,
-        ),
-        InlineKeyboardButton(
-            text="📚 صفحاتي", callback_data="r:pages", style=ButtonStyle.PRIMARY,
-        ),
+        InlineKeyboardButton(text="📚 صفحاتي", callback_data="r:pages"),
+        InlineKeyboardButton(text="💾 حفظ الصفحة", callback_data="r:savepage"),
     ])
     rows.append([
         InlineKeyboardButton(
