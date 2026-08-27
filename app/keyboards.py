@@ -438,6 +438,11 @@ def build_block_editor_keyboard(
         rows.append([InlineKeyboardButton(text=label, callback_data=f"r:e:{block_id}")])
     if block["type"] == "details":
         rows.append([InlineKeyboardButton(text="📝 تعديل عنوان التفاصيل", callback_data=f"r:f:{block_id}:summary")])
+        rows.append([InlineKeyboardButton(
+            text=t("details.inner_manage_button"),
+            callback_data=f"r:dim:{block_id}",
+            style=ButtonStyle.PRIMARY,
+        )])
     if block["type"] == "table":
         rows.append([InlineKeyboardButton(text="🎛 إعدادات خلايا الجدول", callback_data=f"r:tm:{block_id}")])
     if block["type"] == "list" and block.get("data", {}).get("kind") == "checklist":
@@ -475,6 +480,96 @@ def build_block_editor_keyboard(
         [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")],
     ])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_details_inner_blocks_keyboard(details: dict[str, Any]) -> InlineKeyboardMarkup:
+    details_id = str(details["id"])
+    children = sorted(
+        details.get("data", {}).get("children", []),
+        key=lambda item: int(item.get("position", 0)),
+    )
+    rows = [[InlineKeyboardButton(
+        text=f"{index}. {BLOCK_LABELS.get(str(child.get('type', '')), t('block.content'))}",
+        callback_data=f"r:di:{details_id}:{child['id']}",
+    )] for index, child in enumerate(children, start=1)]
+    rows.append([InlineKeyboardButton(
+        text=t("common.cancel"), callback_data=f"r:b:{details_id}",
+    )])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_details_inner_block_keyboard(
+    details: dict[str, Any],
+    child: dict[str, Any],
+) -> InlineKeyboardMarkup:
+    details_id = str(details["id"])
+    child_id = str(child["id"])
+    children = sorted(
+        details.get("data", {}).get("children", []),
+        key=lambda item: int(item.get("position", 0)),
+    )
+    position = children.index(child)
+    prefix = f"{details_id}:{child_id}"
+    rows: list[list[InlineKeyboardButton]] = [[InlineKeyboardButton(
+        text=t("preview_block"), callback_data=f"r:dip:{prefix}",
+        style=ButtonStyle.PRIMARY,
+    )]]
+    if child.get("type") != "divider":
+        rows.append([InlineKeyboardButton(
+            text=t("edit_content"), callback_data=f"r:die:{prefix}",
+        )])
+    if child.get("type") in MEDIA_CAPTION_TYPES:
+        rows.append([
+            InlineKeyboardButton(
+                text=t("block.caption"), callback_data=f"r:dif:{prefix}:caption",
+            ),
+            InlineKeyboardButton(
+                text=t("details.inner_credit"), callback_data=f"r:dif:{prefix}:credit",
+            ),
+        ])
+    elif child.get("type") in QUOTE_TYPES:
+        rows.append([InlineKeyboardButton(
+            text=t("details.inner_credit"), callback_data=f"r:dif:{prefix}:credit",
+        )])
+    elif child.get("type") not in {"footer", "divider", "anchor"}:
+        rows.append([InlineKeyboardButton(
+            text=t("details.inner_add_footer"), callback_data=f"r:dif:{prefix}:add_footer",
+        )])
+    rows.extend([
+        [InlineKeyboardButton(
+            text=t("delete"), callback_data=f"r:did:{prefix}",
+            style=ButtonStyle.DANGER,
+        )],
+        [
+            InlineKeyboardButton(
+                text=t("block.move_up"),
+                callback_data="r:no" if position <= 0 else f"r:dimu:{prefix}",
+            ),
+            InlineKeyboardButton(
+                text=t("block.move_down"),
+                callback_data="r:no" if position >= len(children) - 1 else f"r:dimd:{prefix}",
+            ),
+        ],
+        [InlineKeyboardButton(
+            text=t("back"), callback_data=f"r:dim:{details_id}",
+        )],
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_details_inner_delete_keyboard(
+    details_id: str, child_id: str,
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=t("pages.delete_yes"),
+            callback_data=f"r:didok:{details_id}:{child_id}",
+            style=ButtonStyle.DANGER,
+        ),
+        InlineKeyboardButton(
+            text=t("common.cancel"), callback_data=f"r:di:{details_id}:{child_id}",
+        ),
+    ]])
 
 
 def build_table_options_keyboard(block_id: str) -> InlineKeyboardMarkup:
