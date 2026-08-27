@@ -86,6 +86,10 @@ def _math_input_prompt(*, editing: bool = False) -> str:
     return t("math.edit_prompt" if editing else "math.add_prompt")
 
 
+def _code_input_prompt(*, editing: bool = False) -> str:
+    return t("code.edit_prompt" if editing else "code.add_prompt")
+
+
 def _saved_pages_text(
     page_index: int = 0,
     total_pages: int = 1,
@@ -1049,7 +1053,7 @@ async def choose_add_block(callback: CallbackQuery, state: FSMContext, bot: Bot)
     prompts = {
         "paragraph": "أرسل نص الفقرة",
         "heading": "أرسل عنوان القسم",
-        "preformatted": "أرسل النص البرمجي",
+        "preformatted": _code_input_prompt(),
         "footer": "أرسل نص التذييل",
         "mathematical_expression": _math_input_prompt(),
         "anchor": "أرسل اسم المرساة",
@@ -1203,7 +1207,7 @@ async def choose_details_child_type(
         return
     prompts = {
         "paragraph": "أرسل نص الفقرة",
-        "preformatted": "أرسل النص البرمجي",
+        "preformatted": _code_input_prompt(),
         "footer": "أرسل نص التذييل",
         "mathematical_expression": _math_input_prompt(),
         "anchor": "أرسل اسم المرساة",
@@ -2385,7 +2389,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
     prompts = {
         "text": "أرسل النص الجديد", "caption": "أرسل الوصف الجديد", "photo": "أرسل الصورة الجديدة",
         "paragraph": "أرسل نص الفقرة الجديد", "heading": "أرسل عنوان القسم الجديد",
-        "preformatted": "أرسل النص البرمجي الجديد", "footer": "أرسل التذييل الجديد",
+        "preformatted": _code_input_prompt(editing=True), "footer": "أرسل التذييل الجديد",
         "mathematical_expression": _math_input_prompt(editing=True), "anchor": "أرسل اسم المرساة الجديد",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر", "table": "أرسل صفوف الجدول؛ افصل الأعمدة بعلامة |",
         "blockquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لوضعه داخله",
