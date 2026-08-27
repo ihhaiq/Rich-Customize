@@ -6,6 +6,7 @@ class RichEditorStates(StatesGroup):
     selecting_button_user = State()
     saving_page_name = State()
     renaming_page = State()
+    searching_page = State()
     managing = State()
     editing_block = State()
     adding_block = State()
