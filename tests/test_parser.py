@@ -10,7 +10,7 @@ from app.services.renderer import build_input_rich_message
 from app.services.inline_buttons import (
     find_user_button_markers, resolve_user_button_marker,
 )
-from app.routers.rich_editor import _button_guide_blocks, _friendly_rich_error
+from app.routers.editor_core import _button_guide_blocks, _friendly_rich_error
 
 
 class FormattedTextParserTests(unittest.TestCase):
@@ -300,6 +300,26 @@ class FormattedTextParserTests(unittest.TestCase):
         self.assertEqual(
             [item["blocks"][0]["text"] for item in nested[0]["items"]],
             ["الأول", "الثاني"],
+        )
+
+    def test_footer_can_follow_a_specific_block_inside_details(self):
+        paragraph = new_block("paragraph", {
+            "text": "المعلومة", "html": "<p>المعلومة</p>",
+        })
+        footer = new_block("footer", {
+            "text": "المصدر", "html": "<footer>المصدر</footer>",
+        })
+        paragraph["position"] = 0
+        footer["position"] = 1
+        details = new_block("details", details_data("العنوان", [paragraph, footer]))
+
+        rich = build_input_rich_message([details]).model_dump(
+            mode="json", exclude_none=True,
+        )
+
+        self.assertEqual(
+            [block["type"] for block in rich["blocks"][0]["blocks"]],
+            ["paragraph", "footer"],
         )
 
     def test_quote_inside_details_survives_typed_rendering(self):
