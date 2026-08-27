@@ -7,7 +7,8 @@ from app.keyboards import (
     build_details_content_keyboard, build_inner_block_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
     build_pages_keyboard, build_page_target_keyboard,
-    build_rich_editor_keyboard,
+    build_block_editor_keyboard, build_editor_tools_keyboard,
+    build_page_sort_keyboard, build_rich_editor_keyboard,
     build_start_editor_keyboard,
     build_welcome_keyboard,
 )
@@ -31,6 +32,7 @@ class ButtonKeyboardTests(unittest.TestCase):
 
         self.assertEqual(button.callback_data, "r:starteditor")
         self.assertTrue(button.text)
+        self.assertEqual(button.style, ButtonStyle.PRIMARY)
 
     def test_welcome_places_start_editor_next_to_showcase(self):
         keyboard = build_welcome_keyboard()
@@ -116,7 +118,7 @@ class ButtonKeyboardTests(unittest.TestCase):
 
         self.assertEqual(open_button.style, ButtonStyle.PRIMARY)
         self.assertEqual(copy_button.copy_text.text, "a1b2c3d4")
-        self.assertEqual(copy_button.style, ButtonStyle.SUCCESS)
+        self.assertIsNone(copy_button.style)
         self.assertEqual(rename_button.callback_data, "r:prename:a1b2c3d4:2")
         self.assertEqual(delete_button.callback_data, "r:pdelete:a1b2c3d4:2")
         self.assertEqual(delete_button.style, ButtonStyle.DANGER)
@@ -124,7 +126,34 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertEqual(counter_button.text, "3/4")
         self.assertEqual(next_button.callback_data, "r:pages:3")
 
-    def test_editor_uses_color_only_for_final_actions(self):
+    def test_saved_page_controls_appear_and_search_results_keep_their_pager(self):
+        keyboard = build_pages_keyboard(
+            [{"page_id": "a1", "title": "صفحة"}],
+            page_index=0,
+            total_pages=2,
+            show_controls=True,
+            pagination_prefix="r:presults",
+        )
+        callbacks = {
+            button.callback_data
+            for row in keyboard.inline_keyboard
+            for button in row
+            if button.callback_data
+        }
+
+        self.assertIn("r:presults:1", callbacks)
+        self.assertIn("r:psearch", callbacks)
+        self.assertIn("r:psort", callbacks)
+
+    def test_page_sort_marks_the_current_filter(self):
+        keyboard = build_page_sort_keyboard("updated")
+        selected = keyboard.inline_keyboard[0][0]
+
+        self.assertEqual(selected.callback_data, "r:psortset:updated")
+        self.assertTrue(selected.text.startswith("✅ "))
+        self.assertEqual(selected.style, ButtonStyle.PRIMARY)
+
+    def test_editor_keeps_secondary_actions_inside_tools(self):
         keyboard = build_rich_editor_keyboard([
             {"id": "b1", "type": "paragraph", "position": 0, "data": {}},
         ])
@@ -135,12 +164,42 @@ class ButtonKeyboardTests(unittest.TestCase):
             if button.callback_data
         }
 
-        self.assertIsNone(by_callback["r:addmenu"].style)
-        self.assertIsNone(by_callback["r:buttons"].style)
-        self.assertIsNone(by_callback["r:savepage"].style)
-        self.assertIsNone(by_callback["r:pages"].style)
+        self.assertEqual(by_callback["r:addmenu"].style, ButtonStyle.PRIMARY)
+        self.assertIsNone(by_callback["r:tools"].style)
+        self.assertNotIn("r:buttons", by_callback)
+        self.assertNotIn("r:savepage", by_callback)
+        self.assertNotIn("r:pages", by_callback)
         self.assertEqual(by_callback["r:post"].style, ButtonStyle.PRIMARY)
         self.assertEqual(by_callback["r:result"].style, ButtonStyle.SUCCESS)
+
+        tools = {
+            button.callback_data: button
+            for row in build_editor_tools_keyboard().inline_keyboard
+            for button in row
+            if button.callback_data
+        }
+        self.assertIn("r:buttons", tools)
+        self.assertIn("r:pages", tools)
+        self.assertIn("r:undo", tools)
+        self.assertEqual(tools["r:savepage"].style, ButtonStyle.SUCCESS)
+
+    def test_block_editor_moves_one_step_without_number_picker(self):
+        blocks = [
+            {"id": "a", "type": "paragraph", "position": 0, "data": {}},
+            {"id": "b", "type": "paragraph", "position": 1, "data": {}},
+            {"id": "c", "type": "paragraph", "position": 2, "data": {}},
+        ]
+        keyboard = build_block_editor_keyboard(blocks[1], blocks)
+        callbacks = {
+            button.callback_data
+            for row in keyboard.inline_keyboard
+            for button in row
+            if button.callback_data
+        }
+
+        self.assertIn("r:mu:b", callbacks)
+        self.assertIn("r:md:b", callbacks)
+        self.assertFalse(any(value.startswith("r:mt:") for value in callbacks))
 
     def test_details_builder_only_finishes_after_an_inner_block(self):
         empty = build_details_content_keyboard(0)
