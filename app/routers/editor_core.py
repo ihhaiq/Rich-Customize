@@ -30,7 +30,7 @@ from app.keyboards import (
     build_post_settings_keyboard, build_rich_editor_keyboard,
     build_table_cell_keyboard, build_table_options_keyboard, build_welcome_keyboard,
 )
-from app.i18n import current_language, preserve_user_content, tr
+from app.i18n import preserve_user_content, t, tr
 from app.services.albums import AlbumCollector
 from app.services.blocks import (
     BLOCK_LABELS, delete_block, get_block_by_id, move_block, normalize_block_positions,
@@ -76,10 +76,8 @@ CHANNEL_ADMIN_RIGHTS = (
 )
 
 
-def _math_input_prompt(prompt: str) -> str:
-    if current_language() != "ar":
-        return prompt
-    return f"{prompt}\n\nلإضافة مسافة بين النصوص استخدم: \\ "
+def _math_input_prompt(*, editing: bool = False) -> str:
+    return t("math.edit_prompt" if editing else "math.add_prompt")
 
 
 def _saved_pages_text(pages: list[dict[str, Any]]) -> str:
@@ -964,7 +962,7 @@ async def choose_add_block(callback: CallbackQuery, state: FSMContext, bot: Bot)
         "heading": "أرسل عنوان القسم",
         "preformatted": "أرسل النص البرمجي",
         "footer": "أرسل نص التذييل",
-        "mathematical_expression": _math_input_prompt("أرسل المعادلة بصيغة LaTeX"),
+        "mathematical_expression": _math_input_prompt(),
         "anchor": "أرسل اسم المرساة",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
         "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
@@ -1118,7 +1116,7 @@ async def choose_details_child_type(
         "paragraph": "أرسل نص الفقرة",
         "preformatted": "أرسل النص البرمجي",
         "footer": "أرسل نص التذييل",
-        "mathematical_expression": _math_input_prompt("أرسل المعادلة بصيغة LaTeX"),
+        "mathematical_expression": _math_input_prompt(),
         "anchor": "أرسل اسم المرساة",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
         "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
@@ -2238,7 +2236,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         "text": "أرسل النص الجديد", "caption": "أرسل الوصف الجديد", "photo": "أرسل الصورة الجديدة",
         "paragraph": "أرسل نص الفقرة الجديد", "heading": "أرسل عنوان القسم الجديد",
         "preformatted": "أرسل النص البرمجي الجديد", "footer": "أرسل التذييل الجديد",
-        "mathematical_expression": _math_input_prompt("أرسل معادلة LaTeX الجديدة"), "anchor": "أرسل اسم المرساة الجديد",
+        "mathematical_expression": _math_input_prompt(editing=True), "anchor": "أرسل اسم المرساة الجديد",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر", "table": "أرسل صفوف الجدول؛ افصل الأعمدة بعلامة |",
         "blockquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لوضعه داخله",
         "pullquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لإرفاقه به",
