@@ -94,6 +94,21 @@ PHRASES: dict[str, str] = {
     "pages.sort_oldest": "🗓 Oldest created",
     "pages.sort_title": "🔤 By name",
     "pages.sort_done": "Page order changed",
+    "list.menu_button": "📋 Lists",
+    "list.menu_title": "Choose a list type:",
+    "list.bullet": "• Bulleted list",
+    "list.numbered": "1. Numbered list",
+    "list.checklist": "☑️ Checklist",
+    "list.bullet_prompt": "Send the list items, one per line.",
+    "list.numbered_prompt": "Send the numbered-list items, one per line. Numbers are added automatically.",
+    "list.checklist_prompt": "Send one task per line. Normal lines are pending; prefix completed tasks with [x], ✅, or ☑️.",
+    "list.tasks_title": "Tasks:",
+    "list.unnamed_task": "Task",
+    "list.invalid": "Invalid list selection.",
+    "list.empty": "Send at least one non-empty item.",
+    "list.missing_task": "This task no longer exists.",
+    "list.marked_done": "Task marked as completed",
+    "list.marked_pending": "Task marked as pending",
 
     # Canonical Rich Block keys. These are deliberately semantic keys rather
     # than source-language strings so block names can never get stuck midway
@@ -164,6 +179,21 @@ AR_PHRASES: dict[str, str] = {
     "pages.sort_oldest": "🗓 الأقدم إنشاءً",
     "pages.sort_title": "🔤 حسب الاسم",
     "pages.sort_done": "تم تغيير ترتيب الصفحات",
+    "list.menu_button": "📋 القوائم",
+    "list.menu_title": "اختر نوع القائمة:",
+    "list.bullet": "• قائمة نقطية",
+    "list.numbered": "1. قائمة مرقّمة",
+    "list.checklist": "☑️ قائمة مهام",
+    "list.bullet_prompt": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل.",
+    "list.numbered_prompt": "أرسل عناصر القائمة المرقّمة؛ كل عنصر في سطر، والأرقام تضاف تلقائيًا.",
+    "list.checklist_prompt": "أرسل كل مهمة في سطر. السطر العادي غير منجز، وللمنجز اكتب قبله [x] أو ✅ أو ☑️.",
+    "list.tasks_title": "المهام:",
+    "list.unnamed_task": "مهمة",
+    "list.invalid": "اختيار نوع القائمة غير صالح.",
+    "list.empty": "أرسل عنصرًا واحدًا غير فارغ على الأقل.",
+    "list.missing_task": "هذه المهمة لم تعد موجودة.",
+    "list.marked_done": "تم تحديد المهمة كمنجزة",
+    "list.marked_pending": "تم تحديد المهمة كغير منجزة",
     "block.content": "📦 محتوى",
     "block.text": "📝 نص",
     "block.paragraph": "📝 فقرة",
@@ -568,6 +598,43 @@ EDITOR_UX_TRANSLATIONS = {
     for language, values in EDITOR_UX_VALUES.items()
 }
 
+LIST_UI_KEYS = (
+    "list.menu_button", "list.menu_title", "list.bullet", "list.numbered",
+    "list.checklist", "list.bullet_prompt", "list.numbered_prompt",
+    "list.checklist_prompt", "list.tasks_title", "list.unnamed_task",
+    "list.invalid", "list.empty", "list.missing_task", "list.marked_done",
+    "list.marked_pending",
+)
+
+LIST_UI_VALUES = {
+    "es": ("📋 Listas", "Elige un tipo de lista:", "• Lista con viñetas", "1. Lista numerada", "☑️ Lista de tareas", "Envía un elemento por línea.", "Envía un elemento por línea; los números se añaden automáticamente.", "Envía una tarea por línea. Las líneas normales están pendientes; usa [x], ✅ o ☑️ para las completadas.", "Tareas:", "Tarea", "Selección de lista no válida.", "Envía al menos un elemento no vacío.", "Esta tarea ya no existe.", "Tarea marcada como completada", "Tarea marcada como pendiente"),
+    "fr": ("📋 Listes", "Choisissez un type de liste :", "• Liste à puces", "1. Liste numérotée", "☑️ Liste de tâches", "Envoyez un élément par ligne.", "Envoyez un élément par ligne ; les numéros sont ajoutés automatiquement.", "Envoyez une tâche par ligne. Les lignes normales sont en attente ; utilisez [x], ✅ ou ☑️ pour les tâches terminées.", "Tâches :", "Tâche", "Sélection de liste invalide.", "Envoyez au moins un élément non vide.", "Cette tâche n’existe plus.", "Tâche marquée comme terminée", "Tâche marquée comme en attente"),
+    "de": ("📋 Listen", "Listentyp auswählen:", "• Aufzählung", "1. Nummerierte Liste", "☑️ Checkliste", "Sende einen Eintrag pro Zeile.", "Sende einen Eintrag pro Zeile; Nummern werden automatisch ergänzt.", "Sende eine Aufgabe pro Zeile. Normale Zeilen sind offen; verwende [x], ✅ oder ☑️ für erledigte Aufgaben.", "Aufgaben:", "Aufgabe", "Ungültige Listenauswahl.", "Sende mindestens einen nicht leeren Eintrag.", "Diese Aufgabe existiert nicht mehr.", "Aufgabe als erledigt markiert", "Aufgabe als offen markiert"),
+    "it": ("📋 Elenchi", "Scegli un tipo di elenco:", "• Elenco puntato", "1. Elenco numerato", "☑️ Elenco attività", "Invia un elemento per riga.", "Invia un elemento per riga; i numeri vengono aggiunti automaticamente.", "Invia un’attività per riga. Le righe normali sono da fare; usa [x], ✅ o ☑️ per quelle completate.", "Attività:", "Attività", "Selezione elenco non valida.", "Invia almeno un elemento non vuoto.", "Questa attività non esiste più.", "Attività segnata come completata", "Attività segnata come da fare"),
+    "pt": ("📋 Listas", "Escolha um tipo de lista:", "• Lista com marcadores", "1. Lista numerada", "☑️ Lista de tarefas", "Envie um item por linha.", "Envie um item por linha; os números são adicionados automaticamente.", "Envie uma tarefa por linha. Linhas normais ficam pendentes; use [x], ✅ ou ☑️ nas concluídas.", "Tarefas:", "Tarefa", "Seleção de lista inválida.", "Envie pelo menos um item não vazio.", "Esta tarefa não existe mais.", "Tarefa marcada como concluída", "Tarefa marcada como pendente"),
+    "nl": ("📋 Lijsten", "Kies een lijsttype:", "• Opsomming", "1. Genummerde lijst", "☑️ Takenlijst", "Stuur één item per regel.", "Stuur één item per regel; nummers worden automatisch toegevoegd.", "Stuur één taak per regel. Gewone regels zijn open; gebruik [x], ✅ of ☑️ voor voltooide taken.", "Taken:", "Taak", "Ongeldige lijstkeuze.", "Stuur minstens één niet-leeg item.", "Deze taak bestaat niet meer.", "Taak als voltooid gemarkeerd", "Taak als open gemarkeerd"),
+    "pl": ("📋 Listy", "Wybierz typ listy:", "• Lista punktowana", "1. Lista numerowana", "☑️ Lista zadań", "Wyślij jeden element w każdym wierszu.", "Wyślij jeden element w każdym wierszu; numery zostaną dodane automatycznie.", "Wyślij jedno zadanie w każdym wierszu. Zwykłe wiersze są oczekujące; użyj [x], ✅ lub ☑️ dla ukończonych.", "Zadania:", "Zadanie", "Nieprawidłowy wybór listy.", "Wyślij co najmniej jeden niepusty element.", "To zadanie już nie istnieje.", "Zadanie oznaczono jako ukończone", "Zadanie oznaczono jako oczekujące"),
+    "uk": ("📋 Списки", "Виберіть тип списку:", "• Маркований список", "1. Нумерований список", "☑️ Список завдань", "Надішліть по одному елементу в рядку.", "Надішліть по одному елементу в рядку; номери додадуться автоматично.", "Надішліть по одному завданню в рядку. Звичайні рядки незавершені; використовуйте [x], ✅ або ☑️ для завершених.", "Завдання:", "Завдання", "Неприпустимий вибір списку.", "Надішліть хоча б один непорожній елемент.", "Цього завдання більше немає.", "Завдання позначено виконаним", "Завдання позначено невиконаним"),
+    "ru": ("📋 Списки", "Выберите тип списка:", "• Маркированный список", "1. Нумерованный список", "☑️ Список задач", "Отправьте по одному элементу в строке.", "Отправьте по одному элементу в строке; номера добавятся автоматически.", "Отправьте по одной задаче в строке. Обычные строки не выполнены; используйте [x], ✅ или ☑️ для выполненных.", "Задачи:", "Задача", "Неверный выбор списка.", "Отправьте хотя бы один непустой элемент.", "Этой задачи больше нет.", "Задача отмечена выполненной", "Задача отмечена невыполненной"),
+    "tr": ("📋 Listeler", "Liste türünü seçin:", "• Madde işaretli liste", "1. Numaralı liste", "☑️ Görev listesi", "Her satıra bir öğe gönderin.", "Her satıra bir öğe gönderin; numaralar otomatik eklenir.", "Her satıra bir görev gönderin. Normal satırlar beklemededir; tamamlananlar için [x], ✅ veya ☑️ kullanın.", "Görevler:", "Görev", "Geçersiz liste seçimi.", "En az bir boş olmayan öğe gönderin.", "Bu görev artık yok.", "Görev tamamlandı olarak işaretlendi", "Görev beklemede olarak işaretlendi"),
+    "fa": ("📋 فهرست‌ها", "نوع فهرست را انتخاب کنید:", "• فهرست نشانه‌دار", "1. فهرست شماره‌دار", "☑️ فهرست کارها", "هر مورد را در یک خط بفرستید.", "هر مورد را در یک خط بفرستید؛ شماره‌ها خودکار افزوده می‌شوند.", "هر کار را در یک خط بفرستید. خط عادی انجام‌نشده است؛ برای انجام‌شده از [x]، ✅ یا ☑️ استفاده کنید.", "کارها:", "کار", "انتخاب فهرست نامعتبر است.", "حداقل یک مورد غیرخالی بفرستید.", "این کار دیگر وجود ندارد.", "کار انجام‌شده علامت خورد", "کار انجام‌نشده علامت خورد"),
+    "ku": ("📋 Lîste", "Cureyê lîsteyê hilbijêre:", "• Lîsteya xalî", "1. Lîsteya hejmartî", "☑️ Lîsteya peywiran", "Her hêmanekê di rêzekê de bişîne.", "Her hêmanekê di rêzekê de bişîne; hejmar bixwe têne zêdekirin.", "Her peywirekê di rêzekê de bişîne. Rêzên asayî neqediyayî ne; ji bo yên qediyayî [x], ✅ an ☑️ bikar bîne.", "Peywir:", "Peywir", "Hilbijartina lîsteyê nederbasdar e.", "Herî kêm hêmanek nevala bişîne.", "Ev peywir êdî tune ye.", "Peywir wek qediyayî hate nîşankirin", "Peywir wek neqediyayî hate nîşankirin"),
+    "ur": ("📋 فہرستیں", "فہرست کی قسم منتخب کریں:", "• نقطہ دار فہرست", "1. نمبر والی فہرست", "☑️ کاموں کی فہرست", "ہر سطر میں ایک آئٹم بھیجیں۔", "ہر سطر میں ایک آئٹم بھیجیں؛ نمبر خود شامل ہوں گے۔", "ہر سطر میں ایک کام بھیجیں۔ عام سطر نامکمل ہوگی؛ مکمل کام کے لیے [x]، ✅ یا ☑️ لگائیں۔", "کام:", "کام", "فہرست کا انتخاب درست نہیں۔", "کم از کم ایک غیر خالی آئٹم بھیجیں۔", "یہ کام اب موجود نہیں۔", "کام مکمل نشان زد ہوا", "کام نامکمل نشان زد ہوا"),
+    "hi": ("📋 सूचियाँ", "सूची का प्रकार चुनें:", "• बुलेट सूची", "1. क्रमांकित सूची", "☑️ कार्य सूची", "हर पंक्ति में एक आइटम भेजें।", "हर पंक्ति में एक आइटम भेजें; नंबर अपने आप जुड़ेंगे।", "हर पंक्ति में एक कार्य भेजें। सामान्य पंक्तियाँ लंबित होंगी; पूर्ण कार्य के लिए [x], ✅ या ☑️ लगाएँ।", "कार्य:", "कार्य", "अमान्य सूची चयन।", "कम से कम एक गैर-खाली आइटम भेजें।", "यह कार्य अब मौजूद नहीं है।", "कार्य पूर्ण चिह्नित किया गया", "कार्य लंबित चिह्नित किया गया"),
+    "id": ("📋 Daftar", "Pilih jenis daftar:", "• Daftar berpoin", "1. Daftar bernomor", "☑️ Daftar tugas", "Kirim satu item per baris.", "Kirim satu item per baris; nomor ditambahkan otomatis.", "Kirim satu tugas per baris. Baris biasa berstatus tertunda; gunakan [x], ✅, atau ☑️ untuk yang selesai.", "Tugas:", "Tugas", "Pilihan daftar tidak valid.", "Kirim setidaknya satu item yang tidak kosong.", "Tugas ini sudah tidak ada.", "Tugas ditandai selesai", "Tugas ditandai tertunda"),
+    "ja": ("📋 リスト", "リストの種類を選択:", "• 箇条書き", "1. 番号付きリスト", "☑️ チェックリスト", "1行に1項目を送信してください。", "1行に1項目を送信してください。番号は自動で追加されます。", "1行に1つのタスクを送信してください。通常の行は未完了です。完了済みには [x]、✅、☑️ を付けます。", "タスク:", "タスク", "リストの選択が無効です。", "空でない項目を1つ以上送信してください。", "このタスクは存在しません。", "タスクを完了にしました", "タスクを未完了にしました"),
+    "ko": ("📋 목록", "목록 유형 선택:", "• 글머리 기호 목록", "1. 번호 매기기 목록", "☑️ 작업 목록", "한 줄에 하나씩 보내세요.", "한 줄에 하나씩 보내면 번호가 자동으로 추가됩니다.", "한 줄에 작업 하나씩 보내세요. 일반 줄은 미완료이며, 완료 작업에는 [x], ✅ 또는 ☑️를 붙이세요.", "작업:", "작업", "잘못된 목록 선택입니다.", "비어 있지 않은 항목을 하나 이상 보내세요.", "이 작업은 더 이상 없습니다.", "작업을 완료로 표시했습니다", "작업을 미완료로 표시했습니다"),
+    "vi": ("📋 Danh sách", "Chọn loại danh sách:", "• Danh sách dấu đầu dòng", "1. Danh sách đánh số", "☑️ Danh sách việc", "Gửi mỗi dòng một mục.", "Gửi mỗi dòng một mục; số sẽ được thêm tự động.", "Gửi mỗi dòng một việc. Dòng thường là chưa xong; dùng [x], ✅ hoặc ☑️ cho việc đã xong.", "Công việc:", "Công việc", "Lựa chọn danh sách không hợp lệ.", "Gửi ít nhất một mục không trống.", "Công việc này không còn tồn tại.", "Đã đánh dấu hoàn thành", "Đã đánh dấu chưa hoàn thành"),
+    "th": ("📋 รายการ", "เลือกประเภทรายการ:", "• รายการแบบหัวข้อย่อย", "1. รายการแบบมีหมายเลข", "☑️ รายการงาน", "ส่งหนึ่งรายการต่อบรรทัด", "ส่งหนึ่งรายการต่อบรรทัด ระบบจะใส่หมายเลขให้อัตโนมัติ", "ส่งหนึ่งงานต่อบรรทัด บรรทัดปกติคือยังไม่เสร็จ งานที่เสร็จแล้วให้ใส่ [x], ✅ หรือ ☑️", "งาน:", "งาน", "การเลือกรายการไม่ถูกต้อง", "ส่งอย่างน้อยหนึ่งรายการที่ไม่ว่าง", "งานนี้ไม่มีอยู่แล้ว", "ทำเครื่องหมายว่าเสร็จแล้ว", "ทำเครื่องหมายว่ายังไม่เสร็จ"),
+    "zh-hans": ("📋 列表", "选择列表类型：", "• 项目符号列表", "1. 编号列表", "☑️ 任务列表", "每行发送一个项目。", "每行发送一个项目，编号会自动添加。", "每行发送一个任务。普通行默认为未完成；已完成任务请加 [x]、✅ 或 ☑️。", "任务：", "任务", "列表选择无效。", "请至少发送一个非空项目。", "此任务已不存在。", "任务已标记为完成", "任务已标记为未完成"),
+    "zh-hant": ("📋 列表", "選擇列表類型：", "• 項目符號列表", "1. 編號列表", "☑️ 任務列表", "每行傳送一個項目。", "每行傳送一個項目，編號會自動加入。", "每行傳送一個任務。普通行預設為未完成；已完成任務請加 [x]、✅ 或 ☑️。", "任務：", "任務", "列表選擇無效。", "請至少傳送一個非空項目。", "此任務已不存在。", "任務已標記為完成", "任務已標記為未完成"),
+}
+
+LIST_UI_TRANSLATIONS = {
+    language: dict(zip(LIST_UI_KEYS, values, strict=True))
+    for language, values in LIST_UI_VALUES.items()
+}
+
 KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     language: {f"block.{name}": value for name, value in values.items()}
     for language, values in BLOCK_KEY_TRANSLATIONS.items()
@@ -586,6 +653,9 @@ for language, translations in PAGE_MANAGEMENT_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 for language, translations in EDITOR_UX_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in LIST_UI_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 
