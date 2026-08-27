@@ -4,6 +4,25 @@ from __future__ import annotations
 # Arabic -> English normalization. Locale-specific packs can override every
 # visible fragment without touching editor/router code.
 GUIDE_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "ar": {
+        "Send the message you want to customize. You can place button syntax anywhere in the text.": "أرسل الرسالة التي تريد تخصيصها. تقدر تكتب تنسيق الزر داخل النص بأي مكان.",
+        "📘 Inline button guide — tap to open": "📘 دليل الأزرار داخل النص — اضغط للفتح",
+        "Syntax: {button name:type value#color}": "الصيغة: {اسم الزر:النوع القيمة#اللون}",
+        "{Button name:url https://example.com#b}": "{اسم الزر:url https://example.com#b}",
+        "{Profile:user#p}": "{الملف الشخصي:user#p}",
+        "{Action:callback_data action:1#r}": "{تنفيذ:callback_data action:1#r}",
+        "{Next page:cbd a86d3132#b}": "{الصفحة التالية:cbd a86d3132#b}",
+        "{Subscribers only:cbd a86d3132#b sub}": "{للمشتركين فقط:cbd a86d3132#b sub}",
+        "{Alert:popup This is the alert text#r}": "{تنبيه:popup هذا نص التنبيه#r}",
+        "{Copy:copy text to copy#g}": "{نسخ:copy النص المطلوب#g}",
+        "{Search:switch_inline_query search words}": "{بحث:switch_inline_query كلمة البحث}",
+        "{Search here:switch_inline_query_current_chat search words}": "{بحث هنا:switch_inline_query_current_chat كلمة البحث}",
+        "{Disabled:disabled#r}": "{معطّل:disabled#r}",
+        "Two buttons side by side:": "زران بجانب بعضهما:",
+        "{Accept:callback_data yes#g} {Reject:callback_data no#r}": "{قبول:callback_data yes#g} {رفض:callback_data no#r}",
+        "Colors: #r red, #b or #p blue, #g green, and no code for the default color.": "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر، وبدون رمز للون الافتراضي.",
+        "📘 Inline button guide:": "📘 دليل الأزرار داخل النص:",
+    },
     "fr": {
         "Send the message you want to customize. You can place button syntax anywhere in the text.": "Envoyez le message que vous souhaitez personnaliser. Vous pouvez placer la syntaxe des boutons n’importe où dans le texte.",
         "📘 Inline button guide — tap to open": "📘 Guide des boutons intégrés — appuyez pour ouvrir",
