@@ -2965,11 +2965,14 @@ async def _pages_for_user(
     if sort_mode == "title":
         pages.sort(key=lambda page: str(page.get("title") or page["page_id"]).casefold())
     elif sort_mode == "oldest":
-        pages.sort(key=lambda page: (int(page.get("created_at", 0)), str(page["page_id"])))
+        pages.sort(key=lambda page: str(page.get("title") or page["page_id"]).casefold())
+        pages.sort(key=lambda page: int(page.get("created_at", 0)))
     elif sort_mode == "newest":
-        pages.sort(key=lambda page: (int(page.get("created_at", 0)), str(page["page_id"])), reverse=True)
+        pages.sort(key=lambda page: str(page.get("title") or page["page_id"]).casefold())
+        pages.sort(key=lambda page: int(page.get("created_at", 0)), reverse=True)
     else:
-        pages.sort(key=lambda page: (int(page.get("updated_at", 0)), str(page["page_id"])), reverse=True)
+        pages.sort(key=lambda page: str(page.get("title") or page["page_id"]).casefold())
+        pages.sort(key=lambda page: int(page.get("updated_at", 0)), reverse=True)
     visible, page_index, total_pages = _page_screen(pages, requested_index)
     return pages, visible, page_index, total_pages, total_count
 
