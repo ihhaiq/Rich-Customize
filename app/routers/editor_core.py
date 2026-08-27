@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import secrets
 from collections import defaultdict
@@ -29,7 +30,7 @@ from app.keyboards import (
     build_post_settings_keyboard, build_rich_editor_keyboard,
     build_table_cell_keyboard, build_table_options_keyboard, build_welcome_keyboard,
 )
-from app.i18n import preserve_user_content, tr
+from app.i18n import current_language, preserve_user_content, tr
 from app.services.albums import AlbumCollector
 from app.services.blocks import (
     BLOCK_LABELS, delete_block, get_block_by_id, move_block, normalize_block_positions,
@@ -73,6 +74,27 @@ ADMIN_STATUSES = {"administrator", "creator"}
 CHANNEL_ADMIN_RIGHTS = (
     "post_messages+edit_messages+delete_messages+manage_chat+invite_users+restrict_members"
 )
+
+
+def _math_input_prompt(prompt: str) -> str:
+    if current_language() != "ar":
+        return prompt
+    return f"{prompt}\n\nلإضافة مسافة بين النصوص استخدم: \\ "
+
+
+def _saved_pages_text(pages: list[dict[str, Any]]) -> str:
+    lines = ["📚 صفحاتك المحفوظة", "", "اختر صفحة لفتحها وتعديلها:", ""]
+    for page in pages:
+        page_id = html.escape(str(page["page_id"]))
+        title = html.escape(str(page.get("title") or page["page_id"]))
+        lines.append(f"📄 {title} — <code>{page_id}</code>")
+    return "\n".join(lines)
+
+
+def _opened_page_text(page_id: str, page: dict[str, Any]) -> str:
+    code = html.escape(page_id)
+    title = html.escape(str(page.get("title") or page_id))
+    return f"📄 {title} — <code>{code}</code>\n\n{MAIN_TEXT}"
 GROUP_ADMIN_RIGHTS = "delete_messages+manage_chat+invite_users+restrict_members"
 PULLQUOTE_MEDIA_TYPES = {"photo", "video", "animation", "audio", "voice", "document"}
 
@@ -377,9 +399,18 @@ def _block_page(block: dict[str, Any], blocks: list[dict[str, Any]]) -> str:
     return f"إدارة {name} #{index}\nالنوع: {name.split(' ', 1)[-1]}\n\nاختر العملية:"
 
 
-async def _edit_ui(message: Message, text: str, reply_markup) -> None:
+async def _edit_ui(
+    message: Message,
+    text: str,
+    reply_markup,
+    parse_mode: str | None = None,
+) -> None:
     try:
-        await message.edit_text(text, reply_markup=reply_markup)
+        await message.edit_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+        )
     except TelegramBadRequest as error:
         if "message is not modified" not in str(error).lower():
             raise
@@ -933,7 +964,7 @@ async def choose_add_block(callback: CallbackQuery, state: FSMContext, bot: Bot)
         "heading": "أرسل عنوان القسم",
         "preformatted": "أرسل النص البرمجي",
         "footer": "أرسل نص التذييل",
-        "mathematical_expression": "أرسل المعادلة بصيغة LaTeX",
+        "mathematical_expression": _math_input_prompt("أرسل المعادلة بصيغة LaTeX"),
         "anchor": "أرسل اسم المرساة",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
         "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
@@ -1087,7 +1118,7 @@ async def choose_details_child_type(
         "paragraph": "أرسل نص الفقرة",
         "preformatted": "أرسل النص البرمجي",
         "footer": "أرسل نص التذييل",
-        "mathematical_expression": "أرسل المعادلة بصيغة LaTeX",
+        "mathematical_expression": _math_input_prompt("أرسل المعادلة بصيغة LaTeX"),
         "anchor": "أرسل اسم المرساة",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
         "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
@@ -2207,7 +2238,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         "text": "أرسل النص الجديد", "caption": "أرسل الوصف الجديد", "photo": "أرسل الصورة الجديدة",
         "paragraph": "أرسل نص الفقرة الجديد", "heading": "أرسل عنوان القسم الجديد",
         "preformatted": "أرسل النص البرمجي الجديد", "footer": "أرسل التذييل الجديد",
-        "mathematical_expression": "أرسل معادلة LaTeX الجديدة", "anchor": "أرسل اسم المرساة الجديد",
+        "mathematical_expression": _math_input_prompt("أرسل معادلة LaTeX الجديدة"), "anchor": "أرسل اسم المرساة الجديد",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر", "table": "أرسل صفوف الجدول؛ افصل الأعمدة بعلامة |",
         "blockquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لوضعه داخله",
         "pullquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لإرفاقه به",
@@ -2716,8 +2747,9 @@ async def list_pages(callback: CallbackQuery, state: FSMContext) -> None:
         return
     await _edit_ui(
         callback.message,
-        "📚 صفحاتك المحفوظة\n\nاختر صفحة لفتحها وتعديلها:",
+        _saved_pages_text(pages),
         build_pages_keyboard(pages),
+        parse_mode="HTML",
     )
     await callback.answer()
 
@@ -2745,8 +2777,9 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     )
     await _edit_ui(
         callback.message,
-        f"📄 الصفحة: {page.get('title') or page_id}\n\n{MAIN_TEXT}",
+        _opened_page_text(page_id, page),
         build_rich_editor_keyboard(blocks),
+        parse_mode="HTML",
     )
     await callback.answer("تم فتح الصفحة")
 
