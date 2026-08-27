@@ -67,6 +67,12 @@ PHRASES: dict[str, str] = {
     "editor.start_button": "▶️ Start editor",
     "editor.new_button": "➕ Start editor",
     "editor.empty_hint": "Customize message\n\nAdd a Block or open one of your saved pages:",
+    "editor.forward_hint": "You can also forward a Rich Message here to import and customize its blocks.",
+    "editor.imported_title": "✅ Rich Message imported",
+    "editor.block_count": "Block count: {count}",
+    "editor.imported_blocks_title": "Message blocks:",
+    "editor.imported_choose_block": "Choose a block to customize:",
+    "editor.rich_import_failed": "This Rich Message has no supported blocks.",
     "pages.rename_prompt": "Send a new name for “{title}”; maximum 64 characters.",
     "pages.delete_confirm": "Permanently delete “{title}”?",
     "pages.delete_yes": "🗑 Yes, delete",
@@ -152,6 +158,12 @@ AR_PHRASES: dict[str, str] = {
     "editor.start_button": "▶️ بدء المحرّر",
     "editor.new_button": "➕ بدء المحرّر",
     "editor.empty_hint": "تخصيص الرسالة\n\nأضف Block أو افتح إحدى صفحاتك المحفوظة:",
+    "editor.forward_hint": "وتكدر أيضًا تحوّل رسالة غنية هنا حتى تستورد بلوكاتها وتخصصها.",
+    "editor.imported_title": "✅ تم استيراد الرسالة الغنية",
+    "editor.block_count": "عدد البلوكات: {count}",
+    "editor.imported_blocks_title": "بلوكات الرسالة:",
+    "editor.imported_choose_block": "اختر البلوك الذي تريد تخصيصه:",
+    "editor.rich_import_failed": "هذه الرسالة الغنية لا تحتوي بلوكات مدعومة.",
     "pages.rename_prompt": "أرسل الاسم الجديد للصفحة «{title}»؛ الحد الأقصى 64 حرفًا.",
     "pages.delete_confirm": "هل تريد حذف الصفحة «{title}» نهائيًا؟",
     "pages.delete_yes": "🗑 نعم، حذف",
@@ -635,6 +647,41 @@ LIST_UI_TRANSLATIONS = {
     for language, values in LIST_UI_VALUES.items()
 }
 
+RICH_IMPORT_KEYS = (
+    "editor.forward_hint", "editor.imported_title", "editor.block_count",
+    "editor.imported_blocks_title", "editor.imported_choose_block",
+    "editor.rich_import_failed",
+)
+
+RICH_IMPORT_VALUES = {
+    "es": ("También puedes reenviar aquí un mensaje enriquecido para importar y personalizar sus bloques.", "✅ Mensaje enriquecido importado", "Cantidad de bloques: {count}", "Bloques del mensaje:", "Elige un bloque para personalizar:", "Este mensaje enriquecido no contiene bloques compatibles."),
+    "fr": ("Vous pouvez aussi transférer ici un message enrichi pour importer et personnaliser ses blocs.", "✅ Message enrichi importé", "Nombre de blocs : {count}", "Blocs du message :", "Choisissez un bloc à personnaliser :", "Ce message enrichi ne contient aucun bloc compatible."),
+    "de": ("Du kannst auch eine Rich Message hierher weiterleiten, um ihre Blöcke zu importieren und anzupassen.", "✅ Rich Message importiert", "Blockanzahl: {count}", "Nachrichtenblöcke:", "Wähle einen Block zum Anpassen:", "Diese Rich Message enthält keine unterstützten Blöcke."),
+    "it": ("Puoi anche inoltrare qui un messaggio avanzato per importarne e personalizzarne i blocchi.", "✅ Messaggio avanzato importato", "Numero di blocchi: {count}", "Blocchi del messaggio:", "Scegli un blocco da personalizzare:", "Questo messaggio avanzato non contiene blocchi supportati."),
+    "pt": ("Você também pode encaminhar uma mensagem rica aqui para importar e personalizar seus blocos.", "✅ Mensagem rica importada", "Quantidade de blocos: {count}", "Blocos da mensagem:", "Escolha um bloco para personalizar:", "Esta mensagem rica não contém blocos compatíveis."),
+    "nl": ("Je kunt hier ook een Rich Message doorsturen om de blokken te importeren en aan te passen.", "✅ Rich Message geïmporteerd", "Aantal blokken: {count}", "Berichtblokken:", "Kies een blok om aan te passen:", "Deze Rich Message bevat geen ondersteunde blokken."),
+    "pl": ("Możesz też przekazać tutaj wiadomość Rich Message, aby zaimportować i dostosować jej bloki.", "✅ Zaimportowano Rich Message", "Liczba bloków: {count}", "Bloki wiadomości:", "Wybierz blok do dostosowania:", "Ta Rich Message nie zawiera obsługiwanych bloków."),
+    "uk": ("Також можна переслати сюди Rich Message, щоб імпортувати й налаштувати її блоки.", "✅ Rich Message імпортовано", "Кількість блоків: {count}", "Блоки повідомлення:", "Виберіть блок для налаштування:", "Ця Rich Message не містить підтримуваних блоків."),
+    "ru": ("Также можно переслать сюда Rich Message, чтобы импортировать и настроить её блоки.", "✅ Rich Message импортировано", "Количество блоков: {count}", "Блоки сообщения:", "Выберите блок для настройки:", "Эта Rich Message не содержит поддерживаемых блоков."),
+    "tr": ("Bloklarını içe aktarıp özelleştirmek için buraya bir zengin mesaj da iletebilirsiniz.", "✅ Zengin mesaj içe aktarıldı", "Blok sayısı: {count}", "Mesaj blokları:", "Özelleştirilecek bloğu seçin:", "Bu zengin mesajda desteklenen blok yok."),
+    "fa": ("همچنین می‌توانید یک پیام غنی را اینجا فوروارد کنید تا بلوک‌هایش وارد و سفارشی شوند.", "✅ پیام غنی وارد شد", "تعداد بلوک‌ها: {count}", "بلوک‌های پیام:", "یک بلوک را برای سفارشی‌سازی انتخاب کنید:", "این پیام غنی بلوک پشتیبانی‌شده‌ای ندارد."),
+    "ku": ("Her weha dikarî peyameke dewlemend vir bişînî da ku blokên wê were anîn û taybetkirin.", "✅ Peyama dewlemend hate anîn", "Hejmara blokan: {count}", "Blokên peyamê:", "Blokek ji bo taybetkirinê hilbijêre:", "Di vê peyama dewlemend de blokeke piştgirîkirî tune ye."),
+    "ur": ("آپ رِچ میسج یہاں فارورڈ بھی کر سکتے ہیں تاکہ اس کے بلاکس درآمد اور حسب ضرورت کیے جا سکیں۔", "✅ رِچ میسج درآمد ہو گیا", "بلاکس کی تعداد: {count}", "پیغام کے بلاکس:", "حسب ضرورت بنانے کے لیے بلاک منتخب کریں:", "اس رِچ میسج میں کوئی معاون بلاک نہیں ہے۔"),
+    "hi": ("आप रिच मैसेज को यहाँ फ़ॉरवर्ड करके उसके ब्लॉक आयात और अनुकूलित भी कर सकते हैं।", "✅ रिच मैसेज आयात हुआ", "ब्लॉक की संख्या: {count}", "संदेश के ब्लॉक:", "अनुकूलित करने के लिए ब्लॉक चुनें:", "इस रिच मैसेज में कोई समर्थित ब्लॉक नहीं है।"),
+    "id": ("Anda juga dapat meneruskan Rich Message ke sini untuk mengimpor dan menyesuaikan bloknya.", "✅ Rich Message diimpor", "Jumlah blok: {count}", "Blok pesan:", "Pilih blok untuk disesuaikan:", "Rich Message ini tidak memiliki blok yang didukung."),
+    "ja": ("リッチメッセージをここに転送して、ブロックを読み込み編集することもできます。", "✅ リッチメッセージを読み込みました", "ブロック数: {count}", "メッセージのブロック:", "編集するブロックを選択:", "このリッチメッセージには対応ブロックがありません。"),
+    "ko": ("리치 메시지를 여기로 전달하여 블록을 가져오고 맞춤 설정할 수도 있습니다.", "✅ 리치 메시지를 가져왔습니다", "블록 수: {count}", "메시지 블록:", "맞춤 설정할 블록을 선택하세요:", "이 리치 메시지에는 지원되는 블록이 없습니다."),
+    "vi": ("Bạn cũng có thể chuyển tiếp Rich Message vào đây để nhập và tùy chỉnh các khối của nó.", "✅ Đã nhập Rich Message", "Số khối: {count}", "Các khối của tin nhắn:", "Chọn một khối để tùy chỉnh:", "Rich Message này không có khối được hỗ trợ."),
+    "th": ("คุณยังสามารถส่งต่อ Rich Message มาที่นี่เพื่อนำเข้าและปรับแต่งบล็อกได้", "✅ นำเข้า Rich Message แล้ว", "จำนวนบล็อก: {count}", "บล็อกของข้อความ:", "เลือกบล็อกที่จะปรับแต่ง:", "Rich Message นี้ไม่มีบล็อกที่รองรับ"),
+    "zh-hans": ("你也可以将富消息转发到这里，以导入并自定义其中的区块。", "✅ 已导入富消息", "区块数量：{count}", "消息区块：", "选择要自定义的区块：", "此富消息不包含受支持的区块。"),
+    "zh-hant": ("你也可以將富訊息轉傳到這裡，以匯入並自訂其中的區塊。", "✅ 已匯入富訊息", "區塊數量：{count}", "訊息區塊：", "選擇要自訂的區塊：", "此富訊息不包含支援的區塊。"),
+}
+
+RICH_IMPORT_TRANSLATIONS = {
+    language: dict(zip(RICH_IMPORT_KEYS, values, strict=True))
+    for language, values in RICH_IMPORT_VALUES.items()
+}
+
 KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     language: {f"block.{name}": value for name, value in values.items()}
     for language, values in BLOCK_KEY_TRANSLATIONS.items()
@@ -656,6 +703,9 @@ for language, translations in EDITOR_UX_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 for language, translations in LIST_UI_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in RICH_IMPORT_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 
