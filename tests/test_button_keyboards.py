@@ -5,11 +5,30 @@ from app.keyboards import (
     build_details_content_keyboard, build_inner_block_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
     build_pages_keyboard, build_page_target_keyboard,
+    build_rich_editor_keyboard,
+    build_start_editor_keyboard,
 )
 from app.services.buttons import add_message_button
 
 
 class ButtonKeyboardTests(unittest.TestCase):
+    def test_empty_editor_starts_with_add_block_and_pages(self):
+        keyboard = build_rich_editor_keyboard([])
+        callbacks = [
+            button.callback_data
+            for row in keyboard.inline_keyboard
+            for button in row
+        ]
+
+        self.assertEqual(callbacks, ["r:addmenu", "r:pages"])
+
+    def test_start_editor_button_uses_expected_callback(self):
+        keyboard = build_start_editor_keyboard()
+        button = keyboard.inline_keyboard[0][0]
+
+        self.assertEqual(button.callback_data, "r:starteditor")
+        self.assertTrue(button.text)
+
     def test_button_manager_can_change_button_type(self):
         buttons = []
         button = add_message_button(buttons, "زر", "https://example.com", "url")
