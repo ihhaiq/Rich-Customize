@@ -23,7 +23,7 @@ class ButtonKeyboardTests(unittest.TestCase):
             for button in row
         ]
 
-        self.assertEqual(callbacks, ["r:addmenu", "r:pages"])
+        self.assertEqual(callbacks, ["r:pages", "r:addmenu"])
 
     def test_start_editor_button_uses_expected_callback(self):
         keyboard = build_start_editor_keyboard()
@@ -124,7 +124,7 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertEqual(counter_button.text, "3/4")
         self.assertEqual(next_button.callback_data, "r:pages:3")
 
-    def test_key_editor_actions_are_colored(self):
+    def test_editor_uses_color_only_for_final_actions(self):
         keyboard = build_rich_editor_keyboard([
             {"id": "b1", "type": "paragraph", "position": 0, "data": {}},
         ])
@@ -135,9 +135,12 @@ class ButtonKeyboardTests(unittest.TestCase):
             if button.callback_data
         }
 
-        self.assertEqual(by_callback["r:addmenu"].style, ButtonStyle.PRIMARY)
-        self.assertEqual(by_callback["r:savepage"].style, ButtonStyle.SUCCESS)
-        self.assertEqual(by_callback["r:pages"].style, ButtonStyle.PRIMARY)
+        self.assertIsNone(by_callback["r:addmenu"].style)
+        self.assertIsNone(by_callback["r:buttons"].style)
+        self.assertIsNone(by_callback["r:savepage"].style)
+        self.assertIsNone(by_callback["r:pages"].style)
+        self.assertEqual(by_callback["r:post"].style, ButtonStyle.PRIMARY)
+        self.assertEqual(by_callback["r:result"].style, ButtonStyle.SUCCESS)
 
     def test_details_builder_only_finishes_after_an_inner_block(self):
         empty = build_details_content_keyboard(0)
