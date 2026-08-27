@@ -5,6 +5,7 @@ import copy
 import json
 import os
 import secrets
+import time
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +63,7 @@ class PageRegistry:
             code = page_id if reuse else secrets.token_hex(4)
             while not reuse and code in pages:
                 code = secrets.token_hex(4)
+            now = int(time.time())
             pages[code] = {
                 "owner_id": owner_id,
                 "title": title.strip()[:64] or "صفحة بلا اسم",
@@ -69,6 +71,8 @@ class PageRegistry:
                 "buttons": copy.deepcopy(buttons),
                 "buttons_per_row": buttons_per_row,
                 "buttons_align": buttons_align,
+                "created_at": int(existing.get("created_at", now)) if reuse else now,
+                "updated_at": now,
             }
             self._write(pages)
             media_store.remember_blocks(blocks)
@@ -111,6 +115,7 @@ class PageRegistry:
             if not isinstance(page, dict) or int(page.get("owner_id", 0)) != owner_id:
                 return False
             page["title"] = title.strip()[:64] or "صفحة بلا اسم"
+            page["updated_at"] = int(time.time())
             self._write(pages)
             return True
 
