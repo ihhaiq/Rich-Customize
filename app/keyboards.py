@@ -440,6 +440,19 @@ def build_block_editor_keyboard(
         rows.append([InlineKeyboardButton(text="📝 تعديل عنوان التفاصيل", callback_data=f"r:f:{block_id}:summary")])
     if block["type"] == "table":
         rows.append([InlineKeyboardButton(text="🎛 إعدادات خلايا الجدول", callback_data=f"r:tm:{block_id}")])
+    if block["type"] == "list" and block.get("data", {}).get("kind") == "checklist":
+        for item_index, item in enumerate(block.get("data", {}).get("items", [])):
+            if not isinstance(item, dict):
+                continue
+            checked = bool(item.get("is_checked"))
+            task_text = str(item.get("text") or t("list.unnamed_task"))
+            if len(task_text) > 48:
+                task_text = f"{task_text[:47]}…"
+            rows.append([InlineKeyboardButton(
+                text=f"{'☑️' if checked else '☐'} {task_text}",
+                callback_data=f"r:ct:{block_id}:{item_index}",
+                style=ButtonStyle.SUCCESS if checked else None,
+            )])
     if block["type"] in MEDIA_CAPTION_TYPES:
         rows.append([
             InlineKeyboardButton(text="💬 تعديل التذييل", callback_data=f"r:f:{block_id}:caption"),
@@ -504,7 +517,7 @@ def build_add_block_keyboard() -> InlineKeyboardMarkup:
         ("📝 Paragraph", "paragraph"), ("🔠 Section Heading", "heading"),
         ("💻 Preformatted", "preformatted"), ("🔻 Footer", "footer"),
         ("➖ Divider", "divider"), ("∑ Math", "mathematical_expression"),
-        ("⚓ Anchor", "anchor"), ("📋 List", "list"),
+        ("⚓ Anchor", "anchor"), (t("list.menu_button"), "listmenu"),
         ("❝ Blockquote", "blockquote"), ("💬 Pullquote", "pullquote"),
         ("🖼 Collage", "collage"), ("🎞 Slideshow", "slideshow"),
         ("▦ Table", "table"), ("📂 Details", "details"),
@@ -520,6 +533,25 @@ def build_add_block_keyboard() -> InlineKeyboardMarkup:
     rows.append([InlineKeyboardButton(text="💭 Thinking (للمسودة فقط)", callback_data="r:add:thinking")])
     rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_list_type_keyboard(
+    *,
+    callback_prefix: str = "r:addlist",
+    back_data: str = "r:addmenu",
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=t("list.bullet"), callback_data=f"{callback_prefix}:bullet",
+        )],
+        [InlineKeyboardButton(
+            text=t("list.numbered"), callback_data=f"{callback_prefix}:numbered",
+        )],
+        [InlineKeyboardButton(
+            text=t("list.checklist"), callback_data=f"{callback_prefix}:checklist",
+        )],
+        [InlineKeyboardButton(text=t("common.cancel"), callback_data=back_data)],
+    ])
 
 
 def build_details_content_keyboard(child_count: int = 0) -> InlineKeyboardMarkup:
