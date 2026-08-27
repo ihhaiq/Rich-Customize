@@ -4,11 +4,11 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from app import i18n_core
-from app.i18n import tr
+from app.i18n import t, tr
 from app.locales import TRANSLATIONS
 from app.routers.editor_core import (
     _delete_stored_block_prompt, _math_input_prompt,
-    _opened_page_text, _saved_pages_text,
+    _opened_page_text, _saved_pages_text, _session, new_editor,
 )
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
@@ -35,6 +35,28 @@ class SavedPagesLocalizationTests(unittest.TestCase):
 
             self.assertTrue(prompt.endswith("\\ "), language)
             self.assertNotEqual(prompt, "Send the formula in LaTeX.\n\nTo add a space between text, use: \\ ", language)
+
+    def test_every_locale_translates_closed_editor_message_and_button(self):
+        for language in TRANSLATIONS:
+            token = i18n_core._language.set(language)
+            try:
+                hint = t("editor.closed_hint")
+                button = t("editor.start_button")
+                empty = t("editor.empty_hint")
+            finally:
+                i18n_core._language.reset(token)
+
+            self.assertNotEqual(
+                hint,
+                "Use the editor buttons, or send /editor to start a new message.",
+                language,
+            )
+            self.assertNotEqual(button, "▶️ Start editor", language)
+            self.assertNotEqual(
+                empty,
+                "Customize message\n\nAdd a Block or open one of your saved pages:",
+                language,
+            )
 
     def test_saved_pages_show_copyable_codes_in_message_text(self):
         pages = [
@@ -80,6 +102,31 @@ class SavedPagesLocalizationTests(unittest.TestCase):
 
 
 class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_empty_block_list_is_a_valid_editor_session(self):
+        callback = SimpleNamespace(answer=AsyncMock())
+        state = SimpleNamespace(get_data=AsyncMock(return_value={"blocks": []}))
+
+        session = await _session(callback, state)
+
+        self.assertEqual(session, ({"blocks": []}, []))
+        callback.answer.assert_not_awaited()
+
+    async def test_editor_command_opens_an_empty_editor_immediately(self):
+        sent = SimpleNamespace(chat=SimpleNamespace(id=10), message_id=20)
+        message = SimpleNamespace(answer=AsyncMock(return_value=sent))
+        state = SimpleNamespace(
+            clear=AsyncMock(),
+            set_state=AsyncMock(),
+            update_data=AsyncMock(),
+        )
+
+        await new_editor(message, state)
+
+        state.clear.assert_awaited_once()
+        message.answer.assert_awaited_once()
+        state.update_data.assert_awaited_once()
+        self.assertEqual(state.update_data.await_args.kwargs["blocks"], [])
+
     async def test_back_cleanup_deletes_only_the_separate_prompt(self):
         bot = SimpleNamespace(delete_message=AsyncMock())
         state = SimpleNamespace(update_data=AsyncMock())
