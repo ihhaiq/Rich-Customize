@@ -1,14 +1,16 @@
 import re
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from app import i18n_core
 from app.i18n import t, tr
 from app.locales import TRANSLATIONS
+from app.locales.common import EDITOR_UX_KEYS, KEY_TRANSLATIONS
 from app.routers.editor_core import (
-    _delete_stored_block_prompt, _math_input_prompt,
+    _block_page, _delete_stored_block_prompt, _math_input_prompt,
     _opened_page_text, _page_screen, _saved_pages_text, _session, new_editor,
+    _pages_for_user,
 )
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
@@ -84,6 +86,13 @@ class SavedPagesLocalizationTests(unittest.TestCase):
             for key, value in rendered.items():
                 self.assertNotEqual(value, english[key], f"{language}: {key}")
 
+    def test_every_locale_has_the_new_editor_ux_keys(self):
+        for language in TRANSLATIONS:
+            if language == "ar":
+                continue
+            missing = set(EDITOR_UX_KEYS) - set(KEY_TRANSLATIONS.get(language, {}))
+            self.assertFalse(missing, f"{language}: {sorted(missing)}")
+
     def test_saved_pages_text_leaves_titles_and_codes_to_buttons(self):
         rendered = _saved_pages_text()
 
@@ -106,6 +115,23 @@ class SavedPagesLocalizationTests(unittest.TestCase):
         self.assertEqual([page["page_id"] for page in visible], ["8", "9"])
         self.assertEqual(page_index, 2)
         self.assertEqual(total_pages, 3)
+
+    def test_block_page_shows_current_position_and_ordered_names(self):
+        blocks = [
+            {"id": "photo", "type": "photo", "position": 1, "data": {}},
+            {"id": "text", "type": "paragraph", "position": 0, "data": {}},
+        ]
+
+        token = i18n_core._language.set("ar")
+        try:
+            rendered = _block_page(blocks[0], blocks)
+        finally:
+            i18n_core._language.reset(token)
+
+        self.assertIn("الموقع الحالي: 2 من 2", rendered)
+        order = rendered.split("ترتيب البلوكات:\n", 1)[1]
+        self.assertLess(order.index("📝 فقرة"), order.index("🖼 صورة"))
+        self.assertIn("◀️ 2. 🖼 صورة", rendered)
 
     def test_french_saved_pages_screen_has_no_arabic(self):
         token = i18n_core._language.set("fr")
@@ -134,6 +160,24 @@ class SavedPagesLocalizationTests(unittest.TestCase):
 
 
 class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_pages_can_be_searched_and_sorted_by_latest_update(self):
+        pages = [
+            {"page_id": "a", "title": "Alpha", "updated_at": 10},
+            {"page_id": "b", "title": "Beta", "updated_at": 30},
+            {"page_id": "c", "title": "Other", "updated_at": 50},
+        ]
+        with patch(
+            "app.routers.editor_core.page_registry.list_for_user",
+            AsyncMock(return_value=pages),
+        ):
+            found, visible, page_index, total_pages, total_count = await _pages_for_user(
+                7, 0, "a", "updated",
+            )
+
+        self.assertEqual([page["page_id"] for page in found], ["b", "a"])
+        self.assertEqual(found, visible)
+        self.assertEqual((page_index, total_pages, total_count), (0, 1, 3))
+
     async def test_empty_block_list_is_a_valid_editor_session(self):
         callback = SimpleNamespace(answer=AsyncMock())
         state = SimpleNamespace(get_data=AsyncMock(return_value={"blocks": []}))
