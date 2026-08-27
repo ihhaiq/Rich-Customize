@@ -9,6 +9,7 @@ from app.keyboards import (
     build_pages_keyboard, build_page_target_keyboard,
     build_block_editor_keyboard, build_editor_tools_keyboard,
     build_page_sort_keyboard, build_rich_editor_keyboard,
+    build_list_type_keyboard,
     build_start_editor_keyboard,
     build_welcome_keyboard,
 )
@@ -16,6 +17,39 @@ from app.services.buttons import add_message_button
 
 
 class ButtonKeyboardTests(unittest.TestCase):
+    def test_lists_button_opens_three_list_types(self):
+        keyboard = build_list_type_keyboard()
+        callbacks = [row[0].callback_data for row in keyboard.inline_keyboard]
+
+        self.assertEqual(callbacks[:3], [
+            "r:addlist:bullet",
+            "r:addlist:numbered",
+            "r:addlist:checklist",
+        ])
+
+    def test_checklist_tasks_can_be_toggled_from_block_editor(self):
+        block = {
+            "id": "tasks", "type": "list", "position": 0,
+            "data": {
+                "kind": "checklist",
+                "items": [
+                    {"text": "منجزة", "has_checkbox": True, "is_checked": True},
+                    {"text": "غير منجزة", "has_checkbox": True, "is_checked": False},
+                ],
+            },
+        }
+        keyboard = build_block_editor_keyboard(block, [block])
+        task_buttons = [
+            button for row in keyboard.inline_keyboard for button in row
+            if button.callback_data and button.callback_data.startswith("r:ct:")
+        ]
+
+        self.assertEqual([button.callback_data for button in task_buttons], [
+            "r:ct:tasks:0", "r:ct:tasks:1",
+        ])
+        self.assertEqual(task_buttons[0].style, ButtonStyle.SUCCESS)
+        self.assertIsNone(task_buttons[1].style)
+
     def test_empty_editor_starts_with_add_block_and_pages(self):
         keyboard = build_rich_editor_keyboard([])
         callbacks = [
