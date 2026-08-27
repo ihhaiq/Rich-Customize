@@ -61,6 +61,9 @@ PHRASES: dict[str, str] = {
     "send_voice": "Send a voice note.",
     "math.add_prompt": "Send the formula in LaTeX.\n\nTo add a space between text, use: \\ ",
     "math.edit_prompt": "Send the new LaTeX formula.\n\nTo add a space between text, use: \\ ",
+    "editor.closed_hint": "Use the editor buttons, or send /editor to start a new message.",
+    "editor.start_button": "▶️ Start editor",
+    "editor.empty_hint": "Customize message\n\nAdd a Block or open one of your saved pages:",
 
     # Canonical Rich Block keys. These are deliberately semantic keys rather
     # than source-language strings so block names can never get stuck midway
@@ -98,6 +101,9 @@ PHRASES: dict[str, str] = {
 AR_PHRASES: dict[str, str] = {
     "math.add_prompt": "أرسل المعادلة بصيغة LaTeX.\n\nلإضافة مسافة بين النصوص استخدم: \\ ",
     "math.edit_prompt": "أرسل معادلة LaTeX الجديدة.\n\nلإضافة مسافة بين النصوص استخدم: \\ ",
+    "editor.closed_hint": "استخدم أزرار المحرّر، أو أرسل /editor لبدء رسالة جديدة.",
+    "editor.start_button": "▶️ بدء المحرّر",
+    "editor.empty_hint": "تخصيص الرسالة\n\nأضف Block أو افتح إحدى صفحاتك المحفوظة:",
     "block.content": "📦 محتوى",
     "block.text": "📝 نص",
     "block.paragraph": "📝 فقرة",
@@ -243,12 +249,40 @@ MATH_PROMPT_TRANSLATIONS: dict[str, dict[str, str]] = {
     },
 }
 
+
+EDITOR_START_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {"editor.closed_hint": "Usa los botones del editor o envía /editor para comenzar un mensaje nuevo.", "editor.start_button": "▶️ Iniciar editor", "editor.empty_hint": "Personalizar mensaje\n\nAñade un Block o abre una de tus páginas guardadas:"},
+    "fr": {"editor.closed_hint": "Utilisez les boutons de l’éditeur ou envoyez /editor pour commencer un nouveau message.", "editor.start_button": "▶️ Démarrer l’éditeur", "editor.empty_hint": "Personnaliser le message\n\nAjoutez un Block ou ouvrez l’une de vos pages enregistrées :"},
+    "de": {"editor.closed_hint": "Verwende die Editor-Schaltflächen oder sende /editor, um eine neue Nachricht zu beginnen.", "editor.start_button": "▶️ Editor starten", "editor.empty_hint": "Nachricht anpassen\n\nFüge einen Block hinzu oder öffne eine deiner gespeicherten Seiten:"},
+    "it": {"editor.closed_hint": "Usa i pulsanti dell’editor oppure invia /editor per iniziare un nuovo messaggio.", "editor.start_button": "▶️ Avvia editor", "editor.empty_hint": "Personalizza il messaggio\n\nAggiungi un Block o apri una delle pagine salvate:"},
+    "pt": {"editor.closed_hint": "Use os botões do editor ou envie /editor para iniciar uma nova mensagem.", "editor.start_button": "▶️ Iniciar editor", "editor.empty_hint": "Personalizar mensagem\n\nAdicione um Block ou abra uma das suas páginas salvas:"},
+    "nl": {"editor.closed_hint": "Gebruik de editorknoppen of stuur /editor om een nieuw bericht te beginnen.", "editor.start_button": "▶️ Editor starten", "editor.empty_hint": "Bericht aanpassen\n\nVoeg een Block toe of open een van je opgeslagen pagina’s:"},
+    "pl": {"editor.closed_hint": "Użyj przycisków edytora lub wyślij /editor, aby rozpocząć nową wiadomość.", "editor.start_button": "▶️ Uruchom edytor", "editor.empty_hint": "Dostosuj wiadomość\n\nDodaj Block lub otwórz jedną z zapisanych stron:"},
+    "uk": {"editor.closed_hint": "Скористайтеся кнопками редактора або надішліть /editor, щоб почати нове повідомлення.", "editor.start_button": "▶️ Запустити редактор", "editor.empty_hint": "Налаштувати повідомлення\n\nДодайте Block або відкрийте одну зі збережених сторінок:"},
+    "ru": {"editor.closed_hint": "Используйте кнопки редактора или отправьте /editor, чтобы начать новое сообщение.", "editor.start_button": "▶️ Запустить редактор", "editor.empty_hint": "Настроить сообщение\n\nДобавьте Block или откройте одну из сохранённых страниц:"},
+    "tr": {"editor.closed_hint": "Düzenleyici düğmelerini kullanın veya yeni bir mesaj başlatmak için /editor gönderin.", "editor.start_button": "▶️ Düzenleyiciyi başlat", "editor.empty_hint": "Mesajı özelleştir\n\nBir Block ekleyin veya kayıtlı sayfalarınızdan birini açın:"},
+    "fa": {"editor.closed_hint": "از دکمه‌های ویرایشگر استفاده کنید یا برای شروع پیام جدید /editor را ارسال کنید.", "editor.start_button": "▶️ شروع ویرایشگر", "editor.empty_hint": "سفارشی‌سازی پیام\n\nیک Block اضافه کنید یا یکی از صفحه‌های ذخیره‌شده را باز کنید:"},
+    "ku": {"editor.closed_hint": "Bişkokên edîtorê bikar bînin an ji bo destpêkirina peyameke nû /editor bişînin.", "editor.start_button": "▶️ Edîtorê dest pê bike", "editor.empty_hint": "Peyamê taybet bikin\n\nBlockek zêde bikin an yek ji rûpelên tomarkirî vekin:"},
+    "ur": {"editor.closed_hint": "ایڈیٹر کے بٹن استعمال کریں یا نیا پیغام شروع کرنے کے لیے /editor بھیجیں۔", "editor.start_button": "▶️ ایڈیٹر شروع کریں", "editor.empty_hint": "پیغام کو حسب ضرورت بنائیں\n\nایک Block شامل کریں یا اپنے محفوظ صفحات میں سے کوئی صفحہ کھولیں:"},
+    "hi": {"editor.closed_hint": "एडिटर के बटन इस्तेमाल करें या नया संदेश शुरू करने के लिए /editor भेजें।", "editor.start_button": "▶️ एडिटर शुरू करें", "editor.empty_hint": "संदेश को अनुकूलित करें\n\nएक Block जोड़ें या अपने सहेजे गए पेज में से कोई पेज खोलें:"},
+    "id": {"editor.closed_hint": "Gunakan tombol editor atau kirim /editor untuk memulai pesan baru.", "editor.start_button": "▶️ Mulai editor", "editor.empty_hint": "Sesuaikan pesan\n\nTambahkan Block atau buka salah satu halaman tersimpan Anda:"},
+    "ja": {"editor.closed_hint": "エディターのボタンを使用するか、/editor を送信して新しいメッセージを開始してください。", "editor.start_button": "▶️ エディターを開始", "editor.empty_hint": "メッセージをカスタマイズ\n\nBlockを追加するか、保存済みページを開いてください:"},
+    "ko": {"editor.closed_hint": "편집기 버튼을 사용하거나 /editor를 보내 새 메시지를 시작하세요.", "editor.start_button": "▶️ 편집기 시작", "editor.empty_hint": "메시지 사용자 지정\n\nBlock을 추가하거나 저장된 페이지 중 하나를 여세요:"},
+    "vi": {"editor.closed_hint": "Hãy dùng các nút của trình chỉnh sửa hoặc gửi /editor để bắt đầu tin nhắn mới.", "editor.start_button": "▶️ Bắt đầu trình chỉnh sửa", "editor.empty_hint": "Tùy chỉnh tin nhắn\n\nThêm một Block hoặc mở một trong các trang đã lưu:"},
+    "th": {"editor.closed_hint": "ใช้ปุ่มของตัวแก้ไข หรือส่ง /editor เพื่อเริ่มข้อความใหม่", "editor.start_button": "▶️ เริ่มตัวแก้ไข", "editor.empty_hint": "ปรับแต่งข้อความ\n\nเพิ่ม Block หรือเปิดหน้าที่บันทึกไว้:"},
+    "zh-hans": {"editor.closed_hint": "请使用编辑器按钮，或发送 /editor 开始新消息。", "editor.start_button": "▶️ 启动编辑器", "editor.empty_hint": "自定义消息\n\n添加一个 Block 或打开已保存的页面："},
+    "zh-hant": {"editor.closed_hint": "請使用編輯器按鈕，或傳送 /editor 開始新訊息。", "editor.start_button": "▶️ 啟動編輯器", "editor.empty_hint": "自訂訊息\n\n新增一個 Block 或開啟已儲存的頁面："},
+}
+
 KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     language: {f"block.{name}": value for name, value in values.items()}
     for language, values in BLOCK_KEY_TRANSLATIONS.items()
 }
 
 for language, translations in MATH_PROMPT_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in EDITOR_START_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 
