@@ -16,19 +16,19 @@ _EDITOR_PROMPTS = {
 }
 
 _GUIDE_LINES = (
-    "{Button name:url https://example.com#b}",
-    "{Profile:user#p}",
-    "{Action:callback_data action:1#r}",
-    "{Next page:cbd a86d3132#b}",
-    "{Subscribers only:cbd a86d3132#b sub}",
-    "{Alert:popup This is the alert text#r}",
-    "{Copy:copy text to copy#g}",
-    "{Search:switch_inline_query search words}",
-    "{Search here:switch_inline_query_current_chat search words}",
-    "{Disabled:disabled#r}",
+    "{Button name - T.ME/IHHAI #b}",
+    "{Profile - USER #p}",
+    "{Action - callback_data: action:1 #r}",
+    "{Next page - CBD:a86d3132 #b}",
+    "{Subscribers only - CBD:a86d3132 #b sub}",
+    "{Alert - popup: This is the alert text #r}",
+    "{Copy - copy: text to copy #g}",
+    "{Search - switch_inline_query: search words}",
+    "{Search here - switch_inline_query_current_chat: search words}",
+    "{Disabled - disabled #r}",
     "",
     "Two buttons side by side:",
-    "{Accept:callback_data yes#g} {Reject:callback_data no#r}",
+    "{Accept - callback_data: yes #g} {Reject - callback_data: no #r}",
 )
 
 
@@ -43,9 +43,9 @@ def button_syntax_examples() -> str:
 
 def button_guide_blocks(prompt: str) -> list[dict[str, Any]]:
     localized_prompt = _localized_prompt(prompt)
-    syntax = tr("Syntax: {button name:type value#color}")
+    syntax = tr("Syntax: {button name - function: content #color}")
     colors = tr(
-        "Colors: #r red, #b or #p blue, #g green, and no code for the default color."
+        "Colors: #r red, #b or #p blue, #g green. RED, BLUE, GREEN and Arabic color names are also accepted."
     )
     examples = button_syntax_examples()
     return [
