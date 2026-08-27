@@ -8,7 +8,7 @@ from app.i18n import t, tr
 from app.locales import TRANSLATIONS
 from app.locales.common import EDITOR_UX_KEYS, KEY_TRANSLATIONS
 from app.routers.editor_core import (
-    _block_page, _delete_stored_block_prompt, _math_input_prompt,
+    _block_page, _code_input_prompt, _delete_stored_block_prompt, _math_input_prompt,
     _opened_page_text, _page_screen, _saved_pages_text, _session, new_editor,
     _pages_for_user,
 )
@@ -37,6 +37,24 @@ class SavedPagesLocalizationTests(unittest.TestCase):
 
             self.assertTrue(prompt.endswith("\\ "), language)
             self.assertNotEqual(prompt, "Send the formula in LaTeX.\n\nTo add a space between text, use: \\ ", language)
+
+    def test_every_locale_explains_how_to_set_code_language(self):
+        english = (
+            "Send the code.\n\nTo set its language, start with /lang python, "
+            "then put the code on the following lines. You can also use a fenced "
+            "block such as ```python ... ```."
+        )
+        for language in TRANSLATIONS:
+            token = i18n_core._language.set(language)
+            try:
+                prompt = _code_input_prompt()
+            finally:
+                i18n_core._language.reset(token)
+
+            self.assertIn("/lang python", prompt, language)
+            self.assertIn("```python", prompt, language)
+            if language != "ar":
+                self.assertNotEqual(prompt, english, language)
 
     def test_every_locale_translates_closed_editor_message_and_button(self):
         for language in TRANSLATIONS:
