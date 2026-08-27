@@ -5,6 +5,7 @@ from aiogram.enums import ButtonStyle
 from app.keyboards import (
     build_button_type_keyboard, build_buttons_manager_keyboard,
     build_details_content_keyboard, build_inner_block_keyboard,
+    build_details_inner_blocks_keyboard, build_details_inner_block_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
     build_pages_keyboard, build_page_target_keyboard,
     build_block_editor_keyboard, build_editor_tools_keyboard,
@@ -258,6 +259,53 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertIn("r:details:type:list", callbacks)
         self.assertIn("r:details:type:mathematical_expression", callbacks)
         self.assertNotIn("r:details:type:details", callbacks)
+
+    def test_details_editor_opens_an_organized_inner_block_manager(self):
+        children = [
+            {"id": "text", "type": "paragraph", "position": 0, "data": {}},
+            {"id": "photo", "type": "photo", "position": 1, "data": {}},
+        ]
+        details = {
+            "id": "details", "type": "details", "position": 0,
+            "data": {"children": children},
+        }
+        editor_callbacks = {
+            button.callback_data
+            for row in build_block_editor_keyboard(details, [details]).inline_keyboard
+            for button in row if button.callback_data
+        }
+        list_callbacks = [
+            row[0].callback_data
+            for row in build_details_inner_blocks_keyboard(details).inline_keyboard
+        ]
+
+        self.assertIn("r:dim:details", editor_callbacks)
+        self.assertEqual(list_callbacks[:2], [
+            "r:di:details:text", "r:di:details:photo",
+        ])
+
+    def test_inner_block_actions_match_the_selected_block_type(self):
+        paragraph = {"id": "text", "type": "paragraph", "position": 0, "data": {}}
+        photo = {"id": "photo", "type": "photo", "position": 1, "data": {}}
+        details = {
+            "id": "details", "type": "details", "position": 0,
+            "data": {"children": [paragraph, photo]},
+        }
+        paragraph_callbacks = {
+            button.callback_data
+            for row in build_details_inner_block_keyboard(details, paragraph).inline_keyboard
+            for button in row if button.callback_data
+        }
+        photo_callbacks = {
+            button.callback_data
+            for row in build_details_inner_block_keyboard(details, photo).inline_keyboard
+            for button in row if button.callback_data
+        }
+
+        self.assertIn("r:dif:details:text:add_footer", paragraph_callbacks)
+        self.assertNotIn("r:dif:details:text:caption", paragraph_callbacks)
+        self.assertIn("r:dif:details:photo:caption", photo_callbacks)
+        self.assertIn("r:dif:details:photo:credit", photo_callbacks)
 
         math = build_inner_block_keyboard("mathematical_expression")
         self.assertEqual(
