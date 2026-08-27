@@ -65,6 +65,11 @@ PHRASES: dict[str, str] = {
     "editor.start_button": "▶️ Start editor",
     "editor.new_button": "➕ Start editor",
     "editor.empty_hint": "Customize message\n\nAdd a Block or open one of your saved pages:",
+    "pages.rename_prompt": "Send a new name for “{title}”; maximum 64 characters.",
+    "pages.delete_confirm": "Permanently delete “{title}”?",
+    "pages.delete_yes": "🗑 Yes, delete",
+    "common.cancel": "Cancel",
+    "pages.deleted": "Page deleted",
 
     # Canonical Rich Block keys. These are deliberately semantic keys rather
     # than source-language strings so block names can never get stuck midway
@@ -106,6 +111,11 @@ AR_PHRASES: dict[str, str] = {
     "editor.start_button": "▶️ بدء المحرّر",
     "editor.new_button": "➕ بدء المحرّر",
     "editor.empty_hint": "تخصيص الرسالة\n\nأضف Block أو افتح إحدى صفحاتك المحفوظة:",
+    "pages.rename_prompt": "أرسل الاسم الجديد للصفحة «{title}»؛ الحد الأقصى 64 حرفًا.",
+    "pages.delete_confirm": "هل تريد حذف الصفحة «{title}» نهائيًا؟",
+    "pages.delete_yes": "🗑 نعم، حذف",
+    "common.cancel": "إلغاء",
+    "pages.deleted": "تم حذف الصفحة",
     "block.content": "📦 محتوى",
     "block.text": "📝 نص",
     "block.paragraph": "📝 فقرة",
@@ -276,6 +286,30 @@ EDITOR_START_TRANSLATIONS: dict[str, dict[str, str]] = {
     "zh-hant": {"editor.closed_hint": "請使用編輯器按鈕，或傳送 /editor 開始新訊息。", "editor.start_button": "▶️ 啟動編輯器", "editor.new_button": "➕ 啟動編輯器", "editor.empty_hint": "自訂訊息\n\n新增一個 Block 或開啟已儲存的頁面："},
 }
 
+PAGE_MANAGEMENT_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {"pages.rename_prompt": "Envía un nombre nuevo para «{title}»; máximo 64 caracteres.", "pages.delete_confirm": "¿Eliminar «{title}» permanentemente?", "pages.delete_yes": "🗑 Sí, eliminar", "common.cancel": "Cancelar", "pages.deleted": "Página eliminada"},
+    "fr": {"pages.rename_prompt": "Envoyez un nouveau nom pour « {title} » ; 64 caractères maximum.", "pages.delete_confirm": "Supprimer définitivement « {title} » ?", "pages.delete_yes": "🗑 Oui, supprimer", "common.cancel": "Annuler", "pages.deleted": "Page supprimée"},
+    "de": {"pages.rename_prompt": "Sende einen neuen Namen für „{title}“; maximal 64 Zeichen.", "pages.delete_confirm": "„{title}“ dauerhaft löschen?", "pages.delete_yes": "🗑 Ja, löschen", "common.cancel": "Abbrechen", "pages.deleted": "Seite gelöscht"},
+    "it": {"pages.rename_prompt": "Invia un nuovo nome per «{title}»; massimo 64 caratteri.", "pages.delete_confirm": "Eliminare definitivamente «{title}»?", "pages.delete_yes": "🗑 Sì, elimina", "common.cancel": "Annulla", "pages.deleted": "Pagina eliminata"},
+    "pt": {"pages.rename_prompt": "Envie um novo nome para “{title}”; máximo de 64 caracteres.", "pages.delete_confirm": "Excluir “{title}” permanentemente?", "pages.delete_yes": "🗑 Sim, excluir", "common.cancel": "Cancelar", "pages.deleted": "Página excluída"},
+    "nl": {"pages.rename_prompt": "Stuur een nieuwe naam voor ‘{title}’; maximaal 64 tekens.", "pages.delete_confirm": "‘{title}’ permanent verwijderen?", "pages.delete_yes": "🗑 Ja, verwijderen", "common.cancel": "Annuleren", "pages.deleted": "Pagina verwijderd"},
+    "pl": {"pages.rename_prompt": "Wyślij nową nazwę dla „{title}”; maksymalnie 64 znaki.", "pages.delete_confirm": "Trwale usunąć „{title}”?", "pages.delete_yes": "🗑 Tak, usuń", "common.cancel": "Anuluj", "pages.deleted": "Strona usunięta"},
+    "uk": {"pages.rename_prompt": "Надішліть нову назву для «{title}»; максимум 64 символи.", "pages.delete_confirm": "Назавжди видалити «{title}»?", "pages.delete_yes": "🗑 Так, видалити", "common.cancel": "Скасувати", "pages.deleted": "Сторінку видалено"},
+    "ru": {"pages.rename_prompt": "Отправьте новое название для «{title}»; максимум 64 символа.", "pages.delete_confirm": "Навсегда удалить «{title}»?", "pages.delete_yes": "🗑 Да, удалить", "common.cancel": "Отмена", "pages.deleted": "Страница удалена"},
+    "tr": {"pages.rename_prompt": "“{title}” için yeni bir ad gönderin; en fazla 64 karakter.", "pages.delete_confirm": "“{title}” kalıcı olarak silinsin mi?", "pages.delete_yes": "🗑 Evet, sil", "common.cancel": "İptal", "pages.deleted": "Sayfa silindi"},
+    "fa": {"pages.rename_prompt": "نام جدید «{title}» را ارسال کنید؛ حداکثر ۶۴ نویسه.", "pages.delete_confirm": "«{title}» برای همیشه حذف شود؟", "pages.delete_yes": "🗑 بله، حذف", "common.cancel": "لغو", "pages.deleted": "صفحه حذف شد"},
+    "ku": {"pages.rename_prompt": "Navekî nû ji bo “{title}” bişînin; herî zêde 64 tîp.", "pages.delete_confirm": "“{title}” bi temamî were jêbirin?", "pages.delete_yes": "🗑 Erê, jê bibe", "common.cancel": "Betal", "pages.deleted": "Rûpel hate jêbirin"},
+    "ur": {"pages.rename_prompt": "“{title}” کے لیے نیا نام بھیجیں؛ زیادہ سے زیادہ 64 حروف۔", "pages.delete_confirm": "“{title}” کو مستقل حذف کریں؟", "pages.delete_yes": "🗑 ہاں، حذف کریں", "common.cancel": "منسوخ", "pages.deleted": "صفحہ حذف ہوگیا"},
+    "hi": {"pages.rename_prompt": "“{title}” के लिए नया नाम भेजें; अधिकतम 64 अक्षर।", "pages.delete_confirm": "“{title}” को हमेशा के लिए हटाएँ?", "pages.delete_yes": "🗑 हाँ, हटाएँ", "common.cancel": "रद्द करें", "pages.deleted": "पेज हटा दिया गया"},
+    "id": {"pages.rename_prompt": "Kirim nama baru untuk “{title}”; maksimal 64 karakter.", "pages.delete_confirm": "Hapus “{title}” secara permanen?", "pages.delete_yes": "🗑 Ya, hapus", "common.cancel": "Batal", "pages.deleted": "Halaman dihapus"},
+    "ja": {"pages.rename_prompt": "「{title}」の新しい名前を送信してください（最大64文字）。", "pages.delete_confirm": "「{title}」を完全に削除しますか？", "pages.delete_yes": "🗑 はい、削除", "common.cancel": "キャンセル", "pages.deleted": "ページを削除しました"},
+    "ko": {"pages.rename_prompt": "‘{title}’의 새 이름을 보내세요. 최대 64자입니다.", "pages.delete_confirm": "‘{title}’을(를) 영구 삭제할까요?", "pages.delete_yes": "🗑 예, 삭제", "common.cancel": "취소", "pages.deleted": "페이지가 삭제되었습니다"},
+    "vi": {"pages.rename_prompt": "Gửi tên mới cho “{title}”; tối đa 64 ký tự.", "pages.delete_confirm": "Xóa vĩnh viễn “{title}”?", "pages.delete_yes": "🗑 Có, xóa", "common.cancel": "Hủy", "pages.deleted": "Đã xóa trang"},
+    "th": {"pages.rename_prompt": "ส่งชื่อใหม่สำหรับ “{title}” สูงสุด 64 อักขระ", "pages.delete_confirm": "ลบ “{title}” อย่างถาวรหรือไม่", "pages.delete_yes": "🗑 ใช่ ลบ", "common.cancel": "ยกเลิก", "pages.deleted": "ลบหน้าแล้ว"},
+    "zh-hans": {"pages.rename_prompt": "请发送“{title}”的新名称，最多 64 个字符。", "pages.delete_confirm": "永久删除“{title}”？", "pages.delete_yes": "🗑 是，删除", "common.cancel": "取消", "pages.deleted": "页面已删除"},
+    "zh-hant": {"pages.rename_prompt": "請傳送「{title}」的新名稱，最多 64 個字元。", "pages.delete_confirm": "永久刪除「{title}」？", "pages.delete_yes": "🗑 是，刪除", "common.cancel": "取消", "pages.deleted": "頁面已刪除"},
+}
+
 KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     language: {f"block.{name}": value for name, value in values.items()}
     for language, values in BLOCK_KEY_TRANSLATIONS.items()
@@ -285,6 +319,9 @@ for language, translations in MATH_PROMPT_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 for language, translations in EDITOR_START_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in PAGE_MANAGEMENT_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 
