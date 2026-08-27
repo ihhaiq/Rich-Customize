@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 from app import i18n_core
 from app.i18n import t, tr
 from app.locales import TRANSLATIONS
-from app.locales.common import EDITOR_UX_KEYS, KEY_TRANSLATIONS
+from app.locales.common import EDITOR_UX_KEYS, KEY_TRANSLATIONS, LIST_UI_KEYS
 from app.routers.editor_core import (
     _ask_for_button_user, _block_page, _code_input_prompt,
     _delete_stored_block_prompt, _math_input_prompt,
@@ -110,6 +110,13 @@ class SavedPagesLocalizationTests(unittest.TestCase):
             if language == "ar":
                 continue
             missing = set(EDITOR_UX_KEYS) - set(KEY_TRANSLATIONS.get(language, {}))
+            self.assertFalse(missing, f"{language}: {sorted(missing)}")
+
+    def test_every_locale_translates_list_editor_keys(self):
+        for language in TRANSLATIONS:
+            if language == "ar":
+                continue
+            missing = set(LIST_UI_KEYS) - set(KEY_TRANSLATIONS.get(language, {}))
             self.assertFalse(missing, f"{language}: {sorted(missing)}")
 
     def test_saved_pages_text_leaves_titles_and_codes_to_buttons(self):
