@@ -8,7 +8,7 @@ from app.services.buttons import (
     delete_message_button, move_message_button,
     normalize_button_url,
 )
-from app.services.factory import new_block, preformatted_data
+from app.services.factory import list_data, new_block, preformatted_data
 from app.services.inline_buttons import find_user_button_markers, inline_button_rich_text
 from app.services.renderer import build_input_rich_message
 
@@ -56,6 +56,34 @@ class BlockOperationsTests(unittest.TestCase):
             "http://t.me/botfather?startapp",
         )
         self.assertEqual(rendered[1]["button"]["style"], "primary")
+
+    def test_numbered_list_uses_native_numeric_labels(self):
+        data = list_data("الأول\n2. الثاني", "numbered")
+        rich = build_input_rich_message([
+            new_block("list", data),
+        ]).model_dump(mode="json", exclude_none=True)
+
+        items = rich["blocks"][0]["items"]
+        self.assertEqual([item["value"] for item in items], [1, 2])
+        self.assertEqual([item["type"] for item in items], ["1", "1"])
+        self.assertEqual(items[1]["blocks"][0]["text"], "الثاني")
+
+    def test_checklist_defaults_to_pending_and_accepts_completed_markers(self):
+        data = list_data(
+            "مهمة عادية\n[x] مهمة منجزة\n✅ منجزة أيضًا\n[ ] غير منجزة",
+            "checklist",
+        )
+        rich = build_input_rich_message([
+            new_block("list", data),
+        ]).model_dump(mode="json", exclude_none=True)
+
+        items = rich["blocks"][0]["items"]
+        self.assertTrue(all(item["has_checkbox"] for item in items))
+        self.assertEqual(
+            [item.get("is_checked", False) for item in items],
+            [False, True, True, False],
+        )
+        self.assertEqual(items[0]["blocks"][0]["text"], "مهمة عادية")
 
     def test_user_marker_needs_no_content_and_ignores_case(self):
         markers = find_user_button_markers("{اختيار الوجهة - UsEr #P}")
