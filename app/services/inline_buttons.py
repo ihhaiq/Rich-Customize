@@ -13,6 +13,12 @@ COLOR_STYLES = {
     "p": "primary",
     "g": "success",
 }
+COLOR_ALIASES = {
+    "r": "r", "red": "r", "أحمر": "r", "احمر": "r",
+    "b": "b", "blue": "b", "أزرق": "b", "ازرق": "b",
+    "p": "p", "primary": "p",
+    "g": "g", "green": "g", "أخضر": "g", "اخضر": "g",
+}
 TYPE_ALIASES = {
     "link": "url",
     "callback": "callback_data",
@@ -22,6 +28,7 @@ TYPE_ALIASES = {
     "current": "switch_inline_query_current_chat",
     "cbd": "page_callback",
     "page": "page_callback",
+    "inline-here": "switch_inline_query_current_chat",
 }
 # Trailing audience word for {title:cbd code#color audience} markers.
 # Only meaningful for page_callback (cbd/page) buttons; ignored otherwise.
@@ -42,9 +49,15 @@ def _marker_parts(
     if not marker.startswith("{") or not marker.endswith("}"):
         return None
     body = marker[1:-1].strip()
-    if ":" not in body:
+    hyphen_index = body.find("-")
+    colon_index = body.find(":")
+    new_syntax = hyphen_index >= 0 and (colon_index < 0 or hyphen_index < colon_index)
+    if new_syntax:
+        title, specification = body[:hyphen_index], body[hyphen_index + 1:]
+    elif ":" in body:
+        title, specification = body.split(":", 1)
+    else:
         return None
-    title, specification = body.split(":", 1)
     title = title.strip()
     specification = specification.strip()
     if not title or len(title) > 64 or not specification:
@@ -53,20 +66,52 @@ def _marker_parts(
     # Trailing audience word (e.g. "all" / "sub") comes after the color, so
     # strip it first: {title:cbd code#r sub}
     audience = "all"
-    audience_match = re.search(r"\s+(\S+)\s*$", specification)
-    if audience_match and audience_match.group(1).lower() in AUDIENCE_ALIASES:
-        audience = AUDIENCE_ALIASES[audience_match.group(1).lower()]
-        specification = specification[:audience_match.start()].rstrip()
-
     color: str | None = None
-    color_match = re.search(r"#([rbpg])\s*$", specification, flags=re.IGNORECASE)
-    if color_match:
-        color = color_match.group(1).lower()
-        specification = specification[:color_match.start()].rstrip()
+    while specification:
+        color_match = re.search(r"#\s*([rbpg])\s*$", specification, flags=re.IGNORECASE)
+        if color_match:
+            color = color_match.group(1).lower()
+            specification = specification[:color_match.start()].rstrip()
+            continue
+        option_match = re.search(r"\s*-\s*([^\s-]+)\s*$", specification)
+        if option_match:
+            option = option_match.group(1).casefold()
+            if option in COLOR_ALIASES:
+                color = COLOR_ALIASES[option]
+                specification = specification[:option_match.start()].rstrip()
+                continue
+            if option in AUDIENCE_ALIASES:
+                audience = AUDIENCE_ALIASES[option]
+                specification = specification[:option_match.start()].rstrip()
+                continue
+        audience_match = re.search(r"\s+([^\s]+)\s*$", specification)
+        if audience_match and audience_match.group(1).casefold() in AUDIENCE_ALIASES:
+            audience = AUDIENCE_ALIASES[audience_match.group(1).casefold()]
+            specification = specification[:audience_match.start()].rstrip()
+            continue
+        break
 
-    pieces = specification.split(maxsplit=1)
-    button_type = TYPE_ALIASES.get(pieces[0].lower(), pieces[0].lower())
-    value = pieces[1].strip() if len(pieces) == 2 else ""
+    typed_match = re.match(r"^([\w-]+)\s*:\s*(.*)$", specification, flags=re.DOTALL)
+    if typed_match:
+        raw_type = typed_match.group(1).casefold()
+        button_type = TYPE_ALIASES.get(raw_type, raw_type)
+        value = typed_match.group(2).strip()
+    elif new_syntax:
+        raw_type = specification.casefold()
+        known_type = TYPE_ALIASES.get(raw_type, raw_type)
+        if known_type in {
+            "user", "disabled", "url", "callback_data", "page_callback", "copy",
+            "popup", "web_app", "login_url", "switch_inline_query",
+            "switch_inline_query_current_chat",
+        }:
+            button_type, value = known_type, ""
+        else:
+            button_type, value = "url", specification.strip()
+    else:
+        pieces = specification.split(maxsplit=1)
+        raw_type = pieces[0].casefold()
+        button_type = TYPE_ALIASES.get(raw_type, raw_type)
+        value = pieces[1].strip() if len(pieces) == 2 else ""
     return title, button_type, value, color, audience
 
 
