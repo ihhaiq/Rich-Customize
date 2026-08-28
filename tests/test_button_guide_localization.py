@@ -1,10 +1,40 @@
 import unittest
 
 from app import i18n_core
+from app.locales import SUPPORTED_LANGUAGES
+from app.locales.guide import GUIDE_TRANSLATIONS
+from app.locales.guide_all import ACTIVE_GUIDE_KEYS
 from app.routers.button_guide import button_guide_blocks, button_syntax_examples
 
 
 class ButtonGuideLocalizationTests(unittest.TestCase):
+    def test_every_supported_language_has_a_complete_button_guide(self):
+        for language in sorted(SUPPORTED_LANGUAGES - {"en"}):
+            with self.subTest(language=language):
+                locale = GUIDE_TRANSLATIONS.get(language, {})
+                self.assertTrue(
+                    set(ACTIVE_GUIDE_KEYS).issubset(locale),
+                    f"Missing button-guide translations for {language}",
+                )
+                self.assertTrue(
+                    all(locale[key] != key for key in ACTIVE_GUIDE_KEYS),
+                    f"English button-guide fallback remains in {language}",
+                )
+                token = i18n_core._language.set(language)
+                try:
+                    blocks = button_guide_blocks(
+                        "Send the message you want to customize. "
+                        "You can place button syntax anywhere in the text."
+                    )
+                    examples = button_syntax_examples()
+                finally:
+                    i18n_core._language.reset(token)
+                self.assertEqual(
+                    blocks[1]["data"]["summary_html"],
+                    locale["📘 Inline button guide — tap to open"],
+                )
+                self.assertIn(locale["{Next page - CBD:code #color}"], examples)
+
     def test_arabic_guide_translates_english_semantic_keys(self):
         token = i18n_core._language.set("ar")
         try:
