@@ -6,7 +6,7 @@ from app.services.blocks import (
 from app.services.buttons import (
     add_message_button, change_message_button_type,
     delete_message_button, move_message_button,
-    normalize_button_url,
+    infer_button_type_and_value, normalize_button_url,
 )
 from app.services.factory import list_data, new_block, preformatted_data
 from app.services.inline_buttons import find_user_button_markers, inline_button_rich_text
@@ -187,6 +187,30 @@ class MessageButtonOperationsTests(unittest.TestCase):
         self.assertIsNone(normalize_button_url("@bad"))
         self.assertEqual(normalize_button_url("tg://resolve?domain=example"), "tg://resolve?domain=example")
         self.assertIsNone(normalize_button_url("javascript:alert(1)"))
+
+    def test_managed_button_content_infers_a_new_type(self):
+        self.assertEqual(
+            infer_button_type_and_value("  CoPy : النص المطلوب  ", "callback_data"),
+            ("copy", "النص المطلوب"),
+        )
+        self.assertEqual(
+            infer_button_type_and_value("CALLBACK DATA : action:2", "url"),
+            ("callback_data", "action:2"),
+        )
+        self.assertEqual(
+            infer_button_type_and_value("t.me/ihhai", "copy"),
+            ("url", "t.me/ihhai"),
+        )
+        self.assertEqual(
+            infer_button_type_and_value("CBD : a86d3132", "url"),
+            ("page", "a86d3132"),
+        )
+
+    def test_plain_managed_button_content_keeps_its_current_type(self):
+        self.assertEqual(
+            infer_button_type_and_value("action:2", "callback_data"),
+            ("callback_data", "action:2"),
+        )
 
 if __name__ == "__main__":
     unittest.main()
