@@ -29,6 +29,12 @@ TYPE_ALIASES = {
     "cbd": "page_callback",
     "page": "page_callback",
     "inline-here": "switch_inline_query_current_chat",
+    "callbackdata": "callback_data",
+    "callback data": "callback_data",
+    "web app": "web_app",
+    "login url": "login_url",
+    "switch inline query": "switch_inline_query",
+    "switch inline query current chat": "switch_inline_query_current_chat",
 }
 BUTTON_TYPES = {
     "user", "disabled", "url", "callback_data", "page_callback", "copy",
@@ -96,7 +102,11 @@ def _marker_parts(
             continue
         break
 
-    typed_match = re.match(r"^([\w-]+)\s*:\s*(.*)$", specification, flags=re.DOTALL)
+    typed_match = re.match(
+        r"^([\w-]+(?:\s+[\w-]+)*)\s*:\s*(.*)$",
+        specification,
+        flags=re.DOTALL,
+    )
     typed_name = typed_match.group(1).casefold() if typed_match else ""
     typed_type = TYPE_ALIASES.get(typed_name, typed_name)
     if typed_match and typed_type in BUTTON_TYPES:
