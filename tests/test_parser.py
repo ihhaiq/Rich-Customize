@@ -8,33 +8,53 @@ from app.services.buttons import add_message_button
 from app.services.parser import message_to_blocks
 from app.services.renderer import build_input_rich_message
 from app.services.inline_buttons import (
-    find_user_button_markers, resolve_user_button_marker,
+    find_user_button_markers, inline_button_rich_text, resolve_user_button_marker,
 )
+from app import i18n_core
 from app.routers.editor_core import _button_guide_blocks, _friendly_rich_error
 
 
 class FormattedTextParserTests(unittest.TestCase):
     def test_button_guide_contains_expandable_copyable_examples(self):
-        rich = build_input_rich_message(
-            _button_guide_blocks("أرسل عنوان الزر"),
-        ).model_dump(mode="json", exclude_none=True)
+        token = i18n_core._language.set("ar")
+        try:
+            rich = build_input_rich_message(
+                _button_guide_blocks("أرسل عنوان الزر"),
+            ).model_dump(mode="json", exclude_none=True)
+        finally:
+            i18n_core._language.reset(token)
 
         self.assertEqual([block["type"] for block in rich["blocks"]], ["paragraph", "details"])
         details = rich["blocks"][1]
         self.assertEqual(details["type"], "details")
         self.assertIn("دليل الأزرار", details["summary"])
-        examples = details["blocks"][1]
-        self.assertEqual(examples["type"], "blockquote")
-        self.assertIn("{الملف الشخصي - USER #p}", examples["blocks"][0]["text"])
-        self.assertIn("{تنفيذ - callback_data: action:1 #r}", examples["blocks"][0]["text"])
-        self.assertIn("{الصفحة التالية - CBD:a86d3132 #b}", examples["blocks"][0]["text"])
-        self.assertIn("{تنبيه - popup: هذا نص التنبيه #r}", examples["blocks"][0]["text"])
-        self.assertNotIn("web_app", examples["blocks"][0]["text"])
-        self.assertNotIn("login_url", examples["blocks"][0]["text"])
+        quote_blocks = [
+            block for block in details["blocks"] if block["type"] == "blockquote"
+        ]
+        self.assertGreater(len(quote_blocks), 4)
+        examples = "\n".join(block["blocks"][0]["text"] for block in quote_blocks)
+        self.assertIn("{الملف الشخصي - USER #p}", examples)
+        self.assertIn("{تنفيذ - callback_data: action:1 #r}", examples)
+        self.assertIn("{الصفحة التالية - CBD:a86d3132 #b}", examples)
+        self.assertIn("{تنبيه - popup: هذا نص التنبيه #r}", examples)
+        self.assertNotIn("web_app", examples)
+        self.assertNotIn("login_url", examples)
         self.assertEqual(
-            details["blocks"][2]["text"],
+            details["blocks"][-1]["text"],
             "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر. يقبل أيضًا RED وBLUE وGREEN وأسماء الألوان العربية.",
         )
+
+    def test_inline_button_type_accepts_case_and_accidental_spaces(self):
+        parsed = inline_button_rich_text(
+            "{نسخ - CoPy : النص#g} {نفذ - CALLBACK DATA : action:1#r}"
+        )
+        buttons = [
+            item["button"] for item in parsed
+            if isinstance(item, dict) and item.get("type") == "button"
+        ]
+
+        self.assertEqual(buttons[0]["copy_text"]["text"], "النص")
+        self.assertEqual(buttons[1]["callback_data"], "action:1")
 
     def test_inline_url_and_callback_buttons_keep_their_text_position(self):
         paragraph = new_block("paragraph", {
