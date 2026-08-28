@@ -48,7 +48,8 @@ from app.services.buttons import (
     BUTTON_STYLES, BUTTON_TYPES, MAX_BUTTONS, add_message_button,
     change_message_button_type,
     delete_message_button, get_button_type, get_button_value,
-    get_message_button, move_message_button, normalize_button_url,
+    get_message_button, infer_button_type_and_value, move_message_button,
+    normalize_button_url,
     normalize_https_url, normalize_page_code,
 )
 from app.services.chat_registry import managed_chat_registry
@@ -279,30 +280,9 @@ async def _ask_for_button_user(
 
 
 def _button_guide_blocks(prompt: str) -> list[dict[str, Any]]:
-    return [
-        new_block("paragraph", {"text": prompt, "html": f"<p>{prompt}</p>"}),
-        new_block("details", {
-            "summary_html": "📘 دليل الأزرار داخل النص — اضغط للفتح",
-            "children": [
-                new_block("paragraph", {
-                    "text": "الصيغة: {اسم الزر - الوظيفة: المحتوى #اللون}",
-                    "html": "<p>الصيغة: {اسم الزر - الوظيفة: المحتوى #اللون}</p>",
-                }),
-                new_block("blockquote", {
-                    "quote_text": BUTTON_SYNTAX_EXAMPLES,
-                    "quote_html": BUTTON_SYNTAX_EXAMPLES,
-                    "parse_inline_buttons": False,
-                }),
-                new_block("paragraph", {
-                    "text": "الألوان: #r أحمر، #b أو #p أزرق، #g أخضر. يقبل أيضًا RED وBLUE وGREEN وأسماء الألوان العربية.",
-                    "html": (
-                        "<p>الألوان: #r أحمر، #b أو #p أزرق، #g أخضر. يقبل أيضًا "
-                        "RED وBLUE وGREEN وأسماء الألوان العربية.</p>"
-                    ),
-                }),
-            ],
-        }),
-    ]
+    from app.routers.button_guide import button_guide_blocks
+
+    return button_guide_blocks(prompt)
 
 
 async def _answer_with_button_guide(
@@ -356,6 +336,8 @@ def _quote_media_payload(parsed: list[dict[str, Any]]) -> tuple[list[dict[str, A
 
 
 def _normalize_button_value(button_type: str, value: str) -> tuple[str | None, str | None]:
+    if button_type == "disabled":
+        return "", None
     if button_type == "url":
         normalized = normalize_button_url(value)
         if normalized is None or len(normalized) > 256:
@@ -382,7 +364,7 @@ def _normalize_button_value(button_type: str, value: str) -> tuple[str | None, s
         if len(normalized) > 256:
             return None, "استعلام Inline طويل جدًا؛ الحد الأقصى 256 حرفًا."
         return normalized, None
-    if button_type not in BUTTON_TYPES or button_type == "disabled":
+    if button_type not in BUTTON_TYPES:
         return None, "نوع الزر غير صالح لهذه العملية."
     return value, None
 
@@ -629,7 +611,12 @@ async def _open_editor(message: Message, state: FSMContext, blocks: list[dict[st
         if not blocks
         else _editor_overview_text(blocks)
     )
-    sent = await message.answer(text, reply_markup=build_rich_editor_keyboard(blocks))
+    if blocks:
+        sent = await message.answer(text, reply_markup=build_rich_editor_keyboard(blocks))
+    else:
+        sent = await _answer_with_button_guide(
+            message, text, reply_markup=build_rich_editor_keyboard(blocks),
+        )
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
         blocks=blocks, message_buttons=[], buttons_per_row=1, buttons_align="center",
@@ -2087,37 +2074,17 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
     if action not in {"value", "url", "title"}:
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
-    if action in {"value", "url"} and get_button_type(button) == "page":
-        pages = await page_registry.list_for_user(callback.from_user.id)
-        if not pages:
-            await callback.answer("ما عندك صفحات محفوظة للاختيار.", show_alert=True)
-            return
-        await _edit_button_ui(
-            callback.message,
-            f"اختر الصفحة الجديدة للزر: {button['text']}",
-            build_page_target_keyboard(pages, "change", button_id),
-        )
-        await callback.answer()
-        return
     await state.set_state(RichEditorStates.editing_button)
     pending_action = "value" if action in {"value", "url"} else "title"
     await state.update_data(pending_button_action=pending_action, current_button_id=button_id)
     if pending_action == "title":
         prompt = "أرسل العنوان الجديد للزر."
     else:
-        prompt = {
-            "url": "أرسل الرابط الجديد للزر؛ يقبل @username أيضاً.",
-            "callback_data": "أرسل callback_data الجديدة؛ الحد الأقصى 64 بايت.",
-            "copy": "أرسل النص الجديد الذي سيتم نسخه.",
-            "popup": "أرسل نص التنبيه الجديد؛ الحد الأقصى 200 حرف.",
-            "web_app": "أرسل رابط Web App الجديد ويبدأ بـ https://",
-            "login_url": (
-                "أرسل رابط HTTPS جديدًا من الدومين المربوط عبر @BotFather ثم /setdomain."
-            ),
-            "switch_inline": "أرسل استعلام Inline الجديد، أو /empty.",
-            "switch_inline_current": "أرسل استعلام Inline الحالي الجديد، أو /empty.",
-            "disabled": "الزر المعطّل لا يحتوي قيمة؛ غيّر نوعه بحذفه وإضافته مجددًا.",
-        }[get_button_type(button)]
+        prompt = (
+            "أرسل المحتوى الجديد. يكتشف البوت النوع تلقائيًا من الصيغة؛ "
+            "مثلاً LINK: الرابط أو callback_data: الكود أو copy: النص. "
+            "إذا أرسلت قيمة بلا نوع فسيبقى نوع الزر الحالي."
+        )
     await _answer_with_button_guide(callback.message, prompt)
     await callback.answer()
 
@@ -2416,19 +2383,27 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
             button["text"] = value
             notice = "✅ تم تغيير عنوان الزر."
         elif action == "value":
-            button_type = get_button_type(button)
-            normalized_value, error = _normalize_button_value(button_type, value)
+            old_type = get_button_type(button)
+            button_type, inferred_value = infer_button_type_and_value(value, old_type)
+            normalized_value, error = _normalize_button_value(button_type, inferred_value)
             if error or normalized_value is None:
                 await message.answer(error or "قيمة الزر غير صالحة.")
                 return
-            button["value"] = normalized_value
-            if button_type in {"url", "web_app", "login_url"}:
-                button["url"] = normalized_value
-                notice = "✅ تم تغيير رابط الزر."
-            elif button_type == "copy":
-                notice = "✅ تم تغيير نص النسخ."
-            else:
-                notice = "✅ تم تغيير نص التنبيه."
+            if button_type == "page":
+                page = await page_registry.get(normalized_value)
+                user_id = message.from_user.id if message.from_user else 0
+                if (
+                    page is None
+                    or int(page.get("owner_id", 0)) != int(user_id)
+                ):
+                    await message.answer("كود الصفحة غير موجود أو لا يخصك.")
+                    return
+            change_message_button_type(button, button_type, normalized_value)
+            notice = (
+                "✅ تم تغيير محتوى الزر ونوعه تلقائيًا."
+                if button_type != old_type
+                else "✅ تم تغيير محتوى الزر."
+            )
         else:
             await message.answer(
                 "انتهت عملية تعديل الزر. ارجع إلى لوحة الإدارة وحاول مجددًا."
