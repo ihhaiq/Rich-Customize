@@ -11,6 +11,22 @@ BUTTON_TYPES = {
     "url", "callback_data", "copy", "popup", "web_app", "login_url",
     "switch_inline", "switch_inline_current", "disabled", "page",
 }
+BUTTON_TYPE_ALIASES = {
+    "url": "url", "link": "url", "رابط": "url",
+    "callback": "callback_data", "callback_data": "callback_data",
+    "callbackdata": "callback_data", "cb": "callback_data",
+    "copy": "copy", "نسخ": "copy",
+    "popup": "popup", "alert": "popup", "تنبيه": "popup",
+    "web_app": "web_app", "webapp": "web_app",
+    "login_url": "login_url", "login": "login_url",
+    "switch_inline": "switch_inline", "switch_inline_query": "switch_inline",
+    "inline": "switch_inline",
+    "switch_inline_current": "switch_inline_current",
+    "switch_inline_query_current_chat": "switch_inline_current",
+    "inline_here": "switch_inline_current", "current": "switch_inline_current",
+    "cbd": "page", "page": "page", "صفحة": "page",
+    "disabled": "disabled", "معطل": "disabled", "معطّل": "disabled",
+}
 PAGE_CODE_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
@@ -80,6 +96,27 @@ def normalize_https_url(value: str) -> str | None:
     if url and urlparse(url).scheme == "https":
         return url
     return None
+
+
+def infer_button_type_and_value(
+    value: str, current_type: str = "url",
+) -> tuple[str, str]:
+    """Infer a managed button type while preserving ambiguous plain edits."""
+    raw = value.strip()
+    compact_word = re.sub(r"[\s-]+", "_", raw.casefold())
+    if compact_word in {"disabled", "معطل", "معطّل"}:
+        return "disabled", ""
+
+    typed = re.match(r"^([\w\u0600-\u06ff -]+?)\s*:\s*(.*)$", raw, re.DOTALL)
+    if typed:
+        alias = re.sub(r"[\s-]+", "_", typed.group(1).strip().casefold())
+        button_type = BUTTON_TYPE_ALIASES.get(alias)
+        if button_type:
+            return button_type, typed.group(2).strip()
+
+    if normalize_button_url(raw) is not None:
+        return "url", raw
+    return (current_type if current_type in BUTTON_TYPES else "url"), raw
 
 
 def add_message_button(
