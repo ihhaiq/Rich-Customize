@@ -75,7 +75,7 @@ class ButtonKeyboardTests(unittest.TestCase):
 
         self.assertEqual(callbacks, ["r:showcase", "r:starteditor"])
 
-    def test_button_manager_can_change_button_type(self):
+    def test_button_manager_changes_type_through_content_instead_of_extra_button(self):
         buttons = []
         button = add_message_button(buttons, "زر", "https://example.com", "url")
         manager = build_buttons_manager_keyboard(buttons)
@@ -83,7 +83,8 @@ class ButtonKeyboardTests(unittest.TestCase):
             item.callback_data
             for row in manager.inline_keyboard for item in row
         }
-        self.assertIn("r:bs:type", callbacks)
+        self.assertNotIn("r:bs:type", callbacks)
+        self.assertIn("r:bs:value", callbacks)
 
         picker = build_button_type_keyboard(f"r:bct:{button['id']}")
         picker_callbacks = {
