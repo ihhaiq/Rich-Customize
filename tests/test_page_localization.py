@@ -352,7 +352,12 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_editor_command_opens_an_empty_editor_immediately(self):
         sent = SimpleNamespace(chat=SimpleNamespace(id=10), message_id=20)
-        message = SimpleNamespace(answer=AsyncMock(return_value=sent))
+        bot = SimpleNamespace(send_rich_message=AsyncMock(return_value=sent))
+        message = SimpleNamespace(
+            answer=AsyncMock(return_value=sent),
+            bot=bot,
+            chat=SimpleNamespace(id=10),
+        )
         state = SimpleNamespace(
             clear=AsyncMock(),
             set_state=AsyncMock(),
@@ -362,7 +367,10 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
         await new_editor(message, state)
 
         state.clear.assert_awaited_once()
-        message.answer.assert_awaited_once()
+        bot.send_rich_message.assert_awaited_once()
+        message.answer.assert_not_awaited()
+        rich_message = bot.send_rich_message.await_args.kwargs["rich_message"]
+        self.assertEqual(rich_message.blocks[1].type, "details")
         state.update_data.assert_awaited_once()
         self.assertEqual(state.update_data.await_args.kwargs["blocks"], [])
 
