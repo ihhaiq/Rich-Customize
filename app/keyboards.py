@@ -351,7 +351,6 @@ def build_buttons_manager_keyboard(
             InlineKeyboardButton(text="🧩 تغيير المحتوى", callback_data="r:bs:value"),
             InlineKeyboardButton(text="✏️ تغيير العنوان", callback_data="r:bs:title"),
         ],
-        [InlineKeyboardButton(text="🔄 تغيير نوع الزر", callback_data="r:bs:type")],
         [InlineKeyboardButton(
             text=f"🔢 عدد الأزرار بالصف: {buttons_per_row}", callback_data="r:brow",
         )],
