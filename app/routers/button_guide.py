@@ -18,28 +18,22 @@ _EDITOR_PROMPTS = {
 _GUIDE_LINES = (
     "{Button name - T.ME/IHHAI #b}",
     "{Profile - USER #p}",
-    "{Action - callback_data: action:1 #r}",
-    "{Next page - CBD:a86d3132 #b}",
-    "{Subscribers only - CBD:a86d3132 #b sub}",
-    "{Alert - popup: This is the alert text #r}",
+    "{Next page - CBD:code #color}",
+    "{Alert - alert: Alert text #color}",
     "{Copy - copy: text to copy #g}",
     "{Search - switch_inline_query: search words}",
     "{Search here - switch_inline_query_current_chat: search words}",
     "{Disabled - disabled #r}",
     "",
     "Two buttons side by side:",
-    "{Accept - callback_data: yes #g} {Reject - callback_data: no #r}",
+    "{Website - T.ME/IHHAI #b} {Copy - copy: text #g}",
 )
 
 _GUIDE_SECTIONS = (
     ("• Link button:", ("{Button name - T.ME/IHHAI #b}",)),
     ("• User or channel button:", ("{Profile - USER #p}",)),
-    ("• Callback button:", ("{Action - callback_data: action:1 #r}",)),
-    ("• Saved page button:", (
-        "{Next page - CBD:a86d3132 #b}",
-        "{Subscribers only - CBD:a86d3132 #b sub}",
-    )),
-    ("• Popup button:", ("{Alert - popup: This is the alert text #r}",)),
+    ("• Saved page button:", ("{Next page - CBD:code #color}",)),
+    ("• Alert button:", ("{Alert - alert: Alert text #color}",)),
     ("• Copy button:", ("{Copy - copy: text to copy #g}",)),
     ("• Inline search buttons:", (
         "{Search - switch_inline_query: search words}",
@@ -47,7 +41,7 @@ _GUIDE_SECTIONS = (
     )),
     ("• Disabled button:", ("{Disabled - disabled #r}",)),
     ("• Two buttons side by side:", (
-        "{Accept - callback_data: yes #g} {Reject - callback_data: no #r}",
+        "{Website - T.ME/IHHAI #b} {Copy - copy: text #g}",
     )),
 )
 
