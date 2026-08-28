@@ -31,6 +31,26 @@ _GUIDE_LINES = (
     "{Accept - callback_data: yes #g} {Reject - callback_data: no #r}",
 )
 
+_GUIDE_SECTIONS = (
+    ("• Link button:", ("{Button name - T.ME/IHHAI #b}",)),
+    ("• User or channel button:", ("{Profile - USER #p}",)),
+    ("• Callback button:", ("{Action - callback_data: action:1 #r}",)),
+    ("• Saved page button:", (
+        "{Next page - CBD:a86d3132 #b}",
+        "{Subscribers only - CBD:a86d3132 #b sub}",
+    )),
+    ("• Popup button:", ("{Alert - popup: This is the alert text #r}",)),
+    ("• Copy button:", ("{Copy - copy: text to copy #g}",)),
+    ("• Inline search buttons:", (
+        "{Search - switch_inline_query: search words}",
+        "{Search here - switch_inline_query_current_chat: search words}",
+    )),
+    ("• Disabled button:", ("{Disabled - disabled #r}",)),
+    ("• Two buttons side by side:", (
+        "{Accept - callback_data: yes #g} {Reject - callback_data: no #r}",
+    )),
+)
+
 
 def _localized_prompt(prompt: str) -> str:
     source = _EDITOR_PROMPTS.get(prompt, prompt)
@@ -47,7 +67,30 @@ def button_guide_blocks(prompt: str) -> list[dict[str, Any]]:
     colors = tr(
         "Colors: #r red, #b or #p blue, #g green. RED, BLUE, GREEN and Arabic color names are also accepted."
     )
-    examples = button_syntax_examples()
+    children = [
+        new_block("paragraph", {
+            "text": syntax,
+            "html": f"<p>{syntax}</p>",
+        }),
+    ]
+    for heading, example_lines in _GUIDE_SECTIONS:
+        localized_heading = tr(heading)
+        example = "\n".join(tr(line) for line in example_lines)
+        children.extend([
+            new_block("paragraph", {
+                "text": localized_heading,
+                "html": f"<p>{localized_heading}</p>",
+            }),
+            new_block("blockquote", {
+                "quote_text": example,
+                "quote_html": example,
+                "parse_inline_buttons": False,
+            }),
+        ])
+    children.append(new_block("paragraph", {
+        "text": colors,
+        "html": f"<p>{colors}</p>",
+    }))
     return [
         new_block("paragraph", {
             "text": localized_prompt,
@@ -55,21 +98,7 @@ def button_guide_blocks(prompt: str) -> list[dict[str, Any]]:
         }),
         new_block("details", {
             "summary_html": tr("📘 Inline button guide — tap to open"),
-            "children": [
-                new_block("paragraph", {
-                    "text": syntax,
-                    "html": f"<p>{syntax}</p>",
-                }),
-                new_block("blockquote", {
-                    "quote_text": examples,
-                    "quote_html": examples,
-                    "parse_inline_buttons": False,
-                }),
-                new_block("paragraph", {
-                    "text": colors,
-                    "html": f"<p>{colors}</p>",
-                }),
-            ],
+            "children": children,
         }),
     ]
 
