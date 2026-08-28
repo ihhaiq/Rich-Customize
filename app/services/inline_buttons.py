@@ -22,6 +22,7 @@ COLOR_ALIASES = {
 TYPE_ALIASES = {
     "link": "url",
     "callback": "callback_data",
+    "alert": "popup",
     "webapp": "web_app",
     "login": "login_url",
     "inline": "switch_inline_query",
