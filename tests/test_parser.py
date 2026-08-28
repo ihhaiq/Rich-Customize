@@ -34,9 +34,9 @@ class FormattedTextParserTests(unittest.TestCase):
         self.assertGreater(len(quote_blocks), 4)
         examples = "\n".join(block["blocks"][0]["text"] for block in quote_blocks)
         self.assertIn("{الملف الشخصي - USER #p}", examples)
-        self.assertIn("{تنفيذ - callback_data: action:1 #r}", examples)
-        self.assertIn("{الصفحة التالية - CBD:a86d3132 #b}", examples)
-        self.assertIn("{تنبيه - popup: هذا نص التنبيه #r}", examples)
+        self.assertIn("{الصفحة التالية - CBD:الكود #اللون}", examples)
+        self.assertIn("{تنبيه - alert: نص التنبيه #اللون}", examples)
+        self.assertNotIn("callback_data:", examples)
         self.assertNotIn("web_app", examples)
         self.assertNotIn("login_url", examples)
         self.assertEqual(
@@ -84,6 +84,13 @@ class FormattedTextParserTests(unittest.TestCase):
         button = rich["blocks"][0]["text"]["button"]
 
         self.assertEqual(button["callback_data"], "r:poptext:هذا نص التنبيه")
+
+    def test_inline_alert_alias_uses_the_builtin_alert_handler(self):
+        parsed = inline_button_rich_text("{تنبيه - ALERT : انتبه #r}")
+        button = parsed["button"]
+
+        self.assertEqual(button["callback_data"], "r:poptext:انتبه")
+        self.assertEqual(button["style"], "danger")
         self.assertEqual(button["style"], "danger")
 
     def test_invalid_short_http_host_is_treated_as_telegram_username(self):
