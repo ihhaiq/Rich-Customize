@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.locales.guide_all import complete_guide_translations
+
 # The button-syntax guide is built from English semantic keys after the normal
 # Arabic -> English normalization. Locale-specific packs can override every
 # visible fragment without touching editor/router code.
@@ -95,3 +97,6 @@ GUIDE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "📘 Inline button guide:": "📘 Guide des boutons intégrés :",
     },
 }
+
+for _language, _translations in complete_guide_translations().items():
+    GUIDE_TRANSLATIONS.setdefault(_language, {}).update(_translations)
