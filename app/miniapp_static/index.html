@@ -2,44 +2,71 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-  <title>Rich Customize Beta</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>Rich Customize Beta 0.2</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="/miniapp/static/style.css">
+  <link rel="stylesheet" href="/miniapp/static/style.css?v=0.2">
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <div class="brand">Rich Customize</div>
-      <div class="beta">Mini App · Beta 0.1</div>
-    </div>
-    <button id="saveBtn" class="primary" disabled>حفظ</button>
-  </header>
-
-  <main>
-    <section id="pagesView" class="view active">
-      <div class="section-head">
-        <div>
-          <h1>الصفحات المحفوظة</h1>
-          <p>اختر صفحة لفتحها وتعديلها بصريًا.</p>
-        </div>
-      </div>
+  <section id="pagesView" class="screen active">
+    <header class="appbar">
+      <div><strong>Rich Customize</strong><small>Mini App · Beta 0.2</small></div>
+      <span class="dev-pill">DEV</span>
+    </header>
+    <main class="pages-main">
+      <h1>الصفحات</h1>
+      <p class="muted">افتح صفحة محفوظة حتى تعدلها بالمحرر المرئي.</p>
       <div id="pages" class="pages"></div>
-      <div id="emptyPages" class="empty hidden">ما عندك صفحات محفوظة بعد.</div>
-    </section>
+      <div id="emptyPages" class="empty hidden">ما عندك صفحات محفوظة.</div>
+    </main>
+  </section>
 
-    <section id="editorView" class="view">
-      <button id="backBtn" class="ghost">→ رجوع للصفحات</button>
-      <div class="title-row">
-        <input id="pageTitle" maxlength="64" placeholder="اسم الصفحة">
+  <section id="editorView" class="screen editor-screen">
+    <header class="editor-topbar">
+      <button id="backBtn" class="icon-btn" aria-label="رجوع">←</button>
+      <div class="page-identity">
+        <input id="pageTitle" maxlength="64" aria-label="اسم الصفحة">
         <code id="pageCode"></code>
       </div>
-      <div class="hint">اضغط على النص لتعديله. استخدم ↑ ↓ لترتيب الـBlocks. هذه النسخة التجريبية تحفظ بنفس كود CBD.</div>
-      <div id="blocks" class="blocks"></div>
-    </section>
-  </main>
+      <div class="history-actions">
+        <button id="undoBtn" class="icon-btn" disabled aria-label="تراجع">↶</button>
+        <button id="redoBtn" class="icon-btn" disabled aria-label="إعادة">↷</button>
+      </div>
+    </header>
 
-  <div id="toast" class="toast"></div>
-  <script src="/miniapp/static/app.js"></script>
+    <main class="editor-main">
+      <div id="canvas" class="canvas" aria-label="محرر الرسالة">
+        <div id="blocks" class="content-flow"></div>
+        <textarea id="slashInput" rows="1" placeholder="اكتب شيئًا…  / لإضافة Block" autocomplete="off" spellcheck="true"></textarea>
+      </div>
+    </main>
+
+    <aside id="slashMenu" class="popup-menu slash-menu hidden" aria-label="قائمة إضافة بلوك">
+      <div class="menu-title">إضافة Block <span id="slashQuery"></span></div>
+      <div id="slashItems" class="menu-list"></div>
+    </aside>
+
+    <aside id="blockMenu" class="popup-menu block-menu hidden" aria-label="تعديل البلوك">
+      <div id="blockMenuTitle" class="menu-title">تعديل Block</div>
+      <div id="blockActions" class="menu-list"></div>
+    </aside>
+
+    <nav class="composer-toolbar" aria-label="أدوات المحرر">
+      <button type="button" data-tool="text" title="النص والعناوين"><b>Aa</b><span>نص</span></button>
+      <button type="button" data-tool="list" title="القوائم"><b>☷</b><span>قائمة</span></button>
+      <button type="button" data-tool="table" title="الجداول"><b>▦</b><span>جدول</span></button>
+      <button type="button" data-tool="math" title="المعادلات"><b>Σ</b><span>معادلة</span></button>
+      <button type="button" data-tool="media" title="المرفقات"><b>⌕</b><span>مرفق</span></button>
+      <button id="allBlocksBtn" type="button" title="كل البلوكات"><b>＋</b><span>Block</span></button>
+    </nav>
+
+    <footer class="savebar">
+      <span id="saveState">تم الحفظ</span>
+      <button id="saveBtn" class="primary" disabled>حفظ</button>
+    </footer>
+  </section>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/miniapp/static/app.js?v=0.2"></script>
 </body>
 </html>
