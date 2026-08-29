@@ -1,14 +1,14 @@
-// Beta 0.3.17 — fixed Apple image emoji picker via emoji-datasource-apple.
+// Beta 0.3.18 — same-origin Apple image emoji picker.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
 
-  // Replace the node so the older OS-font emoji picker listeners are removed.
+  // Replace the node so listeners from the older OS-font picker are removed.
   const emojiBtn = oldButton.cloneNode(true);
   oldButton.replaceWith(emojiBtn);
 
-  const DATA_URL = "https://cdnjs.cloudflare.com/ajax/libs/emoji-datasource-apple/16.0.0/emoji.json";
-  const IMAGE_BASE = "https://cdnjs.cloudflare.com/ajax/libs/emoji-datasource-apple/16.0.0/img/apple/64/";
+  const DATA_URL = "/miniapp/emoji/apple/emoji.json";
+  const IMAGE_BASE = "/miniapp/emoji/apple/64/";
   const RECENT_KEY = "rich_customize_apple_recent_emoji";
 
   const CATEGORY_META = {
@@ -122,7 +122,9 @@
     try {
       const value = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
       return Array.isArray(value) ? value.filter(Boolean).slice(0, 36) : [];
-    } catch (_) { return []; }
+    } catch (_) {
+      return [];
+    }
   }
 
   function addRecent(item) {
@@ -134,7 +136,7 @@
   async function loadCatalog() {
     if (catalog) return catalog;
     if (catalogPromise) return catalogPromise;
-    catalogPromise = fetch(DATA_URL, {cache:"force-cache"})
+    catalogPromise = fetch(DATA_URL, {cache:"force-cache", credentials:"same-origin"})
       .then(response => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
@@ -230,14 +232,20 @@
     if (panel?.dataset.category === "recent") renderCategory("recent");
   }
 
-  function makeAppleImage(item, className = "") {
+  function makeAppleVisual(item, className = "") {
     const img = document.createElement("img");
     img.className = className;
     img.src = imageUrl(item.image);
-    img.alt = "";
+    img.alt = item.emoji;
     img.loading = "lazy";
     img.decoding = "async";
     img.draggable = false;
+    img.addEventListener("error", () => {
+      const fallback = document.createElement("span");
+      fallback.className = `${className} apple-emoji-fallback`;
+      fallback.textContent = item.emoji;
+      img.replaceWith(fallback);
+    }, {once:true});
     return img;
   }
 
@@ -276,7 +284,7 @@
       button.className = "apple-emoji-item";
       button.setAttribute("aria-label", item.name || item.emoji);
       button.title = item.emoji;
-      button.appendChild(makeAppleImage(item, "apple-emoji-img"));
+      button.appendChild(makeAppleVisual(item, "apple-emoji-img"));
       button.addEventListener("pointerdown", event => event.preventDefault());
       button.addEventListener("click", event => {
         event.preventDefault();
@@ -336,7 +344,7 @@
       button.className = "apple-emoji-tab";
       button.dataset.category = category;
       button.setAttribute("aria-label", meta?.label || category);
-      button.appendChild(makeAppleImage(representative, "apple-emoji-tab-img"));
+      button.appendChild(makeAppleVisual(representative, "apple-emoji-tab-img"));
       button.addEventListener("pointerdown", event => event.preventDefault());
       button.onclick = event => {event.preventDefault();event.stopPropagation();renderCategory(category);};
       tabs.appendChild(button);
@@ -362,14 +370,15 @@
     try {
       await loadCatalog();
       if (!panel) return;
-      panel.replaceWith(buildPanel());
-      panel = document.querySelector(".apple-emoji-picker-pop:not(.apple-emoji-loading)");
+      const nextPanel = buildPanel();
+      panel.replaceWith(nextPanel);
+      panel = nextPanel;
       const recent = loadRecent();
       renderCategory(recent.length ? "recent" : activeCategory);
       requestAnimationFrame(placePanel);
     } catch (error) {
       closePanel();
-      toast?.(`تعذر تحميل Apple Emoji: ${error.message}`);
+      if (typeof toast === "function") toast(`تعذر تحميل Apple Emoji: ${error.message}`);
     }
   }
 
@@ -378,6 +387,7 @@
     rememberRange();
     event.preventDefault();
   });
+
   emojiBtn.addEventListener("click", event => {
     event.preventDefault();
     event.stopImmediatePropagation();
