@@ -1,3 +1,5 @@
+const photoPreviewUrls = new Map();
+
 async function uploadPhotoToTelegram(file, block) {
   if (!file) return;
   if (!file.type.startsWith("image/")) {
@@ -8,6 +10,10 @@ async function uploadPhotoToTelegram(file, block) {
     toast("حجم الصورة أكبر من 10 MB");
     return;
   }
+
+  const previousUrl = photoPreviewUrls.get(block.id);
+  if (previousUrl) URL.revokeObjectURL(previousUrl);
+  photoPreviewUrls.set(block.id, URL.createObjectURL(file));
 
   const d = block.data || (block.data = {});
   d._uploading = true;
@@ -55,18 +61,27 @@ mediaEditor = function(block) {
   const box = document.createElement("div");
   box.className = `media-placeholder${d.file?.file_id ? "" : " invalid"}`;
 
+  const previewUrl = photoPreviewUrls.get(block.id);
+  if (previewUrl) {
+    const image = document.createElement("img");
+    image.className = "photo-live-preview";
+    image.src = previewUrl;
+    image.alt = d._local_preview_name || "معاينة الصورة";
+    box.appendChild(image);
+  }
+
   const title = document.createElement("strong");
   title.textContent = "▧ صورة";
 
   const status = document.createElement("div");
   status.className = "photo-upload-status";
   if (d._uploading) status.textContent = "جاري رفع الصورة إلى Telegram…";
-  else if (d.file?.file_id) status.textContent = `✓ مرتبطة بـ Telegram${d._local_preview_name ? ` · ${d._local_preview_name}` : ""}`;
-  else status.textContent = "اختَر صورة من المعرض، والبوت راح يرسلها إلك تلقائيًا ويحصل file_id.";
+  else if (d.file?.file_id) status.textContent = `✓ جاهزة للإرسال${d._local_preview_name ? ` · ${d._local_preview_name}` : ""}`;
+  else status.textContent = "اختَر صورة من المعرض. البوت يرسلها إلك بالخاص ويحصل file_id تلقائيًا.";
 
   const picker = document.createElement("input");
   picker.type = "file";
-  picker.accept = "image/*";
+  picker.accept = "image/jpeg,image/png,image/webp";
   picker.className = "gallery-picker";
   picker.disabled = !!d._uploading;
   picker.setAttribute("aria-label", "اختيار صورة من المعرض");
