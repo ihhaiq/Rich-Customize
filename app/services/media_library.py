@@ -73,5 +73,9 @@ class ShowcaseMediaLibrary:
     def missing_types(self) -> list[str]:
         return [kind for kind in SUPPORTED_MEDIA if not self._items[kind]]
 
+    async def reload(self) -> None:
+        async with self._lock:
+            self._items = self._load()
+
 
 showcase_media_library = ShowcaseMediaLibrary()
