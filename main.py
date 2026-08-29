@@ -142,7 +142,8 @@ async def prepare_telegram(bot: LocalizedBot) -> bool:
             logger.critical(
                 "Telegram returned 404 Not Found during %s. BOT_TOKEN is empty, "
                 "malformed, incomplete, or no longer valid. Replace BOT_TOKEN "
-                "with the exact token from @BotFather."
+                "with the exact token from @BotFather.",
+                stage,
             )
             return False
         except TelegramRetryAfter as error:
@@ -206,8 +207,13 @@ async def main() -> None:
     try:
         if not await prepare_telegram(bot):
             return
-        miniapp_runner = await start_mini_app_server(settings.bot_token)
-        logger.info("Developer Mini App Beta 0.1 server started")
+        try:
+            miniapp_runner = await start_mini_app_server(settings.bot_token)
+            logger.info("Developer Mini App Beta 0.1 server started")
+        except Exception:
+            logger.exception(
+                "Developer Mini App Beta 0.1 failed to start; continuing with bot polling"
+            )
         await page_registry.rebuild_media_pins()
         media_store.cleanup()
         cleanup_task = asyncio.create_task(_media_cleanup_loop(), name="rich-media-cleanup")
