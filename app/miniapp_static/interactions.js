@@ -1,7 +1,13 @@
-// Beta 0.3 — tactile press and long-press interactions.
+// Beta 0.3.3 — tactile press and long-press interactions with mobile fast path.
 (() => {
   const LONG_PRESS_MS = 460;
   const MOVE_CANCEL_PX = 12;
+  const PERFORMANCE_MODE = document.documentElement.classList.contains("mobile-performance")
+    || window.matchMedia?.("(pointer: coarse)")?.matches
+    || window.innerWidth <= 820;
+
+  if (PERFORMANCE_MODE) document.documentElement.classList.add("mobile-performance");
+
   const PRESS_SELECTOR = [
     "button",
     ".menu-item",
@@ -49,7 +55,8 @@
   }
 
   function addRipple(el, clientX, clientY) {
-    if (!el || el.classList.contains("block")) return;
+    // Ripple creation/repaint is intentionally skipped on mobile WebViews.
+    if (PERFORMANCE_MODE || !el || el.classList.contains("block")) return;
     const rect = el.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const ripple = document.createElement("span");
@@ -64,8 +71,13 @@
   function release(el, withPop = true) {
     if (!el) return;
     el.classList.remove("is-pressed", "long-pressing");
-    if (withPop) {
-      el.classList.remove("press-release");
+    if (!withPop) return;
+
+    el.classList.remove("press-release");
+    if (PERFORMANCE_MODE) {
+      requestAnimationFrame(() => el.classList.add("press-release"));
+      setTimeout(() => el.classList.remove("press-release"), 220);
+    } else {
       void el.offsetWidth;
       el.classList.add("press-release");
       setTimeout(() => el.classList.remove("press-release"), 380);
@@ -73,11 +85,15 @@
   }
 
   function finishLongPress(el) {
-    el.classList.remove("is-pressed", "long-pressing");
-    el.classList.remove("long-pressed");
-    void el.offsetWidth;
-    el.classList.add("long-pressed");
-    setTimeout(() => el.classList.remove("long-pressed"), 520);
+    el.classList.remove("is-pressed", "long-pressing", "long-pressed");
+    if (PERFORMANCE_MODE) {
+      requestAnimationFrame(() => el.classList.add("long-pressed"));
+      setTimeout(() => el.classList.remove("long-pressed"), 300);
+    } else {
+      void el.offsetWidth;
+      el.classList.add("long-pressed");
+      setTimeout(() => el.classList.remove("long-pressed"), 520);
+    }
     haptic("medium");
 
     if (el.classList.contains("block") && el.dataset.id) {
@@ -133,7 +149,6 @@
       active.moved = true;
       clearTimer();
       active.el.classList.remove("long-pressing");
-      // During scrolling don't keep the element visually compressed.
       if (Math.abs(dy) > 6 || Math.abs(dx) > 8) active.el.classList.remove("is-pressed");
     }
   }, {passive:true});
@@ -165,7 +180,6 @@
     }
   }, true);
 
-  // Disable the browser's native context popup on long-pressed non-editable blocks.
   document.addEventListener("contextmenu", event => {
     const block = event.target.closest?.(".block");
     if (block && !interactiveTextTarget(event.target)) event.preventDefault();
