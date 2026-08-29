@@ -1,21 +1,20 @@
-/* Beta 0.3.14 — compact Telegram-style composer chrome. */
+/* Beta 0.3.15 — compact Telegram-style composer chrome + emoji slot. */
 
-/* The old + bubble is intentionally kept in the DOM for backward-compatible
-   handlers, but it is no longer part of the visible composer UI. */
-.composer-toolbar.floating-toolbar .add-bubble{
+/* Legacy + stays in the DOM only because older JS still binds to it. */
+#allBlocksBtn.legacy-all-blocks{
   display:none!important;
 }
 
-/* Telegram's composer groups hug their controls instead of stretching across
-   the full available width. */
+/* The row itself spans the editor like Telegram, while every visible bubble
+   still hugs its controls. The emoji bubble occupies the free edge. */
 .composer-toolbar.floating-toolbar{
   display:flex!important;
-  width:max-content!important;
-  max-width:calc(100vw - 16px)!important;
+  width:100%!important;
+  max-width:720px!important;
   margin:0 auto!important;
   padding:2px 0 7px!important;
   gap:6px!important;
-  justify-content:center!important;
+  justify-content:flex-start!important;
   align-items:center!important;
   overflow:visible!important;
 }
@@ -37,16 +36,34 @@
 .composer-toolbar.floating-toolbar .tools-bubble{
   flex:0 1 auto!important;
   width:max-content!important;
-  max-width:calc(100vw - 116px)!important;
+  max-width:calc(100vw - 158px)!important;
   justify-content:flex-start!important;
   overflow-x:auto!important;
   overflow-y:hidden!important;
+}
+
+.composer-toolbar.floating-toolbar .emoji-bubble{
+  margin-left:auto!important;
+  flex:0 0 auto!important;
+  width:46px!important;
+  min-width:46px!important;
+  padding:3px!important;
 }
 
 .composer-toolbar.floating-toolbar .toolbar-bubble button{
   width:38px!important;
   height:38px!important;
   min-width:38px!important;
+}
+
+.composer-toolbar.floating-toolbar #emojiBtn{
+  width:38px!important;
+  min-width:38px!important;
+}
+
+.composer-toolbar.floating-toolbar #emojiBtn svg{
+  width:23px!important;
+  height:23px!important;
 }
 
 .composer-toolbar.floating-toolbar svg{
@@ -86,14 +103,13 @@
   line-height:1.45!important;
 }
 
-/* No artificial vertical spacer is introduced by an otherwise empty canvas. */
 .content-flow:empty + .starter-card.hidden + .slash-wrap{
   margin-top:0!important;
 }
 
 @media(max-width:430px){
   .composer-toolbar.floating-toolbar{
-    max-width:calc(100vw - 10px)!important;
+    max-width:100%!important;
     gap:5px!important;
   }
   .composer-toolbar.floating-toolbar .toolbar-bubble{
@@ -106,7 +122,17 @@
     min-width:36px!important;
   }
   .composer-toolbar.floating-toolbar .tools-bubble{
-    max-width:calc(100vw - 92px)!important;
+    max-width:calc(100vw - 136px)!important;
+  }
+  .composer-toolbar.floating-toolbar .emoji-bubble{
+    width:44px!important;
+    min-width:44px!important;
+    padding:3px!important;
+  }
+  .composer-toolbar.floating-toolbar #emojiBtn{
+    width:36px!important;
+    height:36px!important;
+    min-width:36px!important;
   }
   .composer-toolbar.floating-toolbar svg{
     width:20px!important;
