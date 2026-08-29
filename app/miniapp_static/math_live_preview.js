@@ -1,6 +1,7 @@
-// Beta 0.3.30 — Telegram-style LaTeX editor with live preview.
+// Beta 0.3.31 — formula-first editor: tap to edit, Done to collapse, hold for block actions.
 (() => {
   const KATEX_VERSION = "0.16.11";
+  const editingBlocks = new Set();
   let katexPromise = null;
 
   function ensureKatex() {
@@ -19,8 +20,11 @@
     katexPromise = new Promise((resolve, reject) => {
       const existing = document.querySelector('script[data-rich-katex]');
       if (existing) {
-        existing.addEventListener("load", () => resolve(window.katex), {once:true});
-        existing.addEventListener("error", reject, {once:true});
+        if (window.katex?.render) resolve(window.katex);
+        else {
+          existing.addEventListener("load", () => resolve(window.katex), {once:true});
+          existing.addEventListener("error", reject, {once:true});
+        }
         return;
       }
       const script = document.createElement("script");
@@ -35,8 +39,12 @@
     return katexPromise;
   }
 
-  function haptic() {
-    try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.(); } catch (_) {}
+  function haptic(kind = "selection") {
+    try {
+      const feedback = window.Telegram?.WebApp?.HapticFeedback;
+      if (kind === "medium") feedback?.impactOccurred?.("medium");
+      else feedback?.selectionChanged?.();
+    } catch (_) {}
   }
 
   function inlineMathPayload(expression) {
@@ -54,8 +62,6 @@
     if (typeof data.separate_line === "boolean") return data.separate_line;
     if (data.native_data?.type === "paragraph") return false;
     if (data.native_data?.type === "mathematical_expression") return true;
-    // Preserve old non-empty math blocks, but make newly inserted empty formulas
-    // match Telegram's composer default (inline until the checkbox is enabled).
     return Boolean(String(data.text || "").trim());
   }
 
@@ -74,22 +80,23 @@
     }
   }
 
-  function renderFormula(preview, expression, separateLine) {
-    preview.dataset.latex = expression;
-    preview.dataset.display = separateLine ? "block" : "inline";
-    preview.classList.toggle("display-formula", Boolean(separateLine));
-    preview.classList.toggle("inline-formula", !separateLine);
+  function renderFormula(target, expression, separateLine, {emptyText = ""} = {}) {
+    const latex = String(expression || "");
+    target.dataset.latex = latex;
+    target.dataset.display = separateLine ? "block" : "inline";
+    target.classList.toggle("display-formula", Boolean(separateLine));
+    target.classList.toggle("inline-formula", !separateLine);
 
-    if (!String(expression || "").trim()) {
-      preview.classList.add("is-empty");
-      preview.textContent = "اكتب صيغة LaTeX حتى تظهر المعاينة هنا";
+    if (!latex.trim()) {
+      target.classList.add("is-empty");
+      target.textContent = emptyText || "اكتب صيغة LaTeX";
       return;
     }
-    preview.classList.remove("is-empty");
+    target.classList.remove("is-empty");
 
     if (window.katex?.render) {
       try {
-        window.katex.render(expression, preview, {
+        window.katex.render(latex, target, {
           displayMode:Boolean(separateLine),
           throwOnError:false,
           strict:"ignore",
@@ -100,22 +107,58 @@
       } catch (_) {}
     }
 
-    preview.textContent = expression;
+    target.textContent = latex;
     ensureKatex().then(katex => {
-      if (!katex?.render || !preview.isConnected) return;
-      if (preview.dataset.latex !== expression) return;
-      renderFormula(preview, expression, separateLine);
+      if (!katex?.render || !target.isConnected) return;
+      if (target.dataset.latex !== latex) return;
+      renderFormula(target, latex, separateLine, {emptyText});
     });
   }
 
-  function mathEditor(block) {
+  function formulaView(block) {
+    const d = block.data || (block.data = {});
+    const separateLine = inferSeparateLine(d);
+    syncMathData(block, String(d.text || ""), separateLine);
+
+    const view = document.createElement("div");
+    view.className = "math-formula-view";
+    view.tabIndex = 0;
+    view.setAttribute("role", "button");
+    view.setAttribute("aria-label", "اضغط لتعديل المعادلة");
+    view.title = "اضغط لتعديل المعادلة";
+    renderFormula(view, d.text || "", separateLine, {emptyText:"اضغط لإضافة المعادلة"});
+
+    const openEditor = event => {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      editingBlocks.add(String(block.id));
+      haptic();
+      try { selectBlock(block.id); } catch (_) {}
+      try { renderBlocks(); } catch (_) {}
+      requestAnimationFrame(() => {
+        const selector = `.block[data-id="${CSS.escape(String(block.id))}"] .math-latex-input`;
+        const input = document.querySelector(selector);
+        input?.focus?.({preventScroll:true});
+        input?.scrollIntoView?.({block:"nearest", behavior:"smooth"});
+      });
+    };
+
+    view.addEventListener("click", openEditor);
+    view.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") openEditor(event);
+    });
+    ensureKatex();
+    return view;
+  }
+
+  function formulaEditor(block) {
     const d = block.data || (block.data = {});
     let separateLine = inferSeparateLine(d);
     syncMathData(block, String(d.text || ""), separateLine);
 
     const wrap = document.createElement("section");
     wrap.className = "telegram-math-editor";
-    wrap.setAttribute("aria-label", "محرر المعادلة");
+    wrap.setAttribute("aria-label", "تعديل المعادلة");
 
     const field = document.createElement("label");
     field.className = "math-field";
@@ -147,15 +190,23 @@
 
     const resultHead = document.createElement("div");
     resultHead.className = "math-result-head";
-    resultHead.textContent = "النتيجة";
+    resultHead.textContent = "المعاينة";
     const preview = document.createElement("div");
     preview.className = "math-live-preview";
     preview.setAttribute("aria-live", "polite");
 
+    const actions = document.createElement("div");
+    actions.className = "math-editor-actions";
+    const done = document.createElement("button");
+    done.type = "button";
+    done.className = "math-done-button";
+    done.textContent = "تم";
+    actions.appendChild(done);
+
     function update({dirty = true} = {}) {
       separateLine = checkbox.checked;
       syncMathData(block, input.value, separateLine);
-      renderFormula(preview, input.value, separateLine);
+      renderFormula(preview, input.value, separateLine, {emptyText:"اكتب صيغة LaTeX حتى تظهر المعاينة هنا"});
       if (dirty) {
         try { markDirty(); } catch (_) {}
       }
@@ -169,11 +220,29 @@
       haptic();
       update();
     });
+    done.addEventListener("pointerdown", event => event.stopPropagation());
+    done.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      update();
+      editingBlocks.delete(String(block.id));
+      haptic("medium");
+      try { renderBlocks(); } catch (_) {}
+    });
 
-    wrap.append(field, option, resultHead, preview);
-    renderFormula(preview, input.value, separateLine);
+    wrap.append(field, option, resultHead, preview, actions);
+    renderFormula(preview, input.value, separateLine, {emptyText:"اكتب صيغة LaTeX حتى تظهر المعاينة هنا"});
     ensureKatex();
     return wrap;
+  }
+
+  function mathEditor(block) {
+    const id = String(block.id);
+    const d = block.data || (block.data = {});
+    // A brand-new empty formula opens directly in edit mode. Existing formulas
+    // stay collapsed until the user taps them.
+    if (!String(d.text || "").trim()) editingBlocks.add(id);
+    return editingBlocks.has(id) ? formulaEditor(block) : formulaView(block);
   }
 
   const baseTextEditor = typeof textEditor === "function" ? textEditor : null;
@@ -184,8 +253,6 @@
     return baseTextEditor(block);
   };
 
-  // The app can finish booting before this enhancement file loads from cache.
-  // Refresh once so an already-visible math block upgrades immediately.
   requestAnimationFrame(() => {
     try {
       if (current?.blocks?.some?.(block => block.type === "mathematical_expression")) {
