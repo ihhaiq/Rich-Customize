@@ -208,11 +208,11 @@ async def main() -> None:
         if not await prepare_telegram(bot):
             return
         try:
-            miniapp_runner = await start_mini_app_server(settings.bot_token)
-            logger.info("Developer Mini App Beta 0.1 server started")
+            miniapp_runner = await start_mini_app_server(bot, settings.bot_token)
+            logger.info("Developer Mini App Beta 0.2 server started")
         except Exception:
             logger.exception(
-                "Developer Mini App Beta 0.1 failed to start; continuing with bot polling"
+                "Developer Mini App Beta 0.2 failed to start; continuing with bot polling"
             )
         await page_registry.rebuild_media_pins()
         media_store.cleanup()
