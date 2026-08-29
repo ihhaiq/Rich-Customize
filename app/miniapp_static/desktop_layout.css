@@ -1,40 +1,49 @@
-/* Beta 0.3.25 — dedicated Telegram Desktop/Web desktop layout.
-   Mobile keeps its fullscreen/safe-area behavior; fine-pointer desktops get a
-   centered Telegram-like editor instead of a stretched mobile canvas. */
+/* Beta 0.3.26 — Telegram Desktop layout measured from the real visible WebView.
+   Telegram Desktop can expose a layout viewport wider than the side panel that
+   is actually visible. Never size desktop chrome from 100vw in that case. */
 
 @media (hover:hover) and (pointer:fine){
   :root{
-    --desktop-editor-width:720px;
-    --desktop-page-gap:20px;
+    --desktop-editor-max:720px;
+    --desktop-gutter:16px;
+    --desktop-visible-width:var(--visible-vw,100vw);
   }
 
   html,
   body{
-    width:100%;
-    min-width:0;
+    width:var(--desktop-visible-width)!important;
+    max-width:var(--desktop-visible-width)!important;
+    min-width:0!important;
     min-height:100%;
+    margin:0!important;
     overflow-x:hidden!important;
   }
 
-  /* Telegram Desktop does not need the mobile fullscreen inset pushed into
-     the document. The host window already keeps its own chrome outside the webview. */
+  /* The whole editor is constrained to the *visible* Telegram WebView, not the
+     browser/layout viewport that Telegram Desktop may keep behind the panel. */
   .editor-screen{
-    width:100%!important;
+    width:var(--desktop-visible-width)!important;
+    max-width:var(--desktop-visible-width)!important;
     min-width:0!important;
     min-height:100vh!important;
-    padding-top:12px!important;
-    padding-right:var(--desktop-page-gap)!important;
-    padding-left:var(--desktop-page-gap)!important;
-    padding-bottom:96px!important;
+    margin:0!important;
+    padding:12px var(--desktop-gutter) 96px!important;
+    overflow-x:hidden!important;
+  }
+
+  .editor-head,
+  .editor-main{
+    width:100%!important;
+    max-width:var(--desktop-editor-max)!important;
+    min-width:0!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
   }
 
   .editor-head{
     position:sticky!important;
     top:0!important;
     z-index:30!important;
-    width:min(var(--desktop-editor-width),calc(100vw - (var(--desktop-page-gap) * 2)))!important;
-    max-width:none!important;
-    margin:0 auto!important;
     padding:0!important;
     background:transparent!important;
     backdrop-filter:none!important;
@@ -43,6 +52,7 @@
 
   .editor-topbar{
     width:100%!important;
+    max-width:100%!important;
     min-width:0!important;
     margin:0 0 10px!important;
     padding:10px 13px!important;
@@ -51,6 +61,7 @@
 
   .page-identity{
     min-width:0!important;
+    max-width:100%!important;
   }
   .page-identity input{
     width:100%!important;
@@ -71,16 +82,14 @@
   }
 
   .composer-toolbar.floating-toolbar .tools-bubble{
-    max-width:min(390px,calc(100vw - 220px))!important;
+    max-width:min(390px,calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2) - 112px))!important;
     overflow-x:auto!important;
+    overflow-y:hidden!important;
   }
 
   .editor-main{
-    width:min(var(--desktop-editor-width),calc(100vw - (var(--desktop-page-gap) * 2)))!important;
-    max-width:none!important;
-    min-width:0!important;
-    margin:0 auto!important;
     padding:6px 0 44px!important;
+    overflow-x:hidden!important;
   }
 
   .canvas,
@@ -90,16 +99,21 @@
   .block,
   .block-row,
   .block-main{
+    width:auto;
     min-width:0!important;
     max-width:100%!important;
   }
 
-  /* Tables may be wider than the editing column, but only the table itself
-     should scroll — never the whole Mini App. */
+  .starter-card{
+    width:100%!important;
+  }
+
+  /* A wide table scrolls inside its own surface only. */
   .telegram-table,
   .table-preview{
     width:100%!important;
     max-width:100%!important;
+    min-width:0!important;
     overflow-x:auto!important;
     overflow-y:visible!important;
     overscroll-behavior-x:contain;
@@ -108,26 +122,25 @@
   .table-preview table{
     width:100%!important;
     min-width:420px!important;
+    max-width:none!important;
   }
 
-  /* Keep the bottom actions attached to the editor column instead of to a
-     random fixed 620px desktop strip. */
+  /* Fixed elements must be centered inside the visual viewport. */
   .bottom-actions{
-    left:50%!important;
+    left:var(--visible-center-x,50%)!important;
     right:auto!important;
     bottom:0!important;
-    width:min(var(--desktop-editor-width),calc(100vw - (var(--desktop-page-gap) * 2)))!important;
-    max-width:none!important;
+    width:min(var(--desktop-editor-max),calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2)))!important;
+    max-width:calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2))!important;
     transform:translateX(-50%)!important;
     padding:12px 4px 16px!important;
   }
 
-  /* Bottom sheets are desktop popovers/panels centered to the editor width. */
   .sheet{
-    left:50%!important;
+    left:var(--visible-center-x,50%)!important;
     right:auto!important;
-    width:min(620px,calc(100vw - 32px))!important;
-    max-width:620px!important;
+    width:min(620px,calc(var(--desktop-visible-width) - 24px))!important;
+    max-width:calc(var(--desktop-visible-width) - 24px)!important;
     transform:translateX(-50%)!important;
     border-radius:24px 24px 0 0!important;
   }
@@ -137,11 +150,11 @@
   .text-heading-submenu,
   .text-button-submenu,
   .table-cell-menu{
-    max-width:calc(100vw - 24px)!important;
+    max-width:calc(var(--desktop-visible-width) - 20px)!important;
   }
 
-  /* Do not enable the low-cost mobile glass mode merely because the desktop
-     Mini App window happens to be narrow. */
+  /* Desktop should never inherit the low-cost mobile rendering preset just
+     because Telegram opened the Mini App in a narrow side panel. */
   html.mobile-performance .editor-topbar,
   html.mobile-performance .toolbar-bubble,
   html.mobile-performance .popup-menu,
@@ -156,7 +169,6 @@
     -webkit-backdrop-filter:blur(18px) saturate(150%)!important;
   }
 
-  /* Desktop native text selection is useful; keep the visual highlight neutral. */
   input,
   textarea,
   [contenteditable="true"]{
@@ -164,15 +176,12 @@
   }
 }
 
-/* Very narrow Telegram Desktop windows still use the desktop interaction model,
-   but the editor collapses fluidly instead of overflowing. */
-@media (hover:hover) and (pointer:fine) and (max-width:560px){
-  :root{--desktop-page-gap:10px}
+/* Side-panel sized Telegram Desktop: fluid compact desktop, not mobile. */
+@media (hover:hover) and (pointer:fine) and (max-width:760px){
+  :root{--desktop-gutter:10px}
   .editor-screen{padding-top:8px!important}
   .editor-topbar{border-radius:17px!important}
   .composer-toolbar.floating-toolbar{gap:4px!important}
-  .composer-toolbar.floating-toolbar .tools-bubble{
-    max-width:calc(100vw - 190px)!important;
-  }
-  .telegram-table table,.table-preview table{min-width:360px!important}
+  .telegram-table table,
+  .table-preview table{min-width:360px!important}
 }
