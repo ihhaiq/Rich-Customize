@@ -65,7 +65,7 @@ async def index(_: web.Request) -> web.FileResponse:
 
 async def api_me(request: web.Request) -> web.Response:
     user = _developer_user(request)
-    return web.json_response({"ok": True, "user": user, "beta": "0.1"})
+    return web.json_response({"ok": True, "user": user, "beta": "0.2"})
 
 
 async def api_pages(request: web.Request) -> web.Response:
@@ -73,6 +73,7 @@ async def api_pages(request: web.Request) -> web.Response:
     pages = await page_registry.list_for_user(int(user["id"]))
     return web.json_response({
         "ok": True,
+        "beta": "0.2",
         "pages": [{
             "page_id": page["page_id"],
             "title": page.get("title") or page["page_id"],
@@ -114,7 +115,7 @@ async def api_save_page(request: web.Request) -> web.Response:
         str(current.get("buttons_align") or "center"),
         page_id=page_id,
     )
-    return web.json_response({"ok": True, "page_id": code, "title": title})
+    return web.json_response({"ok": True, "beta": "0.2", "page_id": code, "title": title})
 
 
 def build_web_app(bot_token: str) -> web.Application:
