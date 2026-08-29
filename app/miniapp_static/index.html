@@ -5,17 +5,18 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <title>Rich Customize Beta 0.3</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="/miniapp/static/style.css?v=0.3.13">
-  <link rel="stylesheet" href="/miniapp/static/media_upload.css?v=0.3.13">
-  <link rel="stylesheet" href="/miniapp/static/live_preview.css?v=0.3.13">
-  <link rel="stylesheet" href="/miniapp/static/liquid_glass.css?v=0.3.13">
-  <link rel="stylesheet" href="/miniapp/static/interactions.css?v=0.3.13">
-  <link rel="stylesheet" href="/miniapp/static/details_list_patch.css?v=0.3.13">
-  <link rel="stylesheet" href="/miniapp/static/details_nested_editor.css?v=0.3.13">
-  <link rel="stylesheet" href="/miniapp/static/text_toolbar_menu.css?v=0.3.13">
-  <link rel="stylesheet" href="/miniapp/static/rich_button_patch.css?v=0.3.13">
-  <link rel="stylesheet" href="/miniapp/static/inline_text_tools.css?v=0.3.13">
-  <link rel="stylesheet" href="/miniapp/static/page_menu_patch.css?v=0.3.13">
+  <link rel="stylesheet" href="/miniapp/static/style.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/media_upload.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/live_preview.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/liquid_glass.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/interactions.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/details_list_patch.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/details_nested_editor.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/text_toolbar_menu.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/rich_button_patch.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/inline_text_tools.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/page_menu_patch.css?v=0.3.14">
+  <link rel="stylesheet" href="/miniapp/static/telegram_compact_layout.css?v=0.3.14">
 </head>
 <body>
   <section id="editorView" class="editor-screen">
@@ -59,8 +60,8 @@
           <button type="button" data-tool="math" aria-label="معادلة"><b class="glyph">&Sigma;</b></button>
         </div>
 
-        <div class="toolbar-bubble add-bubble">
-          <button id="allBlocksBtn" type="button" aria-label="بلوكات أخرى" title="بلوكات أخرى">
+        <div class="toolbar-bubble add-bubble" aria-hidden="true">
+          <button id="allBlocksBtn" type="button" aria-label="بلوكات أخرى" title="بلوكات أخرى" tabindex="-1">
             <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
           </button>
         </div>
@@ -131,22 +132,22 @@
   </aside>
 
   <div id="toast" class="toast" role="status"></div>
-  <script src="/miniapp/static/app.js?v=0.3.13"></script>
-  <script src="/miniapp/static/resume_session.js?v=0.3.13"></script>
-  <script src="/miniapp/static/session_guard.js?v=0.3.13"></script>
-  <script src="/miniapp/static/app_patch.js?v=0.3.13"></script>
-  <script src="/miniapp/static/media_upload.js?v=0.3.13"></script>
-  <script src="/miniapp/static/live_preview.js?v=0.3.13"></script>
-  <script src="/miniapp/static/details_list_patch.js?v=0.3.13"></script>
-  <script src="/miniapp/static/details_list_menu_state.js?v=0.3.13"></script>
-  <script src="/miniapp/static/details_nested_editor.js?v=0.3.13"></script>
-  <script src="/miniapp/static/rich_button_patch.js?v=0.3.13"></script>
-  <script src="/miniapp/static/text_toolbar_menu.js?v=0.3.13"></script>
-  <script src="/miniapp/static/inline_text_tools.js?v=0.3.13"></script>
-  <script src="/miniapp/static/page_menu_patch.js?v=0.3.13"></script>
-  <script src="/miniapp/static/toolbar_sections.js?v=0.3.13"></script>
-  <script src="/miniapp/static/toolbar_fab.js?v=0.3.13"></script>
-  <script src="/miniapp/static/popup_performance.js?v=0.3.13"></script>
-  <script src="/miniapp/static/interactions.js?v=0.3.13"></script>
+  <script src="/miniapp/static/app.js?v=0.3.14"></script>
+  <script src="/miniapp/static/resume_session.js?v=0.3.14"></script>
+  <script src="/miniapp/static/session_guard.js?v=0.3.14"></script>
+  <script src="/miniapp/static/app_patch.js?v=0.3.14"></script>
+  <script src="/miniapp/static/media_upload.js?v=0.3.14"></script>
+  <script src="/miniapp/static/live_preview.js?v=0.3.14"></script>
+  <script src="/miniapp/static/details_list_patch.js?v=0.3.14"></script>
+  <script src="/miniapp/static/details_list_menu_state.js?v=0.3.14"></script>
+  <script src="/miniapp/static/details_nested_editor.js?v=0.3.14"></script>
+  <script src="/miniapp/static/rich_button_patch.js?v=0.3.14"></script>
+  <script src="/miniapp/static/text_toolbar_menu.js?v=0.3.14"></script>
+  <script src="/miniapp/static/inline_text_tools.js?v=0.3.14"></script>
+  <script src="/miniapp/static/page_menu_patch.js?v=0.3.14"></script>
+  <script src="/miniapp/static/toolbar_sections.js?v=0.3.14"></script>
+  <script src="/miniapp/static/toolbar_fab.js?v=0.3.14"></script>
+  <script src="/miniapp/static/popup_performance.js?v=0.3.14"></script>
+  <script src="/miniapp/static/interactions.js?v=0.3.14"></script>
 </body>
 </html>
