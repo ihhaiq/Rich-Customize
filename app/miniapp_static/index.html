@@ -5,26 +5,35 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <title>Rich Customize Beta 0.2</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="/miniapp/static/style.css?v=0.2.1">
-  <link rel="stylesheet" href="/miniapp/static/media_upload.css?v=0.2.2">
-  <link rel="stylesheet" href="/miniapp/static/live_preview.css?v=0.2.2">
+  <link rel="stylesheet" href="/miniapp/static/style.css?v=0.2.3">
+  <link rel="stylesheet" href="/miniapp/static/media_upload.css?v=0.2.3">
+  <link rel="stylesheet" href="/miniapp/static/live_preview.css?v=0.2.3">
 </head>
 <body>
   <section id="editorView" class="editor-screen">
-    <header class="editor-topbar">
-      <div class="page-identity">
-        <input id="pageTitle" maxlength="64" value="Untitled" aria-label="اسم الصفحة">
-        <small id="saveState">غير محفوظ</small>
-      </div>
-      <div class="top-actions">
-        <button id="pagesBtn" class="icon-btn" type="button" aria-label="الصفحات المحفوظة">📁</button>
-        <button id="moreBtn" class="icon-btn" type="button" aria-label="المزيد">•••</button>
-      </div>
-    </header>
+    <div class="editor-head">
+      <header class="editor-topbar">
+        <div class="page-identity">
+          <input id="pageTitle" maxlength="64" value="Untitled" aria-label="اسم الصفحة">
+          <small id="saveState">غير محفوظ</small>
+        </div>
+        <div class="top-actions">
+          <button id="pagesBtn" class="icon-btn" type="button" aria-label="الصفحات المحفوظة">📁</button>
+          <button id="moreBtn" class="icon-btn" type="button" aria-label="المزيد">•••</button>
+        </div>
+      </header>
 
-    <div class="history-row">
-      <button id="undoBtn" class="icon-btn" disabled aria-label="تراجع">↶</button>
-      <button id="redoBtn" class="icon-btn" disabled aria-label="إعادة">↷</button>
+      <nav class="composer-toolbar" aria-label="أدوات المحرر">
+        <button id="undoBtn" type="button" disabled aria-label="تراجع"><b>↶</b></button>
+        <button id="redoBtn" type="button" disabled aria-label="إعادة"><b>↷</b></button>
+        <span class="toolbar-sep"></span>
+        <button type="button" data-tool="text" aria-label="نص"><b>Aa</b></button>
+        <button type="button" data-tool="list" aria-label="قائمة"><b>☷</b></button>
+        <button type="button" data-tool="table" class="has-badge" aria-label="جدول"><b>▦</b></button>
+        <button type="button" data-tool="media" aria-label="مرفق"><b>◨</b></button>
+        <button type="button" data-tool="math" class="has-badge" aria-label="معادلة"><b>Σ</b></button>
+        <button id="allBlocksBtn" type="button" aria-label="كل البلوكات"><b>＋</b></button>
+      </nav>
     </div>
 
     <main class="editor-main">
@@ -58,16 +67,14 @@
       <div id="blockActions" class="menu-list"></div>
     </aside>
 
-    <nav class="composer-toolbar" aria-label="أدوات المحرر">
-      <button type="button" data-tool="text"><b>Aa</b><span>نص</span></button>
-      <button type="button" data-tool="list"><b>☷</b><span>قائمة</span></button>
-      <button type="button" data-tool="table"><b>▦</b><span>جدول</span></button>
-      <button type="button" data-tool="math"><b>Σ</b><span>معادلة</span></button>
-      <button type="button" data-tool="media"><b>⌕</b><span>مرفق</span></button>
-      <button id="allBlocksBtn" type="button"><b>＋</b><span>Block</span></button>
-    </nav>
-
-    <button id="sendBtn" class="send-btn" type="button">إرسال</button>
+    <div class="bottom-actions">
+      <button id="deleteSelectedBtn" class="fab fab-ghost" type="button" aria-label="حذف البلوك المحدد">🗑</button>
+      <button id="sendBtn" class="fab fab-send" type="button" aria-label="إرسال">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 11.5 20.5 3 15 20.5l-4.2-6.3L3 11.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
   </section>
 
   <div id="backdrop" class="backdrop hidden"></div>
@@ -91,9 +98,10 @@
   </aside>
 
   <div id="toast" class="toast" role="status"></div>
-  <script src="/miniapp/static/app.js?v=0.2.2"></script>
-  <script src="/miniapp/static/app_patch.js?v=0.2.2"></script>
-  <script src="/miniapp/static/media_upload.js?v=0.2.2"></script>
-  <script src="/miniapp/static/live_preview.js?v=0.2.2"></script>
+  <script src="/miniapp/static/app.js?v=0.2.3"></script>
+  <script src="/miniapp/static/app_patch.js?v=0.2.3"></script>
+  <script src="/miniapp/static/media_upload.js?v=0.2.3"></script>
+  <script src="/miniapp/static/live_preview.js?v=0.2.3"></script>
+  <script src="/miniapp/static/toolbar_fab.js?v=0.2.3"></script>
 </body>
 </html>
