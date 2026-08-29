@@ -8,13 +8,12 @@
   <link rel="stylesheet" href="/miniapp/static/style.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/media_upload.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/live_preview.css?v=0.3.19">
-  <link rel="stylesheet" href="/miniapp/static/math_live_preview.css?v=0.3.31">
+  <link rel="stylesheet" href="/miniapp/static/math_live_preview.css?v=0.3.32">
   <link rel="stylesheet" href="/miniapp/static/liquid_glass.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/interactions.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/details_list_patch.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/details_nested_editor.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/text_toolbar_menu.css?v=0.3.19">
-  <link rel="stylesheet" href="/miniapp/static/rich_button_patch.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/inline_text_tools.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/page_menu_patch.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/telegram_compact_layout.css?v=0.3.22">
@@ -22,6 +21,7 @@
   <link rel="stylesheet" href="/miniapp/static/emoji_picker.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/apple_emoji_picker.css?v=0.3.19">
   <link rel="stylesheet" href="/miniapp/static/apple_inline_emoji.css?v=0.3.20">
+  <link rel="stylesheet" href="/miniapp/static/editor_features.css?v=0.3.32">
 </head>
 <body>
   <section id="editorView" class="editor-screen">
@@ -43,33 +43,17 @@
 
       <nav class="composer-toolbar floating-toolbar" aria-label="أدوات المحرر">
         <div class="toolbar-bubble history-bubble">
-          <button id="undoBtn" type="button" disabled aria-label="تراجع">
-            <svg viewBox="0 0 24 24"><path d="M7 8H4V5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 8c1.8-2.5 4.6-4 8-4a9 9 0 1 1-8.6 11.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button id="redoBtn" type="button" disabled aria-label="إعادة">
-            <svg viewBox="0 0 24 24"><path d="M17 8h3V5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 8c-1.8-2.5-4.6-4-8-4a9 9 0 1 0 8.6 11.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
+          <button id="undoBtn" type="button" disabled aria-label="تراجع"><svg viewBox="0 0 24 24"><path d="M7 8H4V5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 8c1.8-2.5 4.6-4 8-4a9 9 0 1 1-8.6 11.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button id="redoBtn" type="button" disabled aria-label="إعادة"><svg viewBox="0 0 24 24"><path d="M17 8h3V5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 8c-1.8-2.5-4.6-4-8-4a9 9 0 1 0 8.6 11.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
-
         <div class="toolbar-bubble tools-bubble">
           <button type="button" data-tool="text" aria-label="نص"><b class="glyph">Aa</b></button>
-          <button type="button" data-tool="list" aria-label="قائمة">
-            <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" stroke-linecap="round"/><circle cx="4.5" cy="6" r="1.15" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.15" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.15" fill="currentColor" stroke="none"/></svg>
-          </button>
-          <button type="button" data-tool="table" aria-label="جدول">
-            <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M9.5 4.5v15"/></svg>
-          </button>
-          <button type="button" data-tool="media" aria-label="مرفق">
-            <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6" fill="currentColor" stroke="none"/><path d="m4.5 17 5-5 3.2 3.2L16.5 11l3 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
+          <button type="button" data-tool="list" aria-label="قائمة"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" stroke-linecap="round"/><circle cx="4.5" cy="6" r="1.15" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.15" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.15" fill="currentColor" stroke="none"/></svg></button>
+          <button type="button" data-tool="table" aria-label="جدول"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M9.5 4.5v15"/></svg></button>
+          <button type="button" data-tool="media" aria-label="مرفق"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6" fill="currentColor" stroke="none"/><path d="m4.5 17 5-5 3.2 3.2L16.5 11l3 4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button type="button" data-tool="math" aria-label="معادلة"><b class="glyph">&Sigma;</b></button>
         </div>
-
-        <div class="toolbar-bubble emoji-bubble">
-          <button id="emojiBtn" type="button" aria-label="الإيموجي" title="الإيموجي">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/><path d="M8.7 14.1c.9 1.15 2 1.75 3.3 1.75s2.4-.6 3.3-1.75" stroke-linecap="round"/></svg>
-          </button>
-        </div>
+        <div class="toolbar-bubble emoji-bubble"><button id="emojiBtn" type="button" aria-label="الإيموجي" title="الإيموجي"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/><path d="M8.7 14.1c.9 1.15 2 1.75 3.3 1.75s2.4-.6 3.3-1.75" stroke-linecap="round"/></svg></button></div>
         <button id="allBlocksBtn" class="legacy-all-blocks" type="button" tabindex="-1" aria-hidden="true"></button>
       </nav>
     </div>
@@ -77,80 +61,33 @@
     <main class="editor-main">
       <div id="canvas" class="canvas" aria-label="محرر الرسالة">
         <div id="blocks" class="content-flow"></div>
-
-        <div id="starter" class="starter-card">
-          <strong>ابدأ بالرسالة، مو بالإعدادات</strong>
-          <p>اكتب مباشرة أو أضف Block. كتابة <b>/</b> تفتح قائمة كل البلوكات.</p>
-          <div class="starter-actions">
-            <button id="startWritingBtn" type="button" class="primary-soft">¶ ابدأ الكتابة</button>
-            <button id="startPhotoBtn" type="button" class="soft-btn">▧ أضف صورة</button>
-          </div>
-        </div>
-
-        <div class="slash-wrap">
-          <textarea id="slashInput" rows="1" placeholder="اكتب نصًا، أو / للأوامر" autocomplete="off" spellcheck="true"></textarea>
-          <aside id="slashMenu" class="popup-menu slash-menu hidden" aria-label="قائمة إضافة بلوك">
-            <div class="menu-head">
-              <span>إضافة Block</span>
-              <span id="slashQuery"></span>
-            </div>
-            <div id="slashItems" class="menu-list"></div>
-          </aside>
-        </div>
+        <div id="starter" class="starter-card"><strong>ابدأ بالرسالة، مو بالإعدادات</strong><p>اكتب مباشرة أو أضف Block. كتابة <b>/</b> تفتح قائمة كل البلوكات.</p><div class="starter-actions"><button id="startWritingBtn" type="button" class="primary-soft">¶ ابدأ الكتابة</button><button id="startPhotoBtn" type="button" class="soft-btn">▧ أضف صورة</button></div></div>
+        <div class="slash-wrap"><textarea id="slashInput" rows="1" placeholder="اكتب نصًا، أو / للأوامر" autocomplete="off" spellcheck="true"></textarea><aside id="slashMenu" class="popup-menu slash-menu hidden" aria-label="قائمة إضافة بلوك"><div class="menu-head"><span>إضافة Block</span><span id="slashQuery"></span></div><div id="slashItems" class="menu-list"></div></aside></div>
       </div>
     </main>
 
-    <aside id="blockMenu" class="popup-menu block-menu hidden" aria-label="إجراءات البلوك">
-      <div id="blockMenuTitle" class="menu-head">إجراءات البلوك</div>
-      <div id="blockActions" class="menu-list"></div>
-    </aside>
-
-    <div class="bottom-actions">
-      <button id="deleteSelectedBtn" class="fab fab-ghost" type="button" aria-label="إلغاء التغييرات وإغلاق المحرر" title="إلغاء التغييرات وإغلاق المحرر">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M9.5 7V5.2c0-.66.54-1.2 1.2-1.2h2.6c.66 0 1.2.54 1.2 1.2V7M7 7l.7 12a2 2 0 0 0 2 1.9h4.6a2 2 0 0 0 2-1.9L17 7"/></svg>
-      </button>
-      <button id="sendBtn" class="fab fab-send" type="button" aria-label="إرسال عبر Telegram">
-        <svg class="telegram-logo" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M23.91 3.79 20.3 20.84c-.27 1.2-.98 1.49-1.99.93l-5.5-4.05-2.65 2.55c-.29.29-.54.54-1.11.54l.4-5.6L19.65 6c.44-.4-.1-.62-.68-.22L6.36 13.72.93 12.02c-1.18-.37-1.2-1.18.25-1.75L22.4 2.09c.98-.37 1.84.22 1.51 1.7Z"/>
-        </svg>
-      </button>
-    </div>
+    <aside id="blockMenu" class="popup-menu block-menu hidden" aria-label="إجراءات البلوك"><div id="blockMenuTitle" class="menu-head">إجراءات البلوك</div><div id="blockActions" class="menu-list"></div></aside>
+    <div class="bottom-actions"><button id="deleteSelectedBtn" class="fab fab-ghost" type="button" aria-label="إلغاء التغييرات وإغلاق المحرر" title="إلغاء التغييرات وإغلاق المحرر"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M9.5 7V5.2c0-.66.54-1.2 1.2-1.2h2.6c.66 0 1.2.54 1.2 1.2V7M7 7l.7 12a2 2 0 0 0 2 1.9h4.6a2 2 0 0 0 2-1.9L17 7"/></svg></button><button id="sendBtn" class="fab fab-send" type="button" aria-label="إرسال عبر Telegram"><svg class="telegram-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M23.91 3.79 20.3 20.84c-.27 1.2-.98 1.49-1.99.93l-5.5-4.05-2.65 2.55c-.29.29-.54.54-1.11.54l.4-5.6L19.65 6c.44-.4-.1-.62-.68-.22L6.36 13.72.93 12.02c-1.18-.37-1.2-1.18.25-1.75L22.4 2.09c.98-.37 1.84.22 1.51 1.7Z"/></svg></button></div>
   </section>
 
   <div id="backdrop" class="backdrop hidden"></div>
-
-  <aside id="pagesPanel" class="sheet hidden" aria-label="الصفحات المحفوظة">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <div><strong><svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:-3px" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 7.5c0-1.1.9-2 2-2h3.5l1.6 1.8H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7.5Z"/></svg> الصفحات المحفوظة</strong><small>افتح صفحة أو ابدأ صفحة جديدة</small></div>
-      <button id="newPageBtn" class="soft-btn" type="button">＋ جديدة</button>
-    </div>
-    <div id="pages" class="sheet-list"></div>
-    <div id="emptyPages" class="empty hidden">ما عندك صفحات محفوظة.</div>
-  </aside>
-
-  <aside id="sendPanel" class="sheet hidden" aria-label="وجهات الإرسال">
-    <div class="sheet-handle"></div>
-    <div class="sheet-header">
-      <div><strong>إرسال الرسالة</strong><small>اختر المحادثة التي تريد النشر بيها</small></div>
-    </div>
-    <div id="destinations" class="sheet-list"></div>
-  </aside>
-
+  <aside id="pagesPanel" class="sheet hidden" aria-label="الصفحات المحفوظة"><div class="sheet-handle"></div><div class="sheet-header"><div><strong><svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:-3px" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 7.5c0-1.1.9-2 2-2h3.5l1.6 1.8H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7.5Z"/></svg> الصفحات المحفوظة</strong><small>افتح صفحة أو ابدأ صفحة جديدة</small></div><button id="newPageBtn" class="soft-btn" type="button">＋ جديدة</button></div><div id="pages" class="sheet-list"></div><div id="emptyPages" class="empty hidden">ما عندك صفحات محفوظة.</div></aside>
+  <aside id="sendPanel" class="sheet hidden" aria-label="وجهات الإرسال"><div class="sheet-handle"></div><div class="sheet-header"><div><strong>إرسال الرسالة</strong><small>اختر المحادثة التي تريد النشر بيها</small></div></div><div id="destinations" class="sheet-list"></div></aside>
   <div id="toast" class="toast" role="status"></div>
+
   <script src="/miniapp/static/app.js?v=0.3.19"></script>
   <script src="/miniapp/static/resume_session.js?v=0.3.29"></script>
   <script src="/miniapp/static/session_guard.js?v=0.3.19"></script>
   <script src="/miniapp/static/app_patch.js?v=0.3.19"></script>
   <script src="/miniapp/static/media_upload.js?v=0.3.19"></script>
   <script src="/miniapp/static/live_preview.js?v=0.3.19"></script>
-  <script src="/miniapp/static/math_live_preview.js?v=0.3.31"></script>
+  <script src="/miniapp/static/math_live_preview.js?v=0.3.32"></script>
   <script src="/miniapp/static/details_list_patch.js?v=0.3.19"></script>
   <script src="/miniapp/static/details_list_menu_state.js?v=0.3.19"></script>
   <script src="/miniapp/static/details_nested_editor.js?v=0.3.19"></script>
-  <script src="/miniapp/static/rich_button_patch.js?v=0.3.19"></script>
   <script src="/miniapp/static/text_toolbar_menu.js?v=0.3.19"></script>
   <script src="/miniapp/static/inline_text_tools.js?v=0.3.19"></script>
+  <script src="/miniapp/static/editor_buttons.js?v=0.3.32"></script>
   <script src="/miniapp/static/emoji_picker.js?v=0.3.19"></script>
   <script src="/miniapp/static/apple_emoji_picker.js?v=0.3.19"></script>
   <script src="/miniapp/static/apple_inline_emoji.js?v=0.3.20"></script>
@@ -158,7 +95,7 @@
   <script src="/miniapp/static/toolbar_sections.js?v=0.3.19"></script>
   <script src="/miniapp/static/toolbar_fab.js?v=0.3.19"></script>
   <script src="/miniapp/static/popup_performance.js?v=0.3.28"></script>
-  <script src="/miniapp/static/interactions.js?v=0.3.29"></script>
-  <script src="/miniapp/static/table_menu_polish.js?v=0.3.31"></script>
+  <script src="/miniapp/static/interactions.js?v=0.3.32"></script>
+  <script src="/miniapp/static/editor_features.js?v=0.3.32"></script>
 </body>
 </html>
