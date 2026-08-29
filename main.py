@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import unicodedata
+from typing import Any
 
 from aiogram import Dispatcher
 from aiogram.exceptions import (
@@ -26,6 +28,65 @@ logger = logging.getLogger(__name__)
 INITIAL_RETRY_DELAY = 5
 MAX_RETRY_DELAY = 60
 TELEGRAM_REQUEST_TIMEOUT = 30
+
+_VISIBLE_TEXT_KEYS = {
+    "text",
+    "summary",
+    "caption",
+    "credit",
+    "expression",
+    "alternative_text",
+}
+
+
+def _visible_rich_text(value: Any) -> list[str]:
+    """Collect user-visible text without structural fields such as block types or URLs."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            result.extend(_visible_rich_text(item))
+        return result
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(exclude_none=True)
+    if not isinstance(value, dict):
+        return []
+
+    result: list[str] = []
+    for key, item in value.items():
+        if key in _VISIBLE_TEXT_KEYS:
+            result.extend(_visible_rich_text(item))
+        elif key in {"blocks", "items", "buttons", "cells"}:
+            result.extend(_visible_rich_text(item))
+    return result
+
+
+def _detect_rich_rtl(rich_message: Any) -> bool | None:
+    """Detect paragraph direction from the first strong directional character."""
+    for text in _visible_rich_text(rich_message):
+        for char in text:
+            bidi = unicodedata.bidirectional(char)
+            if bidi in {"R", "AL"}:
+                return True
+            if bidi == "L":
+                return False
+    return None
+
+
+class DirectionAwareBot(LocalizedBot):
+    """Set Rich Message direction from its own text, independent of UI locale."""
+
+    async def __call__(self, method, request_timeout: int | None = None):
+        rich_message = getattr(method, "rich_message", None)
+        if rich_message is not None:
+            is_rtl = _detect_rich_rtl(rich_message)
+            if is_rtl is not None and hasattr(rich_message, "model_copy"):
+                rich_message = rich_message.model_copy(update={"is_rtl": is_rtl})
+                method = method.model_copy(update={"rich_message": rich_message})
+        return await super().__call__(method, request_timeout=request_timeout)
 
 
 async def prepare_telegram(bot: LocalizedBot) -> bool:
@@ -132,7 +193,7 @@ async def main() -> None:
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
     try:
-        bot = LocalizedBot(settings.bot_token)
+        bot = DirectionAwareBot(settings.bot_token)
     except TokenValidationError:
         logger.critical(
             "BOT_TOKEN has an invalid format. Paste only the exact token from "
