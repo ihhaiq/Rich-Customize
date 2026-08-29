@@ -1,0 +1,175 @@
+/* Beta 0.3.7 — Telegram-style Aa root menu + H1-H6 submenu. */
+.text-toolbar-menu,
+.text-heading-submenu{
+  position:fixed!important;
+  z-index:3400!important;
+  overflow:hidden!important;
+  padding:6px!important;
+  border-radius:16px!important;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012)),
+    color-mix(in srgb,var(--panel) 78%,transparent)!important;
+  border:1px solid rgba(255,255,255,.085)!important;
+  box-shadow:
+    0 12px 28px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.055)!important;
+  backdrop-filter:blur(16px) saturate(150%)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(150%)!important;
+}
+
+.text-toolbar-menu{
+  width:258px!important;
+  min-width:258px!important;
+  max-width:min(258px,calc(100vw - 16px))!important;
+}
+
+.text-heading-submenu{
+  width:250px!important;
+  min-width:250px!important;
+  max-width:min(250px,calc(100vw - 16px))!important;
+}
+
+.text-menu-row{
+  width:100%;
+  min-height:42px;
+  display:grid;
+  grid-template-columns:38px minmax(0,1fr) auto;
+  align-items:center;
+  gap:7px;
+  padding:6px 9px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:var(--text);
+  text-align:start;
+  direction:ltr;
+  transition:background .12s ease,transform .1s ease;
+}
+.text-menu-row:hover,
+.text-menu-row.active{
+  background:rgba(255,255,255,.055);
+}
+.text-menu-row:active{transform:scale(.985)}
+
+.text-menu-icon{
+  width:34px;
+  min-width:34px;
+  display:grid;
+  place-items:center;
+  color:color-mix(in srgb,var(--text) 92%,var(--accent) 8%);
+  font-size:21px;
+  line-height:1;
+  font-family:ui-serif,Georgia,serif;
+  direction:ltr;
+}
+
+.text-menu-label{
+  min-width:0;
+  color:var(--text);
+  font-size:15px;
+  font-weight:500;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  text-align:right;
+  direction:rtl;
+}
+
+.text-menu-tail{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:7px;
+  min-width:22px;
+  direction:ltr;
+}
+.text-menu-shortcut{
+  color:var(--muted);
+  font-size:11px;
+  font-weight:400;
+  white-space:nowrap;
+  direction:ltr;
+}
+.text-menu-arrow{
+  color:var(--muted);
+  font-size:27px;
+  line-height:.8;
+  transform:translateY(-1px);
+}
+
+.text-menu-row.submenu-open{
+  background:color-mix(in srgb,var(--accent) 12%,rgba(255,255,255,.045));
+}
+
+.heading-level-row{
+  grid-template-columns:44px minmax(0,1fr) auto;
+}
+.heading-level-row .text-menu-icon{
+  width:42px;
+  min-width:42px;
+  font-size:19px;
+  font-weight:600;
+}
+.heading-level-row .text-menu-label{
+  font-size:14px;
+}
+
+html.mobile-performance .text-toolbar-menu,
+html.mobile-performance .text-heading-submenu{
+  backdrop-filter:blur(9px) saturate(125%)!important;
+  -webkit-backdrop-filter:blur(9px) saturate(125%)!important;
+  box-shadow:0 8px 20px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.04)!important;
+}
+html.mobile-performance .text-menu-row{
+  transition:transform .08s ease!important;
+}
+
+@media(max-width:430px){
+  .text-toolbar-menu{
+    width:216px!important;
+    min-width:216px!important;
+  }
+  .text-heading-submenu{
+    width:154px!important;
+    min-width:154px!important;
+  }
+  .text-menu-row{
+    min-height:40px;
+    grid-template-columns:33px minmax(0,1fr) auto;
+    gap:5px;
+    padding:5px 7px;
+  }
+  .text-menu-icon{
+    width:30px;
+    min-width:30px;
+    font-size:19px;
+  }
+  .text-menu-label{font-size:14px}
+  .text-menu-shortcut{font-size:9.5px}
+  .heading-level-row{
+    grid-template-columns:38px minmax(0,1fr);
+  }
+  .heading-level-row .text-menu-tail{display:none}
+  .heading-level-row .text-menu-icon{
+    width:36px;
+    min-width:36px;
+    font-size:17px;
+  }
+  .heading-level-row .text-menu-label{font-size:13px}
+}
+
+@media(max-width:370px){
+  .text-toolbar-menu{
+    width:198px!important;
+    min-width:198px!important;
+  }
+  .text-heading-submenu{
+    width:142px!important;
+    min-width:142px!important;
+  }
+  .text-menu-shortcut{display:none}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .text-menu-row{transition:none!important}
+}
