@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from app.services.blocks import get_block_by_id, table_rows
 from app.services.page_registry import page_registry
+from app.services import renderer as rich_renderer
 from app.states import RichEditorStates
 
 # Reuse the compatibility editor's session/UI helpers while table-specific
@@ -18,6 +19,7 @@ from app.routers import editor_core
 
 
 router = Router(name="table_features")
+_original_editor_input_block = rich_renderer._editor_input_block
 
 
 def _table_data_for_edit(block: dict[str, Any]) -> dict[str, Any] | None:
@@ -111,9 +113,24 @@ def build_table_display_keyboard(block: dict[str, Any]) -> InlineKeyboardMarkup:
     ])
 
 
+def _editor_input_block_with_table_features(block: dict[str, Any], path: str) -> dict[str, Any]:
+    """Keep renderer behavior intact and add Bot API 10.3 table properties."""
+    payload = _original_editor_input_block(block, path)
+    if block.get("type") != "table" or payload.get("type") != "table":
+        return payload
+    data = block.get("data", {})
+    native = data.get("native_data") if isinstance(data.get("native_data"), dict) else {}
+    if "is_compact" in data:
+        payload["is_compact"] = True if data.get("is_compact") else None
+    elif native.get("is_compact"):
+        payload["is_compact"] = True
+    return payload
+
+
 def install() -> None:
-    """Patch the compatibility editor's imported table-options builder."""
+    """Install table controls and Bot API 10.3 serialization support."""
     editor_core.build_table_options_keyboard = build_table_options_keyboard
+    rich_renderer._editor_input_block = _editor_input_block_with_table_features
 
 
 @router.callback_query(F.data.startswith("r:tdisplay:"))
@@ -221,10 +238,7 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
         table_data["caption_rich_text"] = message.html_text or text
         table_data["caption_html"] = message.html_text or text
         table_data["caption_text"] = text
-    await state.update_data(
-        blocks=blocks,
-        table_caption_block_id=None,
-    )
+    await state.update_data(blocks=blocks, table_caption_block_id=None)
     await editor_core._delete_add_step_messages(bot, message, data, state)
     await state.set_state(RichEditorStates.managing)
     await editor_core._edit_saved_ui(
