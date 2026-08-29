@@ -1,4 +1,4 @@
-// Beta 0.3.13 — Telegram-style Aa menu with Heading and inline Rich Button submenus.
+// Beta 0.3.14 — Telegram-style Aa menu with Heading, Anchor and inline Rich Button submenus.
 (() => {
   const textButton = document.querySelector('.composer-toolbar [data-tool="text"]');
   if (!textButton) return;
@@ -16,6 +16,7 @@
     {type:"preformatted", icon:"</>", label:"نص برمجي", shortcut:"Ctrl+Shift+M"},
     {type:"footer", icon:"≡", label:"التذييل"},
     {type:"divider", icon:"—", label:"Divider"},
+    {type:"anchor", icon:"#", label:"مرساة"},
     {kind:"rich_button", icon:"▣", label:"زر غني", arrow:true},
   ];
 
