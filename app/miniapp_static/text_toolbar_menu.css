@@ -1,6 +1,7 @@
-/* Beta 0.3.7 — Telegram-style Aa root menu + H1-H6 submenu. */
+/* Beta 0.3.8 — Telegram-style Aa root menu + nested submenus. */
 .text-toolbar-menu,
-.text-heading-submenu{
+.text-heading-submenu,
+.text-button-submenu{
   position:fixed!important;
   z-index:3400!important;
   overflow:hidden!important;
@@ -27,6 +28,15 @@
   width:250px!important;
   min-width:250px!important;
   max-width:min(250px,calc(100vw - 16px))!important;
+}
+
+.text-button-submenu{
+  width:248px!important;
+  min-width:248px!important;
+  max-width:min(248px,calc(100vw - 16px))!important;
+  max-height:min(485px,calc(var(--visible-vh,100vh) - 20px))!important;
+  overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch;
 }
 
 .text-menu-row{
@@ -115,7 +125,8 @@
 }
 
 html.mobile-performance .text-toolbar-menu,
-html.mobile-performance .text-heading-submenu{
+html.mobile-performance .text-heading-submenu,
+html.mobile-performance .text-button-submenu{
   backdrop-filter:blur(9px) saturate(125%)!important;
   -webkit-backdrop-filter:blur(9px) saturate(125%)!important;
   box-shadow:0 8px 20px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.04)!important;
@@ -132,6 +143,10 @@ html.mobile-performance .text-menu-row{
   .text-heading-submenu{
     width:154px!important;
     min-width:154px!important;
+  }
+  .text-button-submenu{
+    width:184px!important;
+    min-width:184px!important;
   }
   .text-menu-row{
     min-height:40px;
@@ -166,6 +181,10 @@ html.mobile-performance .text-menu-row{
   .text-heading-submenu{
     width:142px!important;
     min-width:142px!important;
+  }
+  .text-button-submenu{
+    width:166px!important;
+    min-width:166px!important;
   }
   .text-menu-shortcut{display:none}
 }
