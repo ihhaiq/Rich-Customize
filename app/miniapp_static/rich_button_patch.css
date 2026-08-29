@@ -1,51 +1,76 @@
-/* Beta 0.3.8 — Rich Button live preview + customization popovers. */
+/* Beta 0.3.11 — compact Telegram-like Rich Button chips + customization popovers. */
 .rich-button-live-wrap{
-  display:grid;
-  gap:5px;
-  margin:5px 0 7px;
-}
-.rich-button-live{
-  min-height:42px;
   display:flex;
   align-items:center;
+  justify-content:flex-start;
+  width:100%;
+  min-height:34px;
+  margin:2px 0 4px;
+  padding:0;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  direction:inherit;
+}
+.rich-button-live{
+  width:fit-content;
+  max-width:min(78%,320px);
+  min-width:76px;
+  min-height:32px;
+  display:inline-flex;
+  align-items:center;
   justify-content:center;
-  padding:9px 16px;
-  border-radius:11px;
-  border:1px solid rgba(255,255,255,.075);
-  background:color-mix(in srgb,var(--panel) 82%,#fff 4%);
-  color:var(--text);
-  font-size:15px;
-  font-weight:650;
+  padding:6px 13px;
+  border-radius:9px;
+  border:1px solid rgba(255,255,255,.055);
+  background:color-mix(in srgb,var(--panel) 92%,#fff 3%);
+  color:var(--accent,#6ab2ff);
+  font-size:14px;
+  font-weight:600;
+  line-height:1.15;
   text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
   user-select:none;
   -webkit-user-select:none;
   pointer-events:none;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
 }
 .rich-button-live.is-primary{
-  background:color-mix(in srgb,var(--accent) 30%,var(--panel));
-  border-color:color-mix(in srgb,var(--accent) 48%,transparent);
+  background:color-mix(in srgb,var(--accent) 15%,var(--panel));
+  border-color:color-mix(in srgb,var(--accent) 28%,transparent);
+  color:color-mix(in srgb,var(--accent) 88%,#fff 12%);
 }
 .rich-button-live.is-success{
-  background:color-mix(in srgb,#31b66b 24%,var(--panel));
-  border-color:color-mix(in srgb,#31b66b 43%,transparent);
+  background:color-mix(in srgb,#31b66b 14%,var(--panel));
+  border-color:color-mix(in srgb,#31b66b 28%,transparent);
+  color:#73d99a;
 }
 .rich-button-live.is-danger{
-  background:color-mix(in srgb,#ed5c65 24%,var(--panel));
-  border-color:color-mix(in srgb,#ed5c65 44%,transparent);
+  background:color-mix(in srgb,#ed5c65 14%,var(--panel));
+  border-color:color-mix(in srgb,#ed5c65 28%,transparent);
+  color:#ff8b92;
 }
-.rich-button-live.is-disabled{opacity:.55}
+.rich-button-live.is-disabled{
+  opacity:.48;
+  color:var(--muted);
+}
 .rich-button-live.is-unconfigured{
-  border-style:dashed;
-  opacity:.78;
+  opacity:.68;
 }
 .rich-button-meta{
-  padding-inline:6px;
-  color:var(--muted);
-  font-size:11px;
-  line-height:1.3;
-  text-align:center;
-  direction:auto;
+  display:none!important;
+}
+
+/* The Rich Button is content in the message flow, not an editor card. */
+.block:has(.rich-button-live-wrap){
+  min-height:0!important;
+  margin-block:1px 3px!important;
+  padding-block:0!important;
+  background:transparent!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
 }
 
 .block-quick-menu.rich-button-menu{
@@ -126,6 +151,13 @@ html.mobile-performance .rich-button-page-pop{
 }
 
 @media(max-width:390px){
+  .rich-button-live{
+    min-height:30px;
+    min-width:70px;
+    max-width:82%;
+    padding:6px 11px;
+    font-size:13.5px;
+  }
   .rich-button-editor-pop,
   .rich-button-page-pop{
     width:calc(100vw - 24px)!important;
