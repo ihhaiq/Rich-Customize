@@ -129,24 +129,13 @@ def _contains_marker(value: Any, marker: str) -> bool:
     return False
 
 
-def _replace_marker_once(value: Any, marker: str, replacement: str, state: list[bool]) -> Any:
-    if state[0]:
-        return value
+def _replace_marker_all(value: Any, marker: str, replacement: str) -> Any:
     if isinstance(value, str):
-        if marker in value:
-            state[0] = True
-            return value.replace(marker, replacement, 1)
-        return value
+        return value.replace(marker, replacement)
     if isinstance(value, list):
-        result: list[Any] = []
-        for item in value:
-            result.append(_replace_marker_once(item, marker, replacement, state))
-        return result
+        return [_replace_marker_all(item, marker, replacement) for item in value]
     if isinstance(value, dict):
-        result: dict[str, Any] = {}
-        for key, item in value.items():
-            result[key] = _replace_marker_once(item, marker, replacement, state)
-        return result
+        return {key: _replace_marker_all(item, marker, replacement) for key, item in value.items()}
     return value
 
 
@@ -245,14 +234,13 @@ async def complete_user_picker(
     target_label = f"@{str(username).lstrip('@')}" if username else str(selected_user_id)
     marker = str(pending.get("marker") or "")
     if marker:
+        if not _contains_marker(block.get("data", {}), marker):
+            return None
         title = _clean_title(pending.get("title"))
         color = str(pending.get("color") or "")
         suffix = f" #{color}" if color in {"r", "b", "p", "g"} else ""
         replacement = f"{{{title}:user:{selected_user_id}{suffix}}}"
-        state = [False]
-        block["data"] = _replace_marker_once(block.get("data", {}), marker, replacement, state)
-        if not state[0]:
-            return None
+        block["data"] = _replace_marker_all(block.get("data", {}), marker, replacement)
     else:
         data = block.setdefault("data", {})
         rich = data.get("_rich_button")
