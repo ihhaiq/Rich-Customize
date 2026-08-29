@@ -12,7 +12,6 @@ from aiohttp import web
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
-from app.config import developer_ids
 from app.miniapp_rich_buttons import register_rich_button_routes
 from app.miniapp_uploads import register_upload_routes
 from app.services.chat_registry import managed_chat_registry
@@ -59,13 +58,15 @@ def _verify_init_data(init_data: str, bot_token: str, max_age: int = 86400) -> d
     return user
 
 
-def _developer_user(request: web.Request) -> dict:
+def _miniapp_user(request: web.Request) -> dict:
+    """Return any authenticated Telegram user opening the Mini App."""
     init_data = request.headers.get("X-Telegram-Init-Data", "")
-    user = _verify_init_data(init_data, request.app["bot_token"])
-    allowed = developer_ids()
-    if not allowed or int(user["id"]) not in allowed:
-        raise web.HTTPForbidden(text="Mini App beta is developer-only")
-    return user
+    return _verify_init_data(init_data, request.app["bot_token"])
+
+
+# Compatibility key used by upload/rich-button route modules. It now means
+# authenticated Mini App user, not developer-only access.
+_developer_user = _miniapp_user
 
 
 def _status_value(member) -> str:
@@ -116,12 +117,12 @@ async def index(_: web.Request) -> web.FileResponse:
 
 
 async def api_me(request: web.Request) -> web.Response:
-    user = _developer_user(request)
+    user = _miniapp_user(request)
     return web.json_response({"ok": True, "user": user, "beta": BETA_VERSION})
 
 
 async def api_pages(request: web.Request) -> web.Response:
-    user = _developer_user(request)
+    user = _miniapp_user(request)
     pages = await page_registry.list_for_user(int(user["id"]))
     return web.json_response({
         "ok": True,
@@ -136,7 +137,7 @@ async def api_pages(request: web.Request) -> web.Response:
 
 
 async def api_page(request: web.Request) -> web.Response:
-    user = _developer_user(request)
+    user = _miniapp_user(request)
     page_id = request.match_info["page_id"]
     page = await page_registry.get(page_id)
     if not page or int(page.get("owner_id", 0)) != int(user["id"]):
@@ -155,7 +156,7 @@ async def _json_payload(request: web.Request) -> dict:
 
 
 async def api_create_page(request: web.Request) -> web.Response:
-    user = _developer_user(request)
+    user = _miniapp_user(request)
     payload = await _json_payload(request)
     blocks = payload.get("blocks")
     buttons = payload.get("buttons", [])
@@ -176,7 +177,7 @@ async def api_create_page(request: web.Request) -> web.Response:
 
 
 async def api_save_page(request: web.Request) -> web.Response:
-    user = _developer_user(request)
+    user = _miniapp_user(request)
     page_id = request.match_info["page_id"]
     current = await page_registry.get(page_id)
     if not current or int(current.get("owner_id", 0)) != int(user["id"]):
@@ -199,13 +200,13 @@ async def api_save_page(request: web.Request) -> web.Response:
 
 
 async def api_destinations(request: web.Request) -> web.Response:
-    user = _developer_user(request)
+    user = _miniapp_user(request)
     destinations = await _eligible_destinations(request.app["bot"], int(user["id"]))
     return web.json_response({"ok": True, "destinations": destinations})
 
 
 async def api_send_page(request: web.Request) -> web.Response:
-    user = _developer_user(request)
+    user = _miniapp_user(request)
     payload = await _json_payload(request)
     page_id = str(payload.get("page_id") or "")
     page = await page_registry.get(page_id)
@@ -259,12 +260,14 @@ async def api_send_page(request: web.Request) -> web.Response:
 
 
 def build_web_app(bot: Bot, bot_token: str) -> web.Application:
-    # 55 MB lets the developer-only beta upload ordinary video/audio/documents
-    # while app/miniapp_uploads.py still enforces per-kind limits.
+    # 55 MB supports ordinary video/audio/document uploads. Per-kind limits are
+    # still enforced by app/miniapp_uploads.py for every authenticated user.
     app = web.Application(client_max_size=55 * 1024 * 1024)
     app["bot"] = bot
     app["bot_token"] = bot_token
-    app["developer_user"] = _developer_user
+    app["miniapp_user"] = _miniapp_user
+    # Compatibility for route modules written while the beta was developer-only.
+    app["developer_user"] = _miniapp_user
     app.router.add_get("/miniapp", index)
     app.router.add_get("/miniapp/", index)
     app.router.add_static("/miniapp/static", STATIC_DIR)
