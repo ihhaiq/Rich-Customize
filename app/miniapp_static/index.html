@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Rich Customize Beta</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/miniapp/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="brand">Rich Customize</div>
+      <div class="beta">Mini App · Beta 0.1</div>
+    </div>
+    <button id="saveBtn" class="primary" disabled>حفظ</button>
+  </header>
+
+  <main>
+    <section id="pagesView" class="view active">
+      <div class="section-head">
+        <div>
+          <h1>الصفحات المحفوظة</h1>
+          <p>اختر صفحة لفتحها وتعديلها بصريًا.</p>
+        </div>
+      </div>
+      <div id="pages" class="pages"></div>
+      <div id="emptyPages" class="empty hidden">ما عندك صفحات محفوظة بعد.</div>
+    </section>
+
+    <section id="editorView" class="view">
+      <button id="backBtn" class="ghost">→ رجوع للصفحات</button>
+      <div class="title-row">
+        <input id="pageTitle" maxlength="64" placeholder="اسم الصفحة">
+        <code id="pageCode"></code>
+      </div>
+      <div class="hint">اضغط على النص لتعديله. استخدم ↑ ↓ لترتيب الـBlocks. هذه النسخة التجريبية تحفظ بنفس كود CBD.</div>
+      <div id="blocks" class="blocks"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/miniapp/static/app.js"></script>
+</body>
+</html>
