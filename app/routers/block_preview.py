@@ -69,10 +69,13 @@ async def preview_one_block(callback: CallbackQuery, state: FSMContext, bot: Bot
         await bot.send_message(callback.from_user.id, t("editor.preview_failed"))
         return
 
-    preview_ids[block_id] = [message.message_id for message in sent]
-    await state.update_data(block_preview_message_ids=preview_ids)
     label = get_block_label(str(block.get("type")))
-    await bot.send_message(
+    notice = await bot.send_message(
         callback.from_user.id,
         t("editor.preview_single_notice", label=label),
     )
+    preview_ids[block_id] = [
+        *[message.message_id for message in sent],
+        notice.message_id,
+    ]
+    await state.update_data(block_preview_message_ids=preview_ids)
