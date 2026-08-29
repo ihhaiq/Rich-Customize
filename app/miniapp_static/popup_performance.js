@@ -1,4 +1,4 @@
-// Beta 0.3.3 — compact floating popup placement + mobile performance tuning.
+// Beta 0.3.4 — compact floating popup placement + mobile performance tuning.
 (() => {
   const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
   const narrowViewport = Math.min(window.innerWidth || 9999, window.screen?.width || 9999) <= 820;
@@ -36,10 +36,10 @@
     return {left, top, right:left + width, bottom:top + height, width, height};
   }
 
-  function blockOptionsAnchor(blockId) {
+  function blockAnchor(blockId) {
     if (!blocksEl || !blockId) return null;
     for (const element of blocksEl.querySelectorAll(".block[data-id]")) {
-      if (element.dataset.id === String(blockId)) return element.querySelector(".mini-btn");
+      if (element.dataset.id === String(blockId)) return element;
     }
     return null;
   }
@@ -85,7 +85,7 @@
   if (baseOpenBlockMenu) {
     openBlockMenu = function(block) {
       const result = baseOpenBlockMenu(block);
-      const anchor = blockOptionsAnchor(block?.id) || lastToolbarAnchor;
+      const anchor = blockAnchor(block?.id) || lastToolbarAnchor;
       requestAnimationFrame(() => placePopup(blockMenu, anchor));
       return result;
     };
@@ -106,7 +106,7 @@
     cancelAnimationFrame(repositionFrame);
     repositionFrame = requestAnimationFrame(() => {
       if (!blockMenu?.classList.contains("hidden")) {
-        const selected = blocksEl?.querySelector?.(".block.selected .mini-btn");
+        const selected = blocksEl?.querySelector?.(".block.selected");
         placePopup(blockMenu, selected || lastToolbarAnchor);
       }
       if (!slashMenu?.classList.contains("hidden")) {
