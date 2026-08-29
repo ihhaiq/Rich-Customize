@@ -1,4 +1,4 @@
-/* Beta 0.3.3 — tactile press / long-press motion layer. */
+/* Beta 0.3.4 — tactile press / long-press motion layer. */
 
 *{
   -webkit-tap-highlight-color:transparent;
@@ -27,6 +27,40 @@ button,
 }
 .block.selected{
   outline:0!important;
+}
+
+/* The old three-dots control is removed from the visual editor completely. */
+.block-tools,
+.block .mini-btn{
+  display:none!important;
+}
+
+/* Long-press block menu is intentionally tiny: move up, move down, delete. */
+.block-quick-menu{
+  width:210px!important;
+  min-width:210px!important;
+  max-width:min(210px,calc(100vw - 20px))!important;
+  max-height:220px!important;
+  padding:6px!important;
+}
+.block-quick-menu .menu-list{
+  display:grid;
+  gap:3px;
+}
+.block-quick-menu .menu-item{
+  min-height:45px!important;
+  padding:8px 10px!important;
+  border-radius:13px!important;
+}
+.block-quick-menu .menu-icon{
+  width:30px!important;
+  font-size:19px!important;
+}
+.block-quick-menu .menu-copy strong{
+  font-size:14px!important;
+}
+.block-quick-menu .menu-item.danger{
+  color:var(--danger)!important;
 }
 
 .press-surface{
@@ -136,22 +170,6 @@ button.press-surface.long-pressing,
   100%{opacity:0;transform:translate(-50%,-50%) scale(9)}
 }
 
-.block-tools{
-  transform:translateY(-2px) scale(.92);
-  transition:opacity .16s ease,transform .2s cubic-bezier(.2,1.2,.2,1);
-}
-.block.selected .block-tools{
-  opacity:1;
-  transform:translateY(0) scale(1);
-}
-.block.selected .mini-btn{
-  animation:selectedToolIn .24s cubic-bezier(.2,1.35,.25,1);
-}
-@keyframes selectedToolIn{
-  from{opacity:0;transform:scale(.72) rotate(-8deg)}
-  to{opacity:1;transform:scale(1) rotate(0)}
-}
-
 .popup-menu:not(.hidden){
   animation:glassMenuIn .18s cubic-bezier(.18,.92,.24,1);
   transform-origin:top center;
@@ -177,7 +195,6 @@ button:focus-visible,
   outline-offset:2px;
 }
 
-/* Mobile fast path: preserve tactile feedback with cheaper compositing. */
 html.mobile-performance .press-surface{
   transition:transform .11s ease,opacity .11s ease!important;
   will-change:auto;
@@ -209,9 +226,6 @@ html.mobile-performance .press-surface.press-release{
 html.mobile-performance .press-surface.long-pressed{
   animation:mobileLongPress .22s ease-out!important;
 }
-html.mobile-performance .block.selected .mini-btn{
-  animation:none!important;
-}
 html.mobile-performance .popup-menu:not(.hidden){
   animation:mobileMenuIn .14s ease-out!important;
 }
@@ -236,13 +250,11 @@ html.mobile-performance .sheet:not(.hidden){
 }
 
 @media(prefers-reduced-motion:reduce){
-  .press-surface,
-  .block-tools{
+  .press-surface{
     transition:none!important;
   }
   .press-surface.press-release,
   .press-surface.long-pressed,
-  .block.selected .mini-btn,
   .popup-menu:not(.hidden),
   .sheet:not(.hidden),
   .press-ripple{
