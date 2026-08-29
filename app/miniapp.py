@@ -4,11 +4,12 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
 from pathlib import Path
 from urllib.parse import parse_qsl
 
-from aiohttp import web
+from aiohttp import ClientSession, ClientTimeout, web
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
@@ -23,6 +24,9 @@ from app.services.renderer import RichMessageRenderError, send_rich_message_post
 STATIC_DIR = Path(__file__).with_name("miniapp_static")
 _ADMIN_STATUSES = {"administrator", "creator"}
 BETA_VERSION = "0.3"
+_APPLE_EMOJI_CDN = "https://cdnjs.cloudflare.com/ajax/libs/emoji-datasource-apple/16.0.0"
+_APPLE_EMOJI_FILE_RE = re.compile(r"^[0-9a-f-]+\.png$")
+_APPLE_EMOJI_CACHE_LIMIT = 384
 
 
 def mini_app_url() -> str | None:
@@ -113,6 +117,59 @@ async def _eligible_destinations(bot: Bot, user_id: int) -> list[dict]:
 
 async def index(_: web.Request) -> web.FileResponse:
     return web.FileResponse(STATIC_DIR / "index.html")
+
+
+async def _fetch_apple_emoji_asset(request: web.Request, cache_key: str, upstream_url: str) -> tuple[bytes, str]:
+    cache: dict[str, tuple[bytes, str]] = request.app["apple_emoji_cache"]
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    session: ClientSession = request.app["apple_emoji_http"]
+    try:
+        async with session.get(upstream_url) as response:
+            if response.status != 200:
+                raise web.HTTPBadGateway(text=f"Apple emoji upstream HTTP {response.status}")
+            body = await response.read()
+            content_type = response.headers.get("Content-Type", "application/octet-stream").split(";", 1)[0]
+    except web.HTTPException:
+        raise
+    except Exception as exc:
+        raise web.HTTPBadGateway(text="Apple emoji upstream unavailable") from exc
+
+    cache[cache_key] = (body, content_type)
+    while len(cache) > _APPLE_EMOJI_CACHE_LIMIT:
+        cache.pop(next(iter(cache)))
+    return body, content_type
+
+
+async def apple_emoji_catalog(request: web.Request) -> web.Response:
+    body, content_type = await _fetch_apple_emoji_asset(
+        request,
+        "catalog",
+        f"{_APPLE_EMOJI_CDN}/emoji.json",
+    )
+    return web.Response(
+        body=body,
+        content_type=content_type or "application/json",
+        headers={"Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"},
+    )
+
+
+async def apple_emoji_image(request: web.Request) -> web.Response:
+    filename = request.match_info.get("filename", "").lower()
+    if not _APPLE_EMOJI_FILE_RE.fullmatch(filename):
+        raise web.HTTPNotFound(text="Emoji image not found")
+    body, content_type = await _fetch_apple_emoji_asset(
+        request,
+        f"img:{filename}",
+        f"{_APPLE_EMOJI_CDN}/img/apple/64/{filename}",
+    )
+    return web.Response(
+        body=body,
+        content_type=content_type or "image/png",
+        headers={"Cache-Control": "public, max-age=2592000, immutable"},
+    )
 
 
 async def api_me(request: web.Request) -> web.Response:
@@ -258,6 +315,16 @@ async def api_send_page(request: web.Request) -> web.Response:
     })
 
 
+async def _start_apple_emoji_proxy(app: web.Application) -> None:
+    app["apple_emoji_http"] = ClientSession(timeout=ClientTimeout(total=12))
+
+
+async def _stop_apple_emoji_proxy(app: web.Application) -> None:
+    session: ClientSession | None = app.get("apple_emoji_http")
+    if session is not None:
+        await session.close()
+
+
 def build_web_app(bot: Bot, bot_token: str) -> web.Application:
     # 55 MB lets the developer-only beta upload ordinary video/audio/documents
     # while app/miniapp_uploads.py still enforces per-kind limits.
@@ -265,9 +332,14 @@ def build_web_app(bot: Bot, bot_token: str) -> web.Application:
     app["bot"] = bot
     app["bot_token"] = bot_token
     app["developer_user"] = _developer_user
+    app["apple_emoji_cache"] = {}
+    app.on_startup.append(_start_apple_emoji_proxy)
+    app.on_cleanup.append(_stop_apple_emoji_proxy)
     app.router.add_get("/miniapp", index)
     app.router.add_get("/miniapp/", index)
     app.router.add_static("/miniapp/static", STATIC_DIR)
+    app.router.add_get("/miniapp/emoji/apple/emoji.json", apple_emoji_catalog)
+    app.router.add_get("/miniapp/emoji/apple/64/{filename}", apple_emoji_image)
     app.router.add_get("/miniapp/api/me", api_me)
     app.router.add_get("/miniapp/api/pages", api_pages)
     app.router.add_post("/miniapp/api/pages", api_create_page)
