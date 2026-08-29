@@ -26,6 +26,11 @@ body{
   background:var(--bg)!important;
 }
 
+::selection{
+  background:rgba(255,255,255,.14);
+  color:inherit;
+}
+
 /* Keep the document below Telegram's fullscreen/content-safe chrome. */
 .editor-screen{
   width:100%;
@@ -90,17 +95,15 @@ button:focus-visible,
   outline:none!important;
 }
 
-/* Press feedback remains subtle and neutral, never a blue square. */
+/* Press/active feedback remains subtle and neutral, never a blue square. */
 .composer-toolbar.floating-toolbar .toolbar-bubble button:active,
 .composer-toolbar.floating-toolbar .toolbar-bubble button.is-pressed,
+.composer-toolbar.floating-toolbar .toolbar-bubble button.active,
 .icon-btn:active,
-.icon-btn.is-pressed{
+.icon-btn.is-pressed,
+.icon-btn.active{
   background:rgba(255,255,255,.055)!important;
   color:var(--text)!important;
-  box-shadow:none!important;
-}
-
-.composer-toolbar.floating-toolbar .toolbar-bubble button.active:not(#emojiBtn){
   box-shadow:none!important;
 }
 
