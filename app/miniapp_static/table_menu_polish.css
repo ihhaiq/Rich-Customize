@@ -1,70 +1,61 @@
-/* Beta 0.3.30 — stronger liquid-glass treatment for table contextual tools. */
+/* Beta 0.3.31 — calm, uniform liquid-glass treatment for table contextual tools. */
 .table-cell-menu{
   isolation:isolate;
-  border:1px solid rgba(255,255,255,.16)!important;
-  background:
-    radial-gradient(120% 85% at 16% 0%,rgba(255,255,255,.14),transparent 42%),
-    radial-gradient(110% 90% at 100% 100%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 50%),
-    linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.018)),
-    color-mix(in srgb,var(--panel) 82%,transparent)!important;
+  border:1px solid rgba(255,255,255,.11)!important;
+  background:color-mix(in srgb,var(--panel) 76%,transparent)!important;
   box-shadow:
-    0 24px 58px rgba(0,0,0,.34),
-    inset 0 1px 0 rgba(255,255,255,.16),
-    inset 0 -1px 0 rgba(255,255,255,.04)!important;
-  backdrop-filter:blur(26px) saturate(178%)!important;
-  -webkit-backdrop-filter:blur(26px) saturate(178%)!important;
+    0 20px 48px rgba(0,0,0,.30),
+    inset 0 1px 0 rgba(255,255,255,.09),
+    inset 0 0 0 1px rgba(255,255,255,.018)!important;
+  backdrop-filter:blur(24px) saturate(132%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(132%)!important;
 }
 .table-cell-menu::before{
-  content:"";
-  position:absolute;
-  z-index:-1;
-  inset:1px;
-  border-radius:inherit;
-  pointer-events:none;
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.055),transparent 26%),
-    radial-gradient(80% 45% at 18% 4%,rgba(255,255,255,.09),transparent 58%);
+  content:none!important;
 }
 .table-scope-switch{
-  background:rgba(255,255,255,.055)!important;
-  border:1px solid rgba(255,255,255,.045);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.065)!important;
+  background:rgba(255,255,255,.035)!important;
+  border:1px solid rgba(255,255,255,.04);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
 }
 .table-scope-switch button{
-  transition:background .14s ease,color .14s ease,box-shadow .14s ease,transform .12s ease;
+  transition:background .14s ease,color .14s ease,border-color .14s ease,transform .12s ease;
+  border:1px solid transparent!important;
 }
 .table-scope-switch button.active{
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.065))!important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.12),
-    0 5px 14px rgba(0,0,0,.10)!important;
+  background:rgba(255,255,255,.075)!important;
+  border-color:rgba(255,255,255,.055)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055)!important;
 }
-.table-scope-switch button:active{transform:scale(.97)}
+.table-scope-switch button:active{transform:scale(.975)}
 .table-tool-icon{
-  background:rgba(255,255,255,.052)!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.055);
+  background:rgba(255,255,255,.038)!important;
+  border:1px solid rgba(255,255,255,.025)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025)!important;
+  transition:background .13s ease,border-color .13s ease,transform .12s ease,color .13s ease;
 }
 .table-tool-icon.active{
-  background:
-    linear-gradient(180deg,color-mix(in srgb,var(--accent) 24%,rgba(255,255,255,.05)),color-mix(in srgb,var(--accent) 13%,transparent))!important;
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),
-    inset 0 1px 0 rgba(255,255,255,.08)!important;
+  background:color-mix(in srgb,var(--accent) 15%,rgba(255,255,255,.035))!important;
+  border-color:color-mix(in srgb,var(--accent) 24%,rgba(255,255,255,.035))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04)!important;
 }
-.table-tool-row{transition:background .12s ease,transform .12s ease}
+.table-tool-icon:active{transform:scale(.95)}
+.table-tool-row{
+  transition:background .12s ease,transform .12s ease;
+}
 .table-tool-row:active{
-  background:rgba(255,255,255,.075)!important;
-  transform:scale(.985);
+  background:rgba(255,255,255,.05)!important;
+  transform:scale(.988);
 }
 .telegram-table-contextual tr.table-row-selected td{
-  background:color-mix(in srgb,var(--accent) 9%,transparent)!important;
+  background:color-mix(in srgb,var(--accent) 7%,transparent)!important;
 }
 .table-menu-scope-swap{
-  transition:opacity .09s ease!important;
+  transition:opacity .08s ease!important;
 }
 
 html.mobile-performance .table-cell-menu{
-  backdrop-filter:blur(14px) saturate(135%)!important;
-  -webkit-backdrop-filter:blur(14px) saturate(135%)!important;
+  backdrop-filter:blur(13px) saturate(118%)!important;
+  -webkit-backdrop-filter:blur(13px) saturate(118%)!important;
+  box-shadow:0 12px 30px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.045)!important;
 }
