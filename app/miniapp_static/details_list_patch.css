@@ -1,0 +1,166 @@
+/* Beta 0.3.5 — Details block and list-tool menu presentation. */
+.telegram-details-v035{
+  margin:8px 0 12px!important;
+  padding:0 12px 11px!important;
+  border:0!important;
+  border-bottom:1px solid var(--tg-rich-line)!important;
+  border-radius:0!important;
+  background:transparent!important;
+  overflow:visible!important;
+  box-shadow:none!important;
+}
+
+.details-header-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  min-height:46px;
+  direction:ltr;
+}
+
+.details-title-side{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+  flex:1 1 auto;
+}
+
+.details-toggle-btn{
+  flex:0 0 auto;
+  width:30px;
+  height:30px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  border:0;
+  border-radius:50%;
+  color:var(--tg-rich-muted);
+  background:transparent;
+  box-shadow:none;
+  touch-action:manipulation;
+}
+.details-toggle-btn svg{
+  width:18px;
+  height:18px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  transition:transform .18s cubic-bezier(.2,.8,.2,1);
+}
+.telegram-details-v035.is-expanded .details-toggle-btn svg{transform:rotate(180deg)}
+.details-toggle-btn:active{background:rgba(255,255,255,.055)}
+
+.telegram-details-v035 .details-title-input{
+  width:100%;
+  min-width:0;
+  min-height:34px;
+  padding:2px 0!important;
+  border:0!important;
+  outline:0!important;
+  background:transparent!important;
+  color:var(--text)!important;
+  font:inherit;
+  font-size:17px!important;
+  font-weight:500!important;
+  text-align:left;
+  direction:auto;
+}
+.telegram-details-v035 .details-title-input::placeholder{color:var(--tg-rich-muted)}
+
+.details-expand-state{
+  flex:0 0 auto;
+  color:var(--tg-rich-muted);
+  font-size:14px;
+  font-weight:400;
+  letter-spacing:.01em;
+  direction:ltr;
+  user-select:none;
+}
+
+.telegram-details-v035 .details-live-body{
+  display:grid;
+  gap:7px;
+  min-height:34px;
+  padding:8px 0 0 30px!important;
+  border-top:0!important;
+  color:var(--text)!important;
+  font-size:inherit!important;
+  transition:opacity .14s ease,transform .16s ease;
+}
+.telegram-details-v035.is-collapsed .details-live-body{display:none!important}
+.details-empty-live{min-height:28px}
+
+.details-child-preview{
+  min-width:0;
+  padding:1px 0;
+  color:var(--text);
+  word-break:break-word;
+}
+.details-child-divider{margin:6px 0!important}
+.details-nested-list{margin:0!important}
+.details-nested-table{margin:2px 0!important}
+.details-nested-table td{
+  min-width:60px;
+  padding:6px 8px;
+  border:1px solid var(--tg-rich-line);
+  font-size:14px;
+}
+.details-nested-details{
+  display:grid;
+  gap:6px;
+  padding-inline-start:10px;
+  border-inline-start:2px solid var(--tg-rich-line);
+}
+.details-nested-details>strong{font-size:14px;color:var(--tg-rich-muted)}
+.details-nested-media{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-height:40px;
+  padding:7px 9px;
+  border:1px solid var(--tg-rich-line);
+  border-radius:10px;
+  color:var(--tg-rich-muted);
+  font-size:14px;
+}
+
+/* The list toolbar is a small fixed four-command bubble, not the generic block catalogue. */
+.slash-menu.list-tool-menu{
+  width:228px!important;
+  min-width:228px!important;
+  max-width:min(228px,calc(100vw - 20px))!important;
+  max-height:270px!important;
+  padding:7px!important;
+}
+.slash-menu.list-tool-menu .menu-head{display:none!important}
+.slash-menu.list-tool-menu .menu-list{gap:2px!important}
+.slash-menu.list-tool-menu .menu-item{
+  min-height:48px!important;
+  padding:8px 10px!important;
+  border-radius:13px!important;
+}
+.slash-menu.list-tool-menu .menu-icon{
+  width:34px!important;
+  font-size:21px!important;
+  font-weight:650;
+  text-align:center;
+}
+.slash-menu.list-tool-menu .menu-copy strong{font-size:15px!important}
+.slash-menu.list-tool-menu .menu-copy small{display:none!important}
+
+html.mobile-performance .details-toggle-btn svg{transition-duration:.1s}
+html.mobile-performance .telegram-details-v035 .details-live-body{transition:none}
+
+@media(max-width:390px){
+  .details-header-row{min-height:42px;gap:10px}
+  .details-toggle-btn{width:28px;height:28px}
+  .details-expand-state{font-size:13px}
+  .slash-menu.list-tool-menu{
+    width:216px!important;
+    min-width:216px!important;
+  }
+}
