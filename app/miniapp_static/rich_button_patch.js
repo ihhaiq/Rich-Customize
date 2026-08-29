@@ -1,4 +1,4 @@
-// Beta 0.3.8 — Rich Button pseudo-blocks rendered as Telegram inline buttons.
+// Beta 0.3.11 — Telegram-style Rich Button chips + contextual text insertion.
 (() => {
   const TYPE_INFO = {
     user: {label:"مستخدم", icon:"👤", action:"تحديد مستخدم"},
@@ -7,8 +7,6 @@
     page_callback: {label:"CBD / صفحة", icon:"📚", action:"ربط بصفحة محفوظة"},
     copy: {label:"نسخ", icon:"📋", action:"تعديل نص النسخ"},
     popup: {label:"Popup", icon:"💬", action:"تعديل نص التنبيه"},
-    web_app: {label:"Web App", icon:"🌐", action:"تعديل رابط Web App"},
-    login_url: {label:"Login URL", icon:"🔐", action:"تعديل Login URL"},
     switch_inline_query: {label:"بحث Inline", icon:"⌕", action:"تعديل نص البحث"},
     switch_inline_query_current_chat: {label:"بحث هنا", icon:"⌖", action:"تعديل نص البحث هنا"},
     disabled: {label:"معطّل", icon:"⊘", action:null},
@@ -50,9 +48,9 @@
   }
 
   function createRichButton(type) {
-    if (!current) return null;
+    if (!current || !TYPE_INFO[type]) return null;
     const block = defaultBlock("paragraph");
-    const typeInfo = TYPE_INFO[type] || TYPE_INFO.url;
+    const typeInfo = TYPE_INFO[type];
     block.data._rich_button = {
       button_type: type,
       title: typeInfo.label === "Callback data" ? "زر" : typeInfo.label,
@@ -87,18 +85,13 @@
   function richButtonEditor(block) {
     const rb = block.data?._rich_button || {};
     const wrap = document.createElement("div");
-    wrap.className = "rich-button-live-wrap";
-    const visual = document.createElement("div");
-    visual.className = `rich-button-live ${buttonStyleClass(rb)}${isConfigured(rb) ? "" : " is-unconfigured"}`;
+    wrap.className = "rich-button-live-wrap telegram-rich-button-row";
+    const visual = document.createElement("span");
+    visual.className = `rich-button-live telegram-rich-inline-button ${buttonStyleClass(rb)}${isConfigured(rb) ? "" : " is-unconfigured"}`;
     visual.textContent = cleanTitle(rb.title);
     visual.setAttribute("role", "button");
-    visual.setAttribute("aria-label", `${cleanTitle(rb.title)} · ${TYPE_INFO[rb.button_type]?.label || rb.button_type}`);
-    const meta = document.createElement("div");
-    meta.className = "rich-button-meta";
-    const type = TYPE_INFO[rb.button_type] || {icon:"▣",label:rb.button_type || "زر"};
-    const target = rb.target_title || rb.target_label || (rb.value && rb.button_type !== "callback_data" ? rb.value : "");
-    meta.textContent = `${type.icon} ${type.label}${target ? ` · ${target}` : isConfigured(rb) ? "" : " · يحتاج تخصيص"}`;
-    wrap.append(visual, meta);
+    visual.setAttribute("aria-label", `${cleanTitle(rb.title)} · ${TYPE_INFO[rb.button_type]?.label || "زر غني"}`);
+    wrap.appendChild(visual);
     return wrap;
   }
 
@@ -148,7 +141,7 @@
     input.className = "rich-button-editor-input";
     input.placeholder = placeholder;
     input.value = field === "title" ? cleanTitle(rb.title) : String(rb.value || "");
-    if (input.tagName === "INPUT" && ["url","web_app","login_url"].includes(rb.button_type)) input.type = "url";
+    if (input.tagName === "INPUT" && rb.button_type === "url") input.type = "url";
     const actions = document.createElement("div");
     actions.className = "rich-button-editor-actions";
     const cancel = document.createElement("button");
@@ -229,6 +222,27 @@
     }
   }
 
+  function insertTextNear(block, before) {
+    if (!current) return;
+    const blockIndex = current.blocks.findIndex(item => String(item.id) === String(block.id));
+    if (blockIndex < 0) return;
+    const paragraph = defaultBlock("paragraph");
+    const targetIndex = before ? blockIndex : blockIndex + 1;
+    current.blocks.splice(targetIndex, 0, paragraph);
+    normalizePositions();
+    selectedBlockId = paragraph.id;
+    insertIndex = targetIndex + 1;
+    hideMenus();
+    renderBlocks();
+    markDirty();
+    pushHistory();
+    requestAnimationFrame(() => {
+      const editor = blocksEl.querySelector(`[data-id="${paragraph.id}"] textarea,[data-id="${paragraph.id}"] [contenteditable="true"]`);
+      editor?.focus?.();
+      editor?.scrollIntoView?.({block:"center", behavior:"smooth"});
+    });
+  }
+
   function openColorMenu(block) {
     const rb = block.data._rich_button;
     blockActions.innerHTML = "";
@@ -279,8 +293,6 @@
         url:"https://example.com",
         copy:"النص المطلوب نسخه",
         popup:"نص التنبيه",
-        web_app:"https://example.com/app",
-        login_url:"https://example.com/login",
         switch_inline_query:"كلمة البحث",
         switch_inline_query_current_chat:"كلمة البحث هنا",
       }[rb.button_type] || "القيمة";
@@ -291,6 +303,9 @@
     }
 
     blockActions.appendChild(menuButton("◉","تغيير اللون","",() => openColorMenu(block)));
+    blockActions.appendChild(separator());
+    blockActions.appendChild(menuButton("＋","إضافة نص قبله","",() => insertTextNear(block,true)));
+    blockActions.appendChild(menuButton("＋","إضافة نص بعده","",() => insertTextNear(block,false)));
     blockActions.appendChild(separator());
 
     const index = current.blocks.findIndex(item => String(item.id) === String(block.id));
