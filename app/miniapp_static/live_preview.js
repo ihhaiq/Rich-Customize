@@ -14,6 +14,28 @@ function liveEditable(block, className, placeholder) {
   return el;
 }
 
+function quoteWithCredit(block, className, quotePlaceholder) {
+  const wrap = document.createElement("div");
+  wrap.className = "live-quote-wrap";
+  wrap.appendChild(liveEditable(block, className, quotePlaceholder));
+
+  const credit = document.createElement("div");
+  credit.className = "live-editor live-credit";
+  credit.contentEditable = "true";
+  credit.spellcheck = true;
+  credit.dataset.placeholder = "إضافة الكاتب";
+  credit.textContent = block.data?.credit_text || "";
+  credit.addEventListener("focus", () => selectBlock(block.id));
+  credit.addEventListener("input", () => {
+    const d = block.data || (block.data = {});
+    d.credit_text = credit.innerText.replace(/\r/g, "");
+    d.credit_html = escapeHtml(d.credit_text);
+    markDirty();
+  });
+  wrap.appendChild(credit);
+  return wrap;
+}
+
 textEditor = function(block) {
   if (block.type === "heading") {
     const level = Math.max(1, Math.min(6, Number(block.data?.size || 2)));
@@ -21,8 +43,8 @@ textEditor = function(block) {
   }
   if (block.type === "footer") return liveEditable(block, "live-footer", "تذييل");
   if (block.type === "preformatted") return liveEditable(block, "live-pre", "اكتب الكود…");
-  if (block.type === "blockquote") return liveEditable(block, "live-quote", "اكتب الاقتباس…");
-  if (block.type === "pullquote") return liveEditable(block, "live-quote live-pullquote", "اكتب الاقتباس البارز…");
+  if (block.type === "blockquote") return quoteWithCredit(block, "live-quote", "اكتب الاقتباس…");
+  if (block.type === "pullquote") return quoteWithCredit(block, "live-quote live-pullquote", "اكتب الاقتباس البارز…");
   return liveEditable(block, "live-paragraph", info(block.type).label);
 };
 
@@ -165,7 +187,7 @@ renderBlocks = function() {
     const more = document.createElement("button");
     more.type = "button";
     more.className = "mini-btn";
-    more.textContent = "•••";
+    more.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>';
     more.setAttribute("aria-label", `إعدادات ${info(block.type).label}`);
     more.addEventListener("click", event => {
       event.stopPropagation();

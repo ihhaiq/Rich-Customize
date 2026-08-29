@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <title>Rich Customize Beta 0.2</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="/miniapp/static/style.css?v=0.2.3">
-  <link rel="stylesheet" href="/miniapp/static/media_upload.css?v=0.2.3">
-  <link rel="stylesheet" href="/miniapp/static/live_preview.css?v=0.2.3">
+  <link rel="stylesheet" href="/miniapp/static/style.css?v=0.2.4">
+  <link rel="stylesheet" href="/miniapp/static/media_upload.css?v=0.2.4">
+  <link rel="stylesheet" href="/miniapp/static/live_preview.css?v=0.2.4">
 </head>
 <body>
   <section id="editorView" class="editor-screen">
@@ -18,21 +18,37 @@
           <small id="saveState">غير محفوظ</small>
         </div>
         <div class="top-actions">
-          <button id="pagesBtn" class="icon-btn" type="button" aria-label="الصفحات المحفوظة">📁</button>
-          <button id="moreBtn" class="icon-btn" type="button" aria-label="المزيد">•••</button>
+          <button id="pagesBtn" class="icon-btn" type="button" aria-label="الصفحات المحفوظة">
+            <svg viewBox="0 0 24 24"><path d="M4 7.5c0-1.1.9-2 2-2h3.5l1.6 1.8H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7.5Z" stroke-linejoin="round"/></svg>
+          </button>
+          <button id="moreBtn" class="icon-btn" type="button" aria-label="المزيد">
+            <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
+          </button>
         </div>
       </header>
 
       <nav class="composer-toolbar" aria-label="أدوات المحرر">
-        <button id="undoBtn" type="button" disabled aria-label="تراجع"><b>↶</b></button>
-        <button id="redoBtn" type="button" disabled aria-label="إعادة"><b>↷</b></button>
+        <button id="undoBtn" type="button" disabled aria-label="تراجع">
+          <svg viewBox="0 0 24 24"><path d="M7 8H4V5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 8c1.8-2.5 4.6-4 8-4a9 9 0 1 1-8.6 11.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button id="redoBtn" type="button" disabled aria-label="إعادة">
+          <svg viewBox="0 0 24 24"><path d="M17 8h3V5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 8c-1.8-2.5-4.6-4-8-4a9 9 0 1 0 8.6 11.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
         <span class="toolbar-sep"></span>
-        <button type="button" data-tool="text" aria-label="نص"><b>Aa</b></button>
-        <button type="button" data-tool="list" aria-label="قائمة"><b>☷</b></button>
-        <button type="button" data-tool="table" class="has-badge" aria-label="جدول"><b>▦</b></button>
-        <button type="button" data-tool="media" aria-label="مرفق"><b>◨</b></button>
-        <button type="button" data-tool="math" class="has-badge" aria-label="معادلة"><b>Σ</b></button>
-        <button id="allBlocksBtn" type="button" aria-label="كل البلوكات"><b>＋</b></button>
+        <button type="button" data-tool="text" aria-label="نص"><b class="glyph">Aa</b></button>
+        <button type="button" data-tool="list" class="has-badge" aria-label="قائمة">
+          <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" stroke-linecap="round"/><circle cx="4.5" cy="6" r="1.15" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.15" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.15" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button type="button" data-tool="table" class="has-badge" aria-label="جدول">
+          <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M9.5 4.5v15"/></svg>
+        </button>
+        <button type="button" data-tool="media" class="has-badge" aria-label="مرفق">
+          <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6" fill="currentColor" stroke="none"/><path d="m4.5 17 5-5 3.2 3.2L16.5 11l3 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" data-tool="math" class="has-badge" aria-label="معادلة"><b class="glyph">&Sigma;</b></button>
+        <button id="allBlocksBtn" type="button" aria-label="كل البلوكات">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+        </button>
       </nav>
     </div>
 
@@ -68,7 +84,9 @@
     </aside>
 
     <div class="bottom-actions">
-      <button id="deleteSelectedBtn" class="fab fab-ghost" type="button" aria-label="حذف البلوك المحدد">🗑</button>
+      <button id="deleteSelectedBtn" class="fab fab-ghost" type="button" aria-label="حذف البلوك المحدد">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M9.5 7V5.2c0-.66.54-1.2 1.2-1.2h2.6c.66 0 1.2.54 1.2 1.2V7M7 7l.7 12a2 2 0 0 0 2 1.9h4.6a2 2 0 0 0 2-1.9L17 7"/></svg>
+      </button>
       <button id="sendBtn" class="fab fab-send" type="button" aria-label="إرسال">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 11.5 20.5 3 15 20.5l-4.2-6.3L3 11.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
@@ -82,7 +100,7 @@
   <aside id="pagesPanel" class="sheet hidden" aria-label="الصفحات المحفوظة">
     <div class="sheet-handle"></div>
     <div class="sheet-header">
-      <div><strong>📁 الصفحات المحفوظة</strong><small>افتح صفحة أو ابدأ صفحة جديدة</small></div>
+      <div><strong><svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:-2px" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 7.5c0-1.1.9-2 2-2h3.5l1.6 1.8H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7.5Z"/></svg> الصفحات المحفوظة</strong><small>افتح صفحة أو ابدأ صفحة جديدة</small></div>
       <button id="newPageBtn" class="soft-btn" type="button">＋ جديدة</button>
     </div>
     <div id="pages" class="sheet-list"></div>
@@ -98,10 +116,10 @@
   </aside>
 
   <div id="toast" class="toast" role="status"></div>
-  <script src="/miniapp/static/app.js?v=0.2.3"></script>
-  <script src="/miniapp/static/app_patch.js?v=0.2.3"></script>
-  <script src="/miniapp/static/media_upload.js?v=0.2.3"></script>
-  <script src="/miniapp/static/live_preview.js?v=0.2.3"></script>
-  <script src="/miniapp/static/toolbar_fab.js?v=0.2.3"></script>
+  <script src="/miniapp/static/app.js?v=0.2.4"></script>
+  <script src="/miniapp/static/app_patch.js?v=0.2.4"></script>
+  <script src="/miniapp/static/media_upload.js?v=0.2.4"></script>
+  <script src="/miniapp/static/live_preview.js?v=0.2.4"></script>
+  <script src="/miniapp/static/toolbar_fab.js?v=0.2.4"></script>
 </body>
 </html>
