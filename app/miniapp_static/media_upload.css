@@ -1,1 +1,7 @@
-.gallery-picker{display:none!important}.photo-pick-btn{justify-self:start;min-width:170px}.photo-upload-status{color:var(--muted);font-size:13px;line-height:1.55}.media-placeholder:not(.invalid) .photo-upload-status{color:color-mix(in srgb,var(--text) 70%,var(--muted))}
+.gallery-picker{display:none!important}
+.media-pick-btn{justify-self:start;min-width:190px}
+.media-upload-status,.photo-upload-status{color:var(--muted);font-size:13px;line-height:1.55}
+.media-live-preview{display:block;width:100%;max-height:430px;object-fit:cover;border-radius:14px;background:#000}
+video.media-live-preview{object-fit:contain}
+.audio-live-preview{display:block;width:100%;min-height:44px}
+.media-picker-card:not(.invalid) .media-upload-status,.media-picker-card:not(.invalid) .photo-upload-status{color:color-mix(in srgb,var(--text) 72%,var(--muted))}
