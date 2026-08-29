@@ -19,6 +19,7 @@ from aiogram.utils.token import TokenValidationError
 
 from app.config import Settings
 from app.i18n import LocaleMiddleware, LocalizedBot, configure_bot_profile
+from app.miniapp import start_mini_app_server
 from app.routers import router
 from app.services.media import cleanup_interval_seconds, media_store
 from app.services.page_registry import page_registry
@@ -141,36 +142,24 @@ async def prepare_telegram(bot: LocalizedBot) -> bool:
             logger.critical(
                 "Telegram returned 404 Not Found during %s. BOT_TOKEN is empty, "
                 "malformed, incomplete, or no longer valid. Replace BOT_TOKEN "
-                "with the exact token from @BotFather.",
-                stage,
+                "with the exact token from @BotFather."
             )
             return False
         except TelegramRetryAfter as error:
-            retry_delay = min(
-                max(int(error.retry_after) + 1, retry_delay),
-                MAX_RETRY_DELAY,
-            )
+            retry_delay = min(max(int(error.retry_after) + 1, retry_delay), MAX_RETRY_DELAY)
             logger.warning(
                 "Telegram rate limit during %s (attempt=%s); retrying in %ss",
-                stage,
-                attempt,
-                retry_delay,
+                stage, attempt, retry_delay,
             )
         except (TelegramNetworkError, TelegramServerError) as error:
             logger.warning(
-                "Temporary Telegram failure during %s (attempt=%s, error=%s); "
-                "retrying in %ss",
-                stage,
-                attempt,
-                error,
-                retry_delay,
+                "Temporary Telegram failure during %s (attempt=%s, error=%s); retrying in %ss",
+                stage, attempt, error, retry_delay,
             )
         except TelegramAPIError as error:
             logger.critical(
-                "Telegram rejected startup during %s with a non-retryable API "
-                "error: %s",
-                stage,
-                error,
+                "Telegram rejected startup during %s with a non-retryable API error: %s",
+                stage, error,
             )
             return False
 
@@ -198,8 +187,8 @@ async def main() -> None:
         bot = DirectionAwareBot(settings.bot_token)
     except TokenValidationError:
         logger.critical(
-            "BOT_TOKEN has an invalid format. Paste only the exact token from "
-            "@BotFather without BOT_TOKEN=, quotes, spaces, or a URL."
+            "BOT_TOKEN has an invalid format. Paste only the exact token from @BotFather "
+            "without BOT_TOKEN=, quotes, spaces, or a URL."
         )
         return
 
@@ -213,9 +202,12 @@ async def main() -> None:
     dispatcher.include_router(router)
 
     cleanup_task: asyncio.Task[None] | None = None
+    miniapp_runner = None
     try:
         if not await prepare_telegram(bot):
             return
+        miniapp_runner = await start_mini_app_server(settings.bot_token)
+        logger.info("Developer Mini App Beta 0.1 server started")
         await page_registry.rebuild_media_pins()
         media_store.cleanup()
         cleanup_task = asyncio.create_task(_media_cleanup_loop(), name="rich-media-cleanup")
@@ -232,6 +224,8 @@ async def main() -> None:
                 await cleanup_task
             except asyncio.CancelledError:
                 pass
+        if miniapp_runner is not None:
+            await miniapp_runner.cleanup()
         await bot.session.close()
         logger.info("Telegram HTTP session closed")
 
