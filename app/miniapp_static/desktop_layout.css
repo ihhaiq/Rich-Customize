@@ -1,187 +1,194 @@
-/* Beta 0.3.26 — Telegram Desktop layout measured from the real visible WebView.
-   Telegram Desktop can expose a layout viewport wider than the side panel that
-   is actually visible. Never size desktop chrome from 100vw in that case. */
+/* Beta 0.3.27 — Telegram Desktop/Main Mini App viewport shell.
+   Main Mini Apps and button-launched Web Apps can report different pointer /
+   layout viewport characteristics. Desktop mode is therefore selected by
+   Telegram.WebApp.platform (class added by popup_performance.js), not by a
+   hover/pointer media query. */
 
-@media (hover:hover) and (pointer:fine){
-  :root{
-    --desktop-editor-max:720px;
-    --desktop-gutter:16px;
-    --desktop-visible-width:var(--visible-vw,100vw);
-  }
-
-  html,
-  body{
-    width:var(--desktop-visible-width)!important;
-    max-width:var(--desktop-visible-width)!important;
-    min-width:0!important;
-    min-height:100%;
-    margin:0!important;
-    overflow-x:hidden!important;
-  }
-
-  /* The whole editor is constrained to the *visible* Telegram WebView, not the
-     browser/layout viewport that Telegram Desktop may keep behind the panel. */
-  .editor-screen{
-    width:var(--desktop-visible-width)!important;
-    max-width:var(--desktop-visible-width)!important;
-    min-width:0!important;
-    min-height:100vh!important;
-    margin:0!important;
-    padding:12px var(--desktop-gutter) 96px!important;
-    overflow-x:hidden!important;
-  }
-
-  .editor-head,
-  .editor-main{
-    width:100%!important;
-    max-width:var(--desktop-editor-max)!important;
-    min-width:0!important;
-    margin-left:auto!important;
-    margin-right:auto!important;
-  }
-
-  .editor-head{
-    position:sticky!important;
-    top:0!important;
-    z-index:30!important;
-    padding:0!important;
-    background:transparent!important;
-    backdrop-filter:none!important;
-    -webkit-backdrop-filter:none!important;
-  }
-
-  .editor-topbar{
-    width:100%!important;
-    max-width:100%!important;
-    min-width:0!important;
-    margin:0 0 10px!important;
-    padding:10px 13px!important;
-    border-radius:20px!important;
-  }
-
-  .page-identity{
-    min-width:0!important;
-    max-width:100%!important;
-  }
-  .page-identity input{
-    width:100%!important;
-    min-width:0!important;
-    max-width:100%!important;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-  }
-
-  .composer-toolbar.floating-toolbar{
-    width:max-content!important;
-    max-width:100%!important;
-    margin:0 auto 8px!important;
-    padding:0!important;
-    gap:6px!important;
-    overflow:visible!important;
-  }
-
-  .composer-toolbar.floating-toolbar .tools-bubble{
-    max-width:min(390px,calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2) - 112px))!important;
-    overflow-x:auto!important;
-    overflow-y:hidden!important;
-  }
-
-  .editor-main{
-    padding:6px 0 44px!important;
-    overflow-x:hidden!important;
-  }
-
-  .canvas,
-  .content-flow,
-  .slash-wrap,
-  .starter-card,
-  .block,
-  .block-row,
-  .block-main{
-    width:auto;
-    min-width:0!important;
-    max-width:100%!important;
-  }
-
-  .starter-card{
-    width:100%!important;
-  }
-
-  /* A wide table scrolls inside its own surface only. */
-  .telegram-table,
-  .table-preview{
-    width:100%!important;
-    max-width:100%!important;
-    min-width:0!important;
-    overflow-x:auto!important;
-    overflow-y:visible!important;
-    overscroll-behavior-x:contain;
-  }
-  .telegram-table table,
-  .table-preview table{
-    width:100%!important;
-    min-width:420px!important;
-    max-width:none!important;
-  }
-
-  /* Fixed elements must be centered inside the visual viewport. */
-  .bottom-actions{
-    left:var(--visible-center-x,50%)!important;
-    right:auto!important;
-    bottom:0!important;
-    width:min(var(--desktop-editor-max),calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2)))!important;
-    max-width:calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2))!important;
-    transform:translateX(-50%)!important;
-    padding:12px 4px 16px!important;
-  }
-
-  .sheet{
-    left:var(--visible-center-x,50%)!important;
-    right:auto!important;
-    width:min(620px,calc(var(--desktop-visible-width) - 24px))!important;
-    max-width:calc(var(--desktop-visible-width) - 24px)!important;
-    transform:translateX(-50%)!important;
-    border-radius:24px 24px 0 0!important;
-  }
-
-  .popup-menu,
-  .text-toolbar-menu,
-  .text-heading-submenu,
-  .text-button-submenu,
-  .table-cell-menu{
-    max-width:calc(var(--desktop-visible-width) - 20px)!important;
-  }
-
-  /* Desktop should never inherit the low-cost mobile rendering preset just
-     because Telegram opened the Mini App in a narrow side panel. */
-  html.mobile-performance .editor-topbar,
-  html.mobile-performance .toolbar-bubble,
-  html.mobile-performance .popup-menu,
-  html.mobile-performance .sheet,
-  html.mobile-performance .starter-card,
-  html.mobile-performance .sheet-item,
-  html.mobile-performance .soft-btn,
-  html.mobile-performance .primary-soft,
-  html.mobile-performance .fab,
-  html.mobile-performance .media-picker-card{
-    backdrop-filter:blur(18px) saturate(150%)!important;
-    -webkit-backdrop-filter:blur(18px) saturate(150%)!important;
-  }
-
-  input,
-  textarea,
-  [contenteditable="true"]{
-    caret-color:var(--text);
-  }
+html.tg-desktop{
+  --desktop-editor-max:720px;
+  --desktop-gutter:10px;
+  --desktop-visible-width:var(--visible-vw,100vw);
 }
 
-/* Side-panel sized Telegram Desktop: fluid compact desktop, not mobile. */
-@media (hover:hover) and (pointer:fine) and (max-width:760px){
-  :root{--desktop-gutter:10px}
-  .editor-screen{padding-top:8px!important}
-  .editor-topbar{border-radius:17px!important}
-  .composer-toolbar.floating-toolbar{gap:4px!important}
-  .telegram-table table,
-  .table-preview table{min-width:360px!important}
+html.tg-desktop,
+html.tg-desktop body{
+  min-width:0!important;
+  min-height:100%;
+  margin:0!important;
+  overflow-x:hidden!important;
+}
+
+/* visualViewport.offsetLeft can be non-zero for Telegram Desktop's Main Mini
+   App pane. Put the editor shell inside the actually visible horizontal slice
+   instead of assuming that visible x always starts at zero. */
+html.tg-desktop .editor-screen{
+  box-sizing:border-box!important;
+  position:relative!important;
+  left:var(--visible-left,0px)!important;
+  width:var(--desktop-visible-width)!important;
+  max-width:var(--desktop-visible-width)!important;
+  min-width:0!important;
+  min-height:var(--visible-vh,100vh)!important;
+  margin:0!important;
+  padding:10px var(--desktop-gutter) 96px!important;
+  overflow-x:hidden!important;
+}
+
+html.tg-desktop .editor-head,
+html.tg-desktop .editor-main{
+  box-sizing:border-box!important;
+  width:min(var(--desktop-editor-max),calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2)))!important;
+  max-width:calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2))!important;
+  min-width:0!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+
+html.tg-desktop .editor-head{
+  position:sticky!important;
+  top:0!important;
+  z-index:30!important;
+  padding:0!important;
+  background:transparent!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+html.tg-desktop .editor-topbar{
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  margin:0 0 10px!important;
+  padding:10px 13px!important;
+  border-radius:20px!important;
+  overflow:hidden!important;
+}
+
+html.tg-desktop .page-identity{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  max-width:100%!important;
+}
+html.tg-desktop .top-actions{
+  flex:0 0 auto!important;
+}
+html.tg-desktop .page-identity input{
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+html.tg-desktop .composer-toolbar.floating-toolbar{
+  box-sizing:border-box!important;
+  width:max-content!important;
+  max-width:calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2))!important;
+  margin:0 auto 8px!important;
+  padding:0!important;
+  gap:5px!important;
+  overflow:visible!important;
+}
+
+html.tg-desktop .composer-toolbar.floating-toolbar .history-bubble,
+html.tg-desktop .composer-toolbar.floating-toolbar .emoji-bubble{
+  flex:0 0 auto!important;
+}
+html.tg-desktop .composer-toolbar.floating-toolbar .tools-bubble{
+  flex:0 1 auto!important;
+  min-width:0!important;
+  max-width:calc(var(--desktop-visible-width) - 168px)!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+}
+
+html.tg-desktop .editor-main{
+  padding:6px 0 44px!important;
+  overflow-x:hidden!important;
+}
+
+html.tg-desktop .canvas,
+html.tg-desktop .content-flow,
+html.tg-desktop .slash-wrap,
+html.tg-desktop .starter-card,
+html.tg-desktop .block,
+html.tg-desktop .block-row,
+html.tg-desktop .block-main{
+  box-sizing:border-box!important;
+  min-width:0!important;
+  max-width:100%!important;
+}
+html.tg-desktop .starter-card{
+  width:100%!important;
+}
+
+/* Wide tables scroll locally instead of increasing the page/layout width. */
+html.tg-desktop .telegram-table,
+html.tg-desktop .table-preview{
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  overflow-x:auto!important;
+  overflow-y:visible!important;
+  overscroll-behavior-x:contain;
+}
+html.tg-desktop .telegram-table table,
+html.tg-desktop .table-preview table{
+  width:100%!important;
+  min-width:360px!important;
+  max-width:none!important;
+}
+
+/* Fixed UI is positioned against the real visual viewport center. */
+html.tg-desktop .bottom-actions{
+  left:var(--visible-center-x,50%)!important;
+  right:auto!important;
+  bottom:0!important;
+  box-sizing:border-box!important;
+  width:min(var(--desktop-editor-max),calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2)))!important;
+  max-width:calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2))!important;
+  transform:translateX(-50%)!important;
+  padding:12px 4px 16px!important;
+}
+
+html.tg-desktop .sheet{
+  left:var(--visible-center-x,50%)!important;
+  right:auto!important;
+  box-sizing:border-box!important;
+  width:min(620px,calc(var(--desktop-visible-width) - 20px))!important;
+  max-width:calc(var(--desktop-visible-width) - 20px)!important;
+  transform:translateX(-50%)!important;
+  border-radius:24px 24px 0 0!important;
+}
+
+html.tg-desktop .popup-menu,
+html.tg-desktop .text-toolbar-menu,
+html.tg-desktop .text-heading-submenu,
+html.tg-desktop .text-button-submenu,
+html.tg-desktop .table-cell-menu{
+  max-width:calc(var(--desktop-visible-width) - 20px)!important;
+}
+
+/* A desktop side pane remains desktop even when only ~400–600px wide. */
+html.tg-desktop.mobile-performance .editor-topbar,
+html.tg-desktop.mobile-performance .toolbar-bubble,
+html.tg-desktop.mobile-performance .popup-menu,
+html.tg-desktop.mobile-performance .sheet,
+html.tg-desktop.mobile-performance .starter-card,
+html.tg-desktop.mobile-performance .sheet-item,
+html.tg-desktop.mobile-performance .soft-btn,
+html.tg-desktop.mobile-performance .primary-soft,
+html.tg-desktop.mobile-performance .fab,
+html.tg-desktop.mobile-performance .media-picker-card{
+  backdrop-filter:blur(18px) saturate(150%)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(150%)!important;
+}
+
+html.tg-desktop input,
+html.tg-desktop textarea,
+html.tg-desktop [contenteditable="true"]{
+  caret-color:var(--text);
 }
