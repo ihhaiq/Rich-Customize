@@ -3,44 +3,48 @@ from __future__ import annotations
 from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.types import (
-    InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove, WebAppInfo,
+    InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove,
 )
 
 from app.config import developer_ids
 from app.miniapp import mini_app_url
+from app.miniapp_links import direct_mini_app_link, mini_app_short_name
 from app.miniapp_rich_buttons import complete_user_picker
 
 router = Router(name="miniapp_beta")
 
 
-def _resume_url(page_id: str) -> str | None:
-    base = mini_app_url()
-    if not base:
-        return None
-    separator = "&" if "?" in base else "?"
-    return f"{base}{separator}page={page_id}"
+def _resume_link(bot_username: str, page_id: str) -> str:
+    return direct_mini_app_link(bot_username, f"page_{page_id}")
 
 
 @router.message(Command("app"), F.chat.type == "private")
 async def open_mini_app(message: Message) -> None:
     # /app remains an internal developer shortcut. Public users enter through
-    # Telegram's Main Mini App deep link: t.me/RichCustomizebot?startapp
+    # the Direct/Named Mini App link: t.me/RichCustomizebot/<short_name>
     if message.from_user is None or message.from_user.id not in developer_ids():
         return
-    url = mini_app_url()
-    if not url:
+    if not mini_app_url():
         await message.answer(
             "Mini App Beta 0.3 جاهزة، لكن ماكو رابط عام بعد. "
             "حدد MINI_APP_URL أو RAILWAY_PUBLIC_DOMAIN ثم أعد التشغيل."
         )
         return
+
+    me = await message.bot.get_me()
+    if not me.username:
+        await message.answer("تعذر تحديد يوزر البوت لفتح التطبيق المصغر.")
+        return
+
+    named_link = direct_mini_app_link(me.username)
     await message.answer(
         "🧪 Rich Customize Mini App — Beta 0.3\n\n"
-        "اختصار خاص بالمطور لفتح المحرر مباشرة.",
+        "اختصار خاص بالمطور لفتح نفس مسار الـNamed Mini App العام.\n"
+        f"Short name: {mini_app_short_name()}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(
                 text="🌐 فتح Mini App Beta 0.3",
-                web_app=WebAppInfo(url=url),
+                url=named_link,
             )
         ]]),
     )
@@ -79,14 +83,14 @@ async def receive_miniapp_rich_button_user(message: Message) -> None:
         reply_markup=ReplyKeyboardRemove(),
     )
 
-    resume_url = _resume_url(str(result["page_id"]))
-    if resume_url:
+    me = await message.bot.get_me()
+    if me.username:
         await message.answer(
             "↩️ كمل التحرير من نفس المكان:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
                 InlineKeyboardButton(
                     text="↩️ متابعة التحرير",
-                    web_app=WebAppInfo(url=resume_url),
+                    url=_resume_link(me.username, str(result["page_id"])),
                 )
             ]]),
         )
