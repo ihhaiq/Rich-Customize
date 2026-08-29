@@ -114,16 +114,20 @@ def build_table_display_keyboard(block: dict[str, Any]) -> InlineKeyboardMarkup:
 
 
 def _editor_input_block_with_table_features(block: dict[str, Any], path: str) -> dict[str, Any]:
-    """Keep renderer behavior intact and add Bot API 10.3 table properties."""
+    """Keep renderer behavior intact and add/normalize current table properties."""
     payload = _original_editor_input_block(block, path)
     if block.get("type") != "table" or payload.get("type") != "table":
         return payload
     data = block.get("data", {})
     native = data.get("native_data") if isinstance(data.get("native_data"), dict) else {}
-    if "is_compact" in data:
-        payload["is_compact"] = True if data.get("is_compact") else None
-    elif native.get("is_compact"):
-        payload["is_compact"] = True
+    values = {
+        "is_bordered": data.get("is_bordered", native.get("is_bordered", True)),
+        "is_striped": data.get("is_striped", native.get("is_striped")),
+        "is_compact": data.get("is_compact", native.get("is_compact")),
+    }
+    for field, value in values.items():
+        # Bot API defines these as optional True fields; omission means disabled.
+        payload[field] = True if value else None
     return payload
 
 
@@ -235,7 +239,7 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
         await message.answer("أرسل عنوانًا صحيحًا أو /empty لإزالته.")
         return
     else:
-        table_data["caption_rich_text"] = message.html_text or text
+        table_data["caption_rich_text"] = None
         table_data["caption_html"] = message.html_text or text
         table_data["caption_text"] = text
     await state.update_data(blocks=blocks, table_caption_block_id=None)
