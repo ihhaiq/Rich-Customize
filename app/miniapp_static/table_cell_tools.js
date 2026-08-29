@@ -1,4 +1,4 @@
-// Beta 0.3.24 — Telegram-style contextual table cell/row tools.
+// Beta 0.3.29 — stable Telegram-style contextual table cell/row tools.
 (() => {
   const state = {
     blockId: null,
@@ -6,6 +6,7 @@
     col: -1,
     scope: "cell",
     anchor: null,
+    anchorRect: null,
     menu: null,
   };
 
@@ -19,7 +20,9 @@
 
   function currentTableBlock() {
     if (!state.blockId || typeof current === "undefined") return null;
-    return current?.blocks?.find?.(block => String(block.id) === String(state.blockId) && block.type === "table") || null;
+    return current?.blocks?.find?.(
+      block => String(block.id) === String(state.blockId) && block.type === "table"
+    ) || null;
   }
 
   function cellObject(raw) {
@@ -29,7 +32,8 @@
   }
 
   function rowsFor(block) {
-    const d = block?.data || (block.data = {});
+    if (!block) return [];
+    const d = block.data || (block.data = {});
     return Array.isArray(d.rows) ? d.rows : (d.rows = []);
   }
 
@@ -37,7 +41,6 @@
     const rows = rowsFor(block);
     if (!rows[ri] || ci < 0 || ci >= rows[ri].length) return null;
     const cell = cellObject(rows[ri][ci]);
-    cell.setdefault = undefined;
     if (!cell.valign) cell.valign = "middle";
     rows[ri][ci] = cell;
     return cell;
@@ -47,7 +50,9 @@
     const rows = rowsFor(block);
     if (!rows[state.row]) return [];
     if (state.scope === "row") {
-      return rows[state.row].map((_, ci) => ({ri:state.row, ci, cell:ensureCell(block, state.row, ci)}));
+      return rows[state.row]
+        .map((_, ci) => ({ri:state.row, ci, cell:ensureCell(block, state.row, ci)}))
+        .filter(item => item.cell);
     }
     const cell = ensureCell(block, state.row, state.col);
     return cell ? [{ri:state.row, ci:state.col, cell}] : [];
@@ -63,6 +68,29 @@
       max = Math.max(max, width);
     });
     return max;
+  }
+
+  function closeMenu() {
+    if (state.menu) state.menu.remove();
+    state.menu = null;
+  }
+
+  function clearSelectionVisuals() {
+    document.querySelectorAll(".telegram-table td.table-cell-selected")
+      .forEach(td => td.classList.remove("table-cell-selected"));
+    document.querySelectorAll(".telegram-table tr.table-row-selected")
+      .forEach(tr => tr.classList.remove("table-row-selected"));
+    document.querySelectorAll(".table-cell-handle")
+      .forEach(handle => handle.remove());
+  }
+
+  function refreshScopeVisuals() {
+    document.querySelectorAll(".telegram-table tr.table-row-selected")
+      .forEach(tr => tr.classList.remove("table-row-selected"));
+    if (state.scope !== "row") return;
+    const blockEl = document.querySelector(`.block[data-id="${CSS.escape(String(state.blockId))}"]`);
+    const rowEl = blockEl?.querySelector?.(`.telegram-table tr:nth-child(${state.row + 1})`);
+    rowEl?.classList.add("table-row-selected");
   }
 
   function sync(block, {rerender = true} = {}) {
@@ -137,7 +165,13 @@
     }
     cell.colspan = 1;
     row[state.col] = cell;
-    for (let i = 1; i < span; i += 1) row.splice(state.col + i, 0, {text:"", align:cell.align || "left", valign:cell.valign || "middle"});
+    for (let i = 1; i < span; i += 1) {
+      row.splice(state.col + i, 0, {
+        text:"",
+        align:cell.align || "left",
+        valign:cell.valign || "middle",
+      });
+    }
     haptic("medium");
     sync(block);
   }
@@ -174,6 +208,7 @@
     btn.title = label;
     btn.innerHTML = svg;
     btn.addEventListener("click", event => {
+      event.preventDefault();
       event.stopPropagation();
       handler();
     });
@@ -201,13 +236,49 @@
     btn.className = `table-tool-row${danger ? " danger" : ""}`;
     btn.innerHTML = `<span class="table-tool-row-icon">${icon}</span><strong>${title}</strong>`;
     btn.addEventListener("click", event => {
+      event.preventDefault();
       event.stopPropagation();
       handler();
     });
     return btn;
   }
 
+  function anchorRect() {
+    if (state.anchor?.isConnected) {
+      state.anchorRect = state.anchor.getBoundingClientRect();
+    }
+    return state.anchorRect;
+  }
+
+  function positionMenu() {
+    if (!state.menu) return;
+    const anchor = anchorRect();
+    if (!anchor) return;
+    const menu = state.menu;
+    const vv = window.visualViewport;
+    const viewportLeft = Number(vv?.offsetLeft || 0);
+    const viewportTop = Number(vv?.offsetTop || 0);
+    const viewportWidth = Number(vv?.width || window.innerWidth || 1);
+    const viewportHeight = Number(vv?.height || window.innerHeight || 1);
+    const viewportRight = viewportLeft + viewportWidth;
+    const viewportBottom = viewportTop + viewportHeight;
+    const margin = 10;
+    const width = menu.offsetWidth || 292;
+    const height = menu.offsetHeight || 360;
+
+    let left = anchor.left;
+    let top = anchor.bottom + 8;
+    if (left + width > viewportRight - margin) left = viewportRight - width - margin;
+    if (left < viewportLeft + margin) left = viewportLeft + margin;
+    if (top + height > viewportBottom - margin) {
+      top = Math.max(viewportTop + margin, anchor.top - height - 8);
+    }
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+  }
+
   function buildMenu() {
+    anchorRect();
     closeMenu();
     const block = currentTableBlock();
     if (!block) return;
@@ -221,6 +292,10 @@
     menu.setAttribute("role", "dialog");
     menu.setAttribute("aria-label", "تخصيص الجدول");
 
+    // The menu lives in document.body, outside .telegram-table. Keep pointer
+    // events inside it from being interpreted as an outside-table click.
+    menu.addEventListener("pointerdown", event => event.stopPropagation());
+
     const scope = document.createElement("div");
     scope.className = "table-scope-switch";
     [["cell","الخلية"],["row","الصف"]].forEach(([value,label]) => {
@@ -228,9 +303,14 @@
       btn.type = "button";
       btn.textContent = label;
       btn.classList.toggle("active", state.scope === value);
+      btn.addEventListener("pointerdown", event => event.stopPropagation());
       btn.addEventListener("click", event => {
+        event.preventDefault();
         event.stopPropagation();
+        if (state.scope === value) return;
         state.scope = value;
+        refreshScopeVisuals();
+        haptic();
         buildMenu();
       });
       scope.appendChild(btn);
@@ -244,7 +324,9 @@
 
     const align = document.createElement("div");
     align.className = "table-align-grid";
-    const representative = state.scope === "row" ? cellObject(rows[state.row]?.[0]) : cell;
+    const representative = state.scope === "row"
+      ? cellObject(rows[state.row]?.[0])
+      : cell;
     align.append(
       iconButton("محاذاة يسار", icons.left, () => setHorizontal("left"), representative.align === "left"),
       iconButton("توسيط أفقي", icons.center, () => setHorizontal("center"), representative.align === "center"),
@@ -262,10 +344,16 @@
     };
     sep();
 
-    menu.appendChild(actionRow(icons.shade, state.scope === "row" ? "تلوين الصف" : "تلوين الخلية", toggleShade));
+    menu.appendChild(actionRow(
+      icons.shade,
+      state.scope === "row" ? "تلوين الصف" : "تلوين الخلية",
+      toggleShade,
+    ));
     if (state.scope === "cell") {
       menu.appendChild(actionRow(icons.merge, "دمج مع الخلية التالية", mergeRight));
-      if (Number(cell.colspan || 1) > 1) menu.appendChild(actionRow(icons.split, "فك دمج الخلية", unmerge));
+      if (Number(cell.colspan || 1) > 1) {
+        menu.appendChild(actionRow(icons.split, "فك دمج الخلية", unmerge));
+      }
     }
     sep();
     menu.appendChild(actionRow(icons.up, "إضافة صف للأعلى", () => addRow(0)));
@@ -278,37 +366,12 @@
     requestAnimationFrame(() => menu.classList.add("show"));
   }
 
-  function positionMenu() {
-    if (!state.menu || !state.anchor?.isConnected) return;
-    const menu = state.menu;
-    const anchor = state.anchor.getBoundingClientRect();
-    const margin = 10;
-    const width = menu.offsetWidth || 292;
-    const height = menu.offsetHeight || 360;
-    let left = anchor.left;
-    let top = anchor.bottom + 8;
-    if (left + width > window.innerWidth - margin) left = window.innerWidth - width - margin;
-    if (left < margin) left = margin;
-    if (top + height > window.innerHeight - margin) top = Math.max(margin, anchor.top - height - 8);
-    menu.style.left = `${Math.round(left)}px`;
-    menu.style.top = `${Math.round(top)}px`;
-  }
-
-  function closeMenu() {
-    if (state.menu) state.menu.remove();
-    state.menu = null;
-  }
-
-  function clearSelectionVisuals() {
-    document.querySelectorAll(".telegram-table td.table-cell-selected").forEach(td => td.classList.remove("table-cell-selected"));
-    document.querySelectorAll(".table-cell-handle").forEach(handle => handle.remove());
-  }
-
   function selectCell(block, td, ri, ci) {
     state.blockId = String(block.id);
     state.row = ri;
     state.col = ci;
     state.scope = "cell";
+    closeMenu();
     clearSelectionVisuals();
     td.classList.add("table-cell-selected");
 
@@ -322,6 +385,7 @@
       event.preventDefault();
       event.stopPropagation();
       state.anchor = handle;
+      state.anchorRect = handle.getBoundingClientRect();
       haptic();
       buildMenu();
     });
@@ -380,9 +444,24 @@
   if (typeof tableEditor === "function") tableEditor = enhancedTableEditor;
 
   document.addEventListener("pointerdown", event => {
-    if (state.menu && !state.menu.contains(event.target) && !event.target.closest?.(".table-cell-handle")) closeMenu();
-    if (!event.target.closest?.(".telegram-table")) clearSelectionVisuals();
+    const target = event.target;
+    const insideMenu = Boolean(state.menu?.contains?.(target));
+    const onHandle = Boolean(target.closest?.(".table-cell-handle"));
+
+    // Crucial: scope buttons are rendered in body, not inside .telegram-table.
+    // Never clear the selected cell/handle while interacting with this menu.
+    if (insideMenu || onHandle) return;
+
+    if (state.menu) closeMenu();
+    if (!target.closest?.(".telegram-table")) {
+      clearSelectionVisuals();
+      state.anchor = null;
+      state.anchorRect = null;
+    }
   }, true);
+
   window.addEventListener("resize", positionMenu, {passive:true});
+  window.visualViewport?.addEventListener("resize", positionMenu, {passive:true});
+  window.visualViewport?.addEventListener("scroll", positionMenu, {passive:true});
   window.addEventListener("scroll", positionMenu, {passive:true, capture:true});
 })();
