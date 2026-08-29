@@ -1,0 +1,34 @@
+/* Beta 0.3.20 — Apple artwork for emoji displayed inside rich text editors. */
+.rich-inline-editor .apple-inline-emoji{
+  display:inline-block!important;
+  width:1.12em!important;
+  height:1.12em!important;
+  min-width:1.12em!important;
+  max-width:1.12em!important;
+  object-fit:contain!important;
+  vertical-align:-0.19em!important;
+  margin:0 .015em!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  pointer-events:none!important;
+  user-select:none!important;
+  -webkit-user-select:none!important;
+  -webkit-user-drag:none!important;
+}
+
+.rich-inline-editor.heading-1 .apple-inline-emoji,
+.rich-inline-editor.live-heading-1 .apple-inline-emoji,
+.rich-inline-editor.heading-2 .apple-inline-emoji,
+.rich-inline-editor.live-heading-2 .apple-inline-emoji,
+.rich-inline-editor.heading-3 .apple-inline-emoji,
+.rich-inline-editor.live-heading-3 .apple-inline-emoji,
+.rich-inline-editor.heading-4 .apple-inline-emoji,
+.rich-inline-editor.live-heading-4 .apple-inline-emoji,
+.rich-inline-editor.heading-5 .apple-inline-emoji,
+.rich-inline-editor.live-heading-5 .apple-inline-emoji,
+.rich-inline-editor.heading-6 .apple-inline-emoji,
+.rich-inline-editor.live-heading-6 .apple-inline-emoji{
+  vertical-align:-0.16em!important;
+}
