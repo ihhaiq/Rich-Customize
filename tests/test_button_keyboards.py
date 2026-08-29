@@ -4,7 +4,7 @@ from aiogram.enums import ButtonStyle
 
 from app.keyboards import (
     build_button_type_keyboard, build_buttons_manager_keyboard,
-    build_developer_keyboard,
+    build_developer_import_confirmation_keyboard, build_developer_keyboard,
     build_details_content_keyboard, build_inner_block_keyboard,
     build_details_inner_blocks_keyboard, build_details_inner_block_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
@@ -19,11 +19,17 @@ from app.services.buttons import add_message_button
 
 
 class ButtonKeyboardTests(unittest.TestCase):
-    def test_developer_panel_has_data_backup_button(self):
+    def test_developer_panel_has_data_import_button(self):
         button = build_developer_keyboard().inline_keyboard[0][0]
 
-        self.assertEqual(button.callback_data, "dev:backup")
+        self.assertEqual(button.callback_data, "dev:import")
         self.assertEqual(button.style, ButtonStyle.SUCCESS)
+
+        confirmation = build_developer_import_confirmation_keyboard()
+        self.assertEqual(
+            [button.callback_data for button in confirmation.inline_keyboard[0]],
+            ["dev:import:confirm", "dev:import:cancel"],
+        )
 
     def test_lists_button_opens_three_list_types(self):
         keyboard = build_list_type_keyboard()
