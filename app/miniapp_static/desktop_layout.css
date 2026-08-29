@@ -1,34 +1,43 @@
-/* Beta 0.3.27 — Telegram Desktop/Main Mini App viewport shell.
-   Main Mini Apps and button-launched Web Apps can report different pointer /
-   layout viewport characteristics. Desktop mode is therefore selected by
-   Telegram.WebApp.platform (class added by popup_performance.js), not by a
-   hover/pointer media query. */
+/* Beta 0.3.28 — stable Telegram Desktop/Main Mini App layout.
+   Important: never translate or resize the document root from visualViewport
+   offsets. Telegram Desktop's Main Mini App can expose geometry that differs
+   from button-launched Web Apps; moving the root by that offset causes the
+   editor to be shifted and clipped. Keep the document in normal flow and only
+   constrain the inner editor column. */
 
 html.tg-desktop{
   --desktop-editor-max:720px;
-  --desktop-gutter:10px;
-  --desktop-visible-width:var(--visible-vw,100vw);
+  --desktop-gutter:12px;
 }
 
 html.tg-desktop,
 html.tg-desktop body{
+  width:100%!important;
+  max-width:100%!important;
   min-width:0!important;
   min-height:100%;
   margin:0!important;
   overflow-x:hidden!important;
 }
 
-/* visualViewport.offsetLeft can be non-zero for Telegram Desktop's Main Mini
-   App pane. Put the editor shell inside the actually visible horizontal slice
-   instead of assuming that visible x always starts at zero. */
+html.tg-desktop body{
+  position:static!important;
+  transform:none!important;
+  translate:none!important;
+}
+
 html.tg-desktop .editor-screen{
   box-sizing:border-box!important;
   position:relative!important;
-  left:var(--visible-left,0px)!important;
-  width:var(--desktop-visible-width)!important;
-  max-width:var(--desktop-visible-width)!important;
+  inset:auto!important;
+  left:auto!important;
+  right:auto!important;
+  transform:none!important;
+  translate:none!important;
+  width:100%!important;
+  max-width:100%!important;
   min-width:0!important;
-  min-height:var(--visible-vh,100vh)!important;
+  min-height:100vh!important;
   margin:0!important;
   padding:10px var(--desktop-gutter) 96px!important;
   overflow-x:hidden!important;
@@ -37,11 +46,12 @@ html.tg-desktop .editor-screen{
 html.tg-desktop .editor-head,
 html.tg-desktop .editor-main{
   box-sizing:border-box!important;
-  width:min(var(--desktop-editor-max),calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2)))!important;
-  max-width:calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2))!important;
+  width:100%!important;
+  max-width:var(--desktop-editor-max)!important;
   min-width:0!important;
-  margin-left:auto!important;
-  margin-right:auto!important;
+  margin-inline:auto!important;
+  transform:none!important;
+  translate:none!important;
 }
 
 html.tg-desktop .editor-head{
@@ -84,12 +94,13 @@ html.tg-desktop .page-identity input{
 
 html.tg-desktop .composer-toolbar.floating-toolbar{
   box-sizing:border-box!important;
-  width:max-content!important;
-  max-width:calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2))!important;
+  width:fit-content!important;
+  max-width:100%!important;
   margin:0 auto 8px!important;
   padding:0!important;
   gap:5px!important;
   overflow:visible!important;
+  transform:none!important;
 }
 
 html.tg-desktop .composer-toolbar.floating-toolbar .history-bubble,
@@ -99,7 +110,7 @@ html.tg-desktop .composer-toolbar.floating-toolbar .emoji-bubble{
 html.tg-desktop .composer-toolbar.floating-toolbar .tools-bubble{
   flex:0 1 auto!important;
   min-width:0!important;
-  max-width:calc(var(--desktop-visible-width) - 168px)!important;
+  max-width:min(390px,calc(100vw - 190px))!important;
   overflow-x:auto!important;
   overflow-y:hidden!important;
 }
@@ -119,12 +130,14 @@ html.tg-desktop .block-main{
   box-sizing:border-box!important;
   min-width:0!important;
   max-width:100%!important;
+  transform:none;
 }
+
 html.tg-desktop .starter-card{
   width:100%!important;
 }
 
-/* Wide tables scroll locally instead of increasing the page/layout width. */
+/* A wide table scrolls inside its own surface and never grows the document. */
 html.tg-desktop .telegram-table,
 html.tg-desktop .table-preview{
   box-sizing:border-box!important;
@@ -142,25 +155,27 @@ html.tg-desktop .table-preview table{
   max-width:none!important;
 }
 
-/* Fixed UI is positioned against the real visual viewport center. */
+/* Fixed footer spans the host WebView. Do not center it using a visualViewport
+   coordinate; Telegram already clips fixed content to the actual WebView. */
 html.tg-desktop .bottom-actions{
-  left:var(--visible-center-x,50%)!important;
-  right:auto!important;
+  left:0!important;
+  right:0!important;
   bottom:0!important;
-  box-sizing:border-box!important;
-  width:min(var(--desktop-editor-max),calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2)))!important;
-  max-width:calc(var(--desktop-visible-width) - (var(--desktop-gutter) * 2))!important;
-  transform:translateX(-50%)!important;
-  padding:12px 4px 16px!important;
+  width:auto!important;
+  max-width:none!important;
+  transform:none!important;
+  padding:12px max(14px,calc((100% - var(--desktop-editor-max)) / 2 + 4px)) 16px!important;
 }
 
+/* Desktop sheets use left+right constraints instead of translateX. This keeps
+   them inside both Main Mini App panes and ordinary Web App windows. */
 html.tg-desktop .sheet{
-  left:var(--visible-center-x,50%)!important;
-  right:auto!important;
-  box-sizing:border-box!important;
-  width:min(620px,calc(var(--desktop-visible-width) - 20px))!important;
-  max-width:calc(var(--desktop-visible-width) - 20px)!important;
-  transform:translateX(-50%)!important;
+  left:12px!important;
+  right:12px!important;
+  width:auto!important;
+  max-width:620px!important;
+  margin-inline:auto!important;
+  transform:none!important;
   border-radius:24px 24px 0 0!important;
 }
 
@@ -169,10 +184,11 @@ html.tg-desktop .text-toolbar-menu,
 html.tg-desktop .text-heading-submenu,
 html.tg-desktop .text-button-submenu,
 html.tg-desktop .table-cell-menu{
-  max-width:calc(var(--desktop-visible-width) - 20px)!important;
+  max-width:calc(100% - 20px)!important;
 }
 
-/* A desktop side pane remains desktop even when only ~400–600px wide. */
+/* Desktop remains desktop even when Telegram opens the Main Mini App in a
+   narrow side pane. */
 html.tg-desktop.mobile-performance .editor-topbar,
 html.tg-desktop.mobile-performance .toolbar-bubble,
 html.tg-desktop.mobile-performance .popup-menu,
@@ -191,4 +207,14 @@ html.tg-desktop input,
 html.tg-desktop textarea,
 html.tg-desktop [contenteditable="true"]{
   caret-color:var(--text);
+}
+
+@media(max-width:760px){
+  html.tg-desktop{--desktop-gutter:8px}
+  html.tg-desktop .editor-screen{padding-top:8px!important}
+  html.tg-desktop .editor-topbar{border-radius:17px!important}
+  html.tg-desktop .composer-toolbar.floating-toolbar{gap:4px!important}
+  html.tg-desktop .composer-toolbar.floating-toolbar .tools-bubble{
+    max-width:calc(100vw - 176px)!important;
+  }
 }
