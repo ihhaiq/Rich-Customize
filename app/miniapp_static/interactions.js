@@ -1,4 +1,4 @@
-// Beta 0.3.25 — one long-press model for every editor Block.
+// Beta 0.3.29 — one long-press model for every editor Block.
 (() => {
   const LONG_PRESS_MS = 460;
   const MOVE_CANCEL_PX = 12;
@@ -23,9 +23,6 @@
     ".block",
   ].join(",");
 
-  // These controls own their own click / long-press semantics. Everything else
-  // inside a .block — table cells, Details title, list editors, text editors,
-  // audio/video players and media surfaces — promotes a hold to the parent Block.
   const BLOCK_EXCLUSIVE_SELECTOR = [
     "button",
     "a",
@@ -56,9 +53,6 @@
   }
 
   function nativeControlTarget(target, pressEl = null) {
-    // Once the press has been promoted to a Block, editable/native children are
-    // intentionally allowed to start the timer. A normal short tap is untouched;
-    // only a stationary hold opens Block actions.
     if (pressEl?.classList?.contains("block")) return false;
     return Boolean(target.closest?.(
       'input,textarea,select,video,audio,a,[contenteditable="true"],[data-inline-rich-button],[data-no-long-press]'
@@ -236,13 +230,13 @@
   if (!document.querySelector('link[data-table-cell-tools]')) {
     const css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/miniapp/static/table_cell_tools.css?v=0.3.25";
+    css.href = "/miniapp/static/table_cell_tools.css?v=0.3.29";
     css.dataset.tableCellTools = "1";
     document.head.appendChild(css);
   }
   if (!document.querySelector('script[data-table-cell-tools]')) {
     const script = document.createElement("script");
-    script.src = "/miniapp/static/table_cell_tools.js?v=0.3.25";
+    script.src = "/miniapp/static/table_cell_tools.js?v=0.3.29";
     script.dataset.tableCellTools = "1";
     script.onload = () => {
       try {
