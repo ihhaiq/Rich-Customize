@@ -363,6 +363,16 @@ def build_buttons_manager_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def build_developer_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="📦 نسخة احتياطية للبيانات",
+            callback_data="dev:backup",
+            style=ButtonStyle.SUCCESS,
+        ),
+    ]])
+
+
 def build_button_picker_keyboard(
     buttons: list[dict[str, Any]], action: str,
 ) -> InlineKeyboardMarkup:
