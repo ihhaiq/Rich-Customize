@@ -324,10 +324,10 @@
 
   function restoreSelection() {
     if (!savedRange || !activeEditor?.isConnected) return false;
+    activeEditor.focus({preventScroll:true});
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(savedRange.cloneRange());
-    activeEditor.focus({preventScroll:true});
     return true;
   }
 
@@ -367,6 +367,60 @@
     } catch (_) {}
   }
 
+  function normalizeLink(value) {
+    const href = String(value || "").trim();
+    if (!href) return "";
+    if (/^(https?:\/\/|tg:\/\/|mailto:|tel:)/i.test(href)) return href;
+    if (/^[\w.-]+\.[a-z]{2,}(?:[/?#].*)?$/i.test(href)) return `https://${href}`;
+    return "";
+  }
+
+  function openLinkEditorFromSelection() {
+    if (!savedRange || !activeEditor) return;
+    const selectionRect = savedRange.getBoundingClientRect();
+    const {menu} = simpleMenu("إضافة رابط داخل النص");
+    menu.classList.add("inline-value-editor");
+    const input = document.createElement("input");
+    input.className = "rich-button-editor-input";
+    input.type = "url";
+    input.dir = "ltr";
+    input.inputMode = "url";
+    input.placeholder = "https://example.com";
+    const actions = document.createElement("div");
+    actions.className = "rich-button-editor-actions";
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "إلغاء";
+    const save = document.createElement("button");
+    save.type = "button";
+    save.className = "primary-soft";
+    save.textContent = "إضافة الرابط";
+    cancel.onclick = () => closeFloatingMenu();
+    save.onclick = () => {
+      const href = normalizeLink(input.value);
+      if (!href) {
+        toast("أدخل رابطًا صحيحًا يبدأ بـ https:// أو tg://");
+        input.focus();
+        return;
+      }
+      closeFloatingMenu();
+      if (!restoreSelection()) return;
+      document.execCommand?.("createLink", false, href);
+      syncActiveAndDirty();
+      hideSelectionToolbar();
+    };
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        save.click();
+      }
+    });
+    actions.append(cancel,save);
+    menu.append(input,actions);
+    placeNearRect(menu, selectionRect, false);
+    requestAnimationFrame(() => input.focus({preventScroll:true}));
+  }
+
   function makeSelectionToolbar() {
     if (selectionToolbar) return selectionToolbar;
     const bar = document.createElement("div");
@@ -377,12 +431,15 @@
       ["I","مائل",() => applyCommand("italic")],
       ["S","مشطوب",() => applyCommand("strikeThrough")],
       ["◌","تشويش",applySpoiler],
+      ["↗","رابط",openLinkEditorFromSelection],
       ["▣","إنشاء زر",openButtonTypeMenuFromSelection],
     ];
     specs.forEach(([icon,label,handler]) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "selection-format-btn";
+      btn.title = label;
+      btn.setAttribute("aria-label", label);
       btn.innerHTML = `<span>${icon}</span><small>${label}</small>`;
       btn.addEventListener("pointerdown", event => event.preventDefault());
       btn.addEventListener("click", event => {event.preventDefault();event.stopPropagation();handler();});
@@ -427,10 +484,39 @@
   }
 
   let selectionFrame = 0;
-  document.addEventListener("selectionchange", () => {
+  function scheduleSelectionToolbar(delay = 0) {
     cancelAnimationFrame(selectionFrame);
+    if (delay) {
+      window.setTimeout(() => {
+        selectionFrame = requestAnimationFrame(refreshSelectionToolbar);
+      }, delay);
+      return;
+    }
     selectionFrame = requestAnimationFrame(refreshSelectionToolbar);
+  }
+
+  document.addEventListener("selectionchange", () => scheduleSelectionToolbar());
+
+  // Telegram's Android/iOS WebViews may finish updating the range only after
+  // pointerup/touchend. Re-check it after those events so our toolbar is not
+  // lost behind the operating-system copy/paste callout.
+  ["pointerup", "touchend", "keyup"].forEach(type => {
+    document.addEventListener(type, event => {
+      if (!event.target.closest?.(".rich-inline-editor")) return;
+      scheduleSelectionToolbar();
+      scheduleSelectionToolbar(80);
+    }, true);
   });
+
+  document.addEventListener("contextmenu", event => {
+    const editor = event.target.closest?.(".rich-inline-editor");
+    if (!editor) return;
+    event.preventDefault();
+    event.stopPropagation();
+    activeEditor = editor;
+    scheduleSelectionToolbar();
+    scheduleSelectionToolbar(80);
+  }, true);
 
   document.addEventListener("pointerdown", event => {
     const editor = event.target.closest?.(".rich-inline-editor");
