@@ -43,7 +43,7 @@
   function makeRow({icon, label, shortcut = "", arrow = false, level = null}, onClick) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "text-menu-row";
+    button.className = "menu-item text-menu-row";
     if (level) button.classList.add("heading-level-row");
 
     const iconEl = document.createElement("span");
