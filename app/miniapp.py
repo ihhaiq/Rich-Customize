@@ -9,11 +9,17 @@ from pathlib import Path
 from urllib.parse import parse_qsl
 
 from aiohttp import web
+from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
 from app.config import developer_ids
+from app.services.chat_registry import managed_chat_registry
 from app.services.page_registry import page_registry
+from app.services.popup_registry import popup_registry
+from app.services.renderer import RichMessageRenderError, send_rich_message_post
 
 STATIC_DIR = Path(__file__).with_name("miniapp_static")
+_ADMIN_STATUSES = {"administrator", "creator"}
 
 
 def mini_app_url() -> str | None:
@@ -59,6 +65,49 @@ def _developer_user(request: web.Request) -> dict:
     return user
 
 
+def _status_value(member) -> str:
+    status = getattr(member, "status", "")
+    return str(getattr(status, "value", status))
+
+
+async def _can_publish_to_chat(bot: Bot, chat_id: int, user_id: int) -> bool:
+    try:
+        bot_member = await bot.get_chat_member(chat_id=chat_id, user_id=bot.id)
+        user_member = await bot.get_chat_member(chat_id=chat_id, user_id=user_id)
+        chat = await bot.get_chat(chat_id)
+    except (TelegramBadRequest, TelegramForbiddenError):
+        return False
+    if _status_value(bot_member) not in _ADMIN_STATUSES:
+        return False
+    if _status_value(user_member) not in _ADMIN_STATUSES:
+        return False
+    chat_type = str(getattr(getattr(chat, "type", ""), "value", getattr(chat, "type", "")))
+    if chat_type == "channel" and not bool(getattr(bot_member, "can_post_messages", False)):
+        return False
+    return True
+
+
+async def _eligible_destinations(bot: Bot, user_id: int) -> list[dict]:
+    result = [{"kind": "private", "chat_id": user_id, "title": "المحادثة الخاصة", "type": "private"}]
+    for item in await managed_chat_registry.list_for_user(user_id):
+        try:
+            chat_id = int(item.get("chat_id", 0))
+        except (TypeError, ValueError):
+            continue
+        if not chat_id:
+            continue
+        if await _can_publish_to_chat(bot, chat_id, user_id):
+            result.append({
+                "kind": "chat",
+                "chat_id": chat_id,
+                "title": str(item.get("title") or chat_id),
+                "type": str(item.get("type") or "chat"),
+            })
+        else:
+            await managed_chat_registry.remove(user_id, chat_id)
+    return result
+
+
 async def index(_: web.Request) -> web.FileResponse:
     return web.FileResponse(STATIC_DIR / "index.html")
 
@@ -92,16 +141,44 @@ async def api_page(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "page": {"page_id": page_id, **page}})
 
 
+async def _json_payload(request: web.Request) -> dict:
+    try:
+        value = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        raise web.HTTPBadRequest(text="Invalid JSON")
+    if not isinstance(value, dict):
+        raise web.HTTPBadRequest(text="JSON object required")
+    return value
+
+
+async def api_create_page(request: web.Request) -> web.Response:
+    user = _developer_user(request)
+    payload = await _json_payload(request)
+    blocks = payload.get("blocks")
+    buttons = payload.get("buttons", [])
+    if not isinstance(blocks, list):
+        raise web.HTTPBadRequest(text="blocks must be a list")
+    if not isinstance(buttons, list):
+        raise web.HTTPBadRequest(text="buttons must be a list")
+    title = str(payload.get("title") or "Untitled")[:64]
+    code = await page_registry.save(
+        int(user["id"]),
+        title,
+        blocks,
+        buttons,
+        int(payload.get("buttons_per_row") or 1),
+        str(payload.get("buttons_align") or "center"),
+    )
+    return web.json_response({"ok": True, "beta": "0.2", "page_id": code, "title": title})
+
+
 async def api_save_page(request: web.Request) -> web.Response:
     user = _developer_user(request)
     page_id = request.match_info["page_id"]
     current = await page_registry.get(page_id)
     if not current or int(current.get("owner_id", 0)) != int(user["id"]):
         raise web.HTTPNotFound(text="Page not found")
-    try:
-        payload = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        raise web.HTTPBadRequest(text="Invalid JSON")
+    payload = await _json_payload(request)
     blocks = payload.get("blocks")
     if not isinstance(blocks, list):
         raise web.HTTPBadRequest(text="blocks must be a list")
@@ -118,21 +195,85 @@ async def api_save_page(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "beta": "0.2", "page_id": code, "title": title})
 
 
-def build_web_app(bot_token: str) -> web.Application:
+async def api_destinations(request: web.Request) -> web.Response:
+    user = _developer_user(request)
+    destinations = await _eligible_destinations(request.app["bot"], int(user["id"]))
+    return web.json_response({"ok": True, "destinations": destinations})
+
+
+async def api_send_page(request: web.Request) -> web.Response:
+    user = _developer_user(request)
+    payload = await _json_payload(request)
+    page_id = str(payload.get("page_id") or "")
+    page = await page_registry.get(page_id)
+    user_id = int(user["id"])
+    if not page or int(page.get("owner_id", 0)) != user_id:
+        raise web.HTTPNotFound(text="Page not found")
+
+    kind = str(payload.get("kind") or "private")
+    if kind == "private":
+        target_chat_id = user_id
+    elif kind == "chat":
+        try:
+            target_chat_id = int(payload.get("chat_id"))
+        except (TypeError, ValueError):
+            raise web.HTTPBadRequest(text="Invalid chat_id")
+        known = {
+            int(item.get("chat_id", 0))
+            for item in await managed_chat_registry.list_for_user(user_id)
+            if item.get("chat_id") is not None
+        }
+        if target_chat_id not in known or not await _can_publish_to_chat(
+            request.app["bot"], target_chat_id, user_id,
+        ):
+            raise web.HTTPForbidden(text="Publishing is not allowed in this chat")
+    else:
+        raise web.HTTPBadRequest(text="Invalid destination kind")
+
+    buttons = [dict(button) for button in (page.get("buttons") or [])]
+    for button in buttons:
+        if str(button.get("type")) == "popup" and button.get("id"):
+            await popup_registry.remember(str(button["id"]), str(button.get("value") or ""))
+
+    try:
+        sent = await send_rich_message_post(
+            request.app["bot"],
+            target_chat_id,
+            page.get("blocks") or [],
+            buttons,
+            int(page.get("buttons_per_row") or 1),
+            str(page.get("buttons_align") or "center"),
+            source_page_id=page_id,
+        )
+    except RichMessageRenderError as error:
+        raise web.HTTPBadRequest(text=str(error))
+
+    return web.json_response({
+        "ok": True,
+        "chat_id": target_chat_id,
+        "message_id": getattr(sent, "message_id", None),
+    })
+
+
+def build_web_app(bot: Bot, bot_token: str) -> web.Application:
     app = web.Application(client_max_size=2 * 1024 * 1024)
+    app["bot"] = bot
     app["bot_token"] = bot_token
     app.router.add_get("/miniapp", index)
     app.router.add_get("/miniapp/", index)
     app.router.add_static("/miniapp/static", STATIC_DIR)
     app.router.add_get("/miniapp/api/me", api_me)
     app.router.add_get("/miniapp/api/pages", api_pages)
+    app.router.add_post("/miniapp/api/pages", api_create_page)
     app.router.add_get("/miniapp/api/pages/{page_id}", api_page)
     app.router.add_put("/miniapp/api/pages/{page_id}", api_save_page)
+    app.router.add_get("/miniapp/api/destinations", api_destinations)
+    app.router.add_post("/miniapp/api/send", api_send_page)
     return app
 
 
-async def start_mini_app_server(bot_token: str) -> web.AppRunner:
-    app = build_web_app(bot_token)
+async def start_mini_app_server(bot: Bot, bot_token: str) -> web.AppRunner:
+    app = build_web_app(bot, bot_token)
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     port = int(os.getenv("PORT", "8080"))
