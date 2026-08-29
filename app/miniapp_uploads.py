@@ -7,6 +7,8 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import BufferedInputFile
 
+from app.services.page_registry import page_registry
+
 MAX_PHOTO_BYTES = 10 * 1024 * 1024
 MAX_MEDIA_BYTES = 50 * 1024 * 1024
 SUPPORTED_KINDS = {"photo", "video", "animation", "audio", "voice", "document"}
@@ -153,6 +155,56 @@ async def upload_photo(request: web.Request) -> web.Response:
     return await _upload_kind(request, "photo")
 
 
+async def discard_editor_session(request: web.Request) -> web.Response:
+    """Restore the page loaded at session start, or remove a new auto-saved draft."""
+    developer_user = request.app["developer_user"]
+    user = developer_user(request)
+    owner_id = int(user["id"])
+
+    try:
+        payload = await request.json()
+    except (ValueError, TypeError) as exc:
+        raise web.HTTPBadRequest(text="Invalid discard payload") from exc
+    if not isinstance(payload, dict):
+        raise web.HTTPBadRequest(text="Discard payload must be an object")
+
+    page_id = str(payload.get("page_id") or "").strip()
+    existed_before = bool(payload.get("existed_before"))
+
+    if existed_before:
+        original = payload.get("original")
+        if not page_id or not isinstance(original, dict):
+            raise web.HTTPBadRequest(text="Missing original page snapshot")
+
+        current_page = await page_registry.get(page_id)
+        if not current_page or int(current_page.get("owner_id", 0)) != owner_id:
+            raise web.HTTPNotFound(text="Page not found")
+
+        blocks = original.get("blocks")
+        buttons = original.get("buttons", [])
+        if not isinstance(blocks, list) or not isinstance(buttons, list):
+            raise web.HTTPBadRequest(text="Invalid original page snapshot")
+
+        await page_registry.save(
+            owner_id,
+            str(original.get("title") or page_id)[:64],
+            blocks,
+            buttons,
+            int(original.get("buttons_per_row") or 1),
+            str(original.get("buttons_align") or "center"),
+            page_id=page_id,
+        )
+        return web.json_response({"ok": True, "action": "restored", "page_id": page_id})
+
+    # The session started as a new local draft. Auto-save may have created a
+    # persistent page while the user was editing; remove only that new page.
+    deleted = False
+    if page_id:
+        deleted = await page_registry.delete(page_id, owner_id)
+    return web.json_response({"ok": True, "action": "discarded", "deleted": deleted})
+
+
 def register_upload_routes(app: web.Application) -> None:
     app.router.add_post("/miniapp/api/upload/photo", upload_photo)
     app.router.add_post("/miniapp/api/upload/{kind}", upload_media)
+    app.router.add_post("/miniapp/api/discard-session", discard_editor_session)
