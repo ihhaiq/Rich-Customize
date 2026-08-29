@@ -257,7 +257,9 @@ async def api_send_page(request: web.Request) -> web.Response:
 
 
 def build_web_app(bot: Bot, bot_token: str) -> web.Application:
-    app = web.Application(client_max_size=12 * 1024 * 1024)
+    # 55 MB lets the developer-only beta upload ordinary video/audio/documents
+    # while app/miniapp_uploads.py still enforces per-kind limits.
+    app = web.Application(client_max_size=55 * 1024 * 1024)
     app["bot"] = bot
     app["bot_token"] = bot_token
     app["developer_user"] = _developer_user
