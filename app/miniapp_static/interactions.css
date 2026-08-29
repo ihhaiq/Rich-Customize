@@ -1,0 +1,207 @@
+/* Beta 0.3 — tactile press / long-press motion layer. */
+
+*{
+  -webkit-tap-highlight-color:transparent;
+}
+
+button,
+.menu-item,
+.sheet-item,
+.soft-btn,
+.primary-soft,
+.fab,
+.icon-btn,
+.media-picker-card,
+.starter-card,
+.block{
+  transform:translateZ(0);
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+
+/* Selection stays internal. No blue rectangle around the selected Rich Block. */
+.block.selected:after{
+  display:none!important;
+  content:none!important;
+  box-shadow:none!important;
+}
+.block.selected{
+  outline:0!important;
+}
+
+.press-surface{
+  position:relative;
+  isolation:isolate;
+  transition:
+    transform .18s cubic-bezier(.2,.8,.2,1),
+    filter .18s ease,
+    background-color .18s ease,
+    box-shadow .18s ease,
+    opacity .18s ease;
+  will-change:transform;
+}
+
+/* Compact controls feel physically pressed. */
+button.press-surface.is-pressed,
+.fab.press-surface.is-pressed,
+.icon-btn.press-surface.is-pressed{
+  transform:scale(.90) translateZ(0)!important;
+  filter:brightness(.94);
+}
+
+/* Rows/cards move less so text doesn't jump. */
+.menu-item.press-surface.is-pressed,
+.sheet-item.press-surface.is-pressed,
+.soft-btn.press-surface.is-pressed,
+.primary-soft.press-surface.is-pressed,
+.media-picker-card.press-surface.is-pressed,
+.starter-card.press-surface.is-pressed{
+  transform:scale(.975) translateY(1px) translateZ(0)!important;
+  filter:brightness(.95);
+}
+
+/* A Rich Block should feel touched without changing its Telegram-like shape. */
+.block.press-surface.is-pressed{
+  transform:scale(.992) translateY(1px) translateZ(0)!important;
+  filter:brightness(.96);
+}
+
+.press-surface.press-release{
+  animation:pressRelease .34s cubic-bezier(.2,1.35,.25,1);
+}
+
+@keyframes pressRelease{
+  0%{transform:scale(.97) translateZ(0)}
+  48%{transform:scale(1.018) translateZ(0)}
+  100%{transform:scale(1) translateZ(0)}
+}
+
+button.press-surface.press-release,
+.fab.press-surface.press-release,
+.icon-btn.press-surface.press-release{
+  animation-name:controlRelease;
+}
+@keyframes controlRelease{
+  0%{transform:scale(.91) translateZ(0)}
+  52%{transform:scale(1.075) translateZ(0)}
+  100%{transform:scale(1) translateZ(0)}
+}
+
+/* Long press: liquid compression + soft luminous pulse. */
+.press-surface.long-pressing{
+  transition-duration:.42s;
+}
+
+button.press-surface.long-pressing,
+.fab.press-surface.long-pressing,
+.icon-btn.press-surface.long-pressing{
+  transform:scale(.86) translateZ(0)!important;
+}
+
+.menu-item.press-surface.long-pressing,
+.sheet-item.press-surface.long-pressing,
+.soft-btn.press-surface.long-pressing,
+.primary-soft.press-surface.long-pressing,
+.media-picker-card.press-surface.long-pressing,
+.starter-card.press-surface.long-pressing{
+  transform:scale(.955) translateY(2px) translateZ(0)!important;
+}
+
+.block.press-surface.long-pressing{
+  transform:scale(.985) translateY(2px) translateZ(0)!important;
+  filter:brightness(.93) saturate(1.08);
+}
+
+.press-surface.long-pressed{
+  animation:longPressPulse .46s cubic-bezier(.18,.9,.24,1);
+}
+
+@keyframes longPressPulse{
+  0%{
+    filter:brightness(.92) saturate(1.08);
+  }
+  42%{
+    filter:brightness(1.12) saturate(1.16);
+  }
+  100%{
+    filter:none;
+  }
+}
+
+/* Liquid ripple, clipped to the control that was touched. */
+.press-ripple{
+  position:absolute;
+  z-index:-1;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  pointer-events:none;
+  transform:translate(-50%,-50%) scale(.1);
+  background:radial-gradient(circle,rgba(255,255,255,.24) 0%,rgba(255,255,255,.10) 42%,transparent 72%);
+  animation:liquidRipple .56s ease-out forwards;
+}
+
+@keyframes liquidRipple{
+  0%{opacity:.9;transform:translate(-50%,-50%) scale(.1)}
+  72%{opacity:.32}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(9)}
+}
+
+/* The selected block exposes its options gently instead of drawing a selection box. */
+.block-tools{
+  transform:translateY(-2px) scale(.92);
+  transition:opacity .16s ease,transform .2s cubic-bezier(.2,1.2,.2,1);
+}
+.block.selected .block-tools{
+  opacity:1;
+  transform:translateY(0) scale(1);
+}
+.block.selected .mini-btn{
+  animation:selectedToolIn .24s cubic-bezier(.2,1.35,.25,1);
+}
+@keyframes selectedToolIn{
+  from{opacity:0;transform:scale(.72) rotate(-8deg)}
+  to{opacity:1;transform:scale(1) rotate(0)}
+}
+
+/* Menus/sheets animate when they become visible. */
+.popup-menu:not(.hidden){
+  animation:glassMenuIn .22s cubic-bezier(.18,.92,.24,1);
+  transform-origin:50% 100%;
+}
+.sheet:not(.hidden){
+  animation:glassSheetIn .30s cubic-bezier(.16,.86,.24,1);
+}
+@keyframes glassMenuIn{
+  from{opacity:0;transform:translateY(8px) scale(.96);filter:blur(3px)}
+  to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
+}
+@keyframes glassSheetIn{
+  from{opacity:0;transform:translateY(24px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* Preserve a visible focus state for keyboard users, but never the old block box. */
+button:focus-visible,
+.menu-item:focus-visible,
+.sheet-item:focus-visible,
+.soft-btn:focus-visible,
+.primary-soft:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--accent) 65%,transparent);
+  outline-offset:2px;
+}
+
+@media(prefers-reduced-motion:reduce){
+  .press-surface,
+  .block-tools{
+    transition:none!important;
+  }
+  .press-surface.press-release,
+  .press-surface.long-pressed,
+  .block.selected .mini-btn,
+  .popup-menu:not(.hidden),
+  .sheet:not(.hidden),
+  .press-ripple{
+    animation:none!important;
+  }
+}
