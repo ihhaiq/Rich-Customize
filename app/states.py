@@ -11,3 +11,4 @@ class RichEditorStates(StatesGroup):
     editing_block = State()
     adding_block = State()
     editing_button = State()
+    editing_table_caption = State()
