@@ -1,4 +1,4 @@
-/* Beta 0.3.24 — contextual table tools, modeled after Telegram's cell menu. */
+/* Beta 0.3.29 — contextual table tools, modeled after Telegram's cell menu. */
 .telegram-table-contextual{
   overflow:visible!important;
 }
@@ -12,6 +12,13 @@
 }
 .telegram-table-contextual td.table-cell-selected{
   z-index:4;
+  box-shadow:inset 0 0 0 2px var(--accent)!important;
+}
+.telegram-table-contextual tr.table-row-selected td{
+  background:color-mix(in srgb,var(--accent) 8%,transparent)!important;
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--accent) 42%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--accent) 42%,transparent);
+}
+.telegram-table-contextual tr.table-row-selected td.table-cell-selected{
   box-shadow:inset 0 0 0 2px var(--accent)!important;
 }
 .telegram-table-contextual td.table-cell-shaded{
