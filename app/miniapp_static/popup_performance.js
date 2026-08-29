@@ -1,4 +1,4 @@
-// Beta 0.3.27 — Telegram platform classification + visual viewport geometry.
+// Beta 0.3.28 — stable platform classification + popup viewport geometry.
 (() => {
   const rootEl = document.documentElement;
   const platform = String(window.Telegram?.WebApp?.platform || "").toLowerCase();
@@ -22,18 +22,30 @@
     return values.map(Number).filter(value => Number.isFinite(value) && value > 0);
   }
 
-  function measuredViewport() {
+  function desktopViewport() {
+    // For Telegram Desktop Main Mini Apps, visualViewport.offsetLeft may describe
+    // host-side pane geometry rather than a CSS origin. Never use it to move the
+    // page. The CSS viewport itself always starts at x=0 for our document.
+    const widths = positive(document.documentElement.clientWidth, window.innerWidth, window.visualViewport?.width);
+    const heights = positive(document.documentElement.clientHeight, window.innerHeight, window.visualViewport?.height);
+    const width = widths.length ? Math.min(...widths) : 1;
+    const height = heights.length ? Math.min(...heights) : 1;
+    return {left:0, top:0, width, height};
+  }
+
+  function mobileViewport() {
     const vv = window.visualViewport;
     const widths = positive(vv?.width, document.documentElement.clientWidth, window.innerWidth);
     const heights = positive(vv?.height, document.documentElement.clientHeight, window.innerHeight);
-    // Telegram Desktop Main Mini App can expose a layout viewport larger than
-    // the pane the user actually sees. The smallest live measurement is the
-    // safest representation of that visible pane.
     const width = widths.length ? Math.min(...widths) : 1;
     const height = heights.length ? Math.min(...heights) : 1;
     const left = Math.max(0, Number(vv?.offsetLeft || 0));
     const top = Math.max(0, Number(vv?.offsetTop || 0));
     return {left, top, width, height};
+  }
+
+  function measuredViewport() {
+    return telegramDesktop ? desktopViewport() : mobileViewport();
   }
 
   const firstViewport = measuredViewport();
