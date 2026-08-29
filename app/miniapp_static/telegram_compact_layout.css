@@ -1,4 +1,6 @@
-/* Beta 0.3.16 — compact centered Telegram-style composer chrome. */
+@import url("./fullscreen_fix.css?v=0.3.22");
+
+/* Beta 0.3.22 — compact centered Telegram-style composer chrome. */
 
 #allBlocksBtn.legacy-all-blocks{
   display:none!important;
