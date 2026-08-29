@@ -1,37 +1,62 @@
-// Beta 0.3.26 — visual viewport geometry + compact popup placement.
+// Beta 0.3.27 — Telegram platform classification + visual viewport geometry.
 (() => {
+  const rootEl = document.documentElement;
+  const platform = String(window.Telegram?.WebApp?.platform || "").toLowerCase();
+  const mobilePlatforms = new Set(["android", "android_x", "ios"]);
+  const desktopPlatforms = new Set(["tdesktop", "macos", "web", "webk", "weba", "unigram"]);
+  const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+  const pointerDesktop = window.matchMedia?.("(hover:hover) and (pointer:fine)")?.matches ?? false;
+  const telegramDesktop = desktopPlatforms.has(platform)
+    || (!mobilePlatforms.has(platform) && !mobileUA && pointerDesktop);
+
+  rootEl.classList.toggle("tg-desktop", telegramDesktop);
+  rootEl.classList.toggle("tg-mobile", !telegramDesktop);
+  rootEl.dataset.tgPlatform = platform || "unknown";
+
   const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
-  const fineDesktop = window.matchMedia?.("(hover:hover) and (pointer:fine)")?.matches ?? false;
-  const narrowViewport = Math.min(window.innerWidth || 9999, window.screen?.width || 9999) <= 820;
   const android = /Android/i.test(navigator.userAgent || "");
   const lowMemory = Number(navigator.deviceMemory || 8) <= 4;
   const lowCpu = Number(navigator.hardwareConcurrency || 8) <= 4;
 
-  // A narrow Telegram Desktop side panel is still desktop. Do not enable the
-  // mobile rendering preset merely because its width happens to be < 820px.
-  const mobilePerformance = !fineDesktop && (coarsePointer || narrowViewport || android || lowMemory || lowCpu);
+  function positive(...values) {
+    return values.map(Number).filter(value => Number.isFinite(value) && value > 0);
+  }
 
-  if (mobilePerformance) document.documentElement.classList.add("mobile-performance");
-  else document.documentElement.classList.remove("mobile-performance");
+  function measuredViewport() {
+    const vv = window.visualViewport;
+    const widths = positive(vv?.width, document.documentElement.clientWidth, window.innerWidth);
+    const heights = positive(vv?.height, document.documentElement.clientHeight, window.innerHeight);
+    // Telegram Desktop Main Mini App can expose a layout viewport larger than
+    // the pane the user actually sees. The smallest live measurement is the
+    // safest representation of that visible pane.
+    const width = widths.length ? Math.min(...widths) : 1;
+    const height = heights.length ? Math.min(...heights) : 1;
+    const left = Math.max(0, Number(vv?.offsetLeft || 0));
+    const top = Math.max(0, Number(vv?.offsetTop || 0));
+    return {left, top, width, height};
+  }
+
+  const firstViewport = measuredViewport();
+  const narrowViewport = firstViewport.width <= 820;
+  const mobilePerformance = !telegramDesktop && (coarsePointer || narrowViewport || android || lowMemory || lowCpu);
+
+  if (mobilePerformance) rootEl.classList.add("mobile-performance");
+  else rootEl.classList.remove("mobile-performance");
 
   function syncViewportVars() {
-    const vv = window.visualViewport;
-    const left = vv?.offsetLeft || 0;
-    const top = vv?.offsetTop || 0;
-    const height = vv?.height || window.innerHeight || document.documentElement.clientHeight || 1;
-    const width = vv?.width || window.innerWidth || document.documentElement.clientWidth || 1;
+    const {left, top, width, height} = measuredViewport();
     const right = left + width;
     const bottom = top + height;
     const centerX = left + width / 2;
 
-    const root = document.documentElement.style;
-    root.setProperty("--visible-vh", `${Math.max(1, height)}px`);
-    root.setProperty("--visible-vw", `${Math.max(1, width)}px`);
-    root.setProperty("--visible-left", `${Math.max(0, left)}px`);
-    root.setProperty("--visible-top", `${Math.max(0, top)}px`);
-    root.setProperty("--visible-right", `${Math.max(1, right)}px`);
-    root.setProperty("--visible-bottom", `${Math.max(1, bottom)}px`);
-    root.setProperty("--visible-center-x", `${Math.max(1, centerX)}px`);
+    const style = rootEl.style;
+    style.setProperty("--visible-vh", `${Math.max(1, height)}px`);
+    style.setProperty("--visible-vw", `${Math.max(1, width)}px`);
+    style.setProperty("--visible-left", `${left}px`);
+    style.setProperty("--visible-top", `${top}px`);
+    style.setProperty("--visible-right", `${Math.max(1, right)}px`);
+    style.setProperty("--visible-bottom", `${Math.max(1, bottom)}px`);
+    style.setProperty("--visible-center-x", `${Math.max(1, centerX)}px`);
   }
   syncViewportVars();
   window.visualViewport?.addEventListener("resize", syncViewportVars, {passive:true});
@@ -45,11 +70,7 @@
   }, {capture:true, passive:true});
 
   function visibleBounds() {
-    const vv = window.visualViewport;
-    const left = vv?.offsetLeft || 0;
-    const top = vv?.offsetTop || 0;
-    const width = vv?.width || window.innerWidth;
-    const height = vv?.height || window.innerHeight;
+    const {left, top, width, height} = measuredViewport();
     return {left, top, right:left + width, bottom:top + height, width, height};
   }
 
@@ -122,6 +143,7 @@
   function repositionOpenPopup() {
     cancelAnimationFrame(repositionFrame);
     repositionFrame = requestAnimationFrame(() => {
+      syncViewportVars();
       if (!blockMenu?.classList.contains("hidden")) {
         const selected = blocksEl?.querySelector?.(".block.selected");
         placePopup(blockMenu, selected || lastToolbarAnchor);
@@ -133,6 +155,7 @@
   }
   window.visualViewport?.addEventListener("resize", repositionOpenPopup, {passive:true});
   window.visualViewport?.addEventListener("scroll", repositionOpenPopup, {passive:true});
+  window.addEventListener("resize", repositionOpenPopup, {passive:true});
 
   const SAVE_DELAY = mobilePerformance ? 1600 : 1000;
   if (typeof markDirty === "function") {
