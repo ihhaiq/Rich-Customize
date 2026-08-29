@@ -1,4 +1,4 @@
-// Beta 0.3.4 — tactile press and long-press block quick actions.
+// Beta 0.3.13 — tactile press while preserving native rich-text selection.
 (() => {
   const LONG_PRESS_MS = 460;
   const MOVE_CANCEL_PX = 12;
@@ -35,11 +35,11 @@
     } catch (_) {}
   }
 
-  // Long-pressing editable Rich text should open the block actions too.
-  // Native controls such as table inputs and media players stay untouched.
+  // Editable Rich text must keep the browser/Telegram native selection gesture.
+  // Inline Rich Button tokens own their own long-press customization menu.
   function nativeControlTarget(target) {
     return Boolean(target.closest(
-      'input,textarea,select,video,audio,a,[data-no-long-press]'
+      'input,textarea,select,video,audio,a,[contenteditable="true"],[data-inline-rich-button],[data-no-long-press]'
     ));
   }
 
