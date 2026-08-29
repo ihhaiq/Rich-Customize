@@ -1,0 +1,130 @@
+/* Beta 0.3.22 — Telegram Fullscreen safe-area + clean chrome patch. */
+
+:root{
+  --miniapp-safe-top:0px;
+  --miniapp-safe-right:0px;
+  --miniapp-safe-bottom:0px;
+  --miniapp-safe-left:0px;
+  --miniapp-content-safe-top:0px;
+  --miniapp-content-safe-right:0px;
+  --miniapp-content-safe-bottom:0px;
+  --miniapp-content-safe-left:0px;
+  --miniapp-top-inset:max(var(--miniapp-safe-top),var(--miniapp-content-safe-top),env(safe-area-inset-top,0px));
+  --miniapp-right-inset:max(var(--miniapp-safe-right),var(--miniapp-content-safe-right),env(safe-area-inset-right,0px));
+  --miniapp-bottom-inset:max(var(--miniapp-safe-bottom),var(--miniapp-content-safe-bottom),env(safe-area-inset-bottom,0px));
+  --miniapp-left-inset:max(var(--miniapp-safe-left),var(--miniapp-content-safe-left),env(safe-area-inset-left,0px));
+  --miniapp-viewport-height:100dvh;
+}
+
+html,
+body{
+  width:100%;
+  min-height:100%;
+  margin:0;
+  overscroll-behavior:none;
+  -webkit-tap-highlight-color:transparent!important;
+  background:var(--bg)!important;
+}
+
+/* The editor starts below Telegram's fullscreen/content-safe chrome and the
+   sticky header never climbs back under it while scrolling. */
+.editor-screen{
+  width:100%;
+  min-height:var(--miniapp-viewport-height)!important;
+  padding-top:calc(var(--miniapp-top-inset) + 6px)!important;
+  padding-right:var(--miniapp-right-inset)!important;
+  padding-left:var(--miniapp-left-inset)!important;
+  padding-bottom:calc(84px + var(--miniapp-bottom-inset))!important;
+}
+
+.editor-head{
+  top:var(--miniapp-top-inset)!important;
+  padding-top:0!important;
+  background:color-mix(in srgb,var(--bg) 94%,transparent)!important;
+  background-image:none!important;
+}
+
+.editor-main{
+  min-height:0!important;
+  padding-bottom:calc(36px + var(--miniapp-bottom-inset))!important;
+}
+
+.bottom-actions{
+  padding-bottom:calc(12px + var(--miniapp-bottom-inset))!important;
+  padding-left:calc(14px + var(--miniapp-left-inset))!important;
+  padding-right:calc(14px + var(--miniapp-right-inset))!important;
+}
+
+/* Remove the accent-coloured patch/glow. Keep the liquid-glass border and
+   neutral translucency, but no blue rectangle or pseudo highlight. */
+body,
+.editor-head{
+  background-image:none!important;
+}
+
+.toolbar-bubble::before,
+.toolbar-bubble::after,
+.editor-topbar::before,
+.editor-topbar::after,
+.top-actions::before,
+.top-actions::after,
+.icon-btn::before,
+.icon-btn::after{
+  content:none!important;
+  display:none!important;
+}
+
+button,
+a,
+input,
+textarea,
+[role="button"]{
+  -webkit-tap-highlight-color:transparent!important;
+}
+
+button:focus,
+button:focus-visible,
+.icon-btn:focus,
+.icon-btn:focus-visible,
+.composer-toolbar button:focus,
+.composer-toolbar button:focus-visible{
+  outline:none!important;
+}
+
+/* Active/pressed chrome is neutral rather than accent-filled. Menus can still
+   use accent where it conveys an actual selected setting. */
+.composer-toolbar.floating-toolbar .toolbar-bubble button:active,
+.composer-toolbar.floating-toolbar .toolbar-bubble button.is-pressed,
+.icon-btn:active,
+.icon-btn.is-pressed{
+  background:rgba(255,255,255,.055)!important;
+  color:var(--text)!important;
+  box-shadow:none!important;
+}
+
+.composer-toolbar.floating-toolbar .toolbar-bubble button.active:not(#emojiBtn){
+  box-shadow:none!important;
+}
+
+/* Fullscreen mobile performance: glass stays visible without repainting a
+   heavy 24px blur over the whole top area on every scroll frame. */
+html.mobile-performance .editor-topbar,
+html.mobile-performance .toolbar-bubble{
+  backdrop-filter:blur(7px) saturate(116%)!important;
+  -webkit-backdrop-filter:blur(7px) saturate(116%)!important;
+  box-shadow:0 4px 14px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.045)!important;
+}
+
+html.mobile-performance .editor-head{
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+@media(max-width:430px){
+  .editor-screen{
+    padding-top:calc(var(--miniapp-top-inset) + 4px)!important;
+  }
+  .editor-head{
+    padding-inline:6px!important;
+  }
+}
