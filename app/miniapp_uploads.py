@@ -54,14 +54,8 @@ def _file_payload(media: Any) -> dict[str, Any]:
         "file_size": getattr(media, "file_size", None),
     }
     for key in (
-        "width",
-        "height",
-        "duration",
-        "performer",
-        "title",
-        "file_name",
-        "mime_type",
-        "supports_streaming",
+        "width", "height", "duration", "performer", "title", "file_name",
+        "mime_type", "supports_streaming",
     ):
         value = getattr(media, key, None)
         if value is not None:
@@ -104,11 +98,10 @@ async def _send_to_telegram(
     return message, media
 
 
-async def upload_media(request: web.Request) -> web.Response:
+async def _upload_kind(request: web.Request, kind: str) -> web.Response:
     developer_user = request.app["developer_user"]
     user = developer_user(request)
     user_id = int(user["id"])
-    kind = str(request.match_info.get("kind") or "").lower()
     if kind not in SUPPORTED_KINDS:
         raise web.HTTPBadRequest(text="Unsupported upload type")
 
@@ -151,10 +144,13 @@ async def upload_media(request: web.Request) -> web.Response:
     })
 
 
+async def upload_media(request: web.Request) -> web.Response:
+    return await _upload_kind(request, str(request.match_info.get("kind") or "").lower())
+
+
 async def upload_photo(request: web.Request) -> web.Response:
     # Compatibility route used by older cached Mini App builds.
-    request.match_info["kind"] = "photo"
-    return await upload_media(request)
+    return await _upload_kind(request, "photo")
 
 
 def register_upload_routes(app: web.Application) -> None:
