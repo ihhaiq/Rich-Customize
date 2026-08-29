@@ -67,8 +67,6 @@
         configureToken(token, type, title, options);
         return token;
       }
-      // When no text editor is active, InlineTextTools creates a paragraph on the
-      // next animation frame. Configure the token as soon as that insertion lands.
       let tries = 0;
       const applyLater = () => {
         tries += 1;
@@ -96,8 +94,20 @@
     create:type => openDialog(type),
   };
 
-  // The selected-text toolbar previously opened a second type chooser. Replace
-  // that flow with the single Telegram-style Add Button panel.
+  // Aa > "زر غني" now opens the single Telegram-style Add Button panel directly.
+  document.addEventListener("click", event => {
+    const row = event.target.closest?.(".text-menu-row");
+    if (!row) return;
+    const label = row.querySelector?.(".text-menu-label")?.textContent?.trim();
+    if (label !== "زر غني") return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    window.RichTextToolbarMenu?.close?.();
+    window.RichButtonDialog?.open?.({presetType:"url"});
+  }, true);
+
+  // Selected text > create button uses the same panel, with the selected text
+  // prefilled as the button title.
   document.addEventListener("click", event => {
     const button = event.target.closest?.(".selection-format-btn");
     if (!button || button.parentElement?.lastElementChild !== button) return;
@@ -107,8 +117,6 @@
     window.RichButtonDialog?.open?.({title, fromSelection:true, presetType:"url"});
   }, true);
 
-  // InlineTextTools loads before this module in the consolidated index. Keep a
-  // small fallback for cached load-order differences.
   if (window.InlineTextTools) installCreateBridge();
   else {
     let attempts = 0;
