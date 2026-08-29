@@ -1,4 +1,4 @@
-// Beta 0.3.8 — Telegram-style Aa menu with Heading and Rich Button submenus.
+// Beta 0.3.13 — Telegram-style Aa menu with Heading and inline Rich Button submenus.
 (() => {
   const textButton = document.querySelector('.composer-toolbar [data-tool="text"]');
   if (!textButton) return;
@@ -185,8 +185,7 @@
     const types = window.RichButtonEditor?.types || {};
     [
       "user", "url", "callback_data", "page_callback", "copy", "popup",
-      "web_app", "login_url", "switch_inline_query",
-      "switch_inline_query_current_chat", "disabled",
+      "switch_inline_query", "switch_inline_query_current_chat", "disabled",
     ].forEach(type => {
       const item = types[type];
       if (!item) return;
