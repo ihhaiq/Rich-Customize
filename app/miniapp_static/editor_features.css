@@ -1,0 +1,258 @@
+/* Beta 0.3.32 — unified editor interactions and calm glass design. */
+:root{
+  --glass-surface:color-mix(in srgb,var(--panel) 78%,transparent);
+  --glass-surface-soft:color-mix(in srgb,var(--panel) 66%,transparent);
+  --glass-border:rgba(255,255,255,.085);
+  --glass-inner:rgba(255,255,255,.055);
+  --glass-elevation:0 18px 44px rgba(0,0,0,.24);
+}
+
+/* One coherent glass language: no decorative/random reflections. */
+.editor-topbar,
+.toolbar-bubble,
+.popup-menu,
+.sheet,
+.table-cell-menu,
+.telegram-math-editor,
+.multi-select-bar,
+.rich-button-dialog,
+.starter-card,
+.sheet-item,
+.media-picker-card{
+  background:var(--glass-surface)!important;
+  border-color:var(--glass-border)!important;
+  box-shadow:var(--glass-elevation),inset 0 1px 0 var(--glass-inner)!important;
+  backdrop-filter:blur(22px) saturate(136%)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(136%)!important;
+}
+.toolbar-bubble::before,.toolbar-bubble::after,.table-cell-menu::before{content:none!important;display:none!important}
+body{background:var(--bg)!important}
+
+.editor-feature-btn.active{
+  background:color-mix(in srgb,var(--accent) 14%,rgba(255,255,255,.035))!important;
+  color:var(--accent)!important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent)!important;
+}
+
+.editor-drag-handle{
+  position:absolute;
+  inset-inline-start:-7px;
+  top:50%;
+  z-index:12;
+  width:28px;
+  height:40px;
+  transform:translateY(-50%);
+  display:grid;
+  grid-template-columns:repeat(2,4px);
+  grid-auto-rows:4px;
+  place-content:center;
+  gap:4px;
+  padding:0;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:12px;
+  color:var(--muted);
+  background:var(--glass-surface-soft);
+  opacity:0;
+  touch-action:none;
+  cursor:grab;
+  transition:opacity .14s ease,transform .14s ease,background .14s ease;
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+}
+.editor-drag-handle span{width:4px;height:4px;border-radius:50%;background:currentColor}
+.block.selected>.editor-drag-handle,.block:hover>.editor-drag-handle{opacity:.82}
+.editor-drag-handle:active{cursor:grabbing;transform:translateY(-50%) scale(.95)}
+.block.is-dragging{opacity:.72;z-index:30;transform:scale(.995)}
+html.editor-dragging{user-select:none;-webkit-user-select:none}
+
+.multi-select-check{
+  position:absolute;
+  inset-inline-end:5px;
+  top:7px;
+  z-index:14;
+  width:30px;
+  height:30px;
+  display:none;
+  place-items:center;
+  padding:0;
+  border-radius:50%;
+  border:1px solid var(--glass-border);
+  background:var(--glass-surface-soft);
+  color:transparent;
+  font-weight:800;
+}
+.multi-select-mode .multi-select-check{display:grid}
+.multi-select-mode .editor-drag-handle{display:none}
+.block.multi-selected>.multi-select-check{
+  color:var(--accentText);
+  background:var(--accent);
+  border-color:var(--accent);
+}
+.block.multi-selected::after{
+  content:"";
+  position:absolute;
+  inset:2px;
+  pointer-events:none;
+  border:1.5px solid color-mix(in srgb,var(--accent) 62%,transparent);
+  border-radius:13px;
+}
+.multi-select-mode .block-main{pointer-events:none}
+
+.multi-select-bar{
+  position:fixed;
+  z-index:3600;
+  left:50%;
+  bottom:max(18px,env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  width:min(520px,calc(100vw - 22px));
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:8px 10px 8px 14px;
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+}
+.multi-select-bar strong{font-size:13px;white-space:nowrap}
+.multi-actions{display:flex;align-items:center;gap:4px;overflow-x:auto;scrollbar-width:none}
+.multi-actions::-webkit-scrollbar{display:none}
+.multi-actions button{
+  min-width:42px;
+  height:40px;
+  padding:0 11px;
+  border-radius:12px;
+  background:rgba(255,255,255,.04);
+  color:var(--text);
+  white-space:nowrap;
+}
+.multi-actions button:active{background:rgba(255,255,255,.075)}
+.multi-actions button.danger{color:var(--danger)}
+
+.preview-mode .composer-toolbar,
+.preview-mode .slash-wrap,
+.preview-mode .bottom-actions,
+.preview-mode .block-tools,
+.preview-mode .editor-drag-handle,
+.preview-mode .multi-select-check,
+.preview-mode #pagesBtn,
+.preview-mode #moreBtn,
+.preview-mode #multiSelectModeBtn,
+.preview-mode .selection-format-bubble,
+.preview-mode .table-cell-handle{display:none!important}
+.preview-mode .editor-head{padding-bottom:4px}
+.preview-mode .editor-topbar{justify-content:flex-end}
+.preview-mode .page-identity{display:none}
+.preview-mode .block{padding-inline:0!important}
+.preview-mode .block.selected::after{display:none!important}
+.preview-mode .block-main input,
+.preview-mode .block-main textarea,
+.preview-mode .block-main [contenteditable="true"]{
+  pointer-events:none!important;
+  caret-color:transparent!important;
+}
+.preview-mode .telegram-table input{
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+.rich-button-dialog-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:5200;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:rgba(0,0,0,.42);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+}
+.rich-button-dialog{
+  width:min(430px,100%);
+  max-height:min(690px,calc(100dvh - 30px));
+  overflow:auto;
+  display:grid;
+  gap:14px;
+  padding:18px;
+  border:1px solid var(--glass-border);
+  border-radius:22px;
+  color:var(--text);
+}
+.rich-button-dialog h3{margin:0;font-size:20px}
+.button-dialog-field{display:grid;gap:6px}
+.button-dialog-field>span{color:var(--accent);font-size:13px;font-weight:700}
+.button-dialog-field input{
+  width:100%;
+  min-height:44px;
+  padding:7px 2px;
+  border:0;
+  border-bottom:1.5px solid color-mix(in srgb,var(--accent) 55%,transparent);
+  outline:0;
+  background:transparent;
+  color:var(--text);
+  font-size:16px;
+}
+.button-separate-option,.button-type-option{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:42px;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.button-separate-option input,.button-type-option input{position:absolute;opacity:0;pointer-events:none}
+.button-check,.button-radio{
+  width:25px;
+  height:25px;
+  flex:0 0 25px;
+  display:grid;
+  place-items:center;
+  border:1.5px solid color-mix(in srgb,var(--muted) 68%,transparent);
+  background:rgba(255,255,255,.02);
+}
+.button-check{border-radius:6px}.button-radio{border-radius:50%}
+.button-separate-option input:checked+.button-check{background:var(--accent);border-color:var(--accent)}
+.button-separate-option input:checked+.button-check::after{
+  content:"";width:10px;height:6px;border-left:2px solid var(--accentText);border-bottom:2px solid var(--accentText);transform:rotate(-45deg) translateY(-1px)
+}
+.button-type-option input:checked+.button-radio{border-color:var(--accent);box-shadow:inset 0 0 0 6px color-mix(in srgb,var(--accent) 92%,transparent)}
+.button-style-row{display:flex;gap:5px;flex-wrap:wrap}
+.button-style-pill{
+  min-height:36px;
+  padding:6px 12px;
+  border-radius:999px;
+  border:1px solid var(--glass-border);
+  background:rgba(255,255,255,.035);
+  color:var(--text);
+}
+.button-style-pill.active{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.button-style-pill.style-b{background:color-mix(in srgb,var(--accent) 23%,transparent)}
+.button-style-pill.style-g{background:color-mix(in srgb,#31b66b 20%,transparent);color:#8de5ac}
+.button-style-pill.style-r{background:color-mix(in srgb,#ed5c65 19%,transparent);color:#ff959b}
+.button-type-list{display:grid;gap:2px}
+.button-dialog-actions{display:flex;justify-content:flex-start;gap:8px;padding-top:3px}
+.button-dialog-actions button{min-width:76px;min-height:42px;border-radius:12px;background:transparent;color:var(--accent);font-weight:700}
+.button-dialog-actions button.save{background:color-mix(in srgb,var(--accent) 15%,transparent)}
+
+.slash-menu .menu-item:first-child .menu-icon{color:var(--accent)}
+
+@media(max-width:430px){
+  .editor-drag-handle{inset-inline-start:-2px;width:25px;height:38px}
+  .rich-button-dialog{padding:15px;border-radius:20px;gap:12px}
+  .button-style-row{gap:4px}.button-style-pill{padding-inline:10px}
+  .multi-select-bar{bottom:max(10px,env(safe-area-inset-bottom));padding:7px 8px}
+}
+
+html.mobile-performance .editor-topbar,
+html.mobile-performance .toolbar-bubble,
+html.mobile-performance .popup-menu,
+html.mobile-performance .sheet,
+html.mobile-performance .table-cell-menu,
+html.mobile-performance .telegram-math-editor,
+html.mobile-performance .multi-select-bar,
+html.mobile-performance .rich-button-dialog{
+  backdrop-filter:blur(12px) saturate(118%)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(118%)!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.045)!important;
+}
