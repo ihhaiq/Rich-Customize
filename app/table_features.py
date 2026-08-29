@@ -21,6 +21,16 @@ from app.routers import editor_core
 router = Router(name="table_features")
 _original_editor_input_block = rich_renderer._editor_input_block
 
+TABLE_DISPLAY_HELP_TEXT = (
+    "🧱 إعدادات مظهر الجدول\n\n"
+    "اختر الخاصية التي تريد تغييرها:\n\n"
+    "• الحدود — إظهار أو إخفاء الخطوط المحيطة بالجدول وبين الخلايا.\n"
+    "• صفوف مخططة — تمييز الصفوف بالتناوب لتسهيل قراءة الجدول.\n"
+    "• وضع مضغوط — تقليل المسافات داخل الخلايا ليظهر الجدول بحجم أصغر وأكثر كثافة.\n"
+    "• عنوان الجدول — إضافة نص وصفي يظهر كعنوان للجدول أو تعديل العنوان الحالي.\n\n"
+    "✅ = مفعّل   |   ❌ = غير مفعّل"
+)
+
 
 def _table_data_for_edit(block: dict[str, Any]) -> dict[str, Any] | None:
     """Detach a received native table before changing table-level properties."""
@@ -150,7 +160,7 @@ async def open_table_display(callback: CallbackQuery, state: FSMContext) -> None
         return
     await editor_core._edit_ui(
         callback.message,
-        "إعدادات مظهر الجدول:",
+        TABLE_DISPLAY_HELP_TEXT,
         build_table_display_keyboard(block),
     )
     await callback.answer()
@@ -183,7 +193,7 @@ async def toggle_table_display(callback: CallbackQuery, state: FSMContext) -> No
     await state.update_data(blocks=blocks)
     await editor_core._edit_ui(
         callback.message,
-        "إعدادات مظهر الجدول:",
+        TABLE_DISPLAY_HELP_TEXT,
         build_table_display_keyboard(block),
     )
     labels = {
@@ -248,7 +258,7 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
     await editor_core._edit_saved_ui(
         bot,
         state,
-        "إعدادات مظهر الجدول:",
+        TABLE_DISPLAY_HELP_TEXT,
         build_table_display_keyboard(block),
     )
 
