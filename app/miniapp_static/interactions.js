@@ -1,4 +1,4 @@
-// Beta 0.3.13 — tactile press while preserving native rich-text selection.
+// Beta 0.3.21 — tactile press + reliable long-press actions for media blocks.
 (() => {
   const LONG_PRESS_MS = 460;
   const MOVE_CANCEL_PX = 12;
@@ -21,6 +21,9 @@
     ".block",
   ].join(",");
 
+  const MEDIA_CARD_SELECTOR = ".media-picker-card,.media-placeholder";
+  const MEDIA_PASS_THROUGH_SELECTOR = "button,input,textarea,select,a,[contenteditable=\"true\"],[data-inline-rich-button],[data-no-long-press]";
+
   let active = null;
   let longTimer = null;
   let suppressClickUntil = 0;
@@ -35,15 +38,39 @@
     } catch (_) {}
   }
 
-  // Editable Rich text must keep the browser/Telegram native selection gesture.
-  // Inline Rich Button tokens own their own long-press customization menu.
-  function nativeControlTarget(target) {
+  function mediaBlockTarget(target) {
+    const card = target?.closest?.(MEDIA_CARD_SELECTOR);
+    if (!card) return null;
+
+    // Real form controls keep their own interaction. Native media players are
+    // intentionally excluded here: a short tap still plays/seeks normally,
+    // while holding for LONG_PRESS_MS opens the parent Block menu.
+    if (target.closest?.(MEDIA_PASS_THROUGH_SELECTOR)) return null;
+    return card.closest?.(".block") || null;
+  }
+
+  // Editable rich text and ordinary form controls keep their native selection /
+  // interaction gesture. Audio/video inside a media Block are special: they
+  // still receive short taps, but may also trigger the Block menu on hold.
+  function nativeControlTarget(target, pressEl = null) {
+    const isMediaBlockPress = Boolean(
+      pressEl?.classList?.contains("block")
+      && target?.closest?.(MEDIA_CARD_SELECTOR)
+    );
+    if (isMediaBlockPress && target.closest?.("audio,video,.media-live-preview,.audio-live-preview")) {
+      return false;
+    }
     return Boolean(target.closest(
       'input,textarea,select,video,audio,a,[contenteditable="true"],[data-inline-rich-button],[data-no-long-press]'
     ));
   }
 
   function pressTargetFrom(target) {
+    // A media card is merely the visual surface of its parent Block. Promoting
+    // it here makes long-press consistent with paragraph/table/details blocks.
+    const mediaBlock = mediaBlockTarget(target);
+    if (mediaBlock) return mediaBlock;
+
     const el = target.closest?.(PRESS_SELECTOR);
     if (!el || el.disabled || el.getAttribute?.("aria-disabled") === "true") return null;
     return el;
@@ -101,7 +128,7 @@
       try {
         if (typeof selectBlock === "function") selectBlock(el.dataset.id);
         const block = typeof current !== "undefined"
-          ? current?.blocks?.find?.(item => item.id === el.dataset.id)
+          ? current?.blocks?.find?.(item => String(item.id) === String(el.dataset.id))
           : null;
         if (block && typeof openBlockMenu === "function") openBlockMenu(block);
       } catch (_) {}
@@ -124,7 +151,7 @@
       startY:event.clientY,
       moved:false,
       longPressed:false,
-      nativeControl:nativeControlTarget(event.target),
+      nativeControl:nativeControlTarget(event.target, el),
     };
 
     el.classList.add("press-surface", "is-pressed");
@@ -184,6 +211,9 @@
 
   document.addEventListener("contextmenu", event => {
     const block = event.target.closest?.(".block");
-    if (block && !nativeControlTarget(event.target)) event.preventDefault();
+    if (!block) return;
+    const mediaSurface = event.target.closest?.(MEDIA_CARD_SELECTOR);
+    const isNativeMedia = Boolean(event.target.closest?.("audio,video,.media-live-preview,.audio-live-preview"));
+    if ((mediaSurface && isNativeMedia) || !nativeControlTarget(event.target, block)) event.preventDefault();
   });
 })();
