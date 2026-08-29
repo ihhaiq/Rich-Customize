@@ -1,4 +1,4 @@
-// Beta 0.3.21 — tactile press + reliable long-press actions for media blocks.
+// Beta 0.3.23 — one long-press model for every editor Block.
 (() => {
   const LONG_PRESS_MS = 460;
   const MOVE_CANCEL_PX = 12;
@@ -16,17 +16,24 @@
     ".primary-soft",
     ".fab",
     ".icon-btn",
-    ".media-picker-card",
     ".starter-card",
     ".block",
   ].join(",");
 
-  const MEDIA_CARD_SELECTOR = ".media-picker-card,.media-placeholder";
-  const MEDIA_PASS_THROUGH_SELECTOR = "button,input,textarea,select,a,[contenteditable=\"true\"],[data-inline-rich-button],[data-no-long-press]";
+  // These controls own their own click / long-press semantics. Everything else
+  // inside a .block — table cells, Details title, list editors, text editors,
+  // audio/video players and media surfaces — promotes a hold to the parent Block.
+  const BLOCK_EXCLUSIVE_SELECTOR = [
+    "button",
+    "a",
+    "[data-inline-rich-button]",
+    "[data-no-long-press]",
+  ].join(",");
 
   let active = null;
   let longTimer = null;
   let suppressClickUntil = 0;
+  let suppressContextUntil = 0;
   let suppressTarget = null;
 
   function haptic(kind = "light") {
@@ -38,38 +45,26 @@
     } catch (_) {}
   }
 
-  function mediaBlockTarget(target) {
-    const card = target?.closest?.(MEDIA_CARD_SELECTOR);
-    if (!card) return null;
-
-    // Real form controls keep their own interaction. Native media players are
-    // intentionally excluded here: a short tap still plays/seeks normally,
-    // while holding for LONG_PRESS_MS opens the parent Block menu.
-    if (target.closest?.(MEDIA_PASS_THROUGH_SELECTOR)) return null;
-    return card.closest?.(".block") || null;
+  function blockFromTarget(target) {
+    const block = target?.closest?.(".block");
+    if (!block?.dataset?.id) return null;
+    if (target.closest?.(BLOCK_EXCLUSIVE_SELECTOR)) return null;
+    return block;
   }
 
-  // Editable rich text and ordinary form controls keep their native selection /
-  // interaction gesture. Audio/video inside a media Block are special: they
-  // still receive short taps, but may also trigger the Block menu on hold.
   function nativeControlTarget(target, pressEl = null) {
-    const isMediaBlockPress = Boolean(
-      pressEl?.classList?.contains("block")
-      && target?.closest?.(MEDIA_CARD_SELECTOR)
-    );
-    if (isMediaBlockPress && target.closest?.("audio,video,.media-live-preview,.audio-live-preview")) {
-      return false;
-    }
-    return Boolean(target.closest(
+    // Once the press has been promoted to a Block, editable/native children are
+    // intentionally allowed to start the timer. A normal short tap is untouched;
+    // only a stationary hold opens Block actions.
+    if (pressEl?.classList?.contains("block")) return false;
+    return Boolean(target.closest?.(
       'input,textarea,select,video,audio,a,[contenteditable="true"],[data-inline-rich-button],[data-no-long-press]'
     ));
   }
 
   function pressTargetFrom(target) {
-    // A media card is merely the visual surface of its parent Block. Promoting
-    // it here makes long-press consistent with paragraph/table/details blocks.
-    const mediaBlock = mediaBlockTarget(target);
-    if (mediaBlock) return mediaBlock;
+    const block = blockFromTarget(target);
+    if (block) return block;
 
     const el = target.closest?.(PRESS_SELECTOR);
     if (!el || el.disabled || el.getAttribute?.("aria-disabled") === "true") return null;
@@ -112,6 +107,19 @@
     }
   }
 
+  function clearNativeSelectionInside(block) {
+    try {
+      const focused = document.activeElement;
+      if (focused && block.contains(focused) && (
+        focused.matches?.("input,textarea,select") || focused.isContentEditable
+      )) {
+        focused.blur?.();
+      }
+      const selection = window.getSelection?.();
+      if (selection && !selection.isCollapsed) selection.removeAllRanges();
+    } catch (_) {}
+  }
+
   function finishLongPress(el) {
     el.classList.remove("is-pressed", "long-pressing", "long-pressed");
     if (PERFORMANCE_MODE) {
@@ -126,6 +134,7 @@
 
     if (el.classList.contains("block") && el.dataset.id) {
       try {
+        clearNativeSelectionInside(el);
         if (typeof selectBlock === "function") selectBlock(el.dataset.id);
         const block = typeof current !== "undefined"
           ? current?.blocks?.find?.(item => String(item.id) === String(el.dataset.id))
@@ -135,6 +144,7 @@
     }
 
     suppressClickUntil = Date.now() + 650;
+    suppressContextUntil = Date.now() + 900;
     suppressTarget = el;
   }
 
@@ -212,8 +222,8 @@
   document.addEventListener("contextmenu", event => {
     const block = event.target.closest?.(".block");
     if (!block) return;
-    const mediaSurface = event.target.closest?.(MEDIA_CARD_SELECTOR);
-    const isNativeMedia = Boolean(event.target.closest?.("audio,video,.media-live-preview,.audio-live-preview"));
-    if ((mediaSurface && isNativeMedia) || !nativeControlTarget(event.target, block)) event.preventDefault();
+    if (Date.now() <= suppressContextUntil || !event.target.closest?.(BLOCK_EXCLUSIVE_SELECTOR)) {
+      event.preventDefault();
+    }
   });
 })();
