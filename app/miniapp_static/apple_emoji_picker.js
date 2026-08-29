@@ -1,14 +1,22 @@
-// Beta 0.3.18 — same-origin Apple image emoji picker.
+// Beta 0.3.19 — preserve 0.3.17 editor behavior; repair Apple picker previews only.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
 
-  // Replace the node so listeners from the older OS-font picker are removed.
+  // Keep the exact 0.3.17 interaction model: replace the button so the older
+  // OS-font picker cannot also handle the same click.
   const emojiBtn = oldButton.cloneNode(true);
   oldButton.replaceWith(emojiBtn);
 
-  const DATA_URL = "/miniapp/emoji/apple/emoji.json";
-  const IMAGE_BASE = "/miniapp/emoji/apple/64/";
+  const DATA_URLS = [
+    "https://cdn.jsdelivr.net/npm/emoji-datasource-apple@16.0.0/emoji.json",
+    "https://cdnjs.cloudflare.com/ajax/libs/emoji-datasource-apple/16.0.0/emoji.json",
+  ];
+  const IMAGE_BASES = [
+    "https://cdn.jsdelivr.net/npm/emoji-datasource-apple@16.0.0/img/apple/64/",
+    "https://cdnjs.cloudflare.com/ajax/libs/emoji-datasource-apple/16.0.0/img/apple/64/",
+    "https://unpkg.com/emoji-datasource-apple@16.0.0/img/apple/64/",
+  ];
   const RECENT_KEY = "rich_customize_apple_recent_emoji";
 
   const CATEGORY_META = {
@@ -40,8 +48,9 @@
     }
   }
 
-  function imageUrl(image) {
-    return `${IMAGE_BASE}${String(image || "").toLowerCase()}`;
+  function imageUrl(image, sourceIndex = 0) {
+    const base = IMAGE_BASES[Math.max(0, Math.min(sourceIndex, IMAGE_BASES.length - 1))];
+    return `${base}${String(image || "").toLowerCase()}`;
   }
 
   function isMessageTarget(el) {
@@ -122,9 +131,7 @@
     try {
       const value = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
       return Array.isArray(value) ? value.filter(Boolean).slice(0, 36) : [];
-    } catch (_) {
-      return [];
-    }
+    } catch (_) { return []; }
   }
 
   function addRecent(item) {
@@ -133,14 +140,24 @@
     try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, 36))); } catch (_) {}
   }
 
+  async function fetchCatalogData() {
+    let lastError = null;
+    for (const url of DATA_URLS) {
+      try {
+        const response = await fetch(url, {cache:"force-cache", referrerPolicy:"no-referrer"});
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError || new Error("تعذر تحميل بيانات الإيموجي");
+  }
+
   async function loadCatalog() {
     if (catalog) return catalog;
     if (catalogPromise) return catalogPromise;
-    catalogPromise = fetch(DATA_URL, {cache:"force-cache", credentials:"same-origin"})
-      .then(response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
-      })
+    catalogPromise = fetchCatalogData()
       .then(data => {
         const groups = Object.fromEntries(CATEGORY_ORDER.map(key => [key, []]));
         const byEmoji = new Map();
@@ -209,6 +226,8 @@
     emojiBtn.classList.remove("active");
   }
 
+  // Intentionally unchanged from 0.3.17: inserting an emoji still follows the
+  // editor's existing text path. Preview-image failures must never alter it.
   function insertEmoji(item) {
     const emoji = item.emoji;
     addRecent(item);
@@ -232,20 +251,31 @@
     if (panel?.dataset.category === "recent") renderCategory("recent");
   }
 
-  function makeAppleVisual(item, className = "") {
+  function makeAppleImage(item, className = "") {
     const img = document.createElement("img");
     img.className = className;
-    img.src = imageUrl(item.image);
-    img.alt = item.emoji;
+    img.alt = "";
     img.loading = "lazy";
     img.decoding = "async";
     img.draggable = false;
+    img.referrerPolicy = "no-referrer";
+
+    let sourceIndex = 0;
+    const trySource = () => {
+      img.src = imageUrl(item.image, sourceIndex);
+    };
     img.addEventListener("error", () => {
-      const fallback = document.createElement("span");
-      fallback.className = `${className} apple-emoji-fallback`;
-      fallback.textContent = item.emoji;
-      img.replaceWith(fallback);
-    }, {once:true});
+      sourceIndex += 1;
+      if (sourceIndex < IMAGE_BASES.length) {
+        trySource();
+        return;
+      }
+      // Preview only: never fall back to an OS emoji glyph because that would
+      // make the picker visually inconsistent. Hide a failed asset instead.
+      img.style.visibility = "hidden";
+      img.closest?.(".apple-emoji-item,.apple-emoji-tab")?.classList.add("apple-emoji-preview-failed");
+    });
+    trySource();
     return img;
   }
 
@@ -284,7 +314,7 @@
       button.className = "apple-emoji-item";
       button.setAttribute("aria-label", item.name || item.emoji);
       button.title = item.emoji;
-      button.appendChild(makeAppleVisual(item, "apple-emoji-img"));
+      button.appendChild(makeAppleImage(item, "apple-emoji-img"));
       button.addEventListener("pointerdown", event => event.preventDefault());
       button.addEventListener("click", event => {
         event.preventDefault();
@@ -344,7 +374,7 @@
       button.className = "apple-emoji-tab";
       button.dataset.category = category;
       button.setAttribute("aria-label", meta?.label || category);
-      button.appendChild(makeAppleVisual(representative, "apple-emoji-tab-img"));
+      button.appendChild(makeAppleImage(representative, "apple-emoji-tab-img"));
       button.addEventListener("pointerdown", event => event.preventDefault());
       button.onclick = event => {event.preventDefault();event.stopPropagation();renderCategory(category);};
       tabs.appendChild(button);
@@ -387,7 +417,6 @@
     rememberRange();
     event.preventDefault();
   });
-
   emojiBtn.addEventListener("click", event => {
     event.preventDefault();
     event.stopImmediatePropagation();
