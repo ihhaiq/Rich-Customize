@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/miniapp/static/style.css?v=0.2.4">
   <link rel="stylesheet" href="/miniapp/static/media_upload.css?v=0.2.4">
   <link rel="stylesheet" href="/miniapp/static/live_preview.css?v=0.2.4">
+  <link rel="stylesheet" href="/miniapp/static/liquid_glass.css?v=0.2.5">
 </head>
 <body>
   <section id="editorView" class="editor-screen">
@@ -27,28 +28,35 @@
         </div>
       </header>
 
-      <nav class="composer-toolbar" aria-label="أدوات المحرر">
-        <button id="undoBtn" type="button" disabled aria-label="تراجع">
-          <svg viewBox="0 0 24 24"><path d="M7 8H4V5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 8c1.8-2.5 4.6-4 8-4a9 9 0 1 1-8.6 11.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <button id="redoBtn" type="button" disabled aria-label="إعادة">
-          <svg viewBox="0 0 24 24"><path d="M17 8h3V5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 8c-1.8-2.5-4.6-4-8-4a9 9 0 1 0 8.6 11.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <span class="toolbar-sep"></span>
-        <button type="button" data-tool="text" aria-label="نص"><b class="glyph">Aa</b></button>
-        <button type="button" data-tool="list" class="has-badge" aria-label="قائمة">
-          <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" stroke-linecap="round"/><circle cx="4.5" cy="6" r="1.15" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.15" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.15" fill="currentColor" stroke="none"/></svg>
-        </button>
-        <button type="button" data-tool="table" class="has-badge" aria-label="جدول">
-          <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M9.5 4.5v15"/></svg>
-        </button>
-        <button type="button" data-tool="media" class="has-badge" aria-label="مرفق">
-          <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6" fill="currentColor" stroke="none"/><path d="m4.5 17 5-5 3.2 3.2L16.5 11l3 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <button type="button" data-tool="math" class="has-badge" aria-label="معادلة"><b class="glyph">&Sigma;</b></button>
-        <button id="allBlocksBtn" type="button" aria-label="كل البلوكات">
-          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-        </button>
+      <nav class="composer-toolbar floating-toolbar" aria-label="أدوات المحرر">
+        <div class="toolbar-bubble history-bubble">
+          <button id="undoBtn" type="button" disabled aria-label="تراجع">
+            <svg viewBox="0 0 24 24"><path d="M7 8H4V5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 8c1.8-2.5 4.6-4 8-4a9 9 0 1 1-8.6 11.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button id="redoBtn" type="button" disabled aria-label="إعادة">
+            <svg viewBox="0 0 24 24"><path d="M17 8h3V5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 8c-1.8-2.5-4.6-4-8-4a9 9 0 1 0 8.6 11.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+
+        <div class="toolbar-bubble tools-bubble">
+          <button type="button" data-tool="text" aria-label="نص"><b class="glyph">Aa</b></button>
+          <button type="button" data-tool="list" class="has-badge" aria-label="قائمة">
+            <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" stroke-linecap="round"/><circle cx="4.5" cy="6" r="1.15" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.15" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.15" fill="currentColor" stroke="none"/></svg>
+          </button>
+          <button type="button" data-tool="table" class="has-badge" aria-label="جدول">
+            <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M9.5 4.5v15"/></svg>
+          </button>
+          <button type="button" data-tool="media" class="has-badge" aria-label="مرفق">
+            <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6" fill="currentColor" stroke="none"/><path d="m4.5 17 5-5 3.2 3.2L16.5 11l3 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button type="button" data-tool="math" class="has-badge" aria-label="معادلة"><b class="glyph">&Sigma;</b></button>
+        </div>
+
+        <div class="toolbar-bubble add-bubble">
+          <button id="allBlocksBtn" type="button" aria-label="كل البلوكات">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+          </button>
+        </div>
       </nav>
     </div>
 
