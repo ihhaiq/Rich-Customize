@@ -91,6 +91,11 @@ class I18nCoverageTests(unittest.TestCase):
     def test_recent_ui_never_leaks_arabic_in_non_arabic_locales(self):
         sources = list(PAGE_AR_TO_EN) + list(RECENT_AR_TO_EN)
         for language in TRANSLATIONS:
+            # Arabic, Persian, Sorani Kurdish, and Urdu intentionally use the
+            # Arabic Unicode script; the script detector cannot distinguish a
+            # correct translation from leaked Arabic UI in those locales.
+            if language in {"ar", "fa", "ku", "ur"}:
+                continue
             token = i18n_core._language.set(language)
             try:
                 for source in sources:

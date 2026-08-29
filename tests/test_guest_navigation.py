@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 from app.routers.rich_editor import open_page_link, restore_original_message
 from app.services.factory import new_block
 from app.services.guest_message_registry import GuestMessageRegistry
+from app.services.page_navigation import PageNavigationRegistry
 from app.services.page_registry import PageRegistry
 
 
@@ -16,6 +17,7 @@ class GuestNavigationTests(unittest.IsolatedAsyncioTestCase):
             root = Path(directory)
             pages = PageRegistry(root / "pages.json")
             guests = GuestMessageRegistry(root / "guests.json")
+            navigation = PageNavigationRegistry(root / "navigation.json")
             target = await pages.save(
                 1,
                 "الصفحة الثانية",
@@ -43,8 +45,12 @@ class GuestNavigationTests(unittest.IsolatedAsyncioTestCase):
                     )
 
                     with (
-                        patch("app.routers.rich_editor.page_registry", pages),
-                        patch("app.routers.rich_editor.guest_message_registry", guests),
+                        patch("app.routers.editor_core.page_registry", pages),
+                        patch("app.routers.editor_core.guest_message_registry", guests),
+                        patch(
+                            "app.routers.editor_core.page_navigation_registry",
+                            navigation,
+                        ),
                     ):
                         await open_page_link(callback, bot)
 
@@ -59,9 +65,10 @@ class GuestNavigationTests(unittest.IsolatedAsyncioTestCase):
                         mode="json", exclude_none=True,
                     )
                     self.assertEqual(rendered["blocks"][0]["text"], "النص الجديد")
-                    self.assertEqual(
-                        rendered["blocks"][1]["buttons"][0]["callback_data"],
-                        "r:ephemeral:restore",
+                    self.assertTrue(
+                        rendered["blocks"][1]["buttons"][0]["callback_data"].startswith(
+                            "r:pback:",
+                        ),
                     )
 
     async def test_back_deletes_ephemeral_layer_and_reveals_original(self):

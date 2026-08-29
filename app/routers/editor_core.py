@@ -55,6 +55,7 @@ from app.services.buttons import (
 from app.services.chat_registry import managed_chat_registry
 from app.services.guest_message_registry import guest_message_registry
 from app.services.page_registry import page_registry
+from app.services.page_navigation import PageNavigation, page_navigation_registry
 from app.services.factory import (
     FINAL_RICH_BLOCK_TYPES, MEDIA_CAPTION_TYPES, QUOTE_TYPES, container_data,
     compatible_child_block_types, details_data, map_data, new_block, quote_data,
@@ -3861,6 +3862,7 @@ async def _open_page_link(
     parts = callback.data.split(":")
     target_id = parts[2] if len(parts) > 2 else ""
     source_id = parts[3] if len(parts) > 3 and parts[3] else None
+    navigation_token = parts[4] if len(parts) > 4 and parts[4] else None
     page = await page_registry.get(target_id)
     if page is None:
         await callback.answer("هذه الصفحة لم تعد موجودة أو انتهت صلاحيتها.", show_alert=True)
@@ -3868,19 +3870,15 @@ async def _open_page_link(
     ephemeral_message_id = (
         callback_message.ephemeral_message_id if callback_message is not None else None
     )
+    navigation = await page_navigation_registry.navigate(
+        callback.from_user.id,
+        source_id,
+        target_id,
+        navigation_token,
+    )
     buttons = list(page.get("buttons") or [])
-    if ephemeral_message_id and source_id:
-        buttons = buttons + [{
-            "id": "back", "text": "🔙 رجوع", "type": "page",
-            "value": source_id, "position": len(buttons), "style": "default",
-        }]
-    elif not ephemeral_message_id:
-        buttons = buttons + [{
-            "id": "restore", "text": "🔙 رجوع", "type": "callback_data",
-            "value": "r:ephemeral:restore", "position": len(buttons),
-            "style": "default",
-        }]
     prepared_buttons = await _prepare_message_buttons(buttons)
+    navigation_buttons = _page_navigation_buttons(navigation)
     callback_notice: str | None = None
     try:
         rich_message = build_input_rich_message(
@@ -3889,6 +3887,8 @@ async def _open_page_link(
             buttons_per_row=int(page.get("buttons_per_row", 1)),
             buttons_align=str(page.get("buttons_align", "center")),
             source_page_id=target_id,
+            navigation_token=navigation.token,
+            navigation_buttons=navigation_buttons,
         )
         if ephemeral_message_id:
             await bot.edit_ephemeral_message_text(
@@ -3927,6 +3927,177 @@ async def _open_page_link(
         await callback.answer(callback_notice)
     except TelegramBadRequest:
         pass
+
+
+def _page_navigation_buttons(navigation: PageNavigation) -> list[dict[str, Any]]:
+    buttons: list[dict[str, Any]] = []
+    if navigation.can_go_back:
+        buttons.append({
+            "id": "navigation-back",
+            "text": t("back"),
+            "type": "callback_data",
+            "value": f"r:pback:{navigation.token}",
+            "position": len(buttons),
+            "style": "default",
+        })
+    if navigation.can_go_home:
+        buttons.append({
+            "id": "navigation-home",
+            "text": t("navigation.home"),
+            "type": "callback_data",
+            "value": f"r:phome:{navigation.token}",
+            "position": len(buttons),
+            "style": "primary",
+        })
+    return buttons
+
+
+async def _render_navigation_page(
+    callback: CallbackQuery,
+    bot: Bot,
+    page_id: str,
+    navigation: PageNavigation,
+) -> bool:
+    page = await page_registry.get(page_id)
+    if page is None:
+        await callback.answer(
+            "هذه الصفحة لم تعد موجودة أو انتهت صلاحيتها.", show_alert=True,
+        )
+        return False
+    callback_message = callback.message if isinstance(callback.message, Message) else None
+    if callback_message is None:
+        await callback.answer(t("navigation.message_missing"), show_alert=True)
+        return False
+    try:
+        prepared_buttons = await _prepare_message_buttons(page.get("buttons") or [])
+        rich_message = build_input_rich_message(
+            page.get("blocks", []),
+            prepared_buttons,
+            buttons_per_row=int(page.get("buttons_per_row", 1)),
+            buttons_align=str(page.get("buttons_align", "center")),
+            source_page_id=page_id,
+            navigation_token=navigation.token,
+            navigation_buttons=_page_navigation_buttons(navigation),
+        )
+        if callback_message.ephemeral_message_id:
+            await bot.edit_ephemeral_message_text(
+                chat_id=callback_message.chat.id,
+                receiver_user_id=callback.from_user.id,
+                ephemeral_message_id=callback_message.ephemeral_message_id,
+                rich_message=rich_message,
+            )
+        else:
+            await bot.send_rich_message(
+                chat_id=callback_message.chat.id,
+                rich_message=rich_message,
+            )
+    except (RichMessageRenderError, TelegramAPIError, ValueError) as error:
+        logger.exception(
+            "Failed to render navigation page_id=%s for user_id=%s",
+            page_id,
+            callback.from_user.id,
+        )
+        await callback.answer(
+            f"تعذر فتح الصفحة: {_friendly_rich_error(error)[:160]}",
+            show_alert=True,
+        )
+        return False
+    return True
+
+
+async def _restore_navigation_root(
+    callback: CallbackQuery,
+    bot: Bot,
+    navigation: PageNavigation,
+) -> bool:
+    callback_message = callback.message if isinstance(callback.message, Message) else None
+    ephemeral_message_id = (
+        callback_message.ephemeral_message_id if callback_message is not None else None
+    )
+    if callback_message is not None and ephemeral_message_id:
+        await bot.delete_ephemeral_message(
+            chat_id=callback_message.chat.id,
+            receiver_user_id=callback.from_user.id,
+            ephemeral_message_id=ephemeral_message_id,
+        )
+        return True
+    if navigation.root_page_id:
+        root = PageNavigation(
+            navigation.token,
+            navigation.user_id,
+            (navigation.root_page_id,),
+            False,
+        )
+        return await _render_navigation_page(
+            callback, bot, navigation.root_page_id, root,
+        )
+    await callback.answer(t("navigation.original_above"), show_alert=True)
+    return False
+
+
+@router.callback_query(F.data.startswith("r:pback:"))
+async def navigate_page_back(callback: CallbackQuery, bot: Bot) -> None:
+    token = callback.data.rsplit(":", 1)[-1]
+    navigation = await page_navigation_registry.back(token, callback.from_user.id)
+    if navigation is None:
+        await callback.answer(t("navigation.expired"), show_alert=True)
+        return
+    try:
+        if navigation.is_at_root:
+            restored = await _restore_navigation_root(callback, bot, navigation)
+            if restored:
+                await page_navigation_registry.finish(token)
+            else:
+                await page_navigation_registry.rollback_back(
+                    token, callback.from_user.id,
+                )
+        else:
+            restored = await _render_navigation_page(
+                callback, bot, navigation.stack[-1], navigation,
+            )
+            if restored:
+                await page_navigation_registry.commit_back(
+                    token, callback.from_user.id,
+                )
+            else:
+                await page_navigation_registry.rollback_back(
+                    token, callback.from_user.id,
+                )
+    except TelegramAPIError as error:
+        await page_navigation_registry.rollback_back(token, callback.from_user.id)
+        logger.exception("Failed to navigate back for user_id=%s", callback.from_user.id)
+        await callback.answer(t(
+            "navigation.back_failed", error=_friendly_rich_error(error)[:140],
+        ), show_alert=True)
+        return
+    if restored:
+        try:
+            await callback.answer()
+        except TelegramBadRequest:
+            pass
+
+
+@router.callback_query(F.data.startswith("r:phome:"))
+async def navigate_page_home(callback: CallbackQuery, bot: Bot) -> None:
+    token = callback.data.rsplit(":", 1)[-1]
+    navigation = await page_navigation_registry.home(token, callback.from_user.id)
+    if navigation is None:
+        await callback.answer(t("navigation.expired"), show_alert=True)
+        return
+    try:
+        restored = await _restore_navigation_root(callback, bot, navigation)
+    except TelegramAPIError as error:
+        logger.exception("Failed to navigate home for user_id=%s", callback.from_user.id)
+        await callback.answer(t(
+            "navigation.home_failed", error=_friendly_rich_error(error)[:140],
+        ), show_alert=True)
+        return
+    if restored:
+        await page_navigation_registry.finish(token)
+        try:
+            await callback.answer()
+        except TelegramBadRequest:
+            pass
 
 
 @router.callback_query(F.data == "r:ephemeral:restore")

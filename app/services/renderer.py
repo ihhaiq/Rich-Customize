@@ -445,6 +445,7 @@ def _editor_input_blocks(block: dict[str, Any], path: str) -> list[dict[str, Any
 
 def _rich_button_payload(
     button: dict[str, Any], source_page_id: str | None = None,
+    navigation_token: str | None = None,
 ) -> dict[str, Any]:
     button_type = str(button.get("type", "url"))
     value = str(button.get("value", button.get("url", "")))
@@ -457,9 +458,12 @@ def _rich_button_payload(
 
     if button_type == "page":
         prefix = "r:spage" if button.get("audience") == "subscribers" else "r:page"
-        payload["callback_data"] = (
-            f"{prefix}:{value}:{source_page_id}" if source_page_id else f"{prefix}:{value}"
-        )
+        callback_parts = [prefix, value]
+        if source_page_id:
+            callback_parts.append(source_page_id)
+            if navigation_token:
+                callback_parts.append(navigation_token)
+        payload["callback_data"] = ":".join(callback_parts)
     elif button_type == "copy":
         payload["copy_text"] = CopyTextButton(text=value)
     elif button_type == "callback_data":
@@ -486,6 +490,7 @@ def _button_blocks(
     buttons_per_row: int,
     align: str,
     source_page_id: str | None = None,
+    navigation_token: str | None = None,
 ) -> list[dict[str, Any]]:
     if not buttons:
         return []
@@ -496,7 +501,7 @@ def _button_blocks(
         {
             "type": "buttons",
             "buttons": [
-                _rich_button_payload(item, source_page_id)
+                _rich_button_payload(item, source_page_id, navigation_token)
                 for item in ordered[index:index + width]
             ],
             "align": safe_align,
@@ -505,31 +510,42 @@ def _button_blocks(
     ]
 
 
-def _resolve_inline_page_callbacks(value: Any, source_page_id: str | None) -> Any:
+def _resolve_inline_page_callbacks(
+    value: Any,
+    source_page_id: str | None,
+    navigation_token: str | None = None,
+) -> Any:
     """Turn the simple ``cbd`` marker into the internal page callback format."""
     if isinstance(value, list):
-        return [_resolve_inline_page_callbacks(item, source_page_id) for item in value]
+        return [
+            _resolve_inline_page_callbacks(item, source_page_id, navigation_token)
+            for item in value
+        ]
     if not isinstance(value, dict):
         return value
     payload = {
-        key: _resolve_inline_page_callbacks(item, source_page_id)
+        key: _resolve_inline_page_callbacks(item, source_page_id, navigation_token)
         for key, item in value.items()
     }
     callback_data = payload.get("callback_data")
     if isinstance(callback_data, str) and callback_data.startswith("r:cbd:"):
         target_page_id = callback_data.removeprefix("r:cbd:")
-        payload["callback_data"] = (
-            f"r:page:{target_page_id}:{source_page_id}"
-            if source_page_id else f"r:page:{target_page_id}"
-        )
+        callback_parts = ["r:page", target_page_id]
+        if source_page_id:
+            callback_parts.append(source_page_id)
+            if navigation_token:
+                callback_parts.append(navigation_token)
+        payload["callback_data"] = ":".join(callback_parts)
     elif isinstance(callback_data, str) and callback_data.startswith("r:cbds:"):
         # Subscribers-only page navigation: gated by the r:spage: handler,
         # which checks channel membership before opening the target page.
         target_page_id = callback_data.removeprefix("r:cbds:")
-        payload["callback_data"] = (
-            f"r:spage:{target_page_id}:{source_page_id}"
-            if source_page_id else f"r:spage:{target_page_id}"
-        )
+        callback_parts = ["r:spage", target_page_id]
+        if source_page_id:
+            callback_parts.append(source_page_id)
+            if navigation_token:
+                callback_parts.append(navigation_token)
+        payload["callback_data"] = ":".join(callback_parts)
     return payload
 
 
@@ -539,6 +555,8 @@ def _typed_input_rich_message(
     buttons_per_row: int = 1,
     buttons_align: str = "center",
     source_page_id: str | None = None,
+    navigation_token: str | None = None,
+    navigation_buttons: list[dict[str, Any]] | None = None,
 ) -> InputRichMessage:
     if not blocks:
         raise RichMessageRenderError("The rich message has no blocks")
@@ -556,9 +574,21 @@ def _typed_input_rich_message(
         # Direction is intentionally omitted. Telegram will render Arabic text
         # as RTL and Latin text as LTR instead of forcing every message to RTL.
         payloads.extend(
-            _button_blocks(buttons, buttons_per_row, buttons_align, source_page_id),
+            _button_blocks(
+                buttons, buttons_per_row, buttons_align,
+                source_page_id, navigation_token,
+            ),
         )
-        payloads = _resolve_inline_page_callbacks(payloads, source_page_id)
+        # Navigation controls always use their own compact two-button row so
+        # the saved page's button layout remains unchanged.
+        payloads.extend(
+            _button_blocks(
+                navigation_buttons, 2, "center", source_page_id, navigation_token,
+            ),
+        )
+        payloads = _resolve_inline_page_callbacks(
+            payloads, source_page_id, navigation_token,
+        )
         return InputRichMessage(blocks=payloads)
     except ValidationError as error:
         first = error.errors()[0] if error.errors() else {}
@@ -648,9 +678,12 @@ def build_input_rich_message(
     buttons_per_row: int = 1,
     buttons_align: str = "center",
     source_page_id: str | None = None,
+    navigation_token: str | None = None,
+    navigation_buttons: list[dict[str, Any]] | None = None,
 ) -> InputRichMessage:
     return _typed_input_rich_message(
         blocks, buttons, buttons_per_row, buttons_align, source_page_id,
+        navigation_token, navigation_buttons,
     )
 
 

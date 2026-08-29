@@ -13,6 +13,10 @@ from app.routers.media_events import router as media_events_router
 # replace focused helpers/handlers while the remaining core is split gradually.
 install_button_guide(editor_core)
 editor_core_router = editor_core.router
+# Compatibility exports used by integrations and tests while handlers still
+# live in the compatibility core.
+open_page_link = editor_core.open_page_link
+restore_original_message = editor_core.restore_original_message
 
 router = Router(name="rich_editor")
 

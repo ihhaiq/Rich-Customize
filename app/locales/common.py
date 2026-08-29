@@ -22,6 +22,12 @@ PHRASES: dict[str, str] = {
     "delete": "🗑 Delete",
     "move": "↕️ Change position",
     "back": "🔙 Back",
+    "navigation.home": "🏠 Home",
+    "navigation.message_missing": "Couldn't identify the navigation message.",
+    "navigation.original_above": "The main message is above.",
+    "navigation.expired": "The navigation session expired. Open the page again.",
+    "navigation.back_failed": "Couldn't go back: {error}",
+    "navigation.home_failed": "Couldn't open the home page: {error}",
     "preview_block": "👁 Preview this Block",
     "preview_generating": "Generating preview…",
     "preview_ready": "Preview is ready.",
@@ -187,6 +193,12 @@ AR_PHRASES: dict[str, str] = {
     "pages.delete_yes": "🗑 نعم، حذف",
     "common.cancel": "إلغاء",
     "pages.deleted": "تم حذف الصفحة",
+    "navigation.home": "🏠 الصفحة الرئيسية",
+    "navigation.message_missing": "تعذر تحديد رسالة التنقّل.",
+    "navigation.original_above": "الرسالة الرئيسية موجودة بالأعلى.",
+    "navigation.expired": "انتهت جلسة التنقّل. افتح الصفحة من جديد.",
+    "navigation.back_failed": "تعذر الرجوع: {error}",
+    "navigation.home_failed": "تعذر فتح الصفحة الرئيسية: {error}",
     "editor.tools_button": "🛠 أدوات إضافية",
     "editor.tools_text": "🛠 أدوات إضافية\n\nاختر الأداة التي تحتاجها:",
     "editor.undo_button": "↩️ تراجع",
@@ -930,6 +942,44 @@ for language, translations in RICH_IMPORT_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 for language, translations in DETAILS_INNER_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+NAVIGATION_KEYS = (
+    "navigation.home", "navigation.message_missing",
+    "navigation.original_above", "navigation.expired",
+    "navigation.back_failed", "navigation.home_failed",
+)
+
+NAVIGATION_VALUES: dict[str, tuple[str, ...]] = {
+    "es": ("🏠 Página principal", "No se pudo identificar el mensaje de navegación.", "El mensaje principal está arriba.", "La sesión de navegación caducó. Abre la página de nuevo.", "No se pudo volver: {error}", "No se pudo abrir la página principal: {error}"),
+    "fr": ("🏠 Accueil", "Impossible d’identifier le message de navigation.", "Le message principal se trouve au-dessus.", "La session de navigation a expiré. Ouvrez de nouveau la page.", "Impossible de revenir : {error}", "Impossible d’ouvrir la page d’accueil : {error}"),
+    "de": ("🏠 Startseite", "Die Navigationsnachricht konnte nicht erkannt werden.", "Die Hauptnachricht befindet sich oben.", "Die Navigationssitzung ist abgelaufen. Öffne die Seite erneut.", "Zurückgehen nicht möglich: {error}", "Die Startseite konnte nicht geöffnet werden: {error}"),
+    "it": ("🏠 Pagina iniziale", "Impossibile identificare il messaggio di navigazione.", "Il messaggio principale si trova sopra.", "La sessione di navigazione è scaduta. Apri di nuovo la pagina.", "Impossibile tornare indietro: {error}", "Impossibile aprire la pagina iniziale: {error}"),
+    "pt": ("🏠 Página inicial", "Não foi possível identificar a mensagem de navegação.", "A mensagem principal está acima.", "A sessão de navegação expirou. Abra a página novamente.", "Não foi possível voltar: {error}", "Não foi possível abrir a página inicial: {error}"),
+    "nl": ("🏠 Startpagina", "Het navigatiebericht kon niet worden herkend.", "Het hoofdbericht staat hierboven.", "De navigatiesessie is verlopen. Open de pagina opnieuw.", "Teruggaan is mislukt: {error}", "De startpagina kon niet worden geopend: {error}"),
+    "pl": ("🏠 Strona główna", "Nie udało się rozpoznać wiadomości nawigacyjnej.", "Główna wiadomość znajduje się powyżej.", "Sesja nawigacji wygasła. Otwórz stronę ponownie.", "Nie udało się wrócić: {error}", "Nie udało się otworzyć strony głównej: {error}"),
+    "uk": ("🏠 Головна", "Не вдалося визначити навігаційне повідомлення.", "Головне повідомлення знаходиться вище.", "Сеанс навігації завершився. Відкрийте сторінку знову.", "Не вдалося повернутися: {error}", "Не вдалося відкрити головну сторінку: {error}"),
+    "ru": ("🏠 Главная", "Не удалось определить навигационное сообщение.", "Главное сообщение находится выше.", "Сеанс навигации истёк. Откройте страницу снова.", "Не удалось вернуться: {error}", "Не удалось открыть главную страницу: {error}"),
+    "tr": ("🏠 Ana sayfa", "Gezinme mesajı belirlenemedi.", "Ana mesaj yukarıda.", "Gezinme oturumunun süresi doldu. Sayfayı yeniden açın.", "Geri dönülemedi: {error}", "Ana sayfa açılamadı: {error}"),
+    "fa": ("🏠 صفحه اصلی", "پیام پیمایش شناسایی نشد.", "پیام اصلی در بالاست.", "نشست پیمایش منقضی شد. صفحه را دوباره باز کنید.", "بازگشت ممکن نشد: {error}", "صفحه اصلی باز نشد: {error}"),
+    "ku": ("🏠 Rûpela sereke", "Peyama navîgasyonê nehat diyarkirin.", "Peyama sereke li jor e.", "Danişîna navîgasyonê qediya. Rûpelê dîsa veke.", "Vegera paş ne pêkan bû: {error}", "Rûpela sereke nehat vekirin: {error}"),
+    "ur": ("🏠 مرکزی صفحہ", "نیویگیشن پیغام کی شناخت نہیں ہو سکی۔", "مرکزی پیغام اوپر موجود ہے۔", "نیویگیشن سیشن ختم ہو گیا۔ صفحہ دوبارہ کھولیں۔", "واپس نہیں جا سکے: {error}", "مرکزی صفحہ نہیں کھل سکا: {error}"),
+    "hi": ("🏠 मुख्य पृष्ठ", "नेविगेशन संदेश की पहचान नहीं हो सकी।", "मुख्य संदेश ऊपर है।", "नेविगेशन सत्र समाप्त हो गया। पेज फिर से खोलें।", "वापस नहीं जा सके: {error}", "मुख्य पृष्ठ नहीं खुल सका: {error}"),
+    "id": ("🏠 Halaman utama", "Pesan navigasi tidak dapat dikenali.", "Pesan utama berada di atas.", "Sesi navigasi berakhir. Buka kembali halamannya.", "Tidak dapat kembali: {error}", "Tidak dapat membuka halaman utama: {error}"),
+    "ja": ("🏠 ホーム", "ナビゲーションメッセージを特定できませんでした。", "メインメッセージは上にあります。", "ナビゲーションセッションの期限が切れました。ページをもう一度開いてください。", "戻れませんでした：{error}", "ホームページを開けませんでした：{error}"),
+    "ko": ("🏠 홈", "탐색 메시지를 확인할 수 없습니다.", "기본 메시지는 위에 있습니다.", "탐색 세션이 만료되었습니다. 페이지를 다시 여세요.", "뒤로 갈 수 없습니다: {error}", "홈 페이지를 열 수 없습니다: {error}"),
+    "vi": ("🏠 Trang chủ", "Không thể xác định tin nhắn điều hướng.", "Tin nhắn chính nằm ở phía trên.", "Phiên điều hướng đã hết hạn. Hãy mở lại trang.", "Không thể quay lại: {error}", "Không thể mở trang chủ: {error}"),
+    "th": ("🏠 หน้าหลัก", "ไม่สามารถระบุข้อความนำทางได้", "ข้อความหลักอยู่ด้านบน", "เซสชันการนำทางหมดอายุ โปรดเปิดหน้าอีกครั้ง", "ไม่สามารถย้อนกลับได้: {error}", "ไม่สามารถเปิดหน้าหลักได้: {error}"),
+    "zh-hans": ("🏠 主页", "无法识别导航消息。", "主消息位于上方。", "导航会话已过期，请重新打开页面。", "无法返回：{error}", "无法打开主页：{error}"),
+    "zh-hant": ("🏠 首頁", "無法識別導覽訊息。", "主訊息位於上方。", "導覽工作階段已過期，請重新開啟頁面。", "無法返回：{error}", "無法開啟首頁：{error}"),
+}
+
+NAVIGATION_TRANSLATIONS = {
+    language: dict(zip(NAVIGATION_KEYS, values, strict=True))
+    for language, values in NAVIGATION_VALUES.items()
+}
+
+for language, translations in NAVIGATION_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 
