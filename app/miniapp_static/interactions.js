@@ -1,12 +1,15 @@
-// Beta 0.3.24 — one long-press model for every editor Block.
+// Beta 0.3.25 — one long-press model for every editor Block.
 (() => {
   const LONG_PRESS_MS = 460;
   const MOVE_CANCEL_PX = 12;
+  const COARSE_POINTER = Boolean(window.matchMedia?.("(pointer: coarse)")?.matches);
+  const NO_HOVER = Boolean(window.matchMedia?.("(hover: none)")?.matches);
   const PERFORMANCE_MODE = document.documentElement.classList.contains("mobile-performance")
-    || window.matchMedia?.("(pointer: coarse)")?.matches
-    || window.innerWidth <= 820;
+    || COARSE_POINTER
+    || (NO_HOVER && window.innerWidth <= 820);
 
   if (PERFORMANCE_MODE) document.documentElement.classList.add("mobile-performance");
+  else document.documentElement.classList.remove("mobile-performance");
 
   const PRESS_SELECTOR = [
     "button",
@@ -233,13 +236,13 @@
   if (!document.querySelector('link[data-table-cell-tools]')) {
     const css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/miniapp/static/table_cell_tools.css?v=0.3.24";
+    css.href = "/miniapp/static/table_cell_tools.css?v=0.3.25";
     css.dataset.tableCellTools = "1";
     document.head.appendChild(css);
   }
   if (!document.querySelector('script[data-table-cell-tools]')) {
     const script = document.createElement("script");
-    script.src = "/miniapp/static/table_cell_tools.js?v=0.3.24";
+    script.src = "/miniapp/static/table_cell_tools.js?v=0.3.25";
     script.dataset.tableCellTools = "1";
     script.onload = () => {
       try {
