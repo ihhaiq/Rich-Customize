@@ -23,6 +23,8 @@ def _resume_url(page_id: str) -> str | None:
 
 @router.message(Command("app"), F.chat.type == "private")
 async def open_mini_app(message: Message) -> None:
+    # /app remains an internal developer shortcut. Public users enter through
+    # Telegram's Main Mini App deep link: t.me/RichCustomizebot?startapp
     if message.from_user is None or message.from_user.id not in developer_ids():
         return
     url = mini_app_url()
@@ -34,8 +36,7 @@ async def open_mini_app(message: Message) -> None:
         return
     await message.answer(
         "🧪 Rich Customize Mini App — Beta 0.3\n\n"
-        "واجهة بأسلوب محرر Telegram، تعديل مباشر للـBlocks، Undo/Redo، "
-        "وقائمة / لإضافة أي Block متوفر. النسخة ما زالت خاصة بالمطور فقط.",
+        "اختصار خاص بالمطور لفتح المحرر مباشرة.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(
                 text="🌐 فتح Mini App Beta 0.3",
@@ -47,7 +48,9 @@ async def open_mini_app(message: Message) -> None:
 
 @router.message(StateFilter(None), F.chat.type == "private", F.users_shared)
 async def receive_miniapp_rich_button_user(message: Message) -> None:
-    if message.from_user is None or message.from_user.id not in developer_ids():
+    # This flow belongs to the public Mini App. The pending request registry
+    # already verifies that request_id belongs to message.from_user.id.
+    if message.from_user is None:
         return
     shared = message.users_shared
     if shared is None or not shared.users:
