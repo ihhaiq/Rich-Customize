@@ -9,7 +9,7 @@ from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
 from app.config import developer_ids
 from app.keyboards import (
@@ -17,7 +17,7 @@ from app.keyboards import (
 )
 from app.services.data_import import (
     DataImportError, MAX_IMPORT_ARCHIVE_BYTES, apply_data_import,
-    prepare_data_import,
+    build_data_export, prepare_data_import,
 )
 from app.services.media_library import showcase_media_library
 from app.services.page_registry import page_registry
@@ -26,6 +26,7 @@ from app.services.page_registry import page_registry
 router = Router(name="developer")
 logger = logging.getLogger(__name__)
 _import_lock = asyncio.Lock()
+_export_lock = asyncio.Lock()
 
 
 class DeveloperStates(StatesGroup):
@@ -45,10 +46,47 @@ async def open_developer_panel(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(
         "🛠 لوحة المطوّر\n\n"
-        "تقدر ترفع ملف ZIP أو ملف JSON لاستيراد بيانات البوت. "
-        "سيتم فحصه وعرض تأكيد قبل استبدال أي بيانات.",
+        "تقدر تصدّر بيانات البوت الحالية كملف ZIP، أو ترفع ملف ZIP/JSON "
+        "لاستيرادها. الاستيراد يُفحص ويطلب تأكيدًا قبل استبدال أي بيانات.\n\n"
+        "ملف التصدير لا يحتوي التوكن أو متغيرات البيئة.",
         reply_markup=build_developer_keyboard(),
     )
+
+
+@router.callback_query(F.data == "dev:export")
+async def send_data_export(callback: CallbackQuery) -> None:
+    if not _is_developer(callback.from_user.id):
+        await callback.answer("هذا الخيار للمطوّر فقط.", show_alert=True)
+        return
+    if not isinstance(callback.message, Message):
+        await callback.answer()
+        return
+    if _export_lock.locked():
+        await callback.answer("توجد عملية تصدير قيد التنفيذ.", show_alert=True)
+        return
+
+    await callback.answer("جاري تجهيز ملف التصدير…")
+    async with _export_lock:
+        try:
+            exported = await asyncio.to_thread(build_data_export)
+            if exported is None:
+                await callback.message.answer("لا توجد بيانات لتصديرها.")
+                return
+            await callback.message.answer_document(
+                BufferedInputFile(exported.content, filename=exported.filename),
+                caption=(
+                    "✅ تم تصدير بيانات البوت بنجاح.\n"
+                    f"عدد الملفات: {exported.file_count}\n"
+                    f"الحجم قبل الضغط: {exported.source_size:,} بايت\n\n"
+                    "تقدر تستورد هذا الملف لاحقًا من زر «📤 رفع واستيراد». "
+                    "احتفظ به في مكان آمن."
+                ),
+            )
+        except (DataImportError, OSError, TelegramAPIError):
+            logger.exception("Could not create or send developer data export")
+            await callback.message.answer(
+                "تعذر تصدير البيانات. تأكد من سلامة ملفات JSON وراجع سجل البوت."
+            )
 
 
 @router.callback_query(F.data == "dev:import")

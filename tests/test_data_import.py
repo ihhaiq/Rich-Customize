@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
@@ -9,7 +10,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from app.config import developer_ids
 from app.services.data_import import (
-    DataImportError, apply_data_import, prepare_data_import,
+    DataImportError, apply_data_import, build_data_export, prepare_data_import,
 )
 
 
@@ -74,3 +75,57 @@ class DataImportTests(unittest.TestCase):
 
             self.assertEqual(imported, ["rich_pages.json"])
             self.assertEqual(json.loads(destination.read_text()), {"new": True})
+
+    def test_export_is_directly_accepted_by_import(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ,
+            {
+                "RICH_PAGES_STATE": str(Path(directory) / "rich_pages.json"),
+                "MANAGED_CHATS_STATE": str(Path(directory) / "managed_chats.json"),
+                "RICH_MEDIA_STATE": str(Path(directory) / "missing_media.json"),
+                "GUEST_MESSAGES_STATE": str(Path(directory) / "missing_guests.json"),
+                "BUTTON_POPUPS_STATE": str(Path(directory) / "missing_popups.json"),
+                "SHOWCASE_MEDIA_LIBRARY": str(Path(directory) / "missing_showcase.json"),
+            },
+        ):
+            pages = Path(directory) / "rich_pages.json"
+            chats = Path(directory) / "managed_chats.json"
+            pages.write_text('{"page":"value"}', encoding="utf-8")
+            chats.write_text('{"users":{}}', encoding="utf-8")
+
+            exported = build_data_export(
+                created_at=datetime(2026, 8, 29, 3, 4, 5, tzinfo=timezone.utc),
+            )
+
+            self.assertIsNotNone(exported)
+            assert exported is not None
+            self.assertEqual(
+                exported.filename,
+                "rich_customize_backup_20260829_030405_UTC.zip",
+            )
+            self.assertEqual(exported.file_count, 2)
+            with ZipFile(BytesIO(exported.content)) as archive:
+                self.assertEqual(set(archive.namelist()), {
+                    "data/rich_pages.json",
+                    "data/managed_chats.json",
+                    "manifest.json",
+                })
+            prepared = prepare_data_import(exported.filename, exported.content)
+            self.assertEqual(set(prepared), {str(pages), str(chats)})
+
+    def test_empty_export_returns_none(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ,
+            {
+                variable: str(Path(directory) / f"missing_{index}.json")
+                for index, (variable, _default) in enumerate((
+                    ("RICH_PAGES_STATE", ""),
+                    ("RICH_MEDIA_STATE", ""),
+                    ("MANAGED_CHATS_STATE", ""),
+                    ("GUEST_MESSAGES_STATE", ""),
+                    ("BUTTON_POPUPS_STATE", ""),
+                    ("SHOWCASE_MEDIA_LIBRARY", ""),
+                ))
+            },
+        ):
+            self.assertIsNone(build_data_export())

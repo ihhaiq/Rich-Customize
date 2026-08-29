@@ -370,6 +370,11 @@ def build_developer_keyboard() -> InlineKeyboardMarkup:
             callback_data="dev:import",
             style=ButtonStyle.SUCCESS,
         ),
+        InlineKeyboardButton(
+            text="📥 تنزيل وتصدير",
+            callback_data="dev:export",
+            style=ButtonStyle.PRIMARY,
+        ),
     ]])
 
 

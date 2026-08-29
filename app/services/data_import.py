@@ -3,8 +3,10 @@ from __future__ import annotations
 import io
 import json
 import os
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from zipfile import BadZipFile, ZipFile
+from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 
 MAX_IMPORT_ARCHIVE_BYTES = 20 * 1024 * 1024
@@ -24,6 +26,14 @@ class DataImportError(ValueError):
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class DataExport:
+    filename: str
+    content: bytes
+    file_count: int
+    source_size: int
+
+
 def configured_state_destinations() -> dict[str, Path]:
     return {
         Path(default).name: Path(os.getenv(variable, default).strip() or default)
@@ -39,6 +49,46 @@ def _validated_json(name: str, payload: bytes) -> bytes:
     if not isinstance(value, dict):
         raise DataImportError(f"ملف {name} يجب أن يبدأ بكائن JSON.")
     return payload
+
+
+def build_data_export(*, created_at: datetime | None = None) -> DataExport | None:
+    """Build an import-compatible ZIP from known persistent state files only."""
+    selected = [
+        (name, path)
+        for name, path in configured_state_destinations().items()
+        if path.is_file() and not path.is_symlink()
+    ]
+    if not selected:
+        return None
+
+    timestamp = (created_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    output = io.BytesIO()
+    manifest_files: list[dict[str, int | str]] = []
+    source_size = 0
+    with ZipFile(output, "w", compression=ZIP_DEFLATED, compresslevel=6) as archive:
+        for name, path in sorted(selected):
+            payload = _validated_json(name, path.read_bytes())
+            source_size += len(payload)
+            archive.writestr(f"data/{name}", payload)
+            manifest_files.append({"name": name, "size": len(payload)})
+
+        manifest = {
+            "created_at": timestamp.isoformat(),
+            "format": "rich-customize-json-backup-v1",
+            "file_count": len(manifest_files),
+            "files": manifest_files,
+        }
+        archive.writestr(
+            "manifest.json",
+            json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"),
+        )
+
+    return DataExport(
+        filename=f"rich_customize_backup_{timestamp:%Y%m%d_%H%M%S}_UTC.zip",
+        content=output.getvalue(),
+        file_count=len(manifest_files),
+        source_size=source_size,
+    )
 
 
 def prepare_data_import(filename: str, payload: bytes) -> dict[str, bytes]:

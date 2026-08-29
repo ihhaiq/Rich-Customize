@@ -19,11 +19,14 @@ from app.services.buttons import add_message_button
 
 
 class ButtonKeyboardTests(unittest.TestCase):
-    def test_developer_panel_has_data_import_button(self):
-        button = build_developer_keyboard().inline_keyboard[0][0]
+    def test_developer_panel_has_import_and_export_buttons(self):
+        buttons = build_developer_keyboard().inline_keyboard[0]
+        button = buttons[0]
 
         self.assertEqual(button.callback_data, "dev:import")
         self.assertEqual(button.style, ButtonStyle.SUCCESS)
+        self.assertEqual(buttons[1].callback_data, "dev:export")
+        self.assertEqual(buttons[1].style, ButtonStyle.PRIMARY)
 
         confirmation = build_developer_import_confirmation_keyboard()
         self.assertEqual(
