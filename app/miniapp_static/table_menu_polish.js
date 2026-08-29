@@ -1,9 +1,9 @@
-// Beta 0.3.30 — keep the table menu visually pinned while switching cell/row scope.
+// Beta 0.3.31 — keep the table menu pinned while switching cell/row scope.
 (() => {
   if (!document.querySelector('link[data-table-menu-polish]')) {
     const css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "/miniapp/static/table_menu_polish.css?v=0.3.30";
+    css.href = "/miniapp/static/table_menu_polish.css?v=0.3.31";
     css.dataset.tableMenuPolish = "1";
     document.head.appendChild(css);
   }
@@ -19,17 +19,22 @@
     return {left, top, right:left + width, bottom:top + height};
   }
 
-  function clamp(menu, left, top) {
+  function restorePinnedOrigin(menu, saved) {
     const bounds = viewportBounds();
     const margin = 10;
-    const width = menu.offsetWidth || 292;
-    const height = menu.offsetHeight || 360;
-    let x = left;
-    let y = top;
-    x = Math.max(bounds.left + margin, Math.min(x, bounds.right - width - margin));
-    y = Math.max(bounds.top + margin, Math.min(y, bounds.bottom - height - margin));
-    menu.style.left = `${Math.round(x)}px`;
-    menu.style.top = `${Math.round(y)}px`;
+    const width = menu.offsetWidth || saved.width || 292;
+
+    let left = saved.left;
+    left = Math.max(bounds.left + margin, Math.min(left, bounds.right - width - margin));
+
+    // Keep the same visual top edge when scope content changes. If the new
+    // menu grows, constrain its internal scroll area instead of moving it.
+    const top = Math.max(bounds.top + margin, saved.top);
+    const availableBelow = Math.max(160, bounds.bottom - top - margin);
+
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+    menu.style.maxHeight = `${Math.floor(availableBelow)}px`;
   }
 
   document.addEventListener("pointerdown", event => {
@@ -38,7 +43,7 @@
     const menu = scopeButton.closest(".table-cell-menu");
     if (!menu) return;
     const rect = menu.getBoundingClientRect();
-    pin = {left:rect.left, top:rect.top};
+    pin = {left:rect.left, top:rect.top, width:rect.width};
   }, true);
 
   document.addEventListener("click", event => {
@@ -49,9 +54,7 @@
     queueMicrotask(() => {
       const menu = document.querySelector(".table-cell-menu");
       if (!menu) return;
-      // table_cell_tools rebuilds the menu synchronously when the scope changes.
-      // Reapply the old visual origin before the browser paints the new menu.
-      clamp(menu, saved.left, saved.top);
+      restorePinnedOrigin(menu, saved);
       menu.classList.add("table-menu-scope-swap");
       requestAnimationFrame(() => menu.classList.remove("table-menu-scope-swap"));
     });
