@@ -13,6 +13,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
 from app.config import developer_ids
+from app.miniapp_rich_buttons import register_rich_button_routes
 from app.miniapp_uploads import register_upload_routes
 from app.services.chat_registry import managed_chat_registry
 from app.services.page_registry import page_registry
@@ -275,6 +276,7 @@ def build_web_app(bot: Bot, bot_token: str) -> web.Application:
     app.router.add_get("/miniapp/api/destinations", api_destinations)
     app.router.add_post("/miniapp/api/send", api_send_page)
     register_upload_routes(app)
+    register_rich_button_routes(app)
     return app
 
 
