@@ -21,6 +21,7 @@ from app.services.renderer import RichMessageRenderError, send_rich_message_post
 
 STATIC_DIR = Path(__file__).with_name("miniapp_static")
 _ADMIN_STATUSES = {"administrator", "creator"}
+BETA_VERSION = "0.3"
 
 
 def mini_app_url() -> str | None:
@@ -115,7 +116,7 @@ async def index(_: web.Request) -> web.FileResponse:
 
 async def api_me(request: web.Request) -> web.Response:
     user = _developer_user(request)
-    return web.json_response({"ok": True, "user": user, "beta": "0.2"})
+    return web.json_response({"ok": True, "user": user, "beta": BETA_VERSION})
 
 
 async def api_pages(request: web.Request) -> web.Response:
@@ -123,7 +124,7 @@ async def api_pages(request: web.Request) -> web.Response:
     pages = await page_registry.list_for_user(int(user["id"]))
     return web.json_response({
         "ok": True,
-        "beta": "0.2",
+        "beta": BETA_VERSION,
         "pages": [{
             "page_id": page["page_id"],
             "title": page.get("title") or page["page_id"],
@@ -170,7 +171,7 @@ async def api_create_page(request: web.Request) -> web.Response:
         int(payload.get("buttons_per_row") or 1),
         str(payload.get("buttons_align") or "center"),
     )
-    return web.json_response({"ok": True, "beta": "0.2", "page_id": code, "title": title})
+    return web.json_response({"ok": True, "beta": BETA_VERSION, "page_id": code, "title": title})
 
 
 async def api_save_page(request: web.Request) -> web.Response:
@@ -193,7 +194,7 @@ async def api_save_page(request: web.Request) -> web.Response:
         str(current.get("buttons_align") or "center"),
         page_id=page_id,
     )
-    return web.json_response({"ok": True, "beta": "0.2", "page_id": code, "title": title})
+    return web.json_response({"ok": True, "beta": BETA_VERSION, "page_id": code, "title": title})
 
 
 async def api_destinations(request: web.Request) -> web.Response:
