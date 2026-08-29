@@ -1,11 +1,12 @@
-// Beta 0.3.7 — Telegram-style Aa text menu with a nested H1-H6 submenu.
+// Beta 0.3.8 — Telegram-style Aa menu with Heading and Rich Button submenus.
 (() => {
   const textButton = document.querySelector('.composer-toolbar [data-tool="text"]');
   if (!textButton) return;
 
   let rootMenu = null;
   let headingMenu = null;
-  let headingRow = null;
+  let buttonMenu = null;
+  let submenuRow = null;
 
   const ROOT_ITEMS = [
     {kind:"heading", icon:"H", label:"العنوان", arrow:true},
@@ -15,6 +16,7 @@
     {type:"preformatted", icon:"</>", label:"نص برمجي", shortcut:"Ctrl+Shift+M"},
     {type:"footer", icon:"≡", label:"التذييل"},
     {type:"divider", icon:"—", label:"Divider"},
+    {kind:"rich_button", icon:"▣", label:"زر غني", arrow:true},
   ];
 
   function viewportBounds() {
@@ -26,17 +28,19 @@
     return {left, top, right:left + width, bottom:top + height, width, height};
   }
 
-  function closeHeadingMenu() {
+  function closeSubmenus() {
     headingMenu?.remove();
+    buttonMenu?.remove();
     headingMenu = null;
-    headingRow?.classList.remove("active", "submenu-open");
+    buttonMenu = null;
+    submenuRow?.classList.remove("active", "submenu-open");
+    submenuRow = null;
   }
 
   function closeTextMenus() {
-    closeHeadingMenu();
+    closeSubmenus();
     rootMenu?.remove();
     rootMenu = null;
-    headingRow = null;
     textButton.classList.remove("active");
   }
 
@@ -49,11 +53,9 @@
     const iconEl = document.createElement("span");
     iconEl.className = "text-menu-icon";
     iconEl.textContent = icon;
-
     const labelEl = document.createElement("span");
     labelEl.className = "text-menu-label";
     labelEl.textContent = label;
-
     const tail = document.createElement("span");
     tail.className = "text-menu-tail";
     if (shortcut) {
@@ -68,7 +70,6 @@
       arrowEl.textContent = "›";
       tail.appendChild(arrowEl);
     }
-
     button.append(iconEl, labelEl, tail);
     button.addEventListener("click", event => {
       event.preventDefault();
@@ -103,6 +104,16 @@
     window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.();
   }
 
+  function insertRichButton(type) {
+    closeTextMenus();
+    if (!window.RichButtonEditor?.create) {
+      toast("محرر الأزرار الغنية غير جاهز");
+      return;
+    }
+    window.RichButtonEditor.create(type);
+    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.();
+  }
+
   function positionRootMenu() {
     if (!rootMenu) return;
     const bounds = viewportBounds();
@@ -113,100 +124,96 @@
     rootMenu.style.top = `${bounds.top + margin}px`;
     const rect = rootMenu.getBoundingClientRect();
     const anchor = textButton.getBoundingClientRect();
-
     let left = anchor.left;
     left = Math.max(bounds.left + margin, Math.min(left, bounds.right - rect.width - margin));
-
     let top = anchor.bottom + gap;
     if (top + rect.height > bounds.bottom - margin) top = anchor.top - rect.height - gap;
     top = Math.max(bounds.top + margin, Math.min(top, bounds.bottom - rect.height - margin));
-
     rootMenu.style.left = `${Math.round(left)}px`;
     rootMenu.style.top = `${Math.round(top)}px`;
     rootMenu.style.visibility = "visible";
   }
 
-  function positionHeadingMenu() {
-    if (!rootMenu || !headingMenu || !headingRow) return;
+  function positionSubmenu(menu, row) {
+    if (!rootMenu || !menu || !row) return;
     const bounds = viewportBounds();
     const margin = 6;
     const gap = 5;
-
-    headingMenu.style.visibility = "hidden";
-    headingMenu.style.left = `${bounds.left + margin}px`;
-    headingMenu.style.top = `${bounds.top + margin}px`;
-
+    menu.style.visibility = "hidden";
+    menu.style.left = `${bounds.left + margin}px`;
+    menu.style.top = `${bounds.top + margin}px`;
     const rootRect = rootMenu.getBoundingClientRect();
-    const rowRect = headingRow.getBoundingClientRect();
-    const subRect = headingMenu.getBoundingClientRect();
-
+    const rowRect = row.getBoundingClientRect();
+    const subRect = menu.getBoundingClientRect();
     const rightCandidate = rootRect.right + gap;
     const leftCandidate = rootRect.left - subRect.width - gap;
     let left;
     if (rightCandidate + subRect.width <= bounds.right - margin) left = rightCandidate;
     else if (leftCandidate >= bounds.left + margin) left = leftCandidate;
     else left = Math.max(bounds.left + margin, bounds.right - subRect.width - margin);
-
     let top = rowRect.top;
     if (top + subRect.height > bounds.bottom - margin) top = bounds.bottom - subRect.height - margin;
     top = Math.max(bounds.top + margin, top);
-
-    headingMenu.style.left = `${Math.round(left)}px`;
-    headingMenu.style.top = `${Math.round(top)}px`;
-    headingMenu.style.visibility = "visible";
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+    menu.style.visibility = "visible";
   }
 
   function openHeadingMenu(row) {
-    if (headingMenu) {
-      closeHeadingMenu();
-      return;
-    }
-    headingRow = row;
-    headingRow.classList.add("active", "submenu-open");
-
+    if (headingMenu && submenuRow === row) { closeSubmenus(); return; }
+    closeSubmenus();
+    submenuRow = row;
+    row.classList.add("active", "submenu-open");
     headingMenu = document.createElement("aside");
     headingMenu.className = "popup-menu text-heading-submenu";
     headingMenu.setAttribute("aria-label", "مستوى العنوان");
-
     for (let level = 1; level <= 6; level++) {
-      const item = makeRow(
-        {icon:`H${level}`, label:`العنوان ${level}`, level},
-        () => insertHeading(level),
-      );
-      headingMenu.appendChild(item);
+      headingMenu.appendChild(makeRow({icon:`H${level}`, label:`العنوان ${level}`, level}, () => insertHeading(level)));
     }
-
     document.body.appendChild(headingMenu);
-    requestAnimationFrame(positionHeadingMenu);
+    requestAnimationFrame(() => positionSubmenu(headingMenu, row));
+  }
+
+  function openButtonMenu(row) {
+    if (buttonMenu && submenuRow === row) { closeSubmenus(); return; }
+    closeSubmenus();
+    submenuRow = row;
+    row.classList.add("active", "submenu-open");
+    buttonMenu = document.createElement("aside");
+    buttonMenu.className = "popup-menu text-button-submenu";
+    buttonMenu.setAttribute("aria-label", "نوع الزر الغني");
+    const types = window.RichButtonEditor?.types || {};
+    [
+      "user", "url", "callback_data", "page_callback", "copy", "popup",
+      "web_app", "login_url", "switch_inline_query",
+      "switch_inline_query_current_chat", "disabled",
+    ].forEach(type => {
+      const item = types[type];
+      if (!item) return;
+      buttonMenu.appendChild(makeRow({icon:item.icon, label:item.label}, () => insertRichButton(type)));
+    });
+    document.body.appendChild(buttonMenu);
+    requestAnimationFrame(() => positionSubmenu(buttonMenu, row));
   }
 
   function openRootMenu() {
-    if (rootMenu) {
-      closeTextMenus();
-      return;
-    }
-
+    if (rootMenu) { closeTextMenus(); return; }
     try { hideMenus(); } catch (_) {}
     textButton.classList.add("active");
-
     rootMenu = document.createElement("aside");
     rootMenu.className = "popup-menu text-toolbar-menu";
     rootMenu.setAttribute("aria-label", "أدوات النص");
-
     ROOT_ITEMS.forEach(item => {
-      const row = makeRow(item, button => {
+      rootMenu.appendChild(makeRow(item, button => {
         if (item.kind === "heading") openHeadingMenu(button);
+        else if (item.kind === "rich_button") openButtonMenu(button);
         else insertSimpleBlock(item.type);
-      });
-      rootMenu.appendChild(row);
+      }));
     });
-
     document.body.appendChild(rootMenu);
     requestAnimationFrame(positionRootMenu);
   }
 
-  // Capture phase prevents the generic toolbar handler in app.js from opening
-  // the old flat text catalogue after this Telegram-style menu opens.
   document.addEventListener("click", event => {
     const button = event.target.closest?.('.composer-toolbar [data-tool="text"]');
     if (button !== textButton) return;
@@ -220,6 +227,7 @@
     if (textButton.contains(event.target)) return;
     if (rootMenu.contains(event.target)) return;
     if (headingMenu?.contains(event.target)) return;
+    if (buttonMenu?.contains(event.target)) return;
     closeTextMenus();
   }, true);
 
@@ -227,13 +235,12 @@
     if (!rootMenu) return;
     requestAnimationFrame(() => {
       positionRootMenu();
-      if (headingMenu) positionHeadingMenu();
+      if (headingMenu && submenuRow) positionSubmenu(headingMenu, submenuRow);
+      if (buttonMenu && submenuRow) positionSubmenu(buttonMenu, submenuRow);
     });
   }
-
   window.visualViewport?.addEventListener("resize", reposition, {passive:true});
   window.visualViewport?.addEventListener("scroll", reposition, {passive:true});
   window.addEventListener("resize", reposition, {passive:true});
-
   window.RichTextToolbarMenu = {close: closeTextMenus};
 })();
