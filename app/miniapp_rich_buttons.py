@@ -9,6 +9,7 @@ from typing import Any
 from aiohttp import web
 from aiogram.types import KeyboardButton, KeyboardButtonRequestUsers, ReplyKeyboardMarkup
 
+from app.services.inline_buttons import find_user_button_markers
 from app.services.page_registry import page_registry
 
 
@@ -17,7 +18,16 @@ class MiniAppUserPickerRegistry:
         self._lock = asyncio.Lock()
         self._pending: dict[int, dict[str, Any]] = {}
 
-    async def create(self, owner_id: int, page_id: str, block_id: str) -> int:
+    async def create(
+        self,
+        owner_id: int,
+        page_id: str,
+        block_id: str,
+        *,
+        marker: str | None = None,
+        title: str | None = None,
+        color: str | None = None,
+    ) -> int:
         async with self._lock:
             now = int(time.time())
             self._pending = {
@@ -32,6 +42,9 @@ class MiniAppUserPickerRegistry:
                 "owner_id": owner_id,
                 "page_id": page_id,
                 "block_id": block_id,
+                "marker": marker,
+                "title": title,
+                "color": color,
                 "created_at": now,
             }
             return request_id
@@ -106,6 +119,37 @@ def sync_rich_button_block(block: dict[str, Any]) -> None:
     data["rich_text"] = None
 
 
+def _contains_marker(value: Any, marker: str) -> bool:
+    if isinstance(value, str):
+        return marker in value
+    if isinstance(value, list):
+        return any(_contains_marker(item, marker) for item in value)
+    if isinstance(value, dict):
+        return any(_contains_marker(item, marker) for item in value.values())
+    return False
+
+
+def _replace_marker_once(value: Any, marker: str, replacement: str, state: list[bool]) -> Any:
+    if state[0]:
+        return value
+    if isinstance(value, str):
+        if marker in value:
+            state[0] = True
+            return value.replace(marker, replacement, 1)
+        return value
+    if isinstance(value, list):
+        result: list[Any] = []
+        for item in value:
+            result.append(_replace_marker_once(item, marker, replacement, state))
+        return result
+    if isinstance(value, dict):
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            result[key] = _replace_marker_once(item, marker, replacement, state)
+        return result
+    return value
+
+
 async def request_user_picker(request: web.Request) -> web.Response:
     user = request.app["developer_user"](request)
     try:
@@ -117,6 +161,7 @@ async def request_user_picker(request: web.Request) -> web.Response:
 
     page_id = str(payload.get("page_id") or "")
     block_id = str(payload.get("block_id") or "")
+    marker = str(payload.get("marker") or "").strip() or None
     if not page_id or not block_id:
         raise web.HTTPBadRequest(text="page_id and block_id are required")
 
@@ -125,12 +170,34 @@ async def request_user_picker(request: web.Request) -> web.Response:
     if not page or int(page.get("owner_id", 0)) != owner_id:
         raise web.HTTPNotFound(text="Page not found")
     block = _find_block(page.get("blocks") or [], block_id)
-    rich = block.get("data", {}).get("_rich_button") if block else None
-    if not isinstance(rich, dict) or str(rich.get("button_type")) != "user":
-        raise web.HTTPBadRequest(text="This block is not a user rich button")
+    if block is None:
+        raise web.HTTPNotFound(text="Block not found")
 
-    request_id = await miniapp_user_picker_registry.create(owner_id, page_id, block_id)
-    title = _clean_title(rich.get("title"))
+    title: str
+    color: str | None = None
+    if marker:
+        matches = find_user_button_markers(marker)
+        if not matches or matches[0].get("marker") != marker:
+            raise web.HTTPBadRequest(text="Invalid inline user button marker")
+        if not _contains_marker(block.get("data", {}), marker):
+            raise web.HTTPBadRequest(text="Inline button is no longer present in this block")
+        title = _clean_title(matches[0].get("title"))
+        color = str(matches[0].get("color") or "") or None
+    else:
+        rich = block.get("data", {}).get("_rich_button")
+        if not isinstance(rich, dict) or str(rich.get("button_type")) != "user":
+            raise web.HTTPBadRequest(text="This block is not a user rich button")
+        title = _clean_title(rich.get("title"))
+        color = str(rich.get("color") or "") or None
+
+    request_id = await miniapp_user_picker_registry.create(
+        owner_id,
+        page_id,
+        block_id,
+        marker=marker,
+        title=title,
+        color=color,
+    )
     keyboard = ReplyKeyboardMarkup(
         keyboard=[[
             KeyboardButton(
@@ -174,18 +241,31 @@ async def complete_user_picker(
     block = _find_block(blocks, str(pending["block_id"]))
     if block is None:
         return None
-    data = block.setdefault("data", {})
-    rich = data.get("_rich_button")
-    if not isinstance(rich, dict) or str(rich.get("button_type")) != "user":
-        return None
 
-    rich["value"] = str(selected_user_id)
-    rich["target_user_id"] = selected_user_id
-    if username:
-        rich["target_username"] = str(username).lstrip("@")
-    rich["target_label"] = f"@{str(username).lstrip('@')}" if username else str(selected_user_id)
-    rich["configured"] = True
-    sync_rich_button_block(block)
+    target_label = f"@{str(username).lstrip('@')}" if username else str(selected_user_id)
+    marker = str(pending.get("marker") or "")
+    if marker:
+        title = _clean_title(pending.get("title"))
+        color = str(pending.get("color") or "")
+        suffix = f" #{color}" if color in {"r", "b", "p", "g"} else ""
+        replacement = f"{{{title}:user:{selected_user_id}{suffix}}}"
+        state = [False]
+        block["data"] = _replace_marker_once(block.get("data", {}), marker, replacement, state)
+        if not state[0]:
+            return None
+    else:
+        data = block.setdefault("data", {})
+        rich = data.get("_rich_button")
+        if not isinstance(rich, dict) or str(rich.get("button_type")) != "user":
+            return None
+        rich["value"] = str(selected_user_id)
+        rich["target_user_id"] = selected_user_id
+        if username:
+            rich["target_username"] = str(username).lstrip("@")
+        rich["target_label"] = target_label
+        rich["configured"] = True
+        title = _clean_title(rich.get("title"))
+        sync_rich_button_block(block)
 
     await page_registry.save(
         owner_id,
@@ -199,8 +279,8 @@ async def complete_user_picker(
     return {
         "page_id": page_id,
         "block_id": str(pending["block_id"]),
-        "button_title": _clean_title(rich.get("title")),
-        "target_label": rich.get("target_label"),
+        "button_title": title,
+        "target_label": target_label,
     }
 
 
