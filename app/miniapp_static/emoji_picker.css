@@ -1,7 +1,9 @@
-/* Beta 0.3.16 — dense Telegram-style emoji grid. */
+/* Beta 0.3.16 — dense Apple-first emoji presentation. */
 .emoji-picker-pop{
   position:fixed!important;
   z-index:3300!important;
+  display:flex!important;
+  flex-direction:column!important;
   width:min(374px,calc(100vw - 12px))!important;
   max-width:374px!important;
   max-height:min(438px,calc(var(--visible-vh,100vh) - 18px))!important;
@@ -10,11 +12,13 @@
   border-radius:20px!important;
 }
 
-/* Emoji content is the primary surface, like Telegram's picker. */
+/* Main emoji field: dense rows without cards, matching the visual density of
+   Telegram/iOS emoji panels. Apple devices render the actual Apple glyphs. */
 .emoji-picker-grid{
+  order:1;
   display:grid;
   grid-template-columns:repeat(10,minmax(0,1fr));
-  grid-auto-rows:36px;
+  grid-auto-rows:37px;
   align-items:center;
   gap:0;
   max-height:372px;
@@ -30,7 +34,7 @@
 .emoji-picker-item{
   min-width:0;
   width:100%;
-  height:36px;
+  height:37px;
   padding:0;
   margin:0;
   border:0;
@@ -41,24 +45,30 @@
   box-shadow:none!important;
   backdrop-filter:none!important;
   -webkit-backdrop-filter:none!important;
-  font-size:29px;
-  line-height:1;
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
+  font-size:29px!important;
+  font-weight:400!important;
+  font-style:normal!important;
+  line-height:1!important;
+  letter-spacing:0!important;
+  text-rendering:auto;
   transform:translateZ(0);
 }
 .emoji-picker-item:hover,
 .emoji-picker-item:active{
-  background:rgba(255,255,255,.055)!important;
-  transform:scale(.9);
+  background:rgba(255,255,255,.05)!important;
+  transform:scale(.91);
 }
 
-/* Categories stay available, but as a thin bottom rail instead of consuming
-   the top of the emoji field. */
+/* Categories are a thin bottom rail, leaving the emoji field dominant. */
 .emoji-picker-tabs{
+  order:2;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:0;
   overflow-x:auto;
+  flex:0 0 auto;
   scrollbar-width:none;
   padding:5px 2px 0;
   margin-top:2px;
@@ -75,7 +85,9 @@
   place-items:center;
   padding:0;
   background:transparent;
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
   font-size:17px;
+  font-weight:400;
   line-height:1;
 }
 .emoji-picker-tab.active{
@@ -90,6 +102,7 @@
   padding:18px 8px;
   color:var(--muted);
   text-align:center;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
   font-size:13px;
 }
 
@@ -106,14 +119,14 @@ html.mobile-performance .emoji-picker-pop{
   }
   .emoji-picker-grid{
     grid-template-columns:repeat(9,minmax(0,1fr));
-    grid-auto-rows:35px;
+    grid-auto-rows:36px;
     max-height:350px;
   }
-  .emoji-picker-item{height:35px;font-size:28px}
+  .emoji-picker-item{height:36px;font-size:28px!important}
   .emoji-picker-tab{width:30px;height:29px;font-size:16px}
 }
 
 @media(max-width:330px){
   .emoji-picker-grid{grid-template-columns:repeat(8,minmax(0,1fr))}
-  .emoji-picker-item{font-size:27px}
+  .emoji-picker-item{font-size:27px!important}
 }
