@@ -366,9 +366,23 @@ def build_buttons_manager_keyboard(
 def build_developer_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
-            text="📦 نسخة احتياطية للبيانات",
-            callback_data="dev:backup",
+            text="📤 رفع واستيراد",
+            callback_data="dev:import",
             style=ButtonStyle.SUCCESS,
+        ),
+    ]])
+
+
+def build_developer_import_confirmation_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="✅ تأكيد الاستيراد",
+            callback_data="dev:import:confirm",
+            style=ButtonStyle.DANGER,
+        ),
+        InlineKeyboardButton(
+            text="❌ إلغاء",
+            callback_data="dev:import:cancel",
         ),
     ]])
 
