@@ -9,7 +9,6 @@
 
   if (mobilePerformance) document.documentElement.classList.add("mobile-performance");
 
-  // Keep CSS aware of the actually visible WebView area (including keyboard).
   function syncViewportVars() {
     const vv = window.visualViewport;
     const height = vv?.height || window.innerHeight;
@@ -37,12 +36,19 @@
     return {left, top, right:left + width, bottom:top + height, width, height};
   }
 
+  function blockOptionsAnchor(blockId) {
+    if (!blocksEl || !blockId) return null;
+    for (const element of blocksEl.querySelectorAll(".block[data-id]")) {
+      if (element.dataset.id === String(blockId)) return element.querySelector(".mini-btn");
+    }
+    return null;
+  }
+
   function placePopup(menu, anchor) {
     if (!menu || menu.classList.contains("hidden")) return;
     const bounds = visibleBounds();
     const margin = 10;
 
-    // Reset legacy right/bottom positioning before measuring.
     menu.style.right = "auto";
     menu.style.bottom = "auto";
     menu.style.left = `${bounds.left + margin}px`;
@@ -60,7 +66,6 @@
       height: 0,
     };
 
-    // RTL friendly: align popup's right edge with the anchor's right edge.
     let left = anchorRect.right - menuRect.width;
     left = Math.max(bounds.left + margin, Math.min(left, bounds.right - menuRect.width - margin));
 
@@ -74,16 +79,13 @@
     menu.style.left = `${Math.round(left)}px`;
     menu.style.top = `${Math.round(top)}px`;
     menu.style.visibility = "visible";
-
-    const center = Math.max(24, Math.min(menuRect.width - 24, anchorRect.left + anchorRect.width / 2 - left));
-    menu.style.setProperty("--popup-arrow-x", `${Math.round(center)}px`);
   }
 
   const baseOpenBlockMenu = typeof openBlockMenu === "function" ? openBlockMenu : null;
   if (baseOpenBlockMenu) {
     openBlockMenu = function(block) {
       const result = baseOpenBlockMenu(block);
-      const anchor = blocksEl?.querySelector?.(`[data-id="${CSS.escape(String(block?.id || ""))}"] .mini-btn`) || lastToolbarAnchor;
+      const anchor = blockOptionsAnchor(block?.id) || lastToolbarAnchor;
       requestAnimationFrame(() => placePopup(blockMenu, anchor));
       return result;
     };
@@ -99,7 +101,6 @@
     };
   }
 
-  // Reposition an open popup when the mobile keyboard/viewport changes.
   let repositionFrame = 0;
   function repositionOpenPopup() {
     cancelAnimationFrame(repositionFrame);
@@ -116,7 +117,6 @@
   window.visualViewport?.addEventListener("resize", repositionOpenPopup, {passive:true});
   window.visualViewport?.addEventListener("scroll", repositionOpenPopup, {passive:true});
 
-  // Mobile typing should not fire a network save less than a second after every keystroke.
   const SAVE_DELAY = mobilePerformance ? 1600 : 1000;
   if (typeof markDirty === "function") {
     markDirty = function() {
