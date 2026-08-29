@@ -1,4 +1,4 @@
-// Beta 0.3.12 — resume the exact editor page after Telegram-native pickers close the Mini App.
+// Beta 0.3.29 — resume the exact editor page after Telegram-native pickers close the Mini App.
 (() => {
   const STORAGE_KEY = "rich_customize_resume_page";
   const tgApp = window.Telegram?.WebApp;
@@ -34,6 +34,18 @@
     catch (_) { return ""; }
   }
 
+  function directLinkPage() {
+    try {
+      const fromInitData = String(tgApp?.initDataUnsafe?.start_param || "");
+      const fromQuery = String(new URLSearchParams(location.search).get("tgWebAppStartParam") || "");
+      const raw = fromInitData || fromQuery;
+      if (!raw.startsWith("page_")) return "";
+      return normalizePageId(raw.slice(5));
+    } catch (_) {
+      return "";
+    }
+  }
+
   function localPage() {
     try { return normalizePageId(localStorage.getItem(STORAGE_KEY)); }
     catch (_) { return ""; }
@@ -61,7 +73,7 @@
 
   window.RichMiniAppResume = {remember, clear};
 
-  const initialPage = queryPage() || localPage();
+  const initialPage = directLinkPage() || queryPage() || localPage();
   const baseNewDraft = typeof newDraft === "function" ? newDraft : null;
   let blockingBootDraft = Boolean(initialPage && baseNewDraft);
 
