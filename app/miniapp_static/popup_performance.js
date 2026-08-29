@@ -1,20 +1,37 @@
-// Beta 0.3.4 — compact floating popup placement + mobile performance tuning.
+// Beta 0.3.26 — visual viewport geometry + compact popup placement.
 (() => {
   const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
+  const fineDesktop = window.matchMedia?.("(hover:hover) and (pointer:fine)")?.matches ?? false;
   const narrowViewport = Math.min(window.innerWidth || 9999, window.screen?.width || 9999) <= 820;
   const android = /Android/i.test(navigator.userAgent || "");
   const lowMemory = Number(navigator.deviceMemory || 8) <= 4;
   const lowCpu = Number(navigator.hardwareConcurrency || 8) <= 4;
-  const mobilePerformance = coarsePointer || narrowViewport || android || lowMemory || lowCpu;
+
+  // A narrow Telegram Desktop side panel is still desktop. Do not enable the
+  // mobile rendering preset merely because its width happens to be < 820px.
+  const mobilePerformance = !fineDesktop && (coarsePointer || narrowViewport || android || lowMemory || lowCpu);
 
   if (mobilePerformance) document.documentElement.classList.add("mobile-performance");
+  else document.documentElement.classList.remove("mobile-performance");
 
   function syncViewportVars() {
     const vv = window.visualViewport;
-    const height = vv?.height || window.innerHeight;
-    const width = vv?.width || window.innerWidth;
-    document.documentElement.style.setProperty("--visible-vh", `${Math.max(1, height)}px`);
-    document.documentElement.style.setProperty("--visible-vw", `${Math.max(1, width)}px`);
+    const left = vv?.offsetLeft || 0;
+    const top = vv?.offsetTop || 0;
+    const height = vv?.height || window.innerHeight || document.documentElement.clientHeight || 1;
+    const width = vv?.width || window.innerWidth || document.documentElement.clientWidth || 1;
+    const right = left + width;
+    const bottom = top + height;
+    const centerX = left + width / 2;
+
+    const root = document.documentElement.style;
+    root.setProperty("--visible-vh", `${Math.max(1, height)}px`);
+    root.setProperty("--visible-vw", `${Math.max(1, width)}px`);
+    root.setProperty("--visible-left", `${Math.max(0, left)}px`);
+    root.setProperty("--visible-top", `${Math.max(0, top)}px`);
+    root.setProperty("--visible-right", `${Math.max(1, right)}px`);
+    root.setProperty("--visible-bottom", `${Math.max(1, bottom)}px`);
+    root.setProperty("--visible-center-x", `${Math.max(1, centerX)}px`);
   }
   syncViewportVars();
   window.visualViewport?.addEventListener("resize", syncViewportVars, {passive:true});
