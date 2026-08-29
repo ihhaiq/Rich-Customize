@@ -1,19 +1,19 @@
 /* Beta 0.3.22 — Telegram Fullscreen safe-area + clean chrome patch. */
 
 :root{
-  --miniapp-safe-top:0px;
-  --miniapp-safe-right:0px;
-  --miniapp-safe-bottom:0px;
-  --miniapp-safe-left:0px;
-  --miniapp-content-safe-top:0px;
-  --miniapp-content-safe-right:0px;
-  --miniapp-content-safe-bottom:0px;
-  --miniapp-content-safe-left:0px;
+  --miniapp-safe-top:var(--tg-safe-area-inset-top,0px);
+  --miniapp-safe-right:var(--tg-safe-area-inset-right,0px);
+  --miniapp-safe-bottom:var(--tg-safe-area-inset-bottom,0px);
+  --miniapp-safe-left:var(--tg-safe-area-inset-left,0px);
+  --miniapp-content-safe-top:var(--tg-content-safe-area-inset-top,0px);
+  --miniapp-content-safe-right:var(--tg-content-safe-area-inset-right,0px);
+  --miniapp-content-safe-bottom:var(--tg-content-safe-area-inset-bottom,0px);
+  --miniapp-content-safe-left:var(--tg-content-safe-area-inset-left,0px);
   --miniapp-top-inset:max(var(--miniapp-safe-top),var(--miniapp-content-safe-top),env(safe-area-inset-top,0px));
   --miniapp-right-inset:max(var(--miniapp-safe-right),var(--miniapp-content-safe-right),env(safe-area-inset-right,0px));
   --miniapp-bottom-inset:max(var(--miniapp-safe-bottom),var(--miniapp-content-safe-bottom),env(safe-area-inset-bottom,0px));
   --miniapp-left-inset:max(var(--miniapp-safe-left),var(--miniapp-content-safe-left),env(safe-area-inset-left,0px));
-  --miniapp-viewport-height:100dvh;
+  --miniapp-viewport-height:var(--tg-viewport-stable-height,100dvh);
 }
 
 html,
@@ -26,8 +26,7 @@ body{
   background:var(--bg)!important;
 }
 
-/* The editor starts below Telegram's fullscreen/content-safe chrome and the
-   sticky header never climbs back under it while scrolling. */
+/* Keep the document below Telegram's fullscreen/content-safe chrome. */
 .editor-screen{
   width:100%;
   min-height:var(--miniapp-viewport-height)!important;
@@ -37,6 +36,7 @@ body{
   padding-bottom:calc(84px + var(--miniapp-bottom-inset))!important;
 }
 
+/* Sticky chrome must stick below Telegram's own fullscreen header, not at y=0. */
 .editor-head{
   top:var(--miniapp-top-inset)!important;
   padding-top:0!important;
@@ -55,8 +55,7 @@ body{
   padding-right:calc(14px + var(--miniapp-right-inset))!important;
 }
 
-/* Remove the accent-coloured patch/glow. Keep the liquid-glass border and
-   neutral translucency, but no blue rectangle or pseudo highlight. */
+/* Remove the accent-coloured patch/glow. Keep neutral liquid glass only. */
 body,
 .editor-head{
   background-image:none!important;
@@ -91,8 +90,7 @@ button:focus-visible,
   outline:none!important;
 }
 
-/* Active/pressed chrome is neutral rather than accent-filled. Menus can still
-   use accent where it conveys an actual selected setting. */
+/* Press feedback remains subtle and neutral, never a blue square. */
 .composer-toolbar.floating-toolbar .toolbar-bubble button:active,
 .composer-toolbar.floating-toolbar .toolbar-bubble button.is-pressed,
 .icon-btn:active,
@@ -106,8 +104,7 @@ button:focus-visible,
   box-shadow:none!important;
 }
 
-/* Fullscreen mobile performance: glass stays visible without repainting a
-   heavy 24px blur over the whole top area on every scroll frame. */
+/* Lower repaint cost on phones after switching the Mini App to fullscreen. */
 html.mobile-performance .editor-topbar,
 html.mobile-performance .toolbar-bubble{
   backdrop-filter:blur(7px) saturate(116%)!important;
