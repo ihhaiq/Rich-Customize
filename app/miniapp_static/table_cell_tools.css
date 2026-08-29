@@ -1,0 +1,188 @@
+/* Beta 0.3.24 — contextual table tools, modeled after Telegram's cell menu. */
+.telegram-table-contextual{
+  overflow:visible!important;
+}
+.telegram-table-contextual table{
+  position:relative;
+}
+.telegram-table-contextual td{
+  position:relative;
+  overflow:visible;
+  transition:box-shadow .14s ease,background .14s ease;
+}
+.telegram-table-contextual td.table-cell-selected{
+  z-index:4;
+  box-shadow:inset 0 0 0 2px var(--accent)!important;
+}
+.telegram-table-contextual td.table-cell-shaded{
+  background:color-mix(in srgb,var(--accent) 11%,var(--tg-rich-surface))!important;
+}
+.telegram-table-contextual tr:first-child td.table-cell-shaded,
+.telegram-table-contextual.striped tr:nth-child(even) td.table-cell-shaded{
+  background:color-mix(in srgb,var(--accent) 13%,var(--tg-rich-surface))!important;
+}
+
+.table-cell-handle{
+  position:absolute;
+  z-index:9;
+  top:50%;
+  left:-17px;
+  width:34px;
+  height:42px;
+  transform:translateY(-50%);
+  padding:0;
+  border:0;
+  border-radius:14px 0 0 14px;
+  display:grid;
+  place-content:center;
+  gap:3px;
+  color:#fff;
+  background:var(--accent)!important;
+  box-shadow:0 5px 14px rgba(0,0,0,.24)!important;
+  -webkit-tap-highlight-color:transparent;
+}
+.table-cell-handle span{
+  display:block;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:currentColor;
+}
+.table-cell-handle:active{transform:translateY(-50%) scale(.94)}
+
+.table-cell-menu{
+  position:fixed;
+  z-index:140;
+  width:min(292px,calc(100vw - 20px));
+  max-height:min(470px,calc(100dvh - 24px));
+  overflow:auto;
+  padding:9px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:20px;
+  color:var(--text);
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.015)),
+    color-mix(in srgb,var(--panel) 88%,transparent);
+  box-shadow:0 18px 46px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.06);
+  backdrop-filter:blur(18px) saturate(145%);
+  -webkit-backdrop-filter:blur(18px) saturate(145%);
+  opacity:0;
+  transform:translateY(-5px) scale(.985);
+  transform-origin:top left;
+  transition:opacity .12s ease,transform .14s ease;
+  overscroll-behavior:contain;
+}
+.table-cell-menu.show{
+  opacity:1;
+  transform:none;
+}
+
+.table-scope-switch{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:4px;
+  margin-bottom:8px;
+  padding:3px;
+  border-radius:13px;
+  background:rgba(255,255,255,.045);
+}
+.table-scope-switch button{
+  min-height:36px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:var(--muted);
+  font-weight:650;
+}
+.table-scope-switch button.active{
+  color:var(--text);
+  background:rgba(255,255,255,.09);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+}
+
+.table-tool-title{
+  padding:3px 8px 7px;
+  color:var(--muted);
+  font-size:12px;
+  text-align:center;
+}
+.table-align-grid{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:5px;
+}
+.table-tool-icon{
+  min-width:0;
+  height:44px;
+  padding:0;
+  border:0;
+  border-radius:11px;
+  display:grid;
+  place-items:center;
+  color:var(--text);
+  background:rgba(255,255,255,.045);
+}
+.table-tool-icon svg,
+.table-tool-row-icon svg{
+  width:25px;
+  height:25px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.table-tool-icon.active{
+  color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 18%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent);
+}
+.table-tool-icon:active{transform:scale(.94)}
+
+.table-tool-sep{
+  height:1px;
+  margin:8px 5px;
+  background:rgba(255,255,255,.08);
+}
+.table-tool-row{
+  width:100%;
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:7px 10px;
+  border:0;
+  border-radius:13px;
+  color:var(--text);
+  background:transparent;
+  text-align:right;
+}
+.table-tool-row:active{background:rgba(255,255,255,.065)}
+.table-tool-row-icon{
+  width:34px;
+  min-width:34px;
+  display:grid;
+  place-items:center;
+  color:var(--muted);
+}
+.table-tool-row strong{font-size:15px;font-weight:650}
+.table-tool-row.danger,
+.table-tool-row.danger .table-tool-row-icon{color:var(--danger)}
+
+@media(max-width:430px){
+  .table-cell-menu{
+    width:min(282px,calc(100vw - 16px));
+    padding:8px;
+    border-radius:18px;
+  }
+  .table-align-grid{gap:4px}
+  .table-tool-icon{height:42px}
+  .table-tool-icon svg{width:23px;height:23px}
+  .table-cell-handle{left:-15px;width:30px;height:40px}
+}
+
+html.mobile-performance .table-cell-menu{
+  backdrop-filter:blur(9px) saturate(120%);
+  -webkit-backdrop-filter:blur(9px) saturate(120%);
+  box-shadow:0 10px 28px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.045);
+}
