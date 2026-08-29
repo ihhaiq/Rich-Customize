@@ -1,10 +1,9 @@
-/* Beta 0.3.8 — Telegram-style Aa root menu + nested submenus. */
+/* Beta 0.3.10 — Telegram-style Aa root menu + nested submenus. */
 .text-toolbar-menu,
 .text-heading-submenu,
 .text-button-submenu{
   position:fixed!important;
   z-index:3400!important;
-  overflow:hidden!important;
   padding:6px!important;
   border-radius:16px!important;
   background:
@@ -16,18 +15,25 @@
     inset 0 1px 0 rgba(255,255,255,.055)!important;
   backdrop-filter:blur(16px) saturate(150%)!important;
   -webkit-backdrop-filter:blur(16px) saturate(150%)!important;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
 }
 
 .text-toolbar-menu{
   width:258px!important;
   min-width:258px!important;
   max-width:min(258px,calc(100vw - 16px))!important;
+  max-height:min(390px,calc(var(--visible-vh,100vh) - 20px))!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch;
 }
 
 .text-heading-submenu{
   width:250px!important;
   min-width:250px!important;
   max-width:min(250px,calc(100vw - 16px))!important;
+  overflow:hidden!important;
 }
 
 .text-button-submenu{
@@ -35,8 +41,17 @@
   min-width:248px!important;
   max-width:min(248px,calc(100vw - 16px))!important;
   max-height:min(485px,calc(var(--visible-vh,100vh) - 20px))!important;
+  overflow-x:hidden!important;
   overflow-y:auto!important;
   -webkit-overflow-scrolling:touch;
+}
+
+.text-toolbar-menu::-webkit-scrollbar,
+.text-button-submenu::-webkit-scrollbar{width:4px}
+.text-toolbar-menu::-webkit-scrollbar-thumb,
+.text-button-submenu::-webkit-scrollbar-thumb{
+  background:rgba(190,205,225,.32);
+  border-radius:999px;
 }
 
 .text-menu-row{
@@ -60,6 +75,22 @@
   background:rgba(255,255,255,.055);
 }
 .text-menu-row:active{transform:scale(.985)}
+
+.text-menu-row.rich-button-entry{
+  position:relative;
+  margin-top:5px;
+  padding-top:9px;
+}
+.text-menu-row.rich-button-entry::before{
+  content:"";
+  position:absolute;
+  top:-3px;
+  left:8px;
+  right:8px;
+  height:1px;
+  background:rgba(255,255,255,.075);
+  pointer-events:none;
+}
 
 .text-menu-icon{
   width:34px;
@@ -139,6 +170,7 @@ html.mobile-performance .text-menu-row{
   .text-toolbar-menu{
     width:216px!important;
     min-width:216px!important;
+    max-height:min(350px,calc(var(--visible-vh,100vh) - 18px))!important;
   }
   .text-heading-submenu{
     width:154px!important;
@@ -149,10 +181,14 @@ html.mobile-performance .text-menu-row{
     min-width:184px!important;
   }
   .text-menu-row{
-    min-height:40px;
+    min-height:37px;
     grid-template-columns:33px minmax(0,1fr) auto;
     gap:5px;
-    padding:5px 7px;
+    padding:4px 7px;
+  }
+  .text-menu-row.rich-button-entry{
+    margin-top:4px;
+    padding-top:7px;
   }
   .text-menu-icon{
     width:30px;
