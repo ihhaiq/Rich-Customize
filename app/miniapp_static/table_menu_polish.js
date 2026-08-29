@@ -1,5 +1,13 @@
 // Beta 0.3.30 — keep the table menu visually pinned while switching cell/row scope.
 (() => {
+  if (!document.querySelector('link[data-table-menu-polish]')) {
+    const css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = "/miniapp/static/table_menu_polish.css?v=0.3.30";
+    css.dataset.tableMenuPolish = "1";
+    document.head.appendChild(css);
+  }
+
   let pin = null;
 
   function viewportBounds() {
