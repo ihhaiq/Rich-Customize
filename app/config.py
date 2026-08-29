@@ -5,6 +5,23 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+def developer_ids() -> frozenset[int]:
+    raw = (
+        os.getenv("DEVELOPER_IDS", "").strip()
+        or os.getenv("DEVELOPER_ID", "").strip()
+        or os.getenv("ADMIN_ID", "").strip()
+    )
+    values: set[int] = set()
+    for item in raw.replace(";", ",").replace(" ", ",").split(","):
+        if not item:
+            continue
+        try:
+            values.add(int(item))
+        except ValueError:
+            continue
+    return frozenset(values)
+
+
 def _load_dotenv(path: Path = Path(".env")) -> None:
     if not path.exists():
         return
@@ -28,4 +45,3 @@ class Settings:
         if not token:
             raise RuntimeError("BOT_TOKEN is missing. Copy .env.example to .env and add the token.")
         return cls(bot_token=token, log_level=os.getenv("LOG_LEVEL", "INFO").upper())
-
