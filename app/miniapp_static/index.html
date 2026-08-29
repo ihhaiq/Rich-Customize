@@ -5,68 +5,90 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <title>Rich Customize Beta 0.2</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="/miniapp/static/style.css?v=0.2">
+  <link rel="stylesheet" href="/miniapp/static/style.css?v=0.2.1">
 </head>
 <body>
-  <section id="pagesView" class="screen active">
-    <header class="appbar">
-      <div><strong>Rich Customize</strong><small>Mini App · Beta 0.2</small></div>
-      <span class="dev-pill">DEV</span>
-    </header>
-    <main class="pages-main">
-      <h1>الصفحات</h1>
-      <p class="muted">افتح صفحة محفوظة حتى تعدلها بالمحرر المرئي.</p>
-      <div id="pages" class="pages"></div>
-      <div id="emptyPages" class="empty hidden">ما عندك صفحات محفوظة.</div>
-    </main>
-  </section>
-
-  <section id="editorView" class="screen editor-screen">
+  <section id="editorView" class="editor-screen">
     <header class="editor-topbar">
-      <button id="backBtn" class="icon-btn" aria-label="رجوع">←</button>
       <div class="page-identity">
-        <input id="pageTitle" maxlength="64" aria-label="اسم الصفحة">
-        <code id="pageCode"></code>
+        <input id="pageTitle" maxlength="64" value="Untitled" aria-label="اسم الصفحة">
+        <small id="saveState">غير محفوظ</small>
       </div>
-      <div class="history-actions">
-        <button id="undoBtn" class="icon-btn" disabled aria-label="تراجع">↶</button>
-        <button id="redoBtn" class="icon-btn" disabled aria-label="إعادة">↷</button>
+      <div class="top-actions">
+        <button id="pagesBtn" class="icon-btn" type="button" aria-label="الصفحات المحفوظة">📁</button>
+        <button id="moreBtn" class="icon-btn" type="button" aria-label="المزيد">•••</button>
       </div>
     </header>
+
+    <div class="history-row">
+      <button id="undoBtn" class="icon-btn" disabled aria-label="تراجع">↶</button>
+      <button id="redoBtn" class="icon-btn" disabled aria-label="إعادة">↷</button>
+    </div>
 
     <main class="editor-main">
       <div id="canvas" class="canvas" aria-label="محرر الرسالة">
         <div id="blocks" class="content-flow"></div>
-        <textarea id="slashInput" rows="1" placeholder="اكتب شيئًا…  / لإضافة Block" autocomplete="off" spellcheck="true"></textarea>
+
+        <div id="starter" class="starter-card">
+          <strong>ابدأ بالرسالة، مو بالإعدادات</strong>
+          <p>اكتب مباشرة أو أضف Block. كتابة <b>/</b> تفتح قائمة كل البلوكات.</p>
+          <div class="starter-actions">
+            <button id="startWritingBtn" type="button" class="primary-soft">¶ ابدأ الكتابة</button>
+            <button id="startPhotoBtn" type="button" class="soft-btn">▧ أضف صورة</button>
+          </div>
+        </div>
+
+        <div class="slash-wrap">
+          <textarea id="slashInput" rows="1" placeholder="اكتب نصًا، أو / للأوامر" autocomplete="off" spellcheck="true"></textarea>
+          <aside id="slashMenu" class="popup-menu slash-menu hidden" aria-label="قائمة إضافة بلوك">
+            <div class="menu-head">
+              <span>إضافة Block</span>
+              <span id="slashQuery"></span>
+            </div>
+            <div id="slashItems" class="menu-list"></div>
+          </aside>
+        </div>
       </div>
     </main>
 
-    <aside id="slashMenu" class="popup-menu slash-menu hidden" aria-label="قائمة إضافة بلوك">
-      <div class="menu-title">إضافة Block <span id="slashQuery"></span></div>
-      <div id="slashItems" class="menu-list"></div>
-    </aside>
-
-    <aside id="blockMenu" class="popup-menu block-menu hidden" aria-label="تعديل البلوك">
-      <div id="blockMenuTitle" class="menu-title">تعديل Block</div>
+    <aside id="blockMenu" class="popup-menu block-menu hidden" aria-label="إعدادات البلوك">
+      <div id="blockMenuTitle" class="menu-head">إعدادات Block</div>
       <div id="blockActions" class="menu-list"></div>
     </aside>
 
     <nav class="composer-toolbar" aria-label="أدوات المحرر">
-      <button type="button" data-tool="text" title="النص والعناوين"><b>Aa</b><span>نص</span></button>
-      <button type="button" data-tool="list" title="القوائم"><b>☷</b><span>قائمة</span></button>
-      <button type="button" data-tool="table" title="الجداول"><b>▦</b><span>جدول</span></button>
-      <button type="button" data-tool="math" title="المعادلات"><b>Σ</b><span>معادلة</span></button>
-      <button type="button" data-tool="media" title="المرفقات"><b>⌕</b><span>مرفق</span></button>
-      <button id="allBlocksBtn" type="button" title="كل البلوكات"><b>＋</b><span>Block</span></button>
+      <button type="button" data-tool="text"><b>Aa</b><span>نص</span></button>
+      <button type="button" data-tool="list"><b>☷</b><span>قائمة</span></button>
+      <button type="button" data-tool="table"><b>▦</b><span>جدول</span></button>
+      <button type="button" data-tool="math"><b>Σ</b><span>معادلة</span></button>
+      <button type="button" data-tool="media"><b>⌕</b><span>مرفق</span></button>
+      <button id="allBlocksBtn" type="button"><b>＋</b><span>Block</span></button>
     </nav>
 
-    <footer class="savebar">
-      <span id="saveState">تم الحفظ</span>
-      <button id="saveBtn" class="primary" disabled>حفظ</button>
-    </footer>
+    <button id="sendBtn" class="send-btn" type="button">إرسال</button>
   </section>
 
+  <div id="backdrop" class="backdrop hidden"></div>
+
+  <aside id="pagesPanel" class="sheet hidden" aria-label="الصفحات المحفوظة">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div><strong>📁 الصفحات المحفوظة</strong><small>افتح صفحة أو ابدأ صفحة جديدة</small></div>
+      <button id="newPageBtn" class="soft-btn" type="button">＋ جديدة</button>
+    </div>
+    <div id="pages" class="sheet-list"></div>
+    <div id="emptyPages" class="empty hidden">ما عندك صفحات محفوظة.</div>
+  </aside>
+
+  <aside id="sendPanel" class="sheet hidden" aria-label="وجهات الإرسال">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div><strong>إرسال الرسالة</strong><small>اختر المحادثة التي تريد النشر بيها</small></div>
+    </div>
+    <div id="destinations" class="sheet-list"></div>
+  </aside>
+
   <div id="toast" class="toast" role="status"></div>
-  <script src="/miniapp/static/app.js?v=0.2"></script>
+  <script src="/miniapp/static/app.js?v=0.2.1"></script>
 </body>
 </html>
