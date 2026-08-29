@@ -59,12 +59,14 @@ body{
   background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 72%,transparent),transparent);
   backdrop-filter:blur(10px);
   -webkit-backdrop-filter:blur(10px);
+  overflow:visible!important;
 }
 
 .editor-topbar{
   border-radius:22px;
   padding:11px 12px;
   margin-bottom:8px;
+  overflow:visible!important;
 }
 
 .page-identity input{font-size:23px}
@@ -85,7 +87,7 @@ body{
   align-items:center;
   gap:9px;
   padding:4px 2px 10px;
-  overflow:visible;
+  overflow:visible!important;
   background:transparent!important;
   border:0!important;
   box-shadow:none!important;
@@ -134,6 +136,7 @@ body{
   overflow-y:hidden;
   overscroll-behavior-x:contain;
   scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
 }
 .tools-bubble::-webkit-scrollbar{display:none}
 
@@ -166,32 +169,48 @@ body{
 .composer-toolbar.floating-toolbar .glyph{font-size:21px;font-weight:680;line-height:1}
 .composer-toolbar button.has-badge:after{display:none!important;content:none!important}
 
+/* Compact floating bubble menus: never inherit the old large bottom/right layout. */
 .popup-menu{
-  border-radius:22px!important;
-  background:var(--glass-bg-strong)!important;
-  overflow:auto;
+  position:fixed!important;
+  right:auto!important;
+  bottom:auto!important;
+  width:min(276px,calc(100vw - 20px))!important;
+  max-width:276px!important;
+  max-height:min(310px,calc(var(--visible-vh,100vh) - 20px))!important;
+  padding:6px!important;
+  border-radius:20px!important;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.018)),
+    color-mix(in srgb,var(--panel) 74%,transparent)!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  contain:layout paint;
+  scrollbar-width:thin;
+  transform-origin:top center;
 }
-.menu-head{
-  background:color-mix(in srgb,var(--glass-bg-strong) 92%,transparent)!important;
-  backdrop-filter:blur(18px);
-  -webkit-backdrop-filter:blur(18px);
-  font-size:14px;
-  padding:14px 16px;
-}
+.popup-menu.popup-floating{visibility:visible}
+.popup-menu .menu-head{display:none!important}
+.menu-list{display:grid;gap:2px;padding:0!important}
 .menu-item{
-  min-height:58px;
-  border-radius:15px;
-  padding:12px 13px;
+  min-height:46px!important;
+  border-radius:14px!important;
+  padding:8px 10px!important;
+  gap:9px!important;
 }
 .menu-item:hover,.menu-item.active{background:rgba(255,255,255,.065)!important}
-.menu-icon{width:40px;font-size:24px}
-.menu-copy strong{font-size:16px}
-.menu-copy small{font-size:13px}
+.menu-icon{width:31px!important;font-size:20px!important}
+.menu-copy strong{font-size:14px!important;line-height:1.2}
+.menu-copy small{font-size:11px!important;line-height:1.25}
+.menu-sep{margin:3px 7px!important}
 
 .sheet{
   background:var(--glass-bg-strong)!important;
   border-radius:28px 28px 0 0!important;
   border-bottom:0!important;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
 }
 .sheet-handle{height:5px;width:52px;background:rgba(255,255,255,.38)}
 .sheet-header{padding:8px 4px 14px}
@@ -272,12 +291,49 @@ body{
   -webkit-backdrop-filter:blur(8px) saturate(125%)!important;
 }
 
+/* Mobile performance mode: preserve the glass look without repainting 24px blur everywhere. */
+html.mobile-performance body{
+  background:var(--bg)!important;
+}
+html.mobile-performance .editor-topbar,
+html.mobile-performance .toolbar-bubble,
+html.mobile-performance .popup-menu,
+html.mobile-performance .sheet,
+html.mobile-performance .starter-card,
+html.mobile-performance .sheet-item,
+html.mobile-performance .soft-btn,
+html.mobile-performance .primary-soft,
+html.mobile-performance .fab,
+html.mobile-performance .media-picker-card{
+  backdrop-filter:blur(10px) saturate(125%)!important;
+  -webkit-backdrop-filter:blur(10px) saturate(125%)!important;
+  box-shadow:0 6px 18px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.055)!important;
+}
+html.mobile-performance .editor-head{
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  background:color-mix(in srgb,var(--bg) 91%,transparent)!important;
+}
+html.mobile-performance .toolbar-bubble:before{
+  filter:blur(5px)!important;
+  opacity:.62;
+}
+html.mobile-performance .popup-menu{
+  backdrop-filter:blur(12px) saturate(130%)!important;
+  -webkit-backdrop-filter:blur(12px) saturate(130%)!important;
+}
+html.mobile-performance .backdrop{
+  backdrop-filter:blur(3px)!important;
+  -webkit-backdrop-filter:blur(3px)!important;
+}
+
 @media(max-width:390px){
   .composer-toolbar.floating-toolbar{gap:6px}
   .toolbar-bubble{height:52px;padding:4px 5px}
   .composer-toolbar.floating-toolbar .toolbar-bubble button{width:42px;height:42px}
   .composer-toolbar.floating-toolbar svg{width:23px;height:23px}
   .composer-toolbar.floating-toolbar .glyph{font-size:20px}
+  .popup-menu{width:min(258px,calc(100vw - 16px))!important;max-width:258px!important;max-height:min(286px,calc(var(--visible-vh,100vh) - 16px))!important}
 }
 
 @media(min-width:760px){
