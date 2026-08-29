@@ -1,0 +1,115 @@
+/* Beta 0.3.14 — compact Telegram-style composer chrome. */
+
+/* The old + bubble is intentionally kept in the DOM for backward-compatible
+   handlers, but it is no longer part of the visible composer UI. */
+.composer-toolbar.floating-toolbar .add-bubble{
+  display:none!important;
+}
+
+/* Telegram's composer groups hug their controls instead of stretching across
+   the full available width. */
+.composer-toolbar.floating-toolbar{
+  display:flex!important;
+  width:max-content!important;
+  max-width:calc(100vw - 16px)!important;
+  margin:0 auto!important;
+  padding:2px 0 7px!important;
+  gap:6px!important;
+  justify-content:center!important;
+  align-items:center!important;
+  overflow:visible!important;
+}
+
+.composer-toolbar.floating-toolbar .toolbar-bubble{
+  flex:0 0 auto!important;
+  width:max-content!important;
+  min-width:0!important;
+  height:46px!important;
+  padding:3px 5px!important;
+  gap:1px!important;
+  border-radius:999px!important;
+}
+
+.composer-toolbar.floating-toolbar .history-bubble{
+  min-width:auto!important;
+}
+
+.composer-toolbar.floating-toolbar .tools-bubble{
+  flex:0 1 auto!important;
+  width:max-content!important;
+  max-width:calc(100vw - 116px)!important;
+  justify-content:flex-start!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+}
+
+.composer-toolbar.floating-toolbar .toolbar-bubble button{
+  width:38px!important;
+  height:38px!important;
+  min-width:38px!important;
+}
+
+.composer-toolbar.floating-toolbar svg{
+  width:21px!important;
+  height:21px!important;
+}
+
+.composer-toolbar.floating-toolbar .glyph{
+  font-size:19px!important;
+}
+
+/* Reduce the vertical chrome around the composer so content begins where a
+   Telegram editor would expect it. */
+.editor-head{
+  padding:5px 8px 0!important;
+}
+
+.editor-topbar{
+  margin-bottom:5px!important;
+}
+
+.editor-main{
+  padding-top:2px!important;
+}
+
+.canvas{
+  min-height:0!important;
+}
+
+.slash-wrap{
+  margin-top:2px!important;
+}
+
+.slash-wrap textarea{
+  min-height:44px!important;
+  padding:8px 4px!important;
+  line-height:1.45!important;
+}
+
+/* No artificial vertical spacer is introduced by an otherwise empty canvas. */
+.content-flow:empty + .starter-card.hidden + .slash-wrap{
+  margin-top:0!important;
+}
+
+@media(max-width:430px){
+  .composer-toolbar.floating-toolbar{
+    max-width:calc(100vw - 10px)!important;
+    gap:5px!important;
+  }
+  .composer-toolbar.floating-toolbar .toolbar-bubble{
+    height:44px!important;
+    padding:2px 4px!important;
+  }
+  .composer-toolbar.floating-toolbar .toolbar-bubble button{
+    width:36px!important;
+    height:36px!important;
+    min-width:36px!important;
+  }
+  .composer-toolbar.floating-toolbar .tools-bubble{
+    max-width:calc(100vw - 92px)!important;
+  }
+  .composer-toolbar.floating-toolbar svg{
+    width:20px!important;
+    height:20px!important;
+  }
+}
