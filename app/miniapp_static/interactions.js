@@ -1,4 +1,4 @@
-// Beta 0.3.3 — tactile press and long-press interactions with mobile fast path.
+// Beta 0.3.4 — tactile press and long-press block quick actions.
 (() => {
   const LONG_PRESS_MS = 460;
   const MOVE_CANCEL_PX = 12;
@@ -35,9 +35,11 @@
     } catch (_) {}
   }
 
-  function interactiveTextTarget(target) {
+  // Long-pressing editable Rich text should open the block actions too.
+  // Native controls such as table inputs and media players stay untouched.
+  function nativeControlTarget(target) {
     return Boolean(target.closest(
-      'input,textarea,select,[contenteditable="true"],video,audio,a,[data-no-long-press]'
+      'input,textarea,select,video,audio,a,[data-no-long-press]'
     ));
   }
 
@@ -55,7 +57,6 @@
   }
 
   function addRipple(el, clientX, clientY) {
-    // Ripple creation/repaint is intentionally skipped on mobile WebViews.
     if (PERFORMANCE_MODE || !el || el.classList.contains("block")) return;
     const rect = el.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
@@ -99,8 +100,9 @@
     if (el.classList.contains("block") && el.dataset.id) {
       try {
         if (typeof selectBlock === "function") selectBlock(el.dataset.id);
-        const block = window.current?.blocks?.find?.(item => item.id === el.dataset.id)
-          || (typeof current !== "undefined" ? current?.blocks?.find?.(item => item.id === el.dataset.id) : null);
+        const block = typeof current !== "undefined"
+          ? current?.blocks?.find?.(item => item.id === el.dataset.id)
+          : null;
         if (block && typeof openBlockMenu === "function") openBlockMenu(block);
       } catch (_) {}
     }
@@ -122,14 +124,14 @@
       startY:event.clientY,
       moved:false,
       longPressed:false,
-      textOrigin:interactiveTextTarget(event.target),
+      nativeControl:nativeControlTarget(event.target),
     };
 
     el.classList.add("press-surface", "is-pressed");
     el.classList.remove("press-release", "long-pressed");
     addRipple(el, event.clientX, event.clientY);
 
-    if (!active.textOrigin) {
+    if (!active.nativeControl) {
       requestAnimationFrame(() => {
         if (active?.el === el) el.classList.add("long-pressing");
       });
@@ -182,6 +184,6 @@
 
   document.addEventListener("contextmenu", event => {
     const block = event.target.closest?.(".block");
-    if (block && !interactiveTextTarget(event.target)) event.preventDefault();
+    if (block && !nativeControlTarget(event.target)) event.preventDefault();
   });
 })();
