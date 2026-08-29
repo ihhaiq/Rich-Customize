@@ -1,7 +1,22 @@
-/* Beta 0.2.5 — floating Telegram-style liquid glass toolbar.
-   Loaded after the base/live-preview styles so it only changes presentation. */
+/* Beta 0.2.6 — liquid-glass UI chrome across the Mini App.
+   Message blocks stay visually clean so the editor remains WYSIWYG. */
 
-/* The message blocks should live directly on the editor canvas. */
+:root{
+  --glass-bg:color-mix(in srgb,var(--panel) 62%,transparent);
+  --glass-bg-strong:color-mix(in srgb,var(--panel) 76%,transparent);
+  --glass-line:rgba(255,255,255,.11);
+  --glass-highlight:rgba(255,255,255,.09);
+  --glass-shadow:0 12px 34px rgba(0,0,0,.22);
+}
+
+body{
+  background:
+    radial-gradient(900px 420px at 18% -8%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 65%),
+    radial-gradient(700px 360px at 100% 18%,rgba(255,255,255,.035),transparent 68%),
+    var(--bg);
+}
+
+/* Message blocks live directly on the editor canvas — no outer box/card. */
 .content-flow{
   display:block;
   margin:0;
@@ -12,119 +27,124 @@
   overflow:visible;
   box-shadow:none;
 }
-
 .content-flow:empty{display:none}
-
-/* Do not turn the selected block into a card. Keep only a very light editing cue. */
-.block{
-  background:transparent!important;
-  border:0!important;
-  border-radius:0!important;
-  box-shadow:none!important;
-}
-
-.block.selected{
-  background:transparent!important;
-  border:0!important;
-}
-
+.block{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+.block.selected{background:transparent!important;border:0!important}
 .block.selected:after{
   inset:-2px -4px;
   border-radius:9px;
   box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 24%,transparent);
 }
 
-/* The toolbar itself is only a positioning rail; the visible surfaces are bubbles. */
+/* Shared liquid-glass surface. */
+.editor-topbar,
+.toolbar-bubble,
+.popup-menu,
+.sheet,
+.starter-card,
+.sheet-item,
+.soft-btn,
+.primary-soft,
+.fab,
+.media-picker-card{
+  border:1px solid var(--glass-line)!important;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.016)),
+    var(--glass-bg)!important;
+  box-shadow:var(--glass-shadow),inset 0 1px 0 var(--glass-highlight),inset 0 -1px 0 rgba(0,0,0,.09)!important;
+  backdrop-filter:blur(24px) saturate(170%)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(170%)!important;
+}
+
+.editor-head{
+  padding:8px 8px 0;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 72%,transparent),transparent);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}
+
+.editor-topbar{
+  border-radius:22px;
+  padding:11px 12px;
+  margin-bottom:8px;
+}
+
+.page-identity input{font-size:23px}
+.page-identity small{font-size:13px}
+
+.top-actions{gap:5px}
+.icon-btn{
+  width:48px!important;
+  height:48px!important;
+  background:rgba(255,255,255,.02)!important;
+}
+.icon-btn svg{width:25px!important;height:25px!important;stroke-width:1.8!important}
+.icon-btn:active{background:rgba(255,255,255,.09)!important}
+
+/* Floating toolbar rail; only the bubbles are visible. */
 .composer-toolbar.floating-toolbar{
   display:grid;
   grid-template-columns:auto minmax(0,1fr) auto;
   align-items:center;
-  gap:8px;
-  padding:5px 10px 11px;
+  gap:9px;
+  padding:4px 2px 10px;
   overflow:visible;
-  background:transparent;
-  border:0;
-  backdrop-filter:none;
-  -webkit-backdrop-filter:none;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
   scrollbar-width:none;
 }
-
 .composer-toolbar.floating-toolbar::-webkit-scrollbar{display:none}
 
 .toolbar-bubble{
-  --glass-line:rgba(255,255,255,.105);
-  --glass-highlight:rgba(255,255,255,.085);
   position:relative;
   isolation:isolate;
   display:flex;
   align-items:center;
   min-width:0;
-  height:48px;
-  padding:4px 6px;
-  border:1px solid var(--glass-line);
-  border-radius:999px;
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018)),
-    color-mix(in srgb,var(--panel) 64%,transparent);
-  box-shadow:
-    0 9px 24px rgba(0,0,0,.20),
-    inset 0 1px 0 var(--glass-highlight),
-    inset 0 -1px 0 rgba(0,0,0,.10);
-  backdrop-filter:blur(22px) saturate(165%);
-  -webkit-backdrop-filter:blur(22px) saturate(165%);
+  height:56px;
+  padding:5px 7px;
+  border-radius:999px!important;
   overflow:hidden;
 }
-
 .toolbar-bubble:before{
   content:"";
   position:absolute;
   z-index:-1;
-  left:8%;
-  right:8%;
-  top:-55%;
-  height:72%;
+  left:8%;right:8%;top:-52%;height:72%;
   border-radius:50%;
-  background:rgba(255,255,255,.075);
-  filter:blur(10px);
+  background:rgba(255,255,255,.085);
+  filter:blur(11px);
   pointer-events:none;
 }
-
 .toolbar-bubble:after{
   content:"";
   position:absolute;
   z-index:-1;
   inset:0;
   border-radius:inherit;
-  background:linear-gradient(115deg,rgba(255,255,255,.035),transparent 38%,rgba(255,255,255,.018) 68%,transparent);
+  background:linear-gradient(115deg,rgba(255,255,255,.05),transparent 36%,rgba(255,255,255,.02) 68%,transparent);
   pointer-events:none;
 }
-
-.history-bubble{
-  flex:0 0 auto;
-  gap:1px;
-}
-
+.history-bubble,.add-bubble{flex:0 0 auto;gap:1px}
 .tools-bubble{
   display:flex;
   justify-content:flex-start;
-  gap:1px;
+  gap:2px;
   overflow-x:auto;
   overflow-y:hidden;
   overscroll-behavior-x:contain;
   scrollbar-width:none;
 }
-
 .tools-bubble::-webkit-scrollbar{display:none}
-
-.add-bubble{
-  flex:0 0 auto;
-}
 
 .composer-toolbar.floating-toolbar .toolbar-bubble button{
   position:relative;
   flex:0 0 auto;
-  width:38px;
-  height:38px;
+  width:46px;
+  height:46px;
   display:grid;
   place-items:center;
   padding:0;
@@ -134,70 +154,134 @@
   color:var(--text);
   transition:background .16s ease,color .16s ease,transform .12s ease,opacity .16s ease;
 }
-
 .composer-toolbar.floating-toolbar .toolbar-bubble button:active{
   transform:scale(.93);
-  background:rgba(255,255,255,.075);
+  background:rgba(255,255,255,.09);
 }
-
 .composer-toolbar.floating-toolbar .toolbar-bubble button.active{
-  background:color-mix(in srgb,var(--accent) 22%,transparent);
+  background:color-mix(in srgb,var(--accent) 24%,transparent);
   color:var(--accent);
-  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 25%,transparent);
 }
+.composer-toolbar.floating-toolbar .toolbar-bubble button:disabled{opacity:.28}
+.composer-toolbar.floating-toolbar #undoBtn,.composer-toolbar.floating-toolbar #redoBtn{border:0}
+.composer-toolbar.floating-toolbar svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.75}
+.composer-toolbar.floating-toolbar .glyph{font-size:21px;font-weight:680;line-height:1}
+/* Explicitly remove the old purple star badges. */
+.composer-toolbar button.has-badge:after{display:none!important;content:none!important}
 
-.composer-toolbar.floating-toolbar .toolbar-bubble button:disabled{
-  opacity:.28;
+/* Popup menus and bottom sheets use the same glass language. */
+.popup-menu{
+  border-radius:22px!important;
+  background:var(--glass-bg-strong)!important;
+  overflow:auto;
 }
-
-.composer-toolbar.floating-toolbar #undoBtn,
-.composer-toolbar.floating-toolbar #redoBtn{
-  border:0;
+.menu-head{
+  background:color-mix(in srgb,var(--glass-bg-strong) 92%,transparent)!important;
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  font-size:14px;
+  padding:14px 16px;
 }
-
-.composer-toolbar.floating-toolbar svg{
-  width:20px;
-  height:20px;
-  fill:none;
-  stroke:currentColor;
-  stroke-width:1.7;
+.menu-item{
+  min-height:58px;
+  border-radius:15px;
+  padding:12px 13px;
 }
+.menu-item:hover,.menu-item.active{background:rgba(255,255,255,.065)!important}
+.menu-icon{width:40px;font-size:24px}
+.menu-copy strong{font-size:16px}
+.menu-copy small{font-size:13px}
 
-.composer-toolbar.floating-toolbar .glyph{
-  font-size:18px;
+.sheet{
+  background:var(--glass-bg-strong)!important;
+  border-radius:28px 28px 0 0!important;
+  border-bottom:0!important;
+}
+.sheet-handle{height:5px;width:52px;background:rgba(255,255,255,.38)}
+.sheet-header{padding:8px 4px 14px}
+.sheet-header strong{font-size:18px}
+.sheet-header small{font-size:13px}
+.sheet-item{
+  min-height:64px;
+  border-radius:18px!important;
+  background:rgba(255,255,255,.035)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
+}
+.destination-icon{width:46px;height:46px;font-size:23px;background:rgba(255,255,255,.045)!important}
+
+.starter-card{
+  border-radius:24px!important;
+  border-style:solid!important;
+}
+.primary-soft,.soft-btn{
+  min-height:48px;
+  border-radius:16px!important;
   font-weight:650;
-  line-height:1;
+}
+.primary-soft{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 82%,#fff 8%),color-mix(in srgb,var(--accent) 82%,#000 8%))!important;
+  color:var(--accentText)!important;
 }
 
-.composer-toolbar.floating-toolbar button.has-badge:after{
-  top:3px;
-  left:4px;
+/* Media/location pickers are glass UI controls, not part of the Rich Message render. */
+.media-picker-card{
+  border-radius:18px!important;
+  padding:13px!important;
+  background:var(--glass-bg)!important;
 }
-
-/* A little physical separation from the sticky title bar makes the bubbles look suspended. */
-.editor-head{
-  background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 94%,transparent) 0%,color-mix(in srgb,var(--bg) 82%,transparent) 72%,transparent 100%);
-  backdrop-filter:blur(12px);
-  -webkit-backdrop-filter:blur(12px);
+.media-picker-card.invalid{border-color:color-mix(in srgb,var(--danger) 48%,var(--glass-line))!important}
+.media-picker-head{display:flex;align-items:center;gap:12px}
+.media-picker-head>div{display:grid;gap:3px;min-width:0}
+.media-picker-head strong{font-size:16px}
+.media-picker-head small{font-size:12px;color:var(--muted);line-height:1.45}
+.media-picker-icon{
+  flex:0 0 auto;
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:15px;
+  font-size:25px;
+  background:rgba(255,255,255,.055);
+  border:1px solid rgba(255,255,255,.07);
 }
+.media-pick-btn{justify-self:start;min-width:190px}
 
-.editor-topbar{
-  background:transparent;
-  backdrop-filter:none;
-  -webkit-backdrop-filter:none;
+/* Bigger bottom action icons. */
+.bottom-actions{gap:12px;padding-inline:14px}
+.fab{
+  width:58px!important;
+  height:58px!important;
+  border-radius:50%!important;
+}
+.fab-ghost{width:54px!important;height:54px!important;color:var(--text)!important}
+.fab-send{
+  width:62px!important;
+  height:62px!important;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 86%,#fff 10%),color-mix(in srgb,var(--accent) 88%,#000 8%))!important;
+}
+.fab svg{width:27px!important;height:27px!important}
+.fab-send svg{width:30px!important;height:30px!important}
+
+/* Backdrop also feels like frosted glass rather than a flat black overlay. */
+.backdrop{
+  background:rgba(4,8,14,.32)!important;
+  backdrop-filter:blur(8px) saturate(125%)!important;
+  -webkit-backdrop-filter:blur(8px) saturate(125%)!important;
 }
 
 @media(max-width:390px){
-  .composer-toolbar.floating-toolbar{gap:6px;padding-inline:7px}
-  .toolbar-bubble{height:46px;padding:3px 5px}
-  .composer-toolbar.floating-toolbar .toolbar-bubble button{width:36px;height:36px}
+  .composer-toolbar.floating-toolbar{gap:6px}
+  .toolbar-bubble{height:52px;padding:4px 5px}
+  .composer-toolbar.floating-toolbar .toolbar-bubble button{width:42px;height:42px}
+  .composer-toolbar.floating-toolbar svg{width:23px;height:23px}
+  .composer-toolbar.floating-toolbar .glyph{font-size:20px}
 }
 
 @media(min-width:760px){
-  .composer-toolbar.floating-toolbar{
-    max-width:720px;
-    margin:0 auto;
-  }
+  .editor-head{max-width:760px;margin:0 auto}
+  .composer-toolbar.floating-toolbar{max-width:720px;margin:0 auto}
 }
 
 @media(prefers-reduced-motion:reduce){
