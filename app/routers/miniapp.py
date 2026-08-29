@@ -10,7 +10,7 @@ from app.miniapp import mini_app_url
 router = Router(name="miniapp_beta")
 
 
-@router.message(Command("app"))
+@router.message(Command("app"), F.chat.type == "private")
 async def open_mini_app(message: Message) -> None:
     if message.from_user is None or message.from_user.id not in developer_ids():
         return
