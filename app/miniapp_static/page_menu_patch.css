@@ -1,0 +1,30 @@
+/* Beta 0.3.8 — compact liquid-glass page options bubble. */
+.page-top-menu{
+  position:fixed!important;
+  z-index:3550!important;
+  width:205px!important;
+  min-width:205px!important;
+  max-width:min(205px,calc(100vw - 20px))!important;
+  padding:7px!important;
+  border-radius:16px!important;
+  overflow:hidden!important;
+}
+.page-top-menu .menu-list{gap:3px!important}
+.page-top-menu .menu-item{
+  min-height:45px!important;
+  border-radius:12px!important;
+  padding:7px 9px!important;
+}
+.page-top-menu .menu-icon{
+  width:32px!important;
+  font-size:20px!important;
+}
+#moreBtn.active{
+  background:rgba(255,255,255,.065)!important;
+}
+@media(max-width:390px){
+  .page-top-menu{
+    width:190px!important;
+    min-width:190px!important;
+  }
+}
