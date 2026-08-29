@@ -17,17 +17,17 @@ async def open_mini_app(message: Message) -> None:
     url = mini_app_url()
     if not url:
         await message.answer(
-            "Mini App Beta 0.1 جاهزة، لكن ماكو رابط عام بعد. "
+            "Mini App Beta 0.2 جاهزة، لكن ماكو رابط عام بعد. "
             "حدد MINI_APP_URL أو RAILWAY_PUBLIC_DOMAIN ثم أعد التشغيل."
         )
         return
     await message.answer(
-        "🧪 Rich Customize Mini App — Beta 0.1\n\n"
-        "نسخة تجريبية خاصة بالمطور. تقدر تفتح الصفحات المحفوظة، "
-        "تعدل النصوص وترتيب الـBlocks وتحفظ بنفس كود CBD.",
+        "🧪 Rich Customize Mini App — Beta 0.2\n\n"
+        "واجهة جديدة بأسلوب محرر Telegram، تعديل مباشر للـBlocks، Undo/Redo، "
+        "وقائمة / لإضافة أي Block متوفر. النسخة ما زالت خاصة بالمطور فقط.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(
-                text="🌐 فتح Mini App Beta",
+                text="🌐 فتح Mini App Beta 0.2",
                 web_app=WebAppInfo(url=url),
             )
         ]]),
