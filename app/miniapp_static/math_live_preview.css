@@ -1,18 +1,17 @@
-/* Beta 0.3.30 — Telegram-style live formula editor. */
+/* Beta 0.3.31 — calm glass formula editor + collapsed formula view. */
 .telegram-math-editor{
   display:grid;
   gap:12px;
   padding:14px;
-  border:1px solid rgba(255,255,255,.11);
+  border:1px solid rgba(255,255,255,.10);
   border-radius:20px;
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018)),
-    color-mix(in srgb,var(--panel) 88%,transparent);
+  background:color-mix(in srgb,var(--panel) 78%,transparent);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.07),
-    0 12px 30px rgba(0,0,0,.16);
-  backdrop-filter:blur(18px) saturate(145%);
-  -webkit-backdrop-filter:blur(18px) saturate(145%);
+    0 14px 34px rgba(0,0,0,.18),
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 0 0 1px rgba(255,255,255,.018);
+  backdrop-filter:blur(22px) saturate(132%);
+  -webkit-backdrop-filter:blur(22px) saturate(132%);
 }
 .math-field{display:grid;gap:7px}
 .math-field-title,.math-result-head{
@@ -25,7 +24,7 @@
   min-height:54px;
   resize:vertical;
   border:0;
-  border-bottom:2px solid color-mix(in srgb,var(--accent) 72%,transparent);
+  border-bottom:2px solid color-mix(in srgb,var(--accent) 68%,transparent);
   outline:0;
   padding:6px 0 8px;
   color:var(--text);
@@ -37,10 +36,7 @@
   line-height:1.5;
 }
 .math-latex-input::placeholder{color:color-mix(in srgb,var(--muted) 68%,transparent)}
-.math-latex-input:focus{
-  border-bottom-color:var(--accent);
-  filter:drop-shadow(0 2px 5px color-mix(in srgb,var(--accent) 20%,transparent));
-}
+.math-latex-input:focus{border-bottom-color:var(--accent)}
 .math-line-option{
   min-height:44px;
   display:flex;
@@ -62,16 +58,16 @@
   flex:0 0 27px;
   display:grid;
   place-items:center;
-  border:1.5px solid color-mix(in srgb,var(--muted) 72%,transparent);
-  border-radius:6px;
+  border:1.5px solid color-mix(in srgb,var(--muted) 68%,transparent);
+  border-radius:7px;
   background:rgba(255,255,255,.025);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
-  transition:.14s ease;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+  transition:background .14s ease,border-color .14s ease,transform .12s ease;
 }
+.math-line-option:active .math-check-box{transform:scale(.95)}
 .math-line-option input:checked + .math-check-box{
   border-color:var(--accent);
-  background:color-mix(in srgb,var(--accent) 88%,transparent);
-  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent);
+  background:color-mix(in srgb,var(--accent) 84%,transparent);
 }
 .math-line-option input:checked + .math-check-box::after{
   content:"";
@@ -91,10 +87,8 @@
   border:1px solid rgba(255,255,255,.075);
   border-radius:14px;
   color:var(--text);
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.014)),
-    color-mix(in srgb,var(--panel2) 90%,transparent);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+  background:color-mix(in srgb,var(--panel2) 78%,transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
   direction:ltr;
   font-size:17px;
   overscroll-behavior-x:contain;
@@ -108,16 +102,75 @@
   font-size:13px;
   text-align:center;
 }
-.math-live-preview .katex-display{margin:0!important;max-width:100%}
-.math-live-preview .katex{white-space:nowrap}
+.math-live-preview .katex-display,
+.math-formula-view .katex-display{margin:0!important;max-width:100%}
+.math-live-preview .katex,
+.math-formula-view .katex{white-space:nowrap}
+
+.math-editor-actions{
+  display:flex;
+  justify-content:flex-start;
+  padding-top:2px;
+}
+.math-done-button{
+  min-width:72px;
+  min-height:42px;
+  padding:8px 18px;
+  border:1px solid color-mix(in srgb,var(--accent) 38%,transparent);
+  border-radius:13px;
+  background:color-mix(in srgb,var(--accent) 18%,transparent);
+  color:var(--text);
+  font-weight:750;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055);
+  transition:transform .12s ease,background .12s ease;
+}
+.math-done-button:active{
+  transform:scale(.97);
+  background:color-mix(in srgb,var(--accent) 26%,transparent);
+}
+
+.math-formula-view{
+  min-height:58px;
+  width:100%;
+  display:flex;
+  align-items:center;
+  overflow:auto hidden;
+  padding:12px 14px;
+  border:1px solid transparent;
+  border-radius:14px;
+  color:var(--text);
+  background:transparent;
+  direction:ltr;
+  cursor:text;
+  outline:0;
+  transition:background .12s ease,border-color .12s ease;
+  overscroll-behavior-x:contain;
+  -webkit-tap-highlight-color:transparent;
+}
+.math-formula-view.display-formula{justify-content:center;text-align:center;font-size:19px}
+.math-formula-view.inline-formula{justify-content:flex-start;text-align:left;font-size:17px}
+.math-formula-view.is-empty{
+  justify-content:center;
+  direction:rtl;
+  color:var(--muted);
+  font-size:13px;
+  cursor:pointer;
+}
+@media(hover:hover) and (pointer:fine){
+  .math-formula-view:hover{
+    background:rgba(255,255,255,.025);
+    border-color:rgba(255,255,255,.045);
+  }
+}
 
 html.mobile-performance .telegram-math-editor{
-  backdrop-filter:blur(10px) saturate(120%);
-  -webkit-backdrop-filter:blur(10px) saturate(120%);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 22px rgba(0,0,0,.14);
+  backdrop-filter:blur(12px) saturate(118%);
+  -webkit-backdrop-filter:blur(12px) saturate(118%);
+  box-shadow:0 9px 24px rgba(0,0,0,.15),inset 0 1px 0 rgba(255,255,255,.045);
 }
 
 @media(max-width:430px){
   .telegram-math-editor{padding:12px;border-radius:18px;gap:10px}
   .math-live-preview{min-height:74px;padding:14px 12px}
+  .math-formula-view{min-height:54px;padding:10px 8px}
 }
