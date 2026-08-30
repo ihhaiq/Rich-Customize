@@ -14,6 +14,7 @@ def test_inline_editor_does_not_use_deprecated_exec_command() -> None:
 
 def test_i18n_loads_before_the_editor() -> None:
     html = (STATIC / "index.html").read_text("utf-8")
+    assert html.index("miniapp_i18n_locales.js") < html.index("miniapp_i18n.js")
     assert html.index("miniapp_i18n.js") < html.index('/miniapp/static/app.js')
     assert html.index("miniapp_icons.js") < html.index('/miniapp/static/app.js')
 
@@ -49,6 +50,22 @@ def test_russian_catalog_covers_referenced_interface_text() -> None:
     russian_keys = set(re.findall(r'[\"\']([a-z][a-z0-9_.]+)[\"\']\s*:', russian))
     assert 'value.startsWith("ru")' in catalog
     assert referenced <= russian_keys
+
+
+def test_miniapp_supports_every_bot_locale() -> None:
+    expected = {
+        "ar", "en", "es", "fr", "de", "it", "pt", "nl", "pl", "uk", "ru",
+        "tr", "fa", "ku", "ur", "hi", "id", "ja", "ko", "vi", "th",
+        "zh-hans", "zh-hant",
+    }
+    base = {"ar", "en", "ru", "zh-hans", "zh-hant"}
+    extra = (STATIC / "miniapp_i18n_locales.js").read_text("utf-8")
+    declared = set(re.findall(r"^    ([a-z]{2}):\[", extra, re.MULTILINE))
+    assert base | declared == expected
+
+    catalog = (STATIC / "miniapp_i18n.js").read_text("utf-8")
+    assert "if (dictionaries[primary]) return primary" in catalog
+    assert '["ar","fa","ur"].includes(language)' in catalog
 
 
 def test_interface_controls_use_shared_svg_icons() -> None:
