@@ -17,7 +17,27 @@ changing the user-facing flow.
 - `app/editor/history.py` owns multi-step undo/redo snapshots.
 - `app/services/factory.py` and parts of `app/services/blocks.py` are compatibility facades for existing callers.
 - `app/routers/editor_core.py` is now a small compatibility facade.
+- `app/routers/history.py` owns the public Undo callback and falls back to the one-step legacy snapshot only for handlers that have not migrated yet.
+- `app/routers/details.py` is only the Details router aggregator.
+- `app/routers/details_support.py` owns Details child/document helpers and legacy callback detachment.
+- `app/routers/details_builder.py` owns Details creation and inner-block creation.
+- `app/routers/details_manager.py` owns inner-block navigation, preview, delete, and move callbacks.
+- `app/routers/details_edit.py` owns Details/nested-block editing and replacement.
 - `app/routers/editor_legacy.py` contains the remaining historical handlers and must not receive new features.
+
+## Legacy migration rule
+
+Extracted feature routers are included before `editor_legacy`. Their dedicated
+legacy callback registrations are detached during router setup, while generic
+legacy handlers remain available for feature types that have not been migrated.
+Compatibility names used inside generic handlers are rebound to the extracted
+implementation. This lets each feature leave the monolith without a flag-day
+rewrite of unrelated editor behavior.
+
+Details is the first feature migrated through this boundary. New Details code
+must live in the `details_*` modules, use `editor_workflow` for document
+mutations, `draft_store` for draft writes, and `app.editor.history` for undo
+snapshots.
 
 ## Canonical block
 

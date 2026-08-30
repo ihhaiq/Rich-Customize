@@ -13,6 +13,10 @@ from app.keyboards import build_block_editor_keyboard
 from app.states import RichEditorStates
 
 from app.routers import editor_core
+from app.routers.details import (
+    receive_nested_replacement,
+    store_pending_details_child,
+)
 
 
 router = Router(name="math_ready")
@@ -46,6 +50,8 @@ async def receive_ready_math_add(message: Message, state: FSMContext, bot: Bot) 
         await editor_core._finish_add(message, state, bot, block)
         return
 
+    # Details now owns its nested input flow. This remains as a compatibility
+    # path if router ordering changes or the handler is called directly.
     if (
         block_type == "details"
         and step == "details_child_content"
@@ -55,7 +61,7 @@ async def receive_ready_math_add(message: Message, state: FSMContext, bot: Bot) 
         if block is None:
             await _missing_math(message)
             return
-        await editor_core._store_details_child(message, state, bot, block)
+        await store_pending_details_child(message, state, bot, block)
         return
 
     raise SkipHandler
@@ -72,7 +78,7 @@ async def receive_ready_math_edit(message: Message, state: FSMContext, bot: Bot)
         if _math_block(message) is None:
             await _missing_math(message)
             return
-        await editor_core._receive_nested_replacement(message, state, bot, data)
+        await receive_nested_replacement(message, state, bot, data)
         return
 
     if data.get("expected_type") != MATH_TYPE or data.get("edit_field"):
