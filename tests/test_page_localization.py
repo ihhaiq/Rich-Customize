@@ -10,13 +10,17 @@ from app.locales.common import (
     DETAILS_INNER_KEYS, EDITOR_UX_KEYS, KEY_TRANSLATIONS, LIST_UI_KEYS,
     RICH_IMPORT_KEYS,
 )
+from app.editor.session import load_editor_session as _session
+from app.editor.history import UNDO_KEY
+from app.routers.editor_entry import new_editor
+from app.routers.editor_preview import import_rich_message_into_editor
+from app.routers.editor_ui import editor_overview_text as _editor_overview_text
 from app.routers.editor_core import (
     _ask_for_button_user, _block_page, _code_input_prompt,
     _delete_stored_block_prompt, _math_input_prompt,
-    _editor_overview_text, _opened_page_text, _page_screen, _saved_pages_text,
+    _opened_page_text, _page_screen, _saved_pages_text,
     _details_inner_list_text, _details_inner_page, _receive_nested_replacement,
-    _session,
-    import_rich_message_into_editor, new_editor, _pages_for_user,
+    _pages_for_user,
 )
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
@@ -281,24 +285,27 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
         bot = SimpleNamespace()
         with (
             patch(
-                "app.routers.editor_core.message_to_blocks",
+                "app.routers.editor_preview.message_to_blocks",
                 return_value=new_blocks,
             ),
             patch(
-                "app.routers.editor_core._delete_input_message",
+                "app.routers.editor_preview.delete_input_message",
                 AsyncMock(),
             ) as delete_input,
             patch(
-                "app.routers.editor_core._edit_saved_ui",
+                "app.routers.editor_preview.edit_saved_ui",
                 AsyncMock(),
             ) as edit_ui,
         ):
             await import_rich_message_into_editor(message, state, bot)
 
-        update = state.update_data.await_args.kwargs
-        self.assertEqual(update["blocks"], new_blocks)
-        self.assertEqual(update["undo_blocks"], old_blocks)
-        self.assertEqual(update["message_buttons"], [])
+        updates = [call.kwargs for call in state.update_data.await_args_list]
+        draft_update = next(update for update in updates if "blocks" in update)
+        history_update = next(update for update in updates if UNDO_KEY in update)
+        self.assertEqual(draft_update["blocks"][0]["id"], "new")
+        self.assertEqual(draft_update["blocks"][0]["type"], "photo")
+        self.assertEqual(draft_update["message_buttons"], [])
+        self.assertEqual(history_update[UNDO_KEY][0]["blocks"][0]["id"], "old")
         delete_input.assert_awaited_once_with(message)
         edit_ui.assert_awaited_once()
 
@@ -347,7 +354,10 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
 
         session = await _session(callback, state)
 
-        self.assertEqual(session, ({"blocks": []}, []))
+        self.assertEqual(session[1], [])
+        self.assertEqual(session[0]["blocks"], [])
+        self.assertEqual(session[0]["message_buttons"], [])
+        self.assertEqual(session[0]["buttons_per_row"], 1)
         callback.answer.assert_not_awaited()
 
     async def test_editor_command_opens_an_empty_editor_immediately(self):
@@ -371,8 +381,8 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
         message.answer.assert_not_awaited()
         rich_message = bot.send_rich_message.await_args.kwargs["rich_message"]
         self.assertEqual(rich_message.blocks[1].type, "details")
-        state.update_data.assert_awaited_once()
-        self.assertEqual(state.update_data.await_args.kwargs["blocks"], [])
+        self.assertEqual(state.update_data.await_count, 2)
+        self.assertEqual(state.update_data.await_args_list[0].kwargs["blocks"], [])
 
     async def test_back_cleanup_deletes_only_the_separate_prompt(self):
         bot = SimpleNamespace(delete_message=AsyncMock())

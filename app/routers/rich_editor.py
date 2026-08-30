@@ -14,6 +14,10 @@ from app.routers.details import (
     router as details_router,
 )
 from app.routers.developer import router as developer_router
+from app.routers.editor_session import (
+    install_into as install_editor_session,
+    router as editor_session_router,
+)
 from app.routers.history import (
     install_into as install_history,
     router as history_router,
@@ -42,6 +46,7 @@ install_block_management(editor_core.compat_module)
 install_message_buttons(editor_core.compat_module)
 install_pages(editor_core.compat_module)
 install_publishing(editor_core.compat_module)
+install_editor_session(editor_core.compat_module)
 editor_core_router = editor_core.router
 
 open_page_link = editor_core.open_page_link
@@ -61,6 +66,7 @@ router.include_router(block_management_router)
 router.include_router(message_buttons_router)
 router.include_router(pages_router)
 router.include_router(publishing_router)
+router.include_router(editor_session_router)
 router.include_router(editor_core_router)
 
 __all__ = ["router"]
