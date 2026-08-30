@@ -5,14 +5,17 @@ from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from app.editor.document import get_block_by_id, replace_block
+from app.editor.document import get_block_by_id
+from app.editor.history import remember
 from app.editor.importer import first_block_of_type
 from app.editor.registry import block_registry
+from app.editor.workflow import editor_workflow
 from app.i18n import t
-from app.keyboards import build_block_editor_keyboard
 from app.states import RichEditorStates
 
 from app.routers import editor_core
+from app.routers.block_keyboard import build_managed_block_keyboard
+from app.routers.block_support import save_blocks
 from app.routers.details import (
     receive_nested_replacement,
     store_pending_details_child,
@@ -50,8 +53,6 @@ async def receive_ready_math_add(message: Message, state: FSMContext, bot: Bot) 
         await editor_core._finish_add(message, state, bot, block)
         return
 
-    # Details now owns its nested input flow. This remains as a compatibility
-    # path if router ordering changes or the handler is called directly.
     if (
         block_type == "details"
         and step == "details_child_content"
@@ -95,18 +96,24 @@ async def receive_ready_math_edit(message: Message, state: FSMContext, bot: Bot)
         await _missing_math(message)
         return
 
-    updated = replace_block(blocks, str(block_id), incoming)
-    if updated is None:
+    await remember(state)
+    result = editor_workflow.replace(blocks, str(block_id), incoming)
+    if not result.changed or result.block is None:
         raise SkipHandler
+    await save_blocks(state, result.blocks)
 
     await editor_core._delete_add_step_messages(bot, message, data, state)
-    await state.update_data(blocks=blocks)
+    await state.update_data(
+        current_block_id=None,
+        expected_type=None,
+        edit_field=None,
+    )
     await state.set_state(RichEditorStates.managing)
     await editor_core._edit_saved_ui(
         bot,
         state,
-        editor_core._block_page(updated, blocks),
-        build_block_editor_keyboard(updated, blocks),
+        editor_core._block_page(result.block, result.blocks),
+        build_managed_block_keyboard(result.block, result.blocks),
     )
 
 

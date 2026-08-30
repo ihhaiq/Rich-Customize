@@ -10,7 +10,7 @@ changing the user-facing flow.
 - `app/editor/adapters/` contains one adapter definition per Rich Block type.
 - `app/editor/registry.py` is the only block-type registry.
 - `app/editor/builders.py` owns generated block payload construction.
-- `app/editor/workflow.py` owns pure document mutations and validation.
+- `app/editor/workflow.py` owns pure document mutations, duplicate, and validation.
 - `app/editor/importer.py` owns Rich Message/block import selection.
 - `app/editor/preview.py` is the preview service boundary.
 - `app/editor/draft_store.py` is the draft persistence boundary.
@@ -23,21 +23,35 @@ changing the user-facing flow.
 - `app/routers/details_builder.py` owns Details creation and inner-block creation.
 - `app/routers/details_manager.py` owns inner-block navigation, preview, delete, and move callbacks.
 - `app/routers/details_edit.py` owns Details/nested-block editing and replacement.
-- `app/routers/editor_legacy.py` contains the remaining historical handlers and must not receive new features.
+- `app/routers/block_management.py` aggregates the extracted top-level Block routers and detaches their old legacy registrations.
+- `app/routers/block_add.py` owns Add Block, list selection, heading selection, and generic block input.
+- `app/routers/block_actions.py` owns open, delete, move, and duplicate operations.
+- `app/routers/block_edit.py` owns generic block replacement, caption/credit edits, and checklist toggles.
+- `app/routers/block_table.py` owns table-cell editing actions.
+- `app/routers/block_support.py` is the draft/history/workflow bridge for Block mutations.
+- `app/routers/block_keyboard.py` extends the compatibility block keyboard with extracted actions such as Duplicate.
+- `app/routers/editor_legacy.py` contains only the remaining historical areas and must not receive new features.
 
 ## Legacy migration rule
 
-Extracted feature routers are included before `editor_legacy`. Their dedicated
-legacy callback registrations are detached during router setup, while generic
-legacy handlers remain available for feature types that have not been migrated.
-Compatibility names used inside generic handlers are rebound to the extracted
-implementation. This lets each feature leave the monolith without a flag-day
-rewrite of unrelated editor behavior.
+Extracted feature routers are included before `editor_legacy`. Their legacy
+callback/message registrations are detached during router setup. Compatibility
+global names that are still called from non-migrated flows are rebound to the
+extracted implementations. This lets each feature leave the monolith without a
+flag-day rewrite of unrelated editor behavior.
 
-Details is the first feature migrated through this boundary. New Details code
-must live in the `details_*` modules, use `editor_workflow` for document
-mutations, `draft_store` for draft writes, and `app.editor.history` for undo
-snapshots.
+Details was the first feature migrated through this boundary. Top-level Block
+management is the second major extraction. Once `rich_editor` is installed,
+`editor_legacy` must have no active registrations for generic Block add/edit,
+open/delete/move, checklist, table, or heading handlers. The legacy USER-button
+resume flow may still call `receive_added_block` and `receive_replacement` by
+name, but those names are rebound to the extracted functions and are not
+registered as legacy message handlers.
+
+All new Block mutations must use `editor_workflow`, write through `draft_store`,
+and snapshot through `app.editor.history`. Do not introduce new `undo_blocks`
+usage. Native blocks edited into generated representations must discard stale
+native-only payload fields at the replacement boundary.
 
 ## Canonical block
 

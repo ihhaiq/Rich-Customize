@@ -10,11 +10,9 @@ from aiogram.types import CallbackQuery, Message
 from app.editor.document import get_block_by_id
 from app.editor.history import remember
 from app.i18n import t
-from app.keyboards import (
-    build_block_editor_keyboard,
-    build_details_inner_block_keyboard,
-)
+from app.keyboards import build_details_inner_block_keyboard
 from app.routers import editor_core as core
+from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.details_support import (
     DETAILS_TYPE,
     add_details_child,
@@ -262,7 +260,7 @@ async def receive_details_edit(
         bot,
         state,
         core._block_page(details, blocks),
-        build_block_editor_keyboard(details, blocks),
+        build_managed_block_keyboard(details, blocks),
     )
 
 
