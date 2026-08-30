@@ -7,6 +7,8 @@ from aiogram import F, Router
 
 from app.editor.models import make_block
 from app.editor.workflow import editor_workflow
+from app.routers.block_add import receive_added_block
+from app.routers.block_edit import receive_replacement
 from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_management import (
     LEGACY_BLOCK_CALLBACKS,
@@ -125,6 +127,19 @@ class BlockManagementLegacyTests(unittest.TestCase):
         }
         self.assertIn("ordinary_callback", callback_names)
         self.assertIn("ordinary_message", message_names)
+
+    def test_real_editor_legacy_has_no_active_extracted_block_handlers(self):
+        # Importing rich_editor performs the compatibility installation.
+        from app.routers import editor_core
+        from app.routers import rich_editor  # noqa: F401
+
+        legacy = editor_core.compat_module
+        self.assertEqual(
+            legacy_block_handlers(legacy),
+            {"callback_query": (), "message": ()},
+        )
+        self.assertIs(legacy.receive_added_block, receive_added_block)
+        self.assertIs(legacy.receive_replacement, receive_replacement)
 
 
 if __name__ == "__main__":
