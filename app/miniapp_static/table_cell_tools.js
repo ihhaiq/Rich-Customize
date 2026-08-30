@@ -89,7 +89,7 @@
   function mergeRight() {
     const block=currentTableBlock(); if(!block)return;
     const row=rowsFor(block)[state.row];
-    if(!row||state.col<0||state.col>=row.length-1){window.toast?.("ماكو خلية تالية حتى تندمج وياها");return;}
+    if(!row||state.col<0||state.col>=row.length-1){window.toast?.(mt("table.no_next_cell"));return;}
     const left=cellObject(row[state.col]); const right=cellObject(row[state.col+1]);
     left.colspan=Math.max(1,Number(left.colspan||1))+Math.max(1,Number(right.colspan||1));
     const a=String(left.text||"").trim(),b=String(right.text||"").trim();
@@ -101,7 +101,7 @@
     const block=currentTableBlock(); if(!block)return;
     const row=rowsFor(block)[state.row]; if(!row?.[state.col])return;
     const cell=cellObject(row[state.col]); const span=Math.max(1,Number(cell.colspan||1));
-    if(span<=1){window.toast?.("الخلية مو مدمجة");return;}
+    if(span<=1){window.toast?.(mt("table.not_merged"));return;}
     cell.colspan=1; row[state.col]=cell;
     for(let i=1;i<span;i+=1)row.splice(state.col+i,0,{text:"",align:cell.align||"left",valign:cell.valign||"middle"});
     haptic("medium"); sync(block);
@@ -115,7 +115,7 @@
   }
   function deleteRow() {
     const block=currentTableBlock(); if(!block)return;
-    const rows=rowsFor(block); if(rows.length<=1){window.toast?.("الجدول لازم يبقى بيه صف واحد على الأقل");return;}
+    const rows=rowsFor(block); if(rows.length<=1){window.toast?.(mt("table.keep_one_row"));return;}
     rows.splice(state.row,1); haptic("medium"); sync(block);
   }
   function addColumn(offset) {
@@ -127,7 +127,7 @@
   function deleteColumn() {
     const block=currentTableBlock(); if(!block)return;
     const rows=rowsFor(block); const width=Math.max(0,...rows.map(row=>row.length));
-    if(width<=1){window.toast?.("الجدول لازم يبقى بيه عمود واحد على الأقل");return;}
+    if(width<=1){window.toast?.(mt("table.keep_one_column"));return;}
     rows.forEach(row=>{if(state.col<row.length)row.splice(state.col,1);}); haptic("medium"); sync(block);
   }
   function toggleTableFlag(key) {
@@ -199,34 +199,34 @@
   function buildMenu({preserve=false}={}){
     const pin=preserve&&state.menu?state.menu.getBoundingClientRect():null;anchorRect();closeMenu();
     const block=currentTableBlock();if(!block)return;const rows=rowsFor(block),raw=rows[state.row]?.[state.col];if(raw===undefined)return;const cell=cellObject(raw),d=block.data||{};
-    const menu=document.createElement("aside");menu.className="table-cell-menu";menu.setAttribute("role","dialog");menu.setAttribute("aria-label","تخصيص الجدول");menu.addEventListener("pointerdown",event=>event.stopPropagation());
+    const menu=document.createElement("aside");menu.className="table-cell-menu";menu.setAttribute("role","dialog");menu.setAttribute("aria-label",mt("table.customize"));menu.addEventListener("pointerdown",event=>event.stopPropagation());
     const scope=document.createElement("div");scope.className="table-scope-switch";
-    [["cell","الخلية"],["row","الصف"],["column","العمود"]].forEach(([value,label])=>{const btn=document.createElement("button");btn.type="button";btn.textContent=label;btn.classList.toggle("active",state.scope===value);btn.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();if(state.scope===value)return;state.scope=value;refreshScopeVisuals();haptic();buildMenu({preserve:true});});scope.appendChild(btn);});
+    [["cell",mt("table.cell")],["row",mt("table.row")],["column",mt("table.column")]].forEach(([value,label])=>{const btn=document.createElement("button");btn.type="button";btn.textContent=label;btn.classList.toggle("active",state.scope===value);btn.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();if(state.scope===value)return;state.scope=value;refreshScopeVisuals();haptic();buildMenu({preserve:true});});scope.appendChild(btn);});
     menu.appendChild(scope);
-    const title=document.createElement("div");title.className="table-tool-title";title.textContent="المحاذاة";menu.appendChild(title);
+    const title=document.createElement("div");title.className="table-tool-title";title.textContent=mt("table.alignment");menu.appendChild(title);
     const representative=state.scope==="row"?cellObject(rows[state.row]?.[0]):state.scope==="column"?cellObject(rows.find(row=>row?.[state.col]!==undefined)?.[state.col]):cell;
     const align=document.createElement("div");align.className="table-align-grid";align.append(
-      iconButton("محاذاة يسار",icons.left,()=>setHorizontal("left"),representative.align==="left"),iconButton("توسيط أفقي",icons.center,()=>setHorizontal("center"),representative.align==="center"),iconButton("محاذاة يمين",icons.right,()=>setHorizontal("right"),representative.align==="right"),
-      iconButton("محاذاة للأعلى",icons.top,()=>setVertical("top"),representative.valign==="top"),iconButton("توسيط عمودي",icons.middle,()=>setVertical("middle"),!representative.valign||representative.valign==="middle"),iconButton("محاذاة للأسفل",icons.bottom,()=>setVertical("bottom"),representative.valign==="bottom")
+      iconButton(mt("table.align_left"),icons.left,()=>setHorizontal("left"),representative.align==="left"),iconButton(mt("table.align_center"),icons.center,()=>setHorizontal("center"),representative.align==="center"),iconButton(mt("table.align_right"),icons.right,()=>setHorizontal("right"),representative.align==="right"),
+      iconButton(mt("table.align_top"),icons.top,()=>setVertical("top"),representative.valign==="top"),iconButton(mt("table.align_middle"),icons.middle,()=>setVertical("middle"),!representative.valign||representative.valign==="middle"),iconButton(mt("table.align_bottom"),icons.bottom,()=>setVertical("bottom"),representative.valign==="bottom")
     );menu.appendChild(align);
     const sep=()=>{const el=document.createElement("div");el.className="table-tool-sep";menu.appendChild(el);};sep();
-    const scopeLabel=state.scope==="row"?"الصف":state.scope==="column"?"العمود":"الخلية";
-    menu.appendChild(actionRow(icons.shade,`تلوين ${scopeLabel}`,toggleShade));
-    if(state.scope==="cell"){menu.appendChild(actionRow(icons.merge,"دمج مع الخلية التالية",mergeRight));if(Number(cell.colspan||1)>1)menu.appendChild(actionRow(icons.split,"فك دمج الخلية",unmerge));}
+    const scopeLabel=state.scope==="row"?mt("table.row"):state.scope==="column"?mt("table.column"):mt("table.cell");
+    menu.appendChild(actionRow(icons.shade,mt("table.shade_scope",{scope:scopeLabel}),toggleShade));
+    if(state.scope==="cell"){menu.appendChild(actionRow(icons.merge,mt("table.merge_next"),mergeRight));if(Number(cell.colspan||1)>1)menu.appendChild(actionRow(icons.split,mt("table.unmerge"),unmerge));}
     sep();
-    menu.appendChild(actionRow(icons.up,"إضافة صف للأعلى",()=>addRow(0)));menu.appendChild(actionRow(icons.down,"إضافة صف للأسفل",()=>addRow(1)));menu.appendChild(actionRow(icons.trash,"حذف الصف",deleteRow,true));
+    menu.appendChild(actionRow(icons.up,mt("table.add_row_above"),()=>addRow(0)));menu.appendChild(actionRow(icons.down,mt("table.add_row_below"),()=>addRow(1)));menu.appendChild(actionRow(icons.trash,mt("table.delete_row"),deleteRow,true));
     sep();
-    menu.appendChild(actionRow(icons.colLeft,"إضافة عمود قبل",()=>addColumn(0)));menu.appendChild(actionRow(icons.colRight,"إضافة عمود بعد",()=>addColumn(1)));menu.appendChild(actionRow(icons.trash,"حذف العمود",deleteColumn,true));
+    menu.appendChild(actionRow(icons.colLeft,mt("table.add_column_before"),()=>addColumn(0)));menu.appendChild(actionRow(icons.colRight,mt("table.add_column_after"),()=>addColumn(1)));menu.appendChild(actionRow(icons.trash,mt("table.delete_column"),deleteColumn,true));
     sep();
-    menu.appendChild(actionRow(icons.border,d.is_bordered===false?"إظهار حدود الجدول":"إخفاء حدود الجدول",()=>toggleTableFlag("is_bordered")));
-    menu.appendChild(actionRow(icons.stripe,d.is_striped?"إلغاء الصفوف المخططة":"صفوف مخططة",()=>toggleTableFlag("is_striped")));
-    menu.appendChild(actionRow(icons.compact,d.is_compact?"إلغاء الوضع المضغوط":"وضع مضغوط",()=>toggleTableFlag("is_compact")));
+    menu.appendChild(actionRow(icons.border,d.is_bordered===false?mt("table.show_borders"):mt("table.hide_borders"),()=>toggleTableFlag("is_bordered")));
+    menu.appendChild(actionRow(icons.stripe,d.is_striped?mt("table.unstriped"):mt("table.striped"),()=>toggleTableFlag("is_striped")));
+    menu.appendChild(actionRow(icons.compact,d.is_compact?mt("table.uncompact"):mt("table.compact"),()=>toggleTableFlag("is_compact")));
     document.body.appendChild(menu);state.menu=menu;positionMenu(pin?{left:pin.left,top:pin.top}:null);requestAnimationFrame(()=>menu.classList.add("show"));
   }
 
   function selectCell(block,td,ri,ci){
     state.blockId=String(block.id);state.row=ri;state.col=ci;state.scope="cell";closeMenu();clearSelectionVisuals();td.classList.add("table-cell-selected");
-    const handle=document.createElement("button");handle.type="button";handle.className="table-cell-handle";handle.setAttribute("aria-label","خيارات الخلية والصف والعمود");handle.innerHTML="<span></span><span></span><span></span>";
+    const handle=document.createElement("button");handle.type="button";handle.className="table-cell-handle";handle.setAttribute("aria-label",mt("table.cell_options"));handle.innerHTML="<span></span><span></span><span></span>";
     handle.addEventListener("pointerdown",event=>event.stopPropagation());handle.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();state.anchor=handle;state.anchorRect=handle.getBoundingClientRect();haptic();buildMenu();});td.appendChild(handle);
   }
 

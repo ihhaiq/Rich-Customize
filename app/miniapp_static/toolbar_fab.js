@@ -12,7 +12,7 @@
     event.stopPropagation();
 
     if (typeof window.discardCurrentWorkAndClose !== "function") {
-      toast("تعذر تجهيز إلغاء التغييرات");
+      toast(mt("session.discard_prepare_failed"));
       return;
     }
     await window.discardCurrentWorkAndClose();

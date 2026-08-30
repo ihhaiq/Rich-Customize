@@ -173,7 +173,7 @@
   if (typeof markDirty === "function") {
     markDirty = function() {
       dirty = true;
-      updateSaveState(current?.page_id ? "جاري الحفظ…" : "مسودة جديدة");
+      updateSaveState(current?.page_id ? mt("save.saving") : mt("save.new_draft"));
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => queueSave(), SAVE_DELAY);
       scheduleHistory();

@@ -23,7 +23,7 @@ function quoteWithCredit(block, className, quotePlaceholder) {
   credit.className = "live-editor live-credit";
   credit.contentEditable = "true";
   credit.spellcheck = true;
-  credit.dataset.placeholder = "إضافة الكاتب";
+  credit.dataset.placeholder = mt("editor.add_author");
   credit.textContent = block.data?.credit_text || "";
   credit.addEventListener("focus", () => selectBlock(block.id));
   credit.addEventListener("input", () => {
@@ -39,12 +39,12 @@ function quoteWithCredit(block, className, quotePlaceholder) {
 textEditor = function(block) {
   if (block.type === "heading") {
     const level = Math.max(1, Math.min(6, Number(block.data?.size || 2)));
-    return liveEditable(block, `live-heading-${level}`, `العنوان ${level}`);
+    return liveEditable(block, `live-heading-${level}`, mt("heading.level",{level}));
   }
-  if (block.type === "footer") return liveEditable(block, "live-footer", "تذييل");
-  if (block.type === "preformatted") return liveEditable(block, "live-pre", "اكتب الكود…");
-  if (block.type === "blockquote") return quoteWithCredit(block, "live-quote", "اكتب الاقتباس…");
-  if (block.type === "pullquote") return quoteWithCredit(block, "live-quote live-pullquote", "اكتب الاقتباس البارز…");
+  if (block.type === "footer") return liveEditable(block, "live-footer", mt("block.footer"));
+  if (block.type === "preformatted") return liveEditable(block, "live-pre", mt("editor.write_code"));
+  if (block.type === "blockquote") return quoteWithCredit(block, "live-quote", mt("editor.write_quote"));
+  if (block.type === "pullquote") return quoteWithCredit(block, "live-quote live-pullquote", mt("editor.write_pullquote"));
   return liveEditable(block, "live-paragraph", info(block.type).label);
 };
 
@@ -57,12 +57,12 @@ detailsEditor = function(block) {
   const summary = document.createElement("summary");
   const input = document.createElement("input");
   input.className = "details-summary-live";
-  input.value = stripHtml(d.summary_html) || d.summary_text || "تفاصيل";
-  input.placeholder = "عنوان التفاصيل";
+  input.value = stripHtml(d.summary_html) || d.summary_text || mt("details.title");
+  input.placeholder = mt("details.title_placeholder");
   input.addEventListener("click", event => event.stopPropagation());
   input.addEventListener("focus", () => selectBlock(block.id));
   input.addEventListener("input", () => {
-    const value = input.value || "تفاصيل";
+    const value = input.value || mt("details.title");
     d.summary_text = value;
     d.summary_html = escapeHtml(value);
     markDirty();
@@ -72,7 +72,7 @@ detailsEditor = function(block) {
   const body = document.createElement("div");
   body.className = "details-body";
   const count = (d.children || []).length;
-  body.textContent = count ? `${count} Block داخل التفاصيل` : "ماكو محتوى داخل التفاصيل بعد";
+  body.textContent = count ? mt("details.inside_count",{count}) : mt("details.empty");
   details.append(summary, body);
   return details;
 };
@@ -101,6 +101,7 @@ listEditor = function(block) {
     const li = document.createElement("li");
     const editor = document.createElement("div");
     editor.contentEditable = "true";
+    editor.dataset.placeholder = mt("list.item");
     editor.textContent = value;
     editor.addEventListener("focus", () => selectBlock(block.id));
     editor.addEventListener("input", sync);
@@ -187,8 +188,8 @@ renderBlocks = function() {
     const more = document.createElement("button");
     more.type = "button";
     more.className = "mini-btn";
-    more.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>';
-    more.setAttribute("aria-label", `إعدادات ${info(block.type).label}`);
+    MiniAppIcons.mount(more,"more");
+    more.setAttribute("aria-label", mt("block.settings",{name:info(block.type).label}));
     more.addEventListener("click", event => {
       event.stopPropagation();
       selectBlock(block.id);

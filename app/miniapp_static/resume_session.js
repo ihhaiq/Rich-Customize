@@ -95,7 +95,7 @@
       if (success) {
         clear(id);
         try { history.replaceState(null, "", location.pathname); } catch (_) {}
-        try { toast("تم استرجاع جلسة التحرير"); } catch (_) {}
+        try { toast(mt("session.restored")); } catch (_) {}
       }
       return success;
     } catch (_) {

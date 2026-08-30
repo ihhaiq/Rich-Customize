@@ -1,0 +1,46 @@
+.miniapp-svg-icon,
+[data-miniapp-icon] svg,
+.menu-icon svg {
+  display: block;
+  width: 1.25em;
+  height: 1.25em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-miniapp-icon] {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.starter-actions button,
+.sheet-header strong,
+.sheet-header button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.live-quote::after,
+.telegram-details summary::before {
+  content: none !important;
+}
+
+.telegram-list [contenteditable]:empty::before {
+  content: attr(data-placeholder) !important;
+}
+
+.telegram-checklist li::before {
+  content: "" !important;
+  width: 15px;
+  height: 15px;
+  margin-top: 4px;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}

@@ -7,8 +7,8 @@
   // blocks that do not already have a dedicated Telegram-style section.
   const OTHER_BLOCK_TYPES = ["anchor"];
 
-  moreBlocksButton.setAttribute("aria-label", "بلوكات أخرى");
-  moreBlocksButton.setAttribute("title", "بلوكات أخرى");
+  moreBlocksButton.setAttribute("aria-label", mt("top.more_blocks"));
+  moreBlocksButton.setAttribute("title", mt("top.more_blocks"));
 
   document.addEventListener("click", event => {
     const target = event.target.closest?.("#allBlocksBtn");

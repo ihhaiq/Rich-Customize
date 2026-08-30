@@ -5,7 +5,7 @@
 
   const RECENT_KEY = "rich_customize_recent_emoji";
   const CATEGORIES = {
-    recent:{icon:"🕘",label:"الأخيرة",items:[]},
+    recent:{icon:"recent",label:mt("emoji.recent"),items:[]},
     smileys:{icon:"😀",label:"الوجوه",items:["😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🥸","🤩","🥳","😏","😒","😞","😔","😟","😕","🙁","☹️","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🫡","🤭","🫢","🫣","🤫","🤥","😶","🫥","😐","🫤","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕"]},
     people:{icon:"👋",label:"الإشارات",items:["👋","🤚","🖐️","✋","🖖","👌","🤌","🤏","✌️","🤞","🫰","🤟","🤘","🤙","👈","👉","👆","👇","☝️","🫵","👍","👎","✊","👊","🤛","🤜","👏","🙌","🫶","👐","🤲","🤝","🙏","✍️","💅","🤳","💪","🦾","🦿","🦵","🦶","👂","👃","🧠","🫀","🫁","🦷","👀","👁️","👅","👄","🫦"]},
     hearts:{icon:"❤️",label:"القلوب",items:["❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","🩷","🩵","🩶","💔","❤️‍🔥","❤️‍🩹","❣️","💕","💞","💓","💗","💖","💘","💝","💟","♥️","💋","💯","💢","💥","💫","💦","💨","🕳️","💬","👁️‍🗨️","🗨️","🗯️","💭","💤"]},
@@ -15,6 +15,15 @@
     objects:{icon:"💡",label:"الأشياء",items:["⌚","📱","💻","⌨️","🖥️","🖨️","🖱️","🖲️","🕹️","🗜️","💽","💾","💿","📀","📼","📷","📸","📹","🎥","📞","☎️","📟","📠","📺","📻","🎙️","🎚️","🎛️","🧭","⏱️","⏲️","⏰","🕰️","⌛","⏳","📡","🔋","🔌","💡","🔦","🕯️","🧯","🛢️","💸","💵","💴","💶","💷","🪙","💰","💳","💎","⚖️","🧰","🔧","🔨","⚒️","🛠️","⛏️","🪛","🔩","⚙️","🧱","⛓️","🧲","🔫","💣","🧨","🪓","🔪","🗡️","🛡️","🚬","⚰️","🪦"]},
     symbols:{icon:"✨",label:"الرموز",items:["✨","⭐","🌟","💫","⚡","🔥","🌈","☀️","🌤️","⛅","🌥️","☁️","🌧️","⛈️","🌩️","🌨️","❄️","☃️","🌊","✅","☑️","✔️","❌","❎","➕","➖","➗","✖️","♾️","‼️","⁉️","❓","❔","❕","❗","〰️","💲","⚕️","♻️","⚜️","🔱","📛","🔰","⭕","🛑","⛔","🚫","🔞","📵","🔕","🔇","🔔","🎵","🎶","➰","➿","〽️","✳️","✴️","❇️","©️","®️","™️","#️⃣","*️⃣","0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]}
   };
+  const CATEGORY_UI = {
+    recent:["recent","emoji.recent"],smileys:["smileys","emoji.smileys"],people:["people","emoji.people"],
+    hearts:["symbols","emoji.hearts"],animals:["nature","emoji.nature"],food:["food","emoji.food"],
+    activity:["activity","emoji.activity"],objects:["objects","emoji.objects"],symbols:["symbols","emoji.symbols"],
+  };
+  Object.entries(CATEGORY_UI).forEach(([name,[icon,key]]) => {
+    CATEGORIES[name].icon = icon;
+    CATEGORIES[name].label = mt(key);
+  });
 
   let panel = null;
   let activeCategory = "smileys";
@@ -167,7 +176,7 @@
     if (!items.length) {
       const empty = document.createElement("div");
       empty.className = "emoji-picker-empty";
-      empty.textContent = "راح تظهر هنا الإيموجيات المستخدمة مؤخرًا";
+      empty.textContent = mt("emoji.recent_empty");
       grid.appendChild(empty);
       return;
     }
@@ -195,7 +204,7 @@
     if (CATEGORIES.recent.items.length) activeCategory = "recent";
     panel = document.createElement("aside");
     panel.className = "popup-menu emoji-picker-pop";
-    panel.setAttribute("aria-label", "الإيموجي");
+    panel.setAttribute("aria-label", mt("top.emoji"));
 
     const tabs = document.createElement("div");
     tabs.className = "emoji-picker-tabs";
@@ -204,7 +213,7 @@
       button.type = "button";
       button.className = "emoji-picker-tab";
       button.dataset.category = name;
-      button.textContent = category.icon;
+      MiniAppIcons.mount(button, category.icon);
       button.title = category.label;
       button.setAttribute("aria-label", category.label);
       button.addEventListener("pointerdown", event => event.preventDefault());

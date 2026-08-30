@@ -84,7 +84,7 @@
       const nested = document.createElement("div");
       nested.className = "details-nested-details";
       const title = document.createElement("strong");
-      title.textContent = stripHtml(d.summary_html || "") || d.summary_text || "Details";
+      title.textContent = stripHtml(d.summary_html || "") || d.summary_text || mt("details.title");
       nested.appendChild(title);
       (d.children || []).forEach(item => nested.appendChild(nestedPreview(item, depth + 1)));
       wrap.appendChild(nested);
@@ -94,9 +94,8 @@
     if (["photo", "video", "animation", "audio", "voice", "document"].includes(type)) {
       const media = document.createElement("div");
       media.className = "details-nested-media";
-      const icon = {photo:"🖼", video:"▶", animation:"GIF", audio:"♫", voice:"◉", document:"▤"}[type] || "□";
       const name = d.file?.file_name || d._local_preview_name || info(type).label;
-      media.innerHTML = `<span>${icon}</span><span>${escapeHtml(name)}</span>`;
+      const icon=document.createElement("span");MiniAppIcons.mount(icon,type);const label=document.createElement("span");label.textContent=name;media.append(icon,label);
       wrap.appendChild(media);
       return wrap;
     }
@@ -124,18 +123,18 @@
     const toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "details-toggle-btn";
-    toggle.setAttribute("aria-label", d.expanded ? "إغلاق التفاصيل" : "توسعة التفاصيل");
+    toggle.setAttribute("aria-label", d.expanded ? mt("details.collapse") : mt("details.expand"));
     toggle.setAttribute("aria-expanded", String(d.expanded));
     toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5"/></svg>';
 
     const input = document.createElement("input");
     input.className = "details-summary-live details-title-input";
-    input.value = stripHtml(d.summary_html || "") || d.summary_text || "Header";
-    input.placeholder = "Header";
+    input.value = stripHtml(d.summary_html || "") || d.summary_text || mt("details.title");
+    input.placeholder = mt("details.title_placeholder");
     input.addEventListener("focus", () => selectBlock(block.id));
     input.addEventListener("click", event => event.stopPropagation());
     input.addEventListener("input", () => {
-      const value = input.value || "Header";
+      const value = input.value || mt("details.title");
       d.summary_text = value;
       d.summary_html = escapeHtml(value);
       markDirty();
@@ -145,7 +144,7 @@
 
     const state = document.createElement("span");
     state.className = "details-expand-state";
-    state.textContent = d.expanded ? "Expanded" : "Collapsed";
+    state.textContent = d.expanded ? mt("details.expanded") : mt("details.collapsed");
 
     const body = document.createElement("div");
     body.className = "details-body details-live-body";
@@ -168,8 +167,8 @@
       shell.classList.toggle("is-expanded", d.expanded);
       shell.classList.toggle("is-collapsed", !d.expanded);
       toggle.setAttribute("aria-expanded", String(d.expanded));
-      toggle.setAttribute("aria-label", d.expanded ? "إغلاق التفاصيل" : "توسعة التفاصيل");
-      state.textContent = d.expanded ? "Expanded" : "Collapsed";
+      toggle.setAttribute("aria-label", d.expanded ? mt("details.collapse") : mt("details.expand"));
+      state.textContent = d.expanded ? mt("details.expanded") : mt("details.collapsed");
       body.hidden = !d.expanded;
       markDirty();
     }
@@ -199,17 +198,11 @@
     const d = block.data || (block.data = {});
     d.kind = kind;
     if (kind === "numbered") {
-      d.items = [{text:"عنصر", value:1, type:"1"}];
-      d.text = "عنصر";
-      d.html = "<ol><li>عنصر</li></ol>";
+      const item=mt("list.item");d.items = [{text:item, value:1, type:"1"}];d.text=item;d.html=`<ol><li>${escapeHtml(item)}</li></ol>`;
     } else if (kind === "checklist") {
-      d.items = [{text:"مهمة", has_checkbox:true, is_checked:false}];
-      d.text = "مهمة";
-      d.html = "<ul><li>مهمة</li></ul>";
+      const task=mt("list.task");d.items = [{text:task, has_checkbox:true, is_checked:false}];d.text=task;d.html=`<ul><li>${escapeHtml(task)}</li></ul>`;
     } else {
-      d.items = [{text:"عنصر"}];
-      d.text = "عنصر";
-      d.html = "<ul><li>عنصر</li></ul>";
+      const item=mt("list.item");d.items = [{text:item}];d.text=item;d.html=`<ul><li>${escapeHtml(item)}</li></ul>`;
     }
 
     const index = Number.isInteger(insertIndex)
@@ -235,8 +228,8 @@
     if (!current) return;
     const block = defaultBlock("details");
     block.data.expanded = true;
-    block.data.summary_text = block.data.summary_text || "Header";
-    block.data.summary_html = block.data.summary_html || "Header";
+    block.data.summary_text = block.data.summary_text || mt("details.title");
+    block.data.summary_html = block.data.summary_html || escapeHtml(mt("details.title"));
 
     const index = Number.isInteger(insertIndex)
       ? Math.max(0, Math.min(insertIndex, current.blocks.length))
@@ -277,10 +270,10 @@
     slashMenu.classList.add("list-tool-menu");
 
     const options = [
-      ["1.", "قائمة مرقمة", () => insertListPreset("numbered")],
-      ["•", "قائمة منقطة", () => insertListPreset("bullet")],
-      ["☑", "قائمة تحقق", () => insertListPreset("checklist")],
-      ["⌄", "تفاصيل", insertDetailsBlock],
+      ["numbered", mt("list.numbered"), () => insertListPreset("numbered")],
+      ["list", mt("list.bulleted"), () => insertListPreset("bullet")],
+      ["checklist", mt("list.tasks"), () => insertListPreset("checklist")],
+      ["details", mt("block.details"), insertDetailsBlock],
     ];
     options.forEach(([icon, label, handler], index) => {
       slashItems.appendChild(menuButton(icon, label, "", handler, index === 0 ? "active" : ""));

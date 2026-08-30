@@ -139,7 +139,7 @@
   function makeNestedCommandMenu(detailsBlock, anchor, replaceChildId = null, query = "") {
     const menu = document.createElement("aside");
     menu.className = "popup-menu details-command-menu";
-    menu.setAttribute("aria-label", "إضافة بلوك داخل التفاصيل");
+    menu.setAttribute("aria-label", mt("details.add_inner"));
     const list = document.createElement("div");
     list.className = "menu-list";
     const items = filteredNestedBlocks(query);
@@ -147,7 +147,7 @@
     if (!items.length) {
       const empty = document.createElement("div");
       empty.className = "empty";
-      empty.textContent = "ماكو Block مطابق";
+      empty.textContent = mt("editor.no_block_match");
       list.appendChild(empty);
     }
 
@@ -189,7 +189,7 @@
       if (child.type === "pullquote") editor.classList.add("live-pullquote");
     } else editor.classList.add("live-paragraph");
 
-    editor.dataset.placeholder = child.type === "paragraph" ? "اكتب داخل التفاصيل، أو / لإضافة بلوك" : info(child.type).label;
+    editor.dataset.placeholder = child.type === "paragraph" ? mt("details.write_inside") : info(child.type).label;
     editor.textContent = blockText(child);
 
     let commandMenu = null;
@@ -331,10 +331,10 @@
     section.className = "details-nested-editable";
     const input = document.createElement("input");
     input.className = "details-nested-title";
-    input.value = stripHtml(d.summary_html || "") || d.summary_text || "تفاصيل";
+    input.value = stripHtml(d.summary_html || "") || d.summary_text || mt("details.title");
     input.addEventListener("focus", () => selectBlock(parentDetails.id));
     input.addEventListener("input", () => {
-      d.summary_text = input.value || "تفاصيل";
+      d.summary_text = input.value || mt("details.title");
       d.summary_html = escapeHtml(d.summary_text);
       markDirty();
     });
@@ -379,21 +379,21 @@
     const index = children.findIndex(item => String(item?.id) === String(child.id));
     const up = document.createElement("button");
     up.type = "button";
-    up.textContent = "↑";
+    MiniAppIcons.mount(up,"up");
     up.disabled = index <= 0;
-    up.setAttribute("aria-label", "تحريك للأعلى");
+    up.setAttribute("aria-label", mt("action.move_up"));
     up.addEventListener("click", event => {event.stopPropagation(); moveNestedBlock(detailsBlock, child.id, -1);});
     const down = document.createElement("button");
     down.type = "button";
-    down.textContent = "↓";
+    MiniAppIcons.mount(down,"down");
     down.disabled = index >= children.length - 1;
-    down.setAttribute("aria-label", "تحريك للأسفل");
+    down.setAttribute("aria-label", mt("action.move_down"));
     down.addEventListener("click", event => {event.stopPropagation(); moveNestedBlock(detailsBlock, child.id, 1);});
     const remove = document.createElement("button");
     remove.type = "button";
-    remove.textContent = "⌫";
+    MiniAppIcons.mount(remove,"delete");
     remove.className = "danger";
-    remove.setAttribute("aria-label", "حذف البلوك من التفاصيل");
+    remove.setAttribute("aria-label", mt("details.delete_inner"));
     remove.addEventListener("click", event => {event.stopPropagation(); removeNestedBlock(detailsBlock, child.id);});
     actions.append(up, down, remove);
     wrapper.appendChild(actions);
@@ -429,12 +429,12 @@
     toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5"/></svg>';
     const input = document.createElement("input");
     input.className = "details-summary-live details-title-input";
-    input.value = stripHtml(d.summary_html || "") || d.summary_text || "Header";
-    input.placeholder = "Header";
+    input.value = stripHtml(d.summary_html || "") || d.summary_text || mt("details.title");
+    input.placeholder = mt("details.title_placeholder");
     input.addEventListener("focus", () => selectBlock(block.id));
     input.addEventListener("click", event => event.stopPropagation());
     input.addEventListener("input", () => {
-      const value = input.value || "Header";
+      const value = input.value || mt("details.title");
       d.summary_text = value;
       d.summary_html = escapeHtml(value);
       markDirty();
@@ -454,7 +454,9 @@
     const add = document.createElement("button");
     add.type = "button";
     add.className = "details-add-block-btn";
-    add.innerHTML = '<span>＋</span><span>إضافة Block داخل التفاصيل</span>';
+    add.innerHTML = '<span class="details-add-icon"></span><span class="details-add-label"></span>';
+    MiniAppIcons.mount(add.querySelector(".details-add-icon"),"add");
+    add.querySelector(".details-add-label").textContent=mt("details.add_inner");
     add.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
@@ -470,8 +472,8 @@
       shell.classList.toggle("is-expanded", d.is_open);
       shell.classList.toggle("is-collapsed", !d.is_open);
       toggle.setAttribute("aria-expanded", String(d.is_open));
-      toggle.setAttribute("aria-label", d.is_open ? "إغلاق التفاصيل" : "توسعة التفاصيل");
-      state.textContent = d.is_open ? "Expanded" : "Collapsed";
+      toggle.setAttribute("aria-label", d.is_open ? mt("details.collapse") : mt("details.expand"));
+      state.textContent = d.is_open ? mt("details.expanded") : mt("details.collapsed");
       body.hidden = !d.is_open;
       if (persist) markDirty();
     }

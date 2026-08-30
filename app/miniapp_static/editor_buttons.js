@@ -2,20 +2,20 @@
 (() => {
   const tr = (key, fallback, vars) => window.MiniAppI18n?.t?.(key, vars) || fallback;
   const TYPE_INFO = {
-    user:{label:tr("button.mention", "Mention"),icon:"👤"},
-    url:{label:tr("button.url", "رابط"),icon:"🔗"},
-    callback_data:{label:"Callback",icon:"↪"},
-    page_callback:{label:tr("button.page", "صفحة"),icon:"📚"},
-    copy:{label:tr("button.copy", "نسخ"),icon:"📋"},
-    popup:{label:tr("button.popup", "Popup"),icon:"💬"},
-    switch_inline_query:{label:"بحث Inline",icon:"⌕"},
-    switch_inline_query_current_chat:{label:"بحث هنا",icon:"⌖"},
-    disabled:{label:"معطّل",icon:"⊘"},
+    user:{label:tr("button.mention", "Mention"),icon:"user"},
+    url:{label:tr("button.url", "Link"),icon:"link"},
+    callback_data:{label:tr("button.callback", "Callback"),icon:"callback"},
+    page_callback:{label:tr("button.page", "Page"),icon:"page"},
+    copy:{label:tr("button.copy", "Copy"),icon:"copy"},
+    popup:{label:tr("button.popup", "Popup"),icon:"popup"},
+    switch_inline_query:{label:tr("button.inline_search", "Inline search"),icon:"search"},
+    switch_inline_query_current_chat:{label:tr("button.search_here", "Search here"),icon:"search_here"},
+    disabled:{label:tr("button.disabled", "Disabled"),icon:"disabled"},
   };
   const PAGE_TYPES = new Set(["callback_data", "page_callback"]);
 
   function cleanTitle(value) {
-    return String(value || "زر").replace(/[{}\n]/g, " ").trim().slice(0, 64) || "زر";
+    return String(value || tr("button.generic", "Button")).replace(/[{}\n]/g, " ").trim().slice(0, 64) || tr("button.generic", "Button");
   }
 
   function markerFor(type, title, options = {}) {
@@ -63,7 +63,7 @@
   function installCreateBridge() {
     if (!window.InlineTextTools?.createButton || window.InlineTextTools.createButton.__richConfigured) return;
     const baseCreate = window.InlineTextTools.createButton.bind(window.InlineTextTools);
-    const create = function(type, title = "زر", fromSelection = false, options = {}) {
+    const create = function(type, title = tr("button.generic", "Button"), fromSelection = false, options = {}) {
       const token = baseCreate(type, title, fromSelection);
       if (token?.nodeType === Node.ELEMENT_NODE) {
         configureToken(token, type, title, options);

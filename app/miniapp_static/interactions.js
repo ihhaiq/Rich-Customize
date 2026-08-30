@@ -36,5 +36,5 @@
 // Load consolidated table-cell controls after live_preview.js has installed tableEditor.
 (() => {
   if(!document.querySelector('link[data-table-cell-tools]')){const css=document.createElement("link");css.rel="stylesheet";css.href="/miniapp/static/table_cell_tools.css?v=0.3.32";css.dataset.tableCellTools="1";document.head.appendChild(css);}
-  if(!document.querySelector('script[data-table-cell-tools]')){const script=document.createElement("script");script.src="/miniapp/static/table_cell_tools.js?v=0.3.32";script.dataset.tableCellTools="1";script.onload=()=>{try{if(typeof current!=="undefined"&&current?.blocks?.some?.(block=>block.type==="table"))renderBlocks?.();}catch(_){}};document.body.appendChild(script);}
+  if(!document.querySelector('script[data-table-cell-tools]')){const script=document.createElement("script");script.src="/miniapp/static/table_cell_tools.js?v=0.3.36";script.dataset.tableCellTools="1";script.onload=()=>{try{if(typeof current!=="undefined"&&current?.blocks?.some?.(block=>block.type==="table"))renderBlocks?.();}catch(_){}};document.body.appendChild(script);}
 })();
