@@ -8,9 +8,16 @@ from aiogram.exceptions import TelegramRetryAfter
 from aiogram.types import BotCommand
 
 from app import i18n_core as _core
-from app.locales import PROFILES as LOCALE_PROFILES, TRANSLATIONS
-from app.locales.catalog import CATALOG_AR, CATALOG_EN, CATALOG_TRANSLATIONS
-from app.locales.common import AR_PHRASES, KEY_TRANSLATIONS, PHRASES
+from app.lang import (
+    AR_PHRASES,
+    CATALOG_AR,
+    CATALOG_EN,
+    CATALOG_TRANSLATIONS,
+    KEY_TRANSLATIONS,
+    PHRASES,
+    PROFILES as LOCALE_PROFILES,
+    TRANSLATIONS,
+)
 
 logger = logging.getLogger(__name__)
 
