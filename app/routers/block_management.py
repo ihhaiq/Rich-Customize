@@ -9,6 +9,7 @@ from app.routers.block_add import receive_added_block, router as add_router
 from app.routers.block_edit import receive_replacement, router as edit_router
 from app.routers.block_support import finish_add
 from app.routers.block_table import router as table_router
+from app.routers.block_view import block_page
 
 
 router = Router(name="block_management")
@@ -96,6 +97,7 @@ def install_into(legacy_module: Any) -> dict[str, tuple[str, ...]]:
     handled only by the extracted routers.
     """
     legacy_module._finish_add = finish_add
+    legacy_module._block_page = block_page
     legacy_module.receive_added_block = receive_added_block
     legacy_module.receive_replacement = receive_replacement
     return detach_legacy_block_handlers(legacy_module)
