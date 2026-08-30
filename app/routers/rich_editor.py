@@ -5,7 +5,10 @@ from aiogram import Router
 from app.routers import editor_core
 from app.routers.block_preview import router as block_preview_router
 from app.routers.button_guide import install_into as install_button_guide
-from app.routers.details import install_into as install_details
+from app.routers.details import (
+    install_into as install_details,
+    router as details_router,
+)
 from app.routers.developer import router as developer_router
 from app.routers.math_ready import router as math_ready_router
 from app.routers.media_events import router as media_events_router
@@ -24,6 +27,9 @@ router.include_router(developer_router)
 router.include_router(miniapp_router)
 router.include_router(block_preview_router)
 router.include_router(media_events_router)
+# Details owns its callbacks and state-specific message flows before the
+# remaining compatibility router sees the update.
+router.include_router(details_router)
 router.include_router(math_ready_router)
 router.include_router(editor_core_router)
 
