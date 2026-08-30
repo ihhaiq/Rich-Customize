@@ -1,5 +1,6 @@
 // Beta 0.3.14 — Telegram-style Aa menu with Heading, Anchor and inline Rich Button submenus.
 (() => {
+  const tr = (key, fallback) => window.MiniAppI18n?.t?.(key) || fallback;
   const textButton = document.querySelector('.composer-toolbar [data-tool="text"]');
   if (!textButton) return;
 
@@ -9,15 +10,15 @@
   let submenuRow = null;
 
   const ROOT_ITEMS = [
-    {kind:"heading", icon:"H", label:"العنوان", arrow:true},
-    {type:"paragraph", icon:"T", label:"Text", shortcut:"Ctrl+Shift+B"},
-    {type:"blockquote", icon:"❝", label:"اقتباس", shortcut:"Ctrl+Shift+."},
-    {type:"pullquote", icon:"❞", label:"اقتباس مميز"},
-    {type:"preformatted", icon:"</>", label:"نص برمجي", shortcut:"Ctrl+Shift+M"},
-    {type:"footer", icon:"≡", label:"التذييل"},
-    {type:"divider", icon:"—", label:"Divider"},
-    {type:"anchor", icon:"#", label:"مرساة"},
-    {kind:"rich_button", icon:"▣", label:"زر غني", arrow:true},
+    {kind:"heading", icon:"H", label:tr("block.heading", "العنوان"), arrow:true},
+    {type:"paragraph", icon:"T", label:tr("block.paragraph", "Text"), shortcut:"Ctrl+Shift+B"},
+    {type:"blockquote", icon:"❝", label:tr("block.blockquote", "اقتباس"), shortcut:"Ctrl+Shift+."},
+    {type:"pullquote", icon:"❞", label:tr("block.pullquote", "اقتباس مميز")},
+    {type:"preformatted", icon:"</>", label:tr("block.preformatted", "نص برمجي"), shortcut:"Ctrl+Shift+M"},
+    {type:"footer", icon:"≡", label:tr("block.footer", "التذييل")},
+    {type:"divider", icon:"—", label:tr("block.divider", "Divider")},
+    {type:"anchor", icon:"#", label:tr("block.anchor", "مرساة")},
+    {kind:"rich_button", icon:"▣", label:tr("inline.create_button", "زر غني"), arrow:true},
   ];
 
   function viewportBounds() {
@@ -108,7 +109,7 @@
   function insertRichButton(type) {
     closeTextMenus();
     if (!window.RichButtonEditor?.create) {
-      toast("محرر الأزرار الغنية غير جاهز");
+      toast(tr("button.editor_not_ready", "محرر الأزرار الغنية غير جاهز"));
       return;
     }
     window.RichButtonEditor.create(type);
@@ -167,9 +168,9 @@
     row.classList.add("active", "submenu-open");
     headingMenu = document.createElement("aside");
     headingMenu.className = "popup-menu text-heading-submenu";
-    headingMenu.setAttribute("aria-label", "مستوى العنوان");
+    headingMenu.setAttribute("aria-label", tr("heading.level_picker", "مستوى العنوان"));
     for (let level = 1; level <= 6; level++) {
-      headingMenu.appendChild(makeRow({icon:`H${level}`, label:`العنوان ${level}`, level}, () => insertHeading(level)));
+      headingMenu.appendChild(makeRow({icon:`H${level}`, label:window.MiniAppI18n?.t?.("heading.level", {level}) || `العنوان ${level}`, level}, () => insertHeading(level)));
     }
     document.body.appendChild(headingMenu);
     requestAnimationFrame(() => positionSubmenu(headingMenu, row));
@@ -182,7 +183,7 @@
     row.classList.add("active", "submenu-open");
     buttonMenu = document.createElement("aside");
     buttonMenu.className = "popup-menu text-button-submenu";
-    buttonMenu.setAttribute("aria-label", "نوع الزر الغني");
+    buttonMenu.setAttribute("aria-label", tr("button.type", "نوع الزر الغني"));
     const types = window.RichButtonEditor?.types || {};
     [
       "user", "url", "callback_data", "page_callback", "copy", "popup",
@@ -202,13 +203,15 @@
     textButton.classList.add("active");
     rootMenu = document.createElement("aside");
     rootMenu.className = "popup-menu text-toolbar-menu";
-    rootMenu.setAttribute("aria-label", "أدوات النص");
+    rootMenu.setAttribute("aria-label", tr("editor.text_tools", "أدوات النص"));
     ROOT_ITEMS.forEach(item => {
-      rootMenu.appendChild(makeRow(item, button => {
+      const row = makeRow(item, button => {
         if (item.kind === "heading") openHeadingMenu(button);
         else if (item.kind === "rich_button") openButtonMenu(button);
         else insertSimpleBlock(item.type);
-      }));
+      });
+      if (item.kind) row.dataset.menuKind = item.kind;
+      rootMenu.appendChild(row);
     });
     document.body.appendChild(rootMenu);
     requestAnimationFrame(positionRootMenu);

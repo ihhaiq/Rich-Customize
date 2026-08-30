@@ -1,18 +1,19 @@
 // Beta 0.3.13 — inline Rich Buttons + selection formatting inside normal text blocks.
 (() => {
+  const tr = (key, fallback, vars) => window.MiniAppI18n?.t?.(key, vars) || fallback;
   const INLINE_TEXT_TYPES = new Set([
     "paragraph", "text", "caption", "heading", "footer", "blockquote", "pullquote",
   ]);
   const BUTTON_TYPES = {
-    user:{label:"مستخدم",icon:"👤",action:"تحديد مستخدم"},
-    url:{label:"رابط",icon:"🔗",action:"تعديل الرابط"},
-    callback_data:{label:"Callback data",icon:"↪",action:"ربط بصفحة محفوظة"},
-    page_callback:{label:"CBD / صفحة",icon:"📚",action:"ربط بصفحة محفوظة"},
-    copy:{label:"نسخ",icon:"📋",action:"تعديل نص النسخ"},
-    popup:{label:"Popup",icon:"💬",action:"تعديل نص التنبيه"},
-    switch_inline_query:{label:"بحث Inline",icon:"⌕",action:"تعديل نص البحث"},
-    switch_inline_query_current_chat:{label:"بحث هنا",icon:"⌖",action:"تعديل نص البحث هنا"},
-    disabled:{label:"معطّل",icon:"⊘",action:null},
+    user:{label:tr("button.mention", "مستخدم"),icon:"👤",action:tr("button.select_user", "تحديد مستخدم")},
+    url:{label:tr("button.url", "رابط"),icon:"🔗",action:tr("button.edit_url", "تعديل الرابط")},
+    callback_data:{label:"Callback data",icon:"↪",action:tr("button.link_page", "ربط بصفحة محفوظة")},
+    page_callback:{label:`CBD / ${tr("button.page", "صفحة")}`,icon:"📚",action:tr("button.link_page", "ربط بصفحة محفوظة")},
+    copy:{label:tr("button.copy", "نسخ"),icon:"📋",action:tr("button.edit_copy", "تعديل نص النسخ")},
+    popup:{label:tr("button.popup", "Popup"),icon:"💬",action:tr("button.edit_popup", "تعديل نص التنبيه")},
+    switch_inline_query:{label:tr("button.inline_search", "بحث Inline"),icon:"⌕",action:tr("button.edit_search", "تعديل نص البحث")},
+    switch_inline_query_current_chat:{label:tr("button.search_here", "بحث هنا"),icon:"⌖",action:tr("button.edit_search_here", "تعديل نص البحث هنا")},
+    disabled:{label:tr("button.disabled", "معطّل"),icon:"⊘",action:null},
   };
   const BUTTON_ORDER = [
     "user", "url", "callback_data", "page_callback", "copy", "popup",
@@ -254,7 +255,18 @@
     editor.addEventListener("keydown", event => {
       if (event.key === "Enter") {
         event.preventDefault();
-        document.execCommand?.("insertLineBreak", false, null);
+        const sel = window.getSelection();
+        if (!sel?.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const br = document.createElement("br");
+        range.insertNode(br);
+        range.setStartAfter(br);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        syncEditor(editor, block);
+        markDirty();
       }
     });
     return editor;
@@ -340,31 +352,127 @@
     pushHistory();
   }
 
-  function applyCommand(command) {
-    if (!restoreSelection()) return;
-    document.execCommand?.(command, false, null);
-    syncActiveAndDirty();
-    requestAnimationFrame(refreshSelectionToolbar);
+  const FORMAT_SPECS = {
+    bold:{tag:"strong",selectors:"b,strong"},
+    italic:{tag:"em",selectors:"i,em"},
+    strike:{tag:"s",selectors:"s,strike,del"},
+    underline:{tag:"u",selectors:"u,ins"},
+    code:{tag:"code",selectors:"code"},
+    highlight:{tag:"mark",selectors:"mark"},
+    subscript:{tag:"sub",selectors:"sub"},
+    superscript:{tag:"sup",selectors:"sup"},
+    spoiler:{tag:"tg-spoiler",selectors:"tg-spoiler",className:"inline-spoiler"},
+  };
+
+  function closestMatching(node, selectors) {
+    const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+    const match = element?.closest?.(selectors);
+    return match && activeEditor?.contains(match) ? match : null;
   }
 
-  function applySpoiler() {
-    if (!restoreSelection()) return;
+  function selectedTextNodes(range) {
+    if (!activeEditor) return [];
+    const walker = document.createTreeWalker(activeEditor, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (!node.nodeValue || !node.nodeValue.trim()) continue;
+      try { if (range.intersectsNode(node)) nodes.push(node); } catch (_) {}
+    }
+    return nodes;
+  }
+
+  function rangeHasFormat(range, selectors) {
+    const nodes = selectedTextNodes(range);
+    return nodes.length > 0 && nodes.every(node => Boolean(closestMatching(node, selectors)));
+  }
+
+  function sharedFormatElement(range, selectors) {
+    const elements = selectedTextNodes(range).map(node => closestMatching(node, selectors));
+    if (!elements.length || !elements[0]) return null;
+    return elements.every(element => element === elements[0]) ? elements[0] : null;
+  }
+
+  function unwrapDescendants(root, selectors) {
+    Array.from(root.querySelectorAll?.(selectors) || []).reverse().forEach(element => {
+      element.replaceWith(...Array.from(element.childNodes));
+    });
+  }
+
+  function splitParentAround(node) {
+    const parent = node?.parentElement;
+    if (!parent || parent === activeEditor) return false;
+    const before = parent.cloneNode(false);
+    const after = parent.cloneNode(false);
+    while (parent.firstChild && parent.firstChild !== node) before.appendChild(parent.firstChild);
+    while (node.nextSibling) after.appendChild(node.nextSibling);
+    if (before.childNodes.length) parent.before(before);
+    parent.before(node);
+    if (after.childNodes.length) node.after(after);
+    parent.remove();
+    return true;
+  }
+
+  function removeAncestorFormat(marker, selectors) {
+    let ancestor = closestMatching(marker.parentElement, selectors);
+    while (ancestor) {
+      while (marker.parentElement && marker.parentElement !== ancestor) {
+        if (!splitParentAround(marker)) break;
+      }
+      if (marker.parentElement === ancestor) splitParentAround(marker);
+      ancestor = closestMatching(marker.parentElement, selectors);
+    }
+  }
+
+  function replaceSelectedInline(spec, mode = "toggle", attributes = {}) {
+    if (!restoreSelection()) return false;
     const sel = window.getSelection();
-    if (!sel.rangeCount || sel.isCollapsed) return;
+    if (!sel?.rangeCount || sel.isCollapsed) return false;
     const range = sel.getRangeAt(0);
-    const wrapper = document.createElement("tg-spoiler");
-    wrapper.className = "inline-spoiler";
+    const remove = mode === "remove" || (mode === "toggle" && rangeHasFormat(range, spec.selectors));
+    const marker = document.createElement("span");
+    marker.dataset.inlineSelectionMarker = "1";
     try {
-      wrapper.appendChild(range.extractContents());
-      range.insertNode(wrapper);
+      marker.appendChild(range.extractContents());
+      range.insertNode(marker);
+      unwrapDescendants(marker, spec.selectors);
+      removeAncestorFormat(marker, spec.selectors);
+      if (!remove) {
+        const wrapper = document.createElement(spec.tag);
+        if (spec.className) wrapper.className = spec.className;
+        Object.entries(attributes).forEach(([name,value]) => wrapper.setAttribute(name, String(value)));
+        wrapper.append(...Array.from(marker.childNodes));
+        marker.appendChild(wrapper);
+      }
+      const children = Array.from(marker.childNodes);
+      if (!children.length) { marker.remove(); return false; }
+      marker.replaceWith(...children);
       const next = document.createRange();
-      next.selectNodeContents(wrapper);
+      if (!remove && children.length === 1 && children[0].nodeType === Node.ELEMENT_NODE) {
+        next.selectNodeContents(children[0]);
+      } else {
+        next.setStartBefore(children[0]);
+        next.setEndAfter(children[children.length - 1]);
+      }
       sel.removeAllRanges();
       sel.addRange(next);
       savedRange = next.cloneRange();
       syncActiveAndDirty();
       requestAnimationFrame(refreshSelectionToolbar);
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      marker.replaceWith(...Array.from(marker.childNodes));
+      return false;
+    }
+  }
+
+  function applyFormat(name) {
+    const spec = FORMAT_SPECS[name];
+    if (spec) replaceSelectedInline(spec);
+  }
+
+  function applySpoiler() {
+    applyFormat("spoiler");
   }
 
   function normalizeLink(value) {
@@ -378,7 +486,10 @@
   function openLinkEditorFromSelection() {
     if (!savedRange || !activeEditor) return;
     const selectionRect = savedRange.getBoundingClientRect();
-    const {menu} = simpleMenu("إضافة رابط داخل النص");
+    const existingLink = sharedFormatElement(savedRange, "a[href]");
+    const {menu} = simpleMenu(existingLink
+      ? tr("inline.edit_link", "تعديل الرابط")
+      : tr("inline.add_link", "إضافة رابط داخل النص"));
     menu.classList.add("inline-value-editor");
     const input = document.createElement("input");
     input.className = "rich-button-editor-input";
@@ -386,27 +497,40 @@
     input.dir = "ltr";
     input.inputMode = "url";
     input.placeholder = "https://example.com";
+    input.value = existingLink?.getAttribute("href") || "";
     const actions = document.createElement("div");
     actions.className = "rich-button-editor-actions";
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = "إلغاء";
+    cancel.textContent = tr("common.cancel", "إلغاء");
+    let remove = null;
+    if (existingLink) {
+      remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "danger";
+      remove.textContent = tr("inline.remove_link", "إزالة الرابط");
+      remove.onclick = () => {
+        closeFloatingMenu();
+        replaceSelectedInline({tag:"a",selectors:"a[href]"}, "remove");
+      };
+    }
     const save = document.createElement("button");
     save.type = "button";
     save.className = "primary-soft";
-    save.textContent = "إضافة الرابط";
+    save.textContent = existingLink
+      ? tr("common.save", "حفظ")
+      : tr("inline.add_link", "إضافة الرابط");
     cancel.onclick = () => closeFloatingMenu();
     save.onclick = () => {
       const href = normalizeLink(input.value);
       if (!href) {
-        toast("أدخل رابطًا صحيحًا يبدأ بـ https:// أو tg://");
+        toast(tr("inline.invalid_link", "أدخل رابطًا صحيحًا يبدأ بـ https:// أو tg://"));
         input.focus();
         return;
       }
       closeFloatingMenu();
       if (!restoreSelection()) return;
-      document.execCommand?.("createLink", false, href);
-      syncActiveAndDirty();
+      replaceSelectedInline({tag:"a",selectors:"a[href]"}, "apply", {href});
       hideSelectionToolbar();
     };
     input.addEventListener("keydown", event => {
@@ -415,7 +539,9 @@
         save.click();
       }
     });
-    actions.append(cancel,save);
+    actions.append(cancel);
+    if (remove) actions.append(remove);
+    actions.append(save);
     menu.append(input,actions);
     placeNearRect(menu, selectionRect, false);
     requestAnimationFrame(() => input.focus({preventScroll:true}));
@@ -427,17 +553,23 @@
     bar.className = "selection-format-bubble";
     bar.setAttribute("role", "toolbar");
     const specs = [
-      ["B","عريض",() => applyCommand("bold")],
-      ["I","مائل",() => applyCommand("italic")],
-      ["S","مشطوب",() => applyCommand("strikeThrough")],
-      ["◌","تشويش",applySpoiler],
-      ["↗","رابط",openLinkEditorFromSelection],
-      ["▣","إنشاء زر",openButtonTypeMenuFromSelection],
+      ["B",tr("inline.bold", "عريض"),() => applyFormat("bold"),"bold"],
+      ["I",tr("inline.italic", "مائل"),() => applyFormat("italic"),"italic"],
+      ["S",tr("inline.strike", "مشطوب"),() => applyFormat("strike"),"strike"],
+      ["U",tr("inline.underline", "تحته خط"),() => applyFormat("underline"),"underline"],
+      ["</>",tr("inline.code", "كود"),() => applyFormat("code"),"code"],
+      ["▰",tr("inline.highlight", "تمييز"),() => applyFormat("highlight"),"highlight"],
+      ["X₂",tr("inline.subscript", "منخفض"),() => applyFormat("subscript"),"subscript"],
+      ["X²",tr("inline.superscript", "مرتفع"),() => applyFormat("superscript"),"superscript"],
+      ["◌",tr("inline.spoiler", "تشويش"),applySpoiler,"spoiler"],
+      ["↗",tr("inline.link", "رابط"),openLinkEditorFromSelection,"link"],
+      ["▣",tr("inline.create_button", "إنشاء زر"),openButtonTypeMenuFromSelection,"button"],
     ];
-    specs.forEach(([icon,label,handler]) => {
+    specs.forEach(([icon,label,handler,format]) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "selection-format-btn";
+      btn.dataset.format = format;
       btn.title = label;
       btn.setAttribute("aria-label", label);
       btn.innerHTML = `<span>${icon}</span><small>${label}</small>`;
@@ -479,6 +611,19 @@
     const rect = range.getBoundingClientRect();
     if (!rect.width && !rect.height) return;
     const bar = makeSelectionToolbar();
+    Object.entries(FORMAT_SPECS).forEach(([name,spec]) => {
+      const button = bar.querySelector(`[data-format="${name}"]`);
+      if (!button) return;
+      const active = rangeHasFormat(range, spec.selectors);
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    const linkButton = bar.querySelector('[data-format="link"]');
+    if (linkButton) {
+      const active = rangeHasFormat(range, "a[href]");
+      linkButton.classList.toggle("active", active);
+      linkButton.setAttribute("aria-pressed", active ? "true" : "false");
+    }
     bar.classList.add("show");
     placeNearRect(bar, rect, true);
   }
@@ -599,8 +744,12 @@
   function openButtonTypeMenuFromSelection() {
     if (!savedRange || !activeEditor) return;
     const selectedTitle = cleanTitle(window.getSelection()?.toString() || savedRange.toString() || "زر");
+    if (window.RichButtonDialog?.open) {
+      window.RichButtonDialog.open({title:selectedTitle,fromSelection:true,presetType:"url"});
+      return;
+    }
     const rect = savedRange.getBoundingClientRect();
-    const {menu,list} = simpleMenu("حوّل النص إلى زر");
+    const {menu,list} = simpleMenu(tr("button.convert_selection", "حوّل النص إلى زر"));
     BUTTON_ORDER.forEach(type => {
       const meta = BUTTON_TYPES[type];
       list.appendChild(menuButton(meta.icon, meta.label, "", () => {
@@ -647,11 +796,11 @@
     actions.className = "rich-button-editor-actions";
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = "إلغاء";
+    cancel.textContent = tr("common.cancel", "إلغاء");
     const save = document.createElement("button");
     save.type = "button";
     save.className = "primary-soft";
-    save.textContent = "حفظ";
+    save.textContent = tr("common.save", "حفظ");
     cancel.onclick = () => closeFloatingMenu();
     save.onclick = () => {updateToken(token,{value:String(input.value || "").trim()});closeFloatingMenu();};
     actions.append(cancel,save);
@@ -664,7 +813,7 @@
     const info = parseMarker(token.dataset.marker);
     if (!info) return;
     const rect = token.getBoundingClientRect();
-    const {menu} = simpleMenu("اسم الزر");
+    const {menu} = simpleMenu(tr("button.name", "اسم الزر"));
     menu.classList.add("inline-value-editor");
     const input = document.createElement("input");
     input.className = "rich-button-editor-input";
@@ -674,7 +823,7 @@
     const save = document.createElement("button");
     save.type = "button";
     save.className = "primary-soft";
-    save.textContent = "حفظ";
+    save.textContent = tr("common.save", "حفظ");
     save.onclick = () => {updateToken(token,{title:cleanTitle(input.value)});closeFloatingMenu();};
     actions.append(save);
     menu.append(input,actions);
@@ -687,11 +836,11 @@
     if (!info) return;
     let data;
     try { data = await api("/miniapp/api/pages"); }
-    catch (error) { toast(`تعذر تحميل الصفحات: ${error.message}`); return; }
+    catch (error) { toast(tr("button.pages_failed", `تعذر تحميل الصفحات: ${error.message}`, {error:error.message})); return; }
     const pages = Array.isArray(data.pages) ? data.pages : [];
-    if (!pages.length) { toast("ما عندك صفحات محفوظة للربط"); return; }
+    if (!pages.length) { toast(tr("button.no_pages", "ما عندك صفحات محفوظة للربط")); return; }
     const rect = token.getBoundingClientRect();
-    const {menu,list} = simpleMenu("اختر الصفحة المرتبطة");
+    const {menu,list} = simpleMenu(tr("button.choose_page", "اختر الصفحة المرتبطة"));
     pages.forEach(page => {
       list.appendChild(menuButton("📄", page.title || page.page_id, page.page_id, () => {
         const value = info.type === "callback_data" ? `r:cbd:${page.page_id}` : page.page_id;
@@ -729,8 +878,8 @@
     const info = parseMarker(token.dataset.marker);
     if (!info) return;
     const rect = token.getBoundingClientRect();
-    const {menu,list} = simpleMenu("لون الزر");
-    [["○","افتراضي",null],["●","أزرق","b"],["●","أخضر","g"],["●","أحمر","r"]].forEach(([icon,label,color]) => {
+    const {menu,list} = simpleMenu(tr("button.color", "لون الزر"));
+    [["○",tr("button.default", "افتراضي"),null],["●",tr("button.blue", "أزرق"),"b"],["●",tr("button.green", "أخضر"),"g"],["●",tr("button.red", "أحمر"),"r"]].forEach(([icon,label,color]) => {
       list.appendChild(menuButton(icon,label,"",() => {updateToken(token,{color});closeFloatingMenu();}));
     });
     placeNearRect(menu, rect, false);
@@ -741,8 +890,8 @@
     if (!info) return;
     hideSelectionToolbar();
     const rect = token.getBoundingClientRect();
-    const {menu,list} = simpleMenu(`${BUTTON_TYPES[info.type]?.icon || "▣"} زر غني`);
-    list.appendChild(menuButton("✎","تعديل اسم الزر","",() => {closeFloatingMenu();openTitleEditor(token);}));
+    const {menu,list} = simpleMenu(`${BUTTON_TYPES[info.type]?.icon || "▣"} ${tr("button.rich", "زر غني")}`);
+    list.appendChild(menuButton("✎",tr("button.edit_name", "تعديل اسم الزر"),"",() => {closeFloatingMenu();openTitleEditor(token);}));
     if (info.type === "user") {
       list.appendChild(menuButton("👤","تحديد مستخدم",info.value || "",() => {closeFloatingMenu();requestUserForToken(token);}));
     } else if (info.type === "callback_data" || info.type === "page_callback") {
@@ -756,15 +905,15 @@
         closeFloatingMenu();openValueEditor(token,BUTTON_TYPES[info.type].action,placeholder);
       }));
     }
-    list.appendChild(menuButton("◉","تغيير اللون","",() => {closeFloatingMenu();openColorMenuForToken(token);}));
+    list.appendChild(menuButton("◉",tr("button.change_color", "تغيير اللون"),"",() => {closeFloatingMenu();openColorMenuForToken(token);}));
     list.appendChild(separator());
-    list.appendChild(menuButton("T","تحويل إلى نص عادي","",() => {
+    list.appendChild(menuButton("T",tr("button.to_text", "تحويل إلى نص عادي"),"",() => {
       const text = document.createTextNode(info.title);
       const editor = tokenEditor(token);
       token.replaceWith(text);
       syncEditor(editor);markDirty();pushHistory();closeFloatingMenu();
     }));
-    list.appendChild(menuButton("⌫","حذف الزر","",() => {
+    list.appendChild(menuButton("⌫",tr("button.delete", "حذف الزر"),"",() => {
       const editor = tokenEditor(token);
       token.remove();syncEditor(editor);markDirty();pushHistory();closeFloatingMenu();
     },"danger"));

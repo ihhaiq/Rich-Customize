@@ -1,12 +1,13 @@
 // Beta 0.3.33 — consolidated inline Rich Button behavior with saved-page callback picker.
 (() => {
+  const tr = (key, fallback, vars) => window.MiniAppI18n?.t?.(key, vars) || fallback;
   const TYPE_INFO = {
-    user:{label:"Mention",icon:"👤"},
-    url:{label:"رابط",icon:"🔗"},
+    user:{label:tr("button.mention", "Mention"),icon:"👤"},
+    url:{label:tr("button.url", "رابط"),icon:"🔗"},
     callback_data:{label:"Callback",icon:"↪"},
-    page_callback:{label:"صفحة",icon:"📚"},
-    copy:{label:"نسخ",icon:"📋"},
-    popup:{label:"Popup",icon:"💬"},
+    page_callback:{label:tr("button.page", "صفحة"),icon:"📚"},
+    copy:{label:tr("button.copy", "نسخ"),icon:"📋"},
+    popup:{label:tr("button.popup", "Popup"),icon:"💬"},
     switch_inline_query:{label:"بحث Inline",icon:"⌕"},
     switch_inline_query_current_chat:{label:"بحث هنا",icon:"⌖"},
     disabled:{label:"معطّل",icon:"⊘"},
@@ -84,7 +85,7 @@
 
   function openDialog(type = "url", title = "") {
     if (!window.RichButtonDialog?.open) {
-      toast?.("محرر الأزرار غير جاهز بعد");
+      toast?.(tr("button.editor_not_ready", "محرر الأزرار غير جاهز بعد"));
       return;
     }
     window.RichButtonDialog.open({presetType:type, title});
@@ -104,7 +105,7 @@
     if (field) return field;
     field = document.createElement("div");
     field.className = "button-dialog-field button-page-field hidden";
-    field.innerHTML = '<span>الصفحة المرتبطة</span><div class="button-page-list button-type-list"></div><small class="details-meta button-pages-status"></small>';
+    field.innerHTML = `<span>${tr("button.linked_page", "الصفحة المرتبطة")}</span><div class="button-page-list button-type-list"></div><small class="details-meta button-pages-status"></small>`;
     card.querySelector(".button-dialog-actions")?.before(field);
     return field;
   }
@@ -116,13 +117,15 @@
     const list = field.querySelector(".button-page-list");
     const status = field.querySelector(".button-pages-status");
     list.innerHTML = "";
-    status.textContent = "جاري تحميل صفحاتك المحفوظة…";
+    status.textContent = tr("button.loading_pages", "جاري تحميل صفحاتك المحفوظة…");
     try {
       const data = await api("/miniapp/api/pages");
       if (!card.isConnected) return;
       const pages = Array.isArray(data?.pages) ? data.pages : [];
       card.dataset.pagesLoaded = "1";
-      status.textContent = pages.length ? "اختر الصفحة التي يفتحها الزر" : "ما عندك صفحات محفوظة بعد";
+      status.textContent = pages.length
+        ? tr("button.choose_page", "اختر الصفحة التي يفتحها الزر")
+        : tr("button.no_pages", "ما عندك صفحات محفوظة بعد");
       pages.forEach(page => {
         const pageId = String(page.page_id || "");
         if (!pageId) return;
@@ -144,13 +147,13 @@
         copy.append(title, meta);
         label.append(input, radio, copy);
         input.addEventListener("change", () => {
-          status.textContent = `تم اختيار «${page.title || pageId}»`;
+          status.textContent = tr("button.selected_page", `تم اختيار «${page.title || pageId}»`, {title:page.title || pageId});
           try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.(); } catch (_) {}
         });
         list.appendChild(label);
       });
     } catch (error) {
-      status.textContent = `تعذر تحميل الصفحات: ${error?.message || "خطأ غير معروف"}`;
+      status.textContent = tr("button.pages_failed", `تعذر تحميل الصفحات: ${error?.message || "خطأ غير معروف"}`, {error:error?.message || tr("common.unknown_error", "خطأ غير معروف")});
     } finally {
       delete card.dataset.pagesLoading;
     }
@@ -186,7 +189,7 @@
       if (!pageId) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        toast?.("اختر صفحة محفوظة للزر");
+        toast?.(tr("button.choose_saved_page", "اختر صفحة محفوظة للزر"));
         return;
       }
       const valueInput = card.querySelector(".button-value-input");
@@ -211,8 +214,7 @@
   document.addEventListener("click", event => {
     const row = event.target.closest?.(".text-menu-row");
     if (!row) return;
-    const label = row.querySelector?.(".text-menu-label")?.textContent?.trim();
-    if (label !== "زر غني") return;
+    if (row.dataset.menuKind !== "rich_button") return;
     event.preventDefault();
     event.stopImmediatePropagation();
     window.RichTextToolbarMenu?.close?.();
@@ -223,7 +225,7 @@
   // prefilled as the button title.
   document.addEventListener("click", event => {
     const button = event.target.closest?.(".selection-format-btn");
-    if (!button || button.parentElement?.lastElementChild !== button) return;
+    if (!button || button.dataset.format !== "button") return;
     event.preventDefault();
     event.stopImmediatePropagation();
     const title = String(window.getSelection?.()?.toString?.() || "").trim();
