@@ -10,6 +10,10 @@ from app.routers.details import (
     router as details_router,
 )
 from app.routers.developer import router as developer_router
+from app.routers.history import (
+    install_into as install_history,
+    router as history_router,
+)
 from app.routers.math_ready import router as math_ready_router
 from app.routers.media_events import router as media_events_router
 from app.routers.miniapp import router as miniapp_router
@@ -17,6 +21,7 @@ from app.routers.miniapp import router as miniapp_router
 
 install_button_guide(editor_core.compat_module)
 install_details(editor_core.compat_module)
+install_history(editor_core.compat_module)
 editor_core_router = editor_core.router
 
 open_page_link = editor_core.open_page_link
@@ -27,9 +32,9 @@ router.include_router(developer_router)
 router.include_router(miniapp_router)
 router.include_router(block_preview_router)
 router.include_router(media_events_router)
-# Details owns its callbacks and state-specific message flows before the
-# remaining compatibility router sees the update.
+# New domain routers own their updates before the remaining compatibility core.
 router.include_router(details_router)
+router.include_router(history_router)
 router.include_router(math_ready_router)
 router.include_router(editor_core_router)
 
