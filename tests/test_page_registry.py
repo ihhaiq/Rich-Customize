@@ -60,6 +60,24 @@ class PageRegistryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((await registry.get(code))["title"], "الاسم الجديد")
             self.assertEqual((await PageRegistry(path).get(code))["title"], "الاسم الجديد")
 
+    async def test_query_filters_and_sorts_inside_registry_service(self):
+        with tempfile.TemporaryDirectory() as directory:
+            registry = PageRegistry(Path(directory) / "pages.json")
+            blocks = [{"id": "a"}]
+            beta = await registry.save(5, "Beta", blocks, [], 1, "center")
+            alpha = await registry.save(5, "Alpha target", blocks, [], 1, "center")
+            await registry.save(8, "Other owner target", blocks, [], 1, "center")
+
+            pages, total_count = await registry.query_for_user(
+                5,
+                query="target",
+                sort_mode="title",
+            )
+
+            self.assertEqual(total_count, 2)
+            self.assertEqual([page["page_id"] for page in pages], [alpha])
+            self.assertNotIn(beta, [page["page_id"] for page in pages])
+
 
 if __name__ == "__main__":
     unittest.main()

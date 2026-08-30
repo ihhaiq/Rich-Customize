@@ -25,6 +25,10 @@ from app.routers.message_buttons import (
     router as message_buttons_router,
 )
 from app.routers.miniapp import router as miniapp_router
+from app.routers.pages import (
+    install_into as install_pages,
+    router as pages_router,
+)
 
 
 install_button_guide(editor_core.compat_module)
@@ -32,6 +36,7 @@ install_details(editor_core.compat_module)
 install_history(editor_core.compat_module)
 install_block_management(editor_core.compat_module)
 install_message_buttons(editor_core.compat_module)
+install_pages(editor_core.compat_module)
 editor_core_router = editor_core.router
 
 open_page_link = editor_core.open_page_link
@@ -49,6 +54,7 @@ router.include_router(history_router)
 router.include_router(math_ready_router)
 router.include_router(block_management_router)
 router.include_router(message_buttons_router)
+router.include_router(pages_router)
 router.include_router(editor_core_router)
 
 __all__ = ["router"]
