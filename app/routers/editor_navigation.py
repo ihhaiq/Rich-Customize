@@ -1,0 +1,64 @@
+from __future__ import annotations
+
+from aiogram import Bot, F, Router
+from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
+
+from app.editor.session import load_editor_session
+from app.i18n import t
+from app.keyboards import build_editor_tools_keyboard, build_rich_editor_keyboard
+from app.routers.editor_ui import MAIN_TEXT, delete_stored_block_prompt, edit_ui
+from app.services.chat_registry import managed_chat_registry
+from app.states import RichEditorStates
+
+
+router = Router(name="editor_navigation")
+
+
+@router.callback_query(F.data == "r:no")
+async def no_op(callback: CallbackQuery) -> None:
+    await callback.answer("هذا هو الموقع الحالي")
+
+
+@router.callback_query(F.data == "r:back")
+async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
+    session = await load_editor_session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    data, blocks = session
+    await delete_stored_block_prompt(
+        bot, state, data, protected_message=callback.message,
+    )
+    await edit_ui(callback.message, MAIN_TEXT, build_rich_editor_keyboard(blocks))
+    await state.set_state(RichEditorStates.managing)
+    await state.update_data(
+        current_block_id=None,
+        current_button_id=None,
+        pending_button_action=None,
+        pending_button_text=None,
+        pending_add_type=None,
+        pending_child_type=None,
+        add_step=None,
+        add_payload=None,
+        nested_details_id=None,
+        nested_child_id=None,
+        nested_action=None,
+    )
+    await managed_chat_registry.clear_panel(callback.from_user.id)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "r:tools")
+async def open_editor_tools(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await load_editor_session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    await edit_ui(
+        callback.message,
+        t("editor.tools_text"),
+        build_editor_tools_keyboard(),
+    )
+    await callback.answer()
+
+
+__all__ = ["back_to_main", "no_op", "open_editor_tools", "router"]

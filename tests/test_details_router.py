@@ -112,7 +112,7 @@ class DetailsDomainTests(unittest.TestCase):
         install_into(legacy)
 
         self.assertEqual(legacy_details_handlers(legacy), ())
-        self.assertGreater(len(legacy.router.callback_query.handlers), 0)
+        self.assertEqual(len(legacy.router.callback_query.handlers), 0)
         self.assertLessEqual(len(legacy.router.callback_query.handlers), before)
 
 
