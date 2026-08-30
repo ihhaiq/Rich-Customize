@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+import unittest
+from types import SimpleNamespace
+
+from aiogram import F, Router
+
+from app.routers.publish_support import chat_type_value, is_administrator
+from app.routers.publishing import (
+    LEGACY_PUBLISH_CALLBACKS,
+    LEGACY_PUBLISH_MEMBERS,
+    detach_legacy_publish_handlers,
+    legacy_publish_handlers,
+    router as publishing_router,
+)
+
+
+class PublishingSupportTests(unittest.TestCase):
+    def test_telegram_enum_like_values_are_normalized(self):
+        status = SimpleNamespace(value="administrator")
+        member = SimpleNamespace(status=status)
+        chat = SimpleNamespace(type=SimpleNamespace(value="channel"))
+
+        self.assertTrue(is_administrator(member))
+        self.assertEqual(chat_type_value(chat), "channel")
+
+
+class PublishingRouterTests(unittest.TestCase):
+    @staticmethod
+    def _registered_callbacks(router, observer_name):
+        observer = getattr(router, observer_name)
+        callbacks = [handler.callback for handler in observer.handlers]
+        for child in router.sub_routers:
+            callbacks.extend(
+                PublishingRouterTests._registered_callbacks(child, observer_name)
+            )
+        return callbacks
+
+    def test_aggregator_is_split_by_responsibility(self):
+        self.assertEqual(
+            {child.name for child in publishing_router.sub_routers},
+            {"publish_destinations", "publish_settings", "publish_actions"},
+        )
+
+    def test_detach_removes_publish_handlers_from_both_observers(self):
+        legacy = SimpleNamespace(router=Router(name="legacy-publishing-test"))
+        for index, name in enumerate(sorted(LEGACY_PUBLISH_CALLBACKS)):
+            async def callback(*args, **kwargs):
+                return None
+            callback.__name__ = name
+            legacy.router.callback_query.register(callback, F.data == f"legacy:{index}")
+        for name in sorted(LEGACY_PUBLISH_MEMBERS):
+            async def member(*args, **kwargs):
+                return None
+            member.__name__ = name
+            legacy.router.my_chat_member.register(member)
+
+        removed = detach_legacy_publish_handlers(legacy)
+
+        self.assertEqual(set(removed["callback_query"]), set(LEGACY_PUBLISH_CALLBACKS))
+        self.assertEqual(set(removed["my_chat_member"]), set(LEGACY_PUBLISH_MEMBERS))
+        self.assertEqual(
+            legacy_publish_handlers(legacy),
+            {"callback_query": (), "my_chat_member": ()},
+        )
+
+    def test_real_router_has_one_active_copy_and_zero_legacy_copies(self):
+        from app.routers import editor_core
+        from app.routers import rich_editor
+
+        legacy = editor_core.compat_module
+        self.assertEqual(
+            legacy_publish_handlers(legacy),
+            {"callback_query": (), "my_chat_member": ()},
+        )
+        sets = {
+            "callback_query": LEGACY_PUBLISH_CALLBACKS,
+            "my_chat_member": LEGACY_PUBLISH_MEMBERS,
+        }
+        for observer_name, names in sets.items():
+            registered = self._registered_callbacks(rich_editor.router, observer_name)
+            for name in names:
+                matches = [callback for callback in registered if callback.__name__ == name]
+                self.assertGreaterEqual(len(matches), 1, name)
+                self.assertEqual(len({id(callback) for callback in matches}), 1, name)
+
+        top_level_names = [child.name for child in rich_editor.router.sub_routers]
+        self.assertLess(
+            top_level_names.index("publishing"),
+            top_level_names.index("rich_editor"),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
