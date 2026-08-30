@@ -20,6 +20,10 @@ from app.routers.history import (
 )
 from app.routers.math_ready import router as math_ready_router
 from app.routers.media_events import router as media_events_router
+from app.routers.message_buttons import (
+    install_into as install_message_buttons,
+    router as message_buttons_router,
+)
 from app.routers.miniapp import router as miniapp_router
 
 
@@ -27,6 +31,7 @@ install_button_guide(editor_core.compat_module)
 install_details(editor_core.compat_module)
 install_history(editor_core.compat_module)
 install_block_management(editor_core.compat_module)
+install_message_buttons(editor_core.compat_module)
 editor_core_router = editor_core.router
 
 open_page_link = editor_core.open_page_link
@@ -43,6 +48,7 @@ router.include_router(history_router)
 # Native Math gets first chance to consume ready Rich Messages.
 router.include_router(math_ready_router)
 router.include_router(block_management_router)
+router.include_router(message_buttons_router)
 router.include_router(editor_core_router)
 
 __all__ = ["router"]
