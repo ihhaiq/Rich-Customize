@@ -65,7 +65,7 @@
         lastError = error;
       }
     }
-    throw lastError || new Error("Apple emoji catalog unavailable");
+    throw lastError || new Error(mt("emoji.catalog_unavailable"));
   }
 
   async function loadCatalog() {

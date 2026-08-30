@@ -5,15 +5,15 @@
     "paragraph", "text", "caption", "heading", "footer", "blockquote", "pullquote",
   ]);
   const BUTTON_TYPES = {
-    user:{label:tr("button.mention", "مستخدم"),icon:"👤",action:tr("button.select_user", "تحديد مستخدم")},
-    url:{label:tr("button.url", "رابط"),icon:"🔗",action:tr("button.edit_url", "تعديل الرابط")},
-    callback_data:{label:"Callback data",icon:"↪",action:tr("button.link_page", "ربط بصفحة محفوظة")},
-    page_callback:{label:`CBD / ${tr("button.page", "صفحة")}`,icon:"📚",action:tr("button.link_page", "ربط بصفحة محفوظة")},
-    copy:{label:tr("button.copy", "نسخ"),icon:"📋",action:tr("button.edit_copy", "تعديل نص النسخ")},
-    popup:{label:tr("button.popup", "Popup"),icon:"💬",action:tr("button.edit_popup", "تعديل نص التنبيه")},
-    switch_inline_query:{label:tr("button.inline_search", "بحث Inline"),icon:"⌕",action:tr("button.edit_search", "تعديل نص البحث")},
-    switch_inline_query_current_chat:{label:tr("button.search_here", "بحث هنا"),icon:"⌖",action:tr("button.edit_search_here", "تعديل نص البحث هنا")},
-    disabled:{label:tr("button.disabled", "معطّل"),icon:"⊘",action:null},
+    user:{label:tr("button.mention", "Mention"),icon:"user",action:tr("button.select_user", "Select user")},
+    url:{label:tr("button.url", "Link"),icon:"link",action:tr("button.edit_url", "Edit link")},
+    callback_data:{label:tr("button.callback_data", "Callback data"),icon:"callback",action:tr("button.link_page", "Link a saved page")},
+    page_callback:{label:`CBD / ${tr("button.page", "Page")}`,icon:"page",action:tr("button.link_page", "Link a saved page")},
+    copy:{label:tr("button.copy", "Copy"),icon:"copy",action:tr("button.edit_copy", "Edit copied text")},
+    popup:{label:tr("button.popup", "Popup"),icon:"popup",action:tr("button.edit_popup", "Edit popup text")},
+    switch_inline_query:{label:tr("button.inline_search", "Inline search"),icon:"search",action:tr("button.edit_search", "Edit search text")},
+    switch_inline_query_current_chat:{label:tr("button.search_here", "Search here"),icon:"search_here",action:tr("button.edit_search_here", "Edit search-here text")},
+    disabled:{label:tr("button.disabled", "Disabled"),icon:"disabled",action:null},
   };
   const BUTTON_ORDER = [
     "user", "url", "callback_data", "page_callback", "copy", "popup",
@@ -28,7 +28,7 @@
   let floatingMenu = null;
 
   function cleanTitle(value) {
-    return String(value || "زر").replace(/[{}\n]/g, " ").trim().slice(0, 64) || "زر";
+    return String(value || tr("button.generic", "Button")).replace(/[{}\n]/g, " ").trim().slice(0, 64) || tr("button.generic", "Button");
   }
 
   function parseMarker(marker) {
@@ -132,7 +132,7 @@
     token.dataset.buttonType = info.type;
     token.textContent = info.title;
     token.setAttribute("role", "button");
-    token.setAttribute("aria-label", `${info.title} · ${BUTTON_TYPES[info.type]?.label || "زر"}`);
+    token.setAttribute("aria-label", `${info.title} · ${BUTTON_TYPES[info.type]?.label || tr("button.generic", "Button")}`);
     return token;
   }
 
@@ -222,7 +222,7 @@
     if (!editor || !block || !INLINE_TEXT_TYPES.has(block.type)) return;
     editor.classList.add("rich-inline-editor");
     editor.dataset.richBlockId = block.id;
-    editor.dataset.placeholder ||= block.type === "paragraph" ? "اكتب نصًا…" : info(block.type).label;
+    editor.dataset.placeholder ||= block.type === "paragraph" ? tr("editor.write_text", "Write text…") : info(block.type).label;
     if (editor.dataset.richHydrated === "1") return;
     editor.dataset.richHydrated = "1";
     editor.innerHTML = sanitizeInlineHtml(innerHtmlForBlock(block));
@@ -553,17 +553,17 @@
     bar.className = "selection-format-bubble";
     bar.setAttribute("role", "toolbar");
     const specs = [
-      ["B",tr("inline.bold", "عريض"),() => applyFormat("bold"),"bold"],
-      ["I",tr("inline.italic", "مائل"),() => applyFormat("italic"),"italic"],
-      ["S",tr("inline.strike", "مشطوب"),() => applyFormat("strike"),"strike"],
-      ["U",tr("inline.underline", "تحته خط"),() => applyFormat("underline"),"underline"],
-      ["</>",tr("inline.code", "كود"),() => applyFormat("code"),"code"],
-      ["▰",tr("inline.highlight", "تمييز"),() => applyFormat("highlight"),"highlight"],
-      ["X₂",tr("inline.subscript", "منخفض"),() => applyFormat("subscript"),"subscript"],
-      ["X²",tr("inline.superscript", "مرتفع"),() => applyFormat("superscript"),"superscript"],
-      ["◌",tr("inline.spoiler", "تشويش"),applySpoiler,"spoiler"],
-      ["↗",tr("inline.link", "رابط"),openLinkEditorFromSelection,"link"],
-      ["▣",tr("inline.create_button", "إنشاء زر"),openButtonTypeMenuFromSelection,"button"],
+      ["bold",tr("inline.bold", "Bold"),() => applyFormat("bold"),"bold"],
+      ["italic",tr("inline.italic", "Italic"),() => applyFormat("italic"),"italic"],
+      ["strike",tr("inline.strike", "Strikethrough"),() => applyFormat("strike"),"strike"],
+      ["underline",tr("inline.underline", "Underline"),() => applyFormat("underline"),"underline"],
+      ["code",tr("inline.code", "Code"),() => applyFormat("code"),"code"],
+      ["highlight",tr("inline.highlight", "Highlight"),() => applyFormat("highlight"),"highlight"],
+      ["subscript",tr("inline.subscript", "Subscript"),() => applyFormat("subscript"),"subscript"],
+      ["superscript",tr("inline.superscript", "Superscript"),() => applyFormat("superscript"),"superscript"],
+      ["spoiler",tr("inline.spoiler", "Spoiler"),applySpoiler,"spoiler"],
+      ["link",tr("inline.link", "Link"),openLinkEditorFromSelection,"link"],
+      ["button",tr("inline.create_button", "Create button"),openButtonTypeMenuFromSelection,"button"],
     ];
     specs.forEach(([icon,label,handler,format]) => {
       const btn = document.createElement("button");
@@ -572,7 +572,7 @@
       btn.dataset.format = format;
       btn.title = label;
       btn.setAttribute("aria-label", label);
-      btn.innerHTML = `<span>${icon}</span><small>${label}</small>`;
+      const iconEl=document.createElement("span");MiniAppIcons.mount(iconEl,icon);const labelEl=document.createElement("small");labelEl.textContent=label;btn.append(iconEl,labelEl);
       btn.addEventListener("pointerdown", event => event.preventDefault());
       btn.addEventListener("click", event => {event.preventDefault();event.stopPropagation();handler();});
       bar.appendChild(btn);
@@ -712,7 +712,7 @@
     });
   }
 
-  function createInlineButton(type, title = "زر", fromSelection = false) {
+  function createInlineButton(type, title = tr("button.generic", "Button"), fromSelection = false) {
     if (!BUTTON_TYPES[type]) return null;
     let created = null;
     ensureEditorForInlineButton(editor => {
@@ -743,7 +743,7 @@
 
   function openButtonTypeMenuFromSelection() {
     if (!savedRange || !activeEditor) return;
-    const selectedTitle = cleanTitle(window.getSelection()?.toString() || savedRange.toString() || "زر");
+    const selectedTitle = cleanTitle(window.getSelection()?.toString() || savedRange.toString() || tr("button.generic", "Button"));
     if (window.RichButtonDialog?.open) {
       window.RichButtonDialog.open({title:selectedTitle,fromSelection:true,presetType:"url"});
       return;
@@ -842,11 +842,11 @@
     const rect = token.getBoundingClientRect();
     const {menu,list} = simpleMenu(tr("button.choose_page", "اختر الصفحة المرتبطة"));
     pages.forEach(page => {
-      list.appendChild(menuButton("📄", page.title || page.page_id, page.page_id, () => {
+      list.appendChild(menuButton("page", page.title || page.page_id, page.page_id, () => {
         const value = info.type === "callback_data" ? `r:cbd:${page.page_id}` : page.page_id;
         updateToken(token,{value});
         closeFloatingMenu();
-        toast(`تم ربط الزر بصفحة «${page.title || page.page_id}»`);
+        toast(tr("button.linked_success", `Linked to “${page.title || page.page_id}”`, {title:page.title || page.page_id}));
       }));
     });
     placeNearRect(menu, rect, false);
@@ -860,17 +860,17 @@
     try {
       updateToken(token,{value:""});
       await flushSave();
-      if (!current?.page_id) throw new Error("تعذر حفظ الصفحة");
+      if (!current?.page_id) throw new Error(tr("button.save_page_failed", "Could not save the page"));
       const marker = token.dataset.marker;
       window.RichMiniAppResume?.remember?.(current.page_id);
       await api("/miniapp/api/rich-buttons/user-picker", {
         method:"POST",
         body:JSON.stringify({page_id:current.page_id,block_id:block.id,marker}),
       });
-      toast("اختَر المستخدم من محادثة البوت");
+      toast(tr("button.pick_user_in_chat", "Choose the user in the bot chat"));
       setTimeout(() => {try { tg?.close?.(); } catch (_) {}}, 650);
     } catch (error) {
-      toast(`تعذر فتح اختيار المستخدم: ${error.message}`);
+      toast(tr("button.user_picker_failed", `Could not open user picker: ${error.message}`, {error:error.message}));
     }
   }
 
@@ -879,8 +879,8 @@
     if (!info) return;
     const rect = token.getBoundingClientRect();
     const {menu,list} = simpleMenu(tr("button.color", "لون الزر"));
-    [["○",tr("button.default", "افتراضي"),null],["●",tr("button.blue", "أزرق"),"b"],["●",tr("button.green", "أخضر"),"g"],["●",tr("button.red", "أحمر"),"r"]].forEach(([icon,label,color]) => {
-      list.appendChild(menuButton(icon,label,"",() => {updateToken(token,{color});closeFloatingMenu();}));
+    [[tr("button.default", "Default"),null],[tr("button.blue", "Blue"),"b"],[tr("button.green", "Green"),"g"],[tr("button.red", "Red"),"r"]].forEach(([label,color]) => {
+      list.appendChild(menuButton("color",label,"",() => {updateToken(token,{color});closeFloatingMenu();}));
     });
     placeNearRect(menu, rect, false);
   }
@@ -890,30 +890,30 @@
     if (!info) return;
     hideSelectionToolbar();
     const rect = token.getBoundingClientRect();
-    const {menu,list} = simpleMenu(`${BUTTON_TYPES[info.type]?.icon || "▣"} ${tr("button.rich", "زر غني")}`);
-    list.appendChild(menuButton("✎",tr("button.edit_name", "تعديل اسم الزر"),"",() => {closeFloatingMenu();openTitleEditor(token);}));
+    const {menu,list} = simpleMenu(tr("button.rich", "Rich button"));
+    list.appendChild(menuButton("edit",tr("button.edit_name", "Edit button name"),"",() => {closeFloatingMenu();openTitleEditor(token);}));
     if (info.type === "user") {
-      list.appendChild(menuButton("👤","تحديد مستخدم",info.value || "",() => {closeFloatingMenu();requestUserForToken(token);}));
+      list.appendChild(menuButton("user",tr("button.select_user", "Select user"),info.value || "",() => {closeFloatingMenu();requestUserForToken(token);}));
     } else if (info.type === "callback_data" || info.type === "page_callback") {
-      list.appendChild(menuButton("📚","ربط بصفحة محفوظة",info.value || "",() => {closeFloatingMenu();choosePageForToken(token);}));
+      list.appendChild(menuButton("page",tr("button.link_page", "Link a saved page"),info.value || "",() => {closeFloatingMenu();choosePageForToken(token);}));
     } else if (BUTTON_TYPES[info.type]?.action) {
       const placeholder = {
-        url:"https://example.com",copy:"النص المطلوب نسخه",popup:"نص التنبيه",
-        switch_inline_query:"كلمة البحث",switch_inline_query_current_chat:"كلمة البحث هنا",
-      }[info.type] || "القيمة";
+        url:"https://example.com",copy:tr("button.copy_placeholder", "Text to copy"),popup:tr("button.popup_placeholder", "Popup text"),
+        switch_inline_query:tr("button.search_placeholder", "Search text"),switch_inline_query_current_chat:tr("button.search_here_placeholder", "Search-here text"),
+      }[info.type] || tr("button.value_placeholder", "Value");
       list.appendChild(menuButton(BUTTON_TYPES[info.type].icon,BUTTON_TYPES[info.type].action,info.value || "",() => {
         closeFloatingMenu();openValueEditor(token,BUTTON_TYPES[info.type].action,placeholder);
       }));
     }
-    list.appendChild(menuButton("◉",tr("button.change_color", "تغيير اللون"),"",() => {closeFloatingMenu();openColorMenuForToken(token);}));
+    list.appendChild(menuButton("color",tr("button.change_color", "Change color"),"",() => {closeFloatingMenu();openColorMenuForToken(token);}));
     list.appendChild(separator());
-    list.appendChild(menuButton("T",tr("button.to_text", "تحويل إلى نص عادي"),"",() => {
+    list.appendChild(menuButton("paragraph",tr("button.to_text", "Convert to plain text"),"",() => {
       const text = document.createTextNode(info.title);
       const editor = tokenEditor(token);
       token.replaceWith(text);
       syncEditor(editor);markDirty();pushHistory();closeFloatingMenu();
     }));
-    list.appendChild(menuButton("⌫",tr("button.delete", "حذف الزر"),"",() => {
+    list.appendChild(menuButton("delete",tr("button.delete", "Delete button"),"",() => {
       const editor = tokenEditor(token);
       token.remove();syncEditor(editor);markDirty();pushHistory();closeFloatingMenu();
     },"danger"));
@@ -958,7 +958,7 @@
   });
 
   if (window.RichButtonEditor) {
-    window.RichButtonEditor.create = type => createInlineButton(type, BUTTON_TYPES[type]?.label || "زر", false);
+    window.RichButtonEditor.create = type => createInlineButton(type, BUTTON_TYPES[type]?.label || tr("button.generic", "Button"), false);
     window.RichButtonEditor.types = BUTTON_TYPES;
   }
 

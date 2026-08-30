@@ -64,7 +64,7 @@
     clearTimeout(saveTimer);
     clearTimeout(historyTimer);
     dirty = false;
-    updateSaveState("جاري إلغاء التغييرات…");
+    updateSaveState(mt("session.discarding"));
 
     try {
       // If a save request was already in flight, let it finish first, then
@@ -82,16 +82,16 @@
       });
 
       tg?.HapticFeedback?.notificationOccurred?.("success");
-      updateSaveState("تم إلغاء التغييرات");
+      updateSaveState(mt("session.discarded"));
 
       // Give Telegram one frame to paint the feedback before closing WebView.
       setTimeout(() => tg?.close?.(), 90);
     } catch (error) {
       discardRunning = false;
       if (button) button.disabled = false;
-      updateSaveState("تعذر إلغاء التغييرات");
+      updateSaveState(mt("session.discard_failed"));
       tg?.HapticFeedback?.notificationOccurred?.("error");
-      toast(`تعذر إلغاء العمل: ${error.message}`);
+      toast(mt("session.discard_error",{error:error.message}));
     }
   }
 

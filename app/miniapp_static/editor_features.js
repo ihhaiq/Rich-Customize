@@ -36,12 +36,12 @@
     if (!top || document.getElementById("previewModeBtn")) return;
     const preview = svgButton(
       "previewModeBtn",
-      "معاينة الرسالة",
+      tr("preview.message", "Preview message"),
       '<path d="M2.8 12s3.4-5.3 9.2-5.3S21.2 12 21.2 12 17.8 17.3 12 17.3 2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.5"/>'
     );
     const multi = svgButton(
       "multiSelectModeBtn",
-      "تحديد عدة بلوكات",
+      tr("multi.select_blocks", "Select multiple blocks"),
       '<rect x="5" y="5" width="6" height="6" rx="1.4"/><rect x="13" y="5" width="6" height="6" rx="1.4"/><rect x="5" y="13" width="6" height="6" rx="1.4"/><path d="m14.2 16 1.7 1.7 3.3-4"/>'
     );
     top.prepend(multi);
@@ -57,14 +57,15 @@
     bar.id = "multiSelectBar";
     bar.className = "multi-select-bar hidden";
     bar.innerHTML = `
-      <strong class="multi-count">0 محدد</strong>
+      <strong class="multi-count">${tr("multi.selected_count", "{count} selected", {count:0})}</strong>
       <div class="multi-actions">
-        <button type="button" data-multi="all">الكل</button>
-        <button type="button" data-multi="up" aria-label="تحريك المحدد للأعلى">↑</button>
-        <button type="button" data-multi="down" aria-label="تحريك المحدد للأسفل">↓</button>
-        <button type="button" data-multi="delete" class="danger">حذف</button>
-        <button type="button" data-multi="done">تم</button>
+        <button type="button" data-multi="all">${tr("common.all", "All")}</button>
+        <button type="button" data-multi="up" aria-label="${tr("multi.move_up", "Move selected up")}"><span data-miniapp-icon="up"></span></button>
+        <button type="button" data-multi="down" aria-label="${tr("multi.move_down", "Move selected down")}"><span data-miniapp-icon="down"></span></button>
+        <button type="button" data-multi="delete" class="danger">${tr("common.delete", "Delete")}</button>
+        <button type="button" data-multi="done">${tr("common.done", "Done")}</button>
       </div>`;
+    MiniAppIcons.apply(bar);
     root.appendChild(bar);
     bar.addEventListener("click", event => {
       const action = event.target.closest?.("[data-multi]")?.dataset?.multi;
@@ -84,7 +85,7 @@
     const bar = ensureMultiBar();
     bar.classList.toggle("hidden", !state.multi);
     const count = bar.querySelector(".multi-count");
-    if (count) count.textContent = `${state.selected.size} محدد`;
+    if (count) count.textContent = tr("multi.selected_count", "{count} selected", {count:state.selected.size});
     document.getElementById("multiSelectModeBtn")?.classList.toggle("active", state.multi);
   }
 
@@ -174,8 +175,8 @@
         const handle = document.createElement("button");
         handle.type = "button";
         handle.className = "editor-drag-handle";
-        handle.setAttribute("aria-label", "اسحب لتغيير موقع البلوك");
-        handle.title = "اسحب لتغيير الموقع";
+        handle.setAttribute("aria-label", tr("block.drag", "Drag to move block"));
+        handle.title = tr("block.drag_short", "Drag to move");
         handle.innerHTML = '<span></span><span></span><span></span><span></span><span></span><span></span>';
         handle.addEventListener("pointerdown", startDrag);
         article.appendChild(handle);
@@ -185,9 +186,9 @@
         const check = document.createElement("button");
         check.type = "button";
         check.className = "multi-select-check";
-        check.setAttribute("aria-label", "تحديد البلوك");
+        check.setAttribute("aria-label", tr("block.select", "Select block"));
         check.setAttribute("aria-pressed", state.selected.has(id) ? "true" : "false");
-        check.innerHTML = "✓";
+        MiniAppIcons.mount(check, "check");
         article.appendChild(check);
       }
     });
@@ -272,25 +273,25 @@
     document.getElementById("previewModeBtn")?.classList.toggle("active", next);
     const previewBtn = document.getElementById("previewModeBtn");
     if (previewBtn) {
-      previewBtn.title = next ? "الرجوع للتحرير" : "معاينة الرسالة";
+      previewBtn.title = next ? tr("preview.back_to_edit", "Back to editing") : tr("preview.message", "Preview message");
       previewBtn.setAttribute("aria-label", previewBtn.title);
     }
     haptic();
   }
 
   const BUTTON_TYPES = [
-    {value:"url", label:tr("button.url", "رابط"), placeholder:"https://example.com"},
-    {value:"copy", label:tr("button.copy", "نسخ"), placeholder:tr("button.copy_placeholder", "النص المطلوب نسخه")},
+    {value:"url", label:tr("button.url", "Link"), placeholder:"https://example.com"},
+    {value:"copy", label:tr("button.copy", "Copy"), placeholder:tr("button.copy_placeholder", "Text to copy")},
     {value:"user", label:tr("button.mention", "Mention"), placeholder:"User ID / @username"},
-    {value:"page_callback", label:tr("button.page", "صفحة"), placeholder:tr("button.page_placeholder", "رمز الصفحة المحفوظة")},
-    {value:"callback_data", label:"Callback", placeholder:"callback_data"},
-    {value:"popup", label:tr("button.popup", "Popup"), placeholder:tr("button.popup_placeholder", "نص التنبيه")},
+    {value:"page_callback", label:tr("button.page", "Page"), placeholder:tr("button.page_placeholder", "Saved page code")},
+    {value:"callback_data", label:tr("button.callback", "Callback"), placeholder:"callback_data"},
+    {value:"popup", label:tr("button.popup", "Popup"), placeholder:tr("button.popup_placeholder", "Popup text")},
   ];
   const BUTTON_STYLES = [
-    {label:"Default", color:null},
-    {label:"Active", color:"b"},
-    {label:"Accept", color:"g"},
-    {label:"Decline", color:"r"},
+    {label:tr("button.default", "Default"), color:null},
+    {label:tr("button.active", "Active"), color:"b"},
+    {label:tr("button.accept", "Accept"), color:"g"},
+    {label:tr("button.decline", "Decline"), color:"r"},
   ];
 
   function closeButtonDialog() {
@@ -391,15 +392,15 @@
   window.RichButtonDialog = {open:openButtonDialog, close:closeButtonDialog};
 
   const COMMANDS = [
-    {name:"h1", label:"عنوان H1", hint:"/h1 النص"},
-    {name:"h2", label:"عنوان H2", hint:"/h2 النص"},
-    {name:"h3", label:"عنوان H3", hint:"/h3 النص"},
-    {name:"table", label:"جدول", hint:"/table 3x4"},
-    {name:"math", label:"معادلة", hint:"/math x^2+y^2"},
-    {name:"details", label:"تفاصيل", hint:"/details العنوان"},
-    {name:"button", label:"زر غني", hint:"/button"},
-    {name:"preview", label:"وضع المعاينة", hint:"/preview"},
-    {name:"select", label:"تحديد متعدد", hint:"/select"},
+    {name:"h1", label:tr("heading.level", "Heading 1", {level:1}), hint:"/h1 text"},
+    {name:"h2", label:tr("heading.level", "Heading 2", {level:2}), hint:"/h2 text"},
+    {name:"h3", label:tr("heading.level", "Heading 3", {level:3}), hint:"/h3 text"},
+    {name:"table", label:tr("block.table", "Table"), hint:"/table 3x4"},
+    {name:"math", label:tr("block.math", "Equation"), hint:"/math x^2+y^2"},
+    {name:"details", label:tr("block.details", "Details"), hint:"/details title"},
+    {name:"button", label:tr("button.rich", "Rich button"), hint:"/button"},
+    {name:"preview", label:tr("preview.mode", "Preview mode"), hint:"/preview"},
+    {name:"select", label:tr("multi.mode", "Multi-select"), hint:"/select"},
   ];
 
   function executeCommand(raw) {
@@ -464,7 +465,7 @@
     slashQuery.textContent = q ? `/${q}` : "/";
     const commandMatches = COMMANDS.filter(command => !q || `${command.name} ${command.label} ${command.hint}`.toLowerCase().includes(q));
     commandMatches.forEach(command => {
-      slashItems.appendChild(menuButton("⌘", command.label, command.hint, () => {
+      slashItems.appendChild(menuButton(command.name.startsWith("h")?"heading":command.name==="math"?"math":command.name==="select"?"multi":command.name, command.label, command.hint, () => {
         if (["preview","select","button"].includes(command.name)) {
           slashInput.value = "";
           slashMenu.classList.add("hidden");
@@ -483,7 +484,7 @@
     if (!slashItems.children.length) {
       const empty = document.createElement("div");
       empty.className = "empty";
-      empty.textContent = "ماكو أمر أو Block مطابق";
+      empty.textContent = tr("editor.no_command_match", "No matching command or block");
       slashItems.appendChild(empty);
     }
     slashMenu.classList.remove("hidden");

@@ -38,14 +38,14 @@
 
   function renderFormula(target,expression,separateLine,{emptyText=""}={}){
     const latex=String(expression||"");target.dataset.latex=latex;target.dataset.display=separateLine?"block":"inline";target.classList.toggle("display-formula",Boolean(separateLine));target.classList.toggle("inline-formula",!separateLine);
-    if(!latex.trim()){target.classList.add("is-empty");target.textContent=emptyText||"اكتب صيغة LaTeX";return;}target.classList.remove("is-empty");
+    if(!latex.trim()){target.classList.add("is-empty");target.textContent=emptyText||mt("math.write_latex");return;}target.classList.remove("is-empty");
     if(window.katex?.render){try{window.katex.render(latex,target,{displayMode:Boolean(separateLine),throwOnError:false,strict:"ignore",trust:false,output:"htmlAndMathml"});return;}catch(_){}}
     target.textContent=latex;ensureKatex().then(katex=>{if(!katex?.render||!target.isConnected||target.dataset.latex!==latex)return;renderFormula(target,latex,separateLine,{emptyText});});
   }
 
   function formulaView(block){
     const d=block.data||(block.data={}),separateLine=inferSeparateLine(d);syncMathData(block,String(d.text||""),separateLine);
-    const view=document.createElement("div");view.className="math-formula-view";view.tabIndex=0;view.setAttribute("role","button");view.setAttribute("aria-label","اضغط لتعديل المعادلة");view.title="اضغط لتعديل المعادلة";renderFormula(view,d.text||"",separateLine,{emptyText:"اضغط لإضافة المعادلة"});
+    const view=document.createElement("div");view.className="math-formula-view";view.tabIndex=0;view.setAttribute("role","button");view.setAttribute("aria-label",mt("math.edit_hint"));view.title=mt("math.edit_hint");renderFormula(view,d.text||"",separateLine,{emptyText:mt("math.add_hint")});
     const openEditor=event=>{event?.preventDefault?.();event?.stopPropagation?.();editingBlocks.add(String(block.id));haptic();try{selectBlock(block.id);}catch(_){}try{renderBlocks();}catch(_){}requestAnimationFrame(()=>{const input=Array.from(document.querySelectorAll(".block[data-id] .math-latex-input")).find(el=>String(el.closest(".block")?.dataset?.id)===String(block.id));input?.focus?.({preventScroll:true});input?.scrollIntoView?.({block:"nearest",behavior:"smooth"});});};
     view.addEventListener("click",openEditor);view.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" ")openEditor(event);});ensureKatex();return view;
   }
@@ -56,17 +56,17 @@
 
   function formulaEditor(block){
     const d=block.data||(block.data={});let separateLine=inferSeparateLine(d);syncMathData(block,String(d.text||""),separateLine);
-    const wrap=document.createElement("section");wrap.className="telegram-math-editor";wrap.setAttribute("aria-label","تعديل المعادلة");
+    const wrap=document.createElement("section");wrap.className="telegram-math-editor";wrap.setAttribute("aria-label",mt("math.edit"));
     const field=document.createElement("label");field.className="math-field";const fieldTitle=document.createElement("span");fieldTitle.className="math-field-title";fieldTitle.textContent="LaTeX";const input=document.createElement("textarea");input.className="math-latex-input";input.rows=2;input.spellcheck=false;input.autocapitalize="off";input.autocomplete="off";input.placeholder="x_{1,2}=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}";input.value=String(d.text||"");field.append(fieldTitle,input);
 
-    const quick=document.createElement("div");quick.className="math-symbol-strip";quick.setAttribute("aria-label","رموز رياضية سريعة");QUICK_INSERTS.forEach(([label,snippet,back])=>{const btn=document.createElement("button");btn.type="button";btn.textContent=label;btn.title=snippet;btn.addEventListener("pointerdown",event=>event.preventDefault());btn.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();insertSnippet(input,snippet,back);});quick.appendChild(btn);});
+    const quick=document.createElement("div");quick.className="math-symbol-strip";quick.setAttribute("aria-label",mt("math.quick_symbols"));QUICK_INSERTS.forEach(([label,snippet,back])=>{const btn=document.createElement("button");btn.type="button";btn.textContent=label;btn.title=snippet;btn.addEventListener("pointerdown",event=>event.preventDefault());btn.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();insertSnippet(input,snippet,back);});quick.appendChild(btn);});
 
-    const option=document.createElement("label");option.className="math-line-option";const checkbox=document.createElement("input");checkbox.type="checkbox";checkbox.checked=separateLine;checkbox.setAttribute("aria-label","صيغة في سطر منفصل");const box=document.createElement("span");box.className="math-check-box";box.setAttribute("aria-hidden","true");const optionText=document.createElement("span");optionText.textContent="صيغة في سطر منفصل";option.append(checkbox,box,optionText);
-    const resultHead=document.createElement("div");resultHead.className="math-result-head";resultHead.textContent="المعاينة";const preview=document.createElement("div");preview.className="math-live-preview";preview.setAttribute("aria-live","polite");
-    const actions=document.createElement("div");actions.className="math-editor-actions";const done=document.createElement("button");done.type="button";done.className="math-done-button";done.textContent="تم";actions.appendChild(done);
-    function update({dirty=true}={}){separateLine=checkbox.checked;syncMathData(block,input.value,separateLine);renderFormula(preview,input.value,separateLine,{emptyText:"اكتب صيغة LaTeX حتى تظهر المعاينة هنا"});if(dirty){try{markDirty();}catch(_){}}}
+    const option=document.createElement("label");option.className="math-line-option";const checkbox=document.createElement("input");checkbox.type="checkbox";checkbox.checked=separateLine;checkbox.setAttribute("aria-label",mt("math.separate_line"));const box=document.createElement("span");box.className="math-check-box";box.setAttribute("aria-hidden","true");const optionText=document.createElement("span");optionText.textContent=mt("math.separate_line");option.append(checkbox,box,optionText);
+    const resultHead=document.createElement("div");resultHead.className="math-result-head";resultHead.textContent=mt("math.preview");const preview=document.createElement("div");preview.className="math-live-preview";preview.setAttribute("aria-live","polite");
+    const actions=document.createElement("div");actions.className="math-editor-actions";const done=document.createElement("button");done.type="button";done.className="math-done-button";done.textContent=mt("common.done");actions.appendChild(done);
+    function update({dirty=true}={}){separateLine=checkbox.checked;syncMathData(block,input.value,separateLine);renderFormula(preview,input.value,separateLine,{emptyText:mt("math.preview_hint")});if(dirty){try{markDirty();}catch(_){}}}
     input.addEventListener("focus",()=>{try{selectBlock(block.id);}catch(_){}});input.addEventListener("input",()=>update());checkbox.addEventListener("change",()=>{haptic();update();});done.addEventListener("pointerdown",event=>event.stopPropagation());done.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();update();editingBlocks.delete(String(block.id));haptic("medium");try{renderBlocks();}catch(_){}});
-    wrap.append(field,quick,option,resultHead,preview,actions);renderFormula(preview,input.value,separateLine,{emptyText:"اكتب صيغة LaTeX حتى تظهر المعاينة هنا"});ensureKatex();return wrap;
+    wrap.append(field,quick,option,resultHead,preview,actions);renderFormula(preview,input.value,separateLine,{emptyText:mt("math.preview_hint")});ensureKatex();return wrap;
   }
 
   function mathEditor(block){const id=String(block.id),d=block.data||(block.data={});if(!String(d.text||"").trim())editingBlocks.add(id);return editingBlocks.has(id)?formulaEditor(block):formulaView(block);}

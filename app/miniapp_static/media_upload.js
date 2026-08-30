@@ -1,22 +1,10 @@
 const mediaPreviewUrls = new Map();
 
-const MEDIA_ICON_PATHS = {
-  photo: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9" r="1.5"/><path d="m5 17 4.5-4.5 3.5 3 2.5-2.5 3.5 4"/>',
-  video: '<rect x="3" y="5" width="14" height="14" rx="3"/><path d="m17 10 4-2v8l-4-2"/>',
-  animation: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="m10 9 5 3-5 3z"/>',
-  audio: '<path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>',
-  voice: '<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/>',
-  document: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
-  collage: '<rect x="3" y="4" width="8" height="7" rx="2"/><rect x="13" y="4" width="8" height="7" rx="2"/><rect x="3" y="13" width="8" height="7" rx="2"/><rect x="13" y="13" width="8" height="7" rx="2"/>',
-  slideshow: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3zM8 22h8"/>',
-  map: '<path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
-};
-
 function createMediaIcon(kind) {
   const icon = document.createElement("span");
   icon.className = "media-picker-icon";
   icon.setAttribute("aria-hidden", "true");
-  icon.innerHTML = `<svg viewBox="0 0 24 24" role="presentation">${MEDIA_ICON_PATHS[kind] || MEDIA_ICON_PATHS.document}</svg>`;
+  MiniAppIcons.mount(icon, kind);
   return icon;
 }
 

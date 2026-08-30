@@ -20,15 +20,15 @@
   const RECENT_KEY = "rich_customize_apple_recent_emoji";
 
   const CATEGORY_META = {
-    "Smileys & Emotion": {key:"smileys", label:"الوجوه", fallback:"😀"},
-    "People & Body": {key:"people", label:"الأشخاص", fallback:"👋"},
-    "Animals & Nature": {key:"nature", label:"الحيوانات", fallback:"🐻"},
-    "Food & Drink": {key:"food", label:"الطعام", fallback:"🍕"},
-    Activities: {key:"activity", label:"النشاط", fallback:"⚽"},
-    "Travel & Places": {key:"travel", label:"السفر", fallback:"🚗"},
-    Objects: {key:"objects", label:"الأشياء", fallback:"💡"},
-    Symbols: {key:"symbols", label:"الرموز", fallback:"✨"},
-    Flags: {key:"flags", label:"الأعلام", fallback:"🏳️"},
+    "Smileys & Emotion": {key:"smileys", labelKey:"emoji.smileys", fallback:"😀"},
+    "People & Body": {key:"people", labelKey:"emoji.people", fallback:"👋"},
+    "Animals & Nature": {key:"nature", labelKey:"emoji.nature", fallback:"🐻"},
+    "Food & Drink": {key:"food", labelKey:"emoji.food", fallback:"🍕"},
+    Activities: {key:"activity", labelKey:"emoji.activity", fallback:"⚽"},
+    "Travel & Places": {key:"travel", labelKey:"emoji.travel", fallback:"🚗"},
+    Objects: {key:"objects", labelKey:"emoji.objects", fallback:"💡"},
+    Symbols: {key:"symbols", labelKey:"emoji.symbols", fallback:"✨"},
+    Flags: {key:"flags", labelKey:"emoji.flags", fallback:"🏳️"},
   };
   const CATEGORY_ORDER = ["smileys","people","nature","food","activity","travel","objects","symbols","flags"];
 
@@ -151,7 +151,7 @@
         lastError = error;
       }
     }
-    throw lastError || new Error("تعذر تحميل بيانات الإيموجي");
+    throw lastError || new Error(mt("emoji.catalog_unavailable"));
   }
 
   async function loadCatalog() {
@@ -294,14 +294,14 @@
       if (!items.length) {
         const empty = document.createElement("div");
         empty.className = "apple-emoji-empty";
-        empty.textContent = "الإيموجيات المستخدمة مؤخرًا راح تظهر هنا";
+        empty.textContent = mt("emoji.recent_empty");
         grid.appendChild(empty);
       }
-      if (title) title.textContent = "الأخيرة";
+      if (title) title.textContent = mt("emoji.recent");
     } else {
       items = catalog.groups[category] || [];
       const meta = Object.values(CATEGORY_META).find(item => item.key === category);
-      if (title) title.textContent = meta?.label || "الإيموجي";
+      if (title) title.textContent = meta?.labelKey ? mt(meta.labelKey) : mt("top.emoji");
     }
 
     panel.querySelectorAll(".apple-emoji-tab").forEach(button => {
@@ -331,8 +331,8 @@
     button.type = "button";
     button.className = "apple-emoji-tab apple-emoji-recent-tab";
     button.dataset.category = "recent";
-    button.setAttribute("aria-label", "الأخيرة");
-    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3.2 1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    button.setAttribute("aria-label", mt("emoji.recent"));
+    MiniAppIcons.mount(button,"recent");
     return button;
   }
 
@@ -345,15 +345,15 @@
   function buildPanel() {
     const root = document.createElement("aside");
     root.className = "popup-menu apple-emoji-picker-pop";
-    root.setAttribute("aria-label", "Apple Emoji");
+    root.setAttribute("aria-label", mt("emoji.apple"));
 
     const head = document.createElement("div");
     head.className = "apple-emoji-head";
     const title = document.createElement("strong");
     title.className = "apple-emoji-category-title";
-    title.textContent = "الوجوه";
+    title.textContent = mt("emoji.smileys");
     const badge = document.createElement("small");
-    badge.textContent = "Apple Emoji";
+    badge.textContent = mt("emoji.apple");
     head.append(title, badge);
 
     const grid = document.createElement("div");
@@ -373,8 +373,8 @@
       button.type = "button";
       button.className = "apple-emoji-tab";
       button.dataset.category = category;
-      button.setAttribute("aria-label", meta?.label || category);
-      button.appendChild(makeAppleImage(representative, "apple-emoji-tab-img"));
+      button.setAttribute("aria-label", meta?.labelKey ? mt(meta.labelKey) : category);
+      MiniAppIcons.mount(button,category);
       button.addEventListener("pointerdown", event => event.preventDefault());
       button.onclick = event => {event.preventDefault();event.stopPropagation();renderCategory(category);};
       tabs.appendChild(button);
@@ -392,7 +392,8 @@
     emojiBtn.classList.add("active");
     const loading = document.createElement("aside");
     loading.className = "popup-menu apple-emoji-picker-pop apple-emoji-loading";
-    loading.innerHTML = '<div class="apple-emoji-loader"></div><span>تحميل Apple Emoji…</span>';
+    loading.innerHTML = '<div class="apple-emoji-loader"></div><span class="apple-emoji-loading-text"></span>';
+    loading.querySelector(".apple-emoji-loading-text").textContent=mt("emoji.loading_apple");
     panel = loading;
     document.body.appendChild(panel);
     requestAnimationFrame(placePanel);
@@ -408,7 +409,7 @@
       requestAnimationFrame(placePanel);
     } catch (error) {
       closePanel();
-      if (typeof toast === "function") toast(`تعذر تحميل Apple Emoji: ${error.message}`);
+      if (typeof toast === "function") toast(mt("emoji.load_failed",{error:error.message}));
     }
   }
 

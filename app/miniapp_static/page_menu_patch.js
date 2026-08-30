@@ -40,10 +40,10 @@
     more.classList.add("active");
     menu = document.createElement("aside");
     menu.className = "popup-menu page-top-menu";
-    menu.setAttribute("aria-label", "خيارات الصفحة");
+    menu.setAttribute("aria-label", mt("page.options"));
     const list = document.createElement("div");
     list.className = "menu-list";
-    list.appendChild(menuButton("＋","صفحة جديدة","",async() => {
+    list.appendChild(menuButton("add",mt("page.new"),"",async() => {
       close();
       try {
         await flushSave();
@@ -52,12 +52,12 @@
         toast(error.message);
       }
     }));
-    list.appendChild(menuButton("✓","حفظ الآن","",async() => {
+    list.appendChild(menuButton("save",mt("page.save_now"),"",async() => {
       close();
       try {
         dirty = true;
         await flushSave();
-        toast("تم الحفظ");
+        toast(mt("save.saved"));
       } catch (error) {
         toast(error.message);
       }

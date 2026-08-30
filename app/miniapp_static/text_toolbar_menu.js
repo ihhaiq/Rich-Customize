@@ -1,6 +1,6 @@
 // Beta 0.3.14 — Telegram-style Aa menu with Heading, Anchor and inline Rich Button submenus.
 (() => {
-  const tr = (key, fallback) => window.MiniAppI18n?.t?.(key) || fallback;
+  const tr = (key, fallback, vars) => window.MiniAppI18n?.t?.(key, vars) || fallback;
   const textButton = document.querySelector('.composer-toolbar [data-tool="text"]');
   if (!textButton) return;
 
@@ -10,15 +10,15 @@
   let submenuRow = null;
 
   const ROOT_ITEMS = [
-    {kind:"heading", icon:"H", label:tr("block.heading", "العنوان"), arrow:true},
-    {type:"paragraph", icon:"T", label:tr("block.paragraph", "Text"), shortcut:"Ctrl+Shift+B"},
-    {type:"blockquote", icon:"❝", label:tr("block.blockquote", "اقتباس"), shortcut:"Ctrl+Shift+."},
-    {type:"pullquote", icon:"❞", label:tr("block.pullquote", "اقتباس مميز")},
-    {type:"preformatted", icon:"</>", label:tr("block.preformatted", "نص برمجي"), shortcut:"Ctrl+Shift+M"},
-    {type:"footer", icon:"≡", label:tr("block.footer", "التذييل")},
-    {type:"divider", icon:"—", label:tr("block.divider", "Divider")},
-    {type:"anchor", icon:"#", label:tr("block.anchor", "مرساة")},
-    {kind:"rich_button", icon:"▣", label:tr("inline.create_button", "زر غني"), arrow:true},
+    {kind:"heading", icon:"heading", label:tr("block.heading", "Heading"), arrow:true},
+    {type:"paragraph", icon:"paragraph", label:tr("block.paragraph", "Text"), shortcut:"Ctrl+Shift+B"},
+    {type:"blockquote", icon:"quote", label:tr("block.blockquote", "Quote"), shortcut:"Ctrl+Shift+."},
+    {type:"pullquote", icon:"pullquote", label:tr("block.pullquote", "Pull quote")},
+    {type:"preformatted", icon:"code", label:tr("block.preformatted", "Code"), shortcut:"Ctrl+Shift+M"},
+    {type:"footer", icon:"footer", label:tr("block.footer", "Footer")},
+    {type:"divider", icon:"divider", label:tr("block.divider", "Divider")},
+    {type:"anchor", icon:"anchor", label:tr("block.anchor", "Anchor")},
+    {kind:"rich_button", icon:"button", label:tr("inline.create_button", "Rich button"), arrow:true},
   ];
 
   function viewportBounds() {
@@ -54,7 +54,7 @@
 
     const iconEl = document.createElement("span");
     iconEl.className = "text-menu-icon";
-    iconEl.textContent = icon;
+    MiniAppIcons.mount(iconEl, icon);
     const labelEl = document.createElement("span");
     labelEl.className = "text-menu-label";
     labelEl.textContent = label;
@@ -69,7 +69,7 @@
     if (arrow) {
       const arrowEl = document.createElement("span");
       arrowEl.className = "text-menu-arrow";
-      arrowEl.textContent = "›";
+      MiniAppIcons.mount(arrowEl, "next");
       tail.appendChild(arrowEl);
     }
     button.append(iconEl, labelEl, tail);
@@ -170,7 +170,7 @@
     headingMenu.className = "popup-menu text-heading-submenu";
     headingMenu.setAttribute("aria-label", tr("heading.level_picker", "مستوى العنوان"));
     for (let level = 1; level <= 6; level++) {
-      headingMenu.appendChild(makeRow({icon:`H${level}`, label:window.MiniAppI18n?.t?.("heading.level", {level}) || `العنوان ${level}`, level}, () => insertHeading(level)));
+      headingMenu.appendChild(makeRow({icon:"heading", label:tr("heading.level", `Heading ${level}`, {level}), level}, () => insertHeading(level)));
     }
     document.body.appendChild(headingMenu);
     requestAnimationFrame(() => positionSubmenu(headingMenu, row));
