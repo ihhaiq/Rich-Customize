@@ -6,8 +6,8 @@ from aiogram.types import CallbackQuery, Message
 
 from app.editor.history import remember
 from app.editor.workflow import editor_workflow
+from app.i18n import t
 from app.keyboards import (
-    build_block_editor_keyboard,
     build_block_position_keyboard,
     build_delete_confirmation_keyboard,
     build_rich_editor_keyboard,
@@ -15,6 +15,7 @@ from app.keyboards import (
 from app.states import RichEditorStates
 
 from app.routers import editor_core as core
+from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_support import block_by_id, save_blocks
 
 
@@ -41,7 +42,7 @@ async def open_block(callback: CallbackQuery, state: FSMContext) -> None:
     await core._edit_ui(
         callback.message,
         core._block_page(block, blocks),
-        build_block_editor_keyboard(block, blocks),
+        build_managed_block_keyboard(block, blocks),
     )
     await callback.answer()
 
@@ -66,7 +67,7 @@ async def duplicate_block_action(callback: CallbackQuery, state: FSMContext) -> 
     await core._edit_ui(
         callback.message,
         core._block_page(result.block, result.blocks),
-        build_block_editor_keyboard(result.block, result.blocks),
+        build_managed_block_keyboard(result.block, result.blocks),
     )
     await callback.answer("تم نسخ الـBlock")
 
@@ -109,7 +110,7 @@ async def confirm_delete(callback: CallbackQuery, state: FSMContext) -> None:
         await state.update_data(current_block_id=None)
         await core._edit_ui(
             callback.message,
-            core.MAIN_TEXT if result.blocks else core.t("editor.empty_hint"),
+            core.MAIN_TEXT if result.blocks else t("editor.empty_hint"),
             build_rich_editor_keyboard(result.blocks),
         )
         await callback.answer("تم الحذف")
@@ -167,7 +168,7 @@ async def move_one_step(callback: CallbackQuery, state: FSMContext) -> None:
         await core._edit_ui(
             callback.message,
             core._block_page(result.block, result.blocks),
-            build_block_editor_keyboard(result.block, result.blocks),
+            build_managed_block_keyboard(result.block, result.blocks),
         )
         await callback.answer("تم تغيير الموقع")
 
