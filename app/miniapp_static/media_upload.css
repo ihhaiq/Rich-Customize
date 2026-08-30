@@ -5,3 +5,5 @@
 video.media-live-preview{object-fit:contain}
 .audio-live-preview{display:block;width:100%;min-height:44px}
 .media-picker-card:not(.invalid) .media-upload-status,.media-picker-card:not(.invalid) .photo-upload-status{color:color-mix(in srgb,var(--text) 72%,var(--muted))}
+.media-picker-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:13px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.media-picker-icon svg{display:block;width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

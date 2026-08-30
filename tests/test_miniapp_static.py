@@ -34,3 +34,11 @@ def test_requested_inline_formats_are_available() -> None:
         assert f'{name}:' in source
     assert 'tr("inline.link"' in source
     assert 'tr("inline.create_button"' in source
+
+
+def test_media_picker_is_localized_and_uses_svg_icons() -> None:
+    source = (STATIC / "media_upload.js").read_text("utf-8")
+    assert not re.search(r"[\u0600-\u06ff]", source)
+    assert "createMediaIcon" in source
+    assert '<svg viewBox="0 0 24 24"' in source
+    assert 'mt("media.picker_hint")' in source
