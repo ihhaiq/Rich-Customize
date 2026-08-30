@@ -2,27 +2,36 @@ from __future__ import annotations
 
 import html
 import re
-import uuid
 from typing import Any, Iterable
 
 from aiogram.types import Message
 
+from app.editor.models import (
+    SOURCE_IMPORTED,
+    SOURCE_NATIVE,
+    make_block,
+    normalize_block,
+    normalize_blocks,
+)
 from app.i18n import tr
-from app.services.blocks import normalize_block_positions
 from app.services.media import media_store, native_file_data
 
 
-TEXT_NATIVE_TYPES = {
-    "paragraph",
-}
+TEXT_NATIVE_TYPES = {"paragraph"}
 BLOCKQUOTE_HTML_RE = re.compile(
     r"<blockquote(?:\s+[^>]*)?>(.*?)</blockquote>",
     flags=re.IGNORECASE | re.DOTALL,
 )
 
 
-def _new_block(block_type: str, position: int, data: dict[str, Any]) -> dict[str, Any]:
-    return {"id": uuid.uuid4().hex[:12], "type": block_type, "position": position, "data": data}
+def _new_block(
+    block_type: str,
+    position: int,
+    data: dict[str, Any],
+    *,
+    source: str = SOURCE_IMPORTED,
+) -> dict[str, Any]:
+    return make_block(block_type, data, position=position, source=source)
 
 
 def _dump_entities(entities: Iterable[Any] | None) -> list[dict[str, Any]]:
@@ -169,8 +178,10 @@ def _native_type(kind: str) -> str:
     if kind in TEXT_NATIVE_TYPES:
         return "text"
     return {
-        "voice_note": "voice", "section_heading": "heading",
-        "block_quotation": "blockquote", "pull_quotation": "pullquote",
+        "voice_note": "voice",
+        "section_heading": "heading",
+        "block_quotation": "blockquote",
+        "pull_quotation": "pullquote",
     }.get(kind, kind)
 
 
@@ -189,7 +200,6 @@ def _native_raw_to_block(raw: dict[str, Any], position: int) -> dict[str, Any]:
     block_type = _native_type(raw_type)
     caption_html, credit_html = _caption_parts(raw)
     data: dict[str, Any] = {
-        "native": True,
         "native_type": raw_type,
         "native_data": raw,
         "html": _native_html(raw),
@@ -200,10 +210,18 @@ def _native_raw_to_block(raw: dict[str, Any], position: int) -> dict[str, Any]:
     if media_file is not None:
         data["file"] = media_file
     if block_type == "details":
-        data["summary_html"] = _rich_text_to_html(raw.get("summary", raw.get("title"))) or tr("تفاصيل")
-        data["children"] = [_native_raw_to_block(item, index) for index, item in enumerate(raw.get("blocks", []))]
+        data["summary_html"] = (
+            _rich_text_to_html(raw.get("summary", raw.get("title"))) or tr("تفاصيل")
+        )
+        data["children"] = [
+            _native_raw_to_block(item, index)
+            for index, item in enumerate(raw.get("blocks", []))
+        ]
     elif block_type in {"collage", "slideshow"}:
-        data["children"] = [_native_raw_to_block(item, index) for index, item in enumerate(raw.get("blocks", []))]
+        data["children"] = [
+            _native_raw_to_block(item, index)
+            for index, item in enumerate(raw.get("blocks", []))
+        ]
     elif block_type == "blockquote":
         data["quote_html"] = "".join(_native_html(item) for item in raw.get("blocks", []))
         data["credit_html"] = _rich_text_to_html(raw.get("credit")) or None
@@ -213,20 +231,28 @@ def _native_raw_to_block(raw: dict[str, Any], position: int) -> dict[str, Any]:
     elif block_type == "map":
         location = raw.get("location", {})
         data.update(
-            latitude=location.get("latitude"), longitude=location.get("longitude"),
-            zoom=raw.get("zoom", 15), width=raw.get("width", 600), height=raw.get("height", 400),
+            latitude=location.get("latitude"),
+            longitude=location.get("longitude"),
+            zoom=raw.get("zoom", 15),
+            width=raw.get("width", 600),
+            height=raw.get("height", 400),
         )
-    return _new_block(block_type, position, data)
+    return _new_block(block_type, position, data, source=SOURCE_NATIVE)
 
 
 def _parse_native_rich(message: Message) -> list[dict[str, Any]]:
     return [
-        _native_raw_to_block(native.model_dump(mode="json", exclude_none=True), position)
+        _native_raw_to_block(
+            native.model_dump(mode="json", exclude_none=True),
+            position,
+        )
         for position, native in enumerate(message.rich_message.blocks)
     ]
 
 
 def _remember(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    for block in blocks:
+        normalize_block(block)
     media_store.remember_blocks(blocks)
     return blocks
 
@@ -241,14 +267,17 @@ def message_to_blocks(message: Message, start_position: int = 0) -> list[dict[st
     blocks: list[dict[str, Any]] = []
     position = start_position
     if message.text is not None:
-        return _formatted_message_text_blocks(message, position)
+        return _remember(_formatted_message_text_blocks(message, position))
 
     media_type = None
     file_obj = None
     if message.photo:
         media_type, file_obj = "photo", message.photo[-1]
     else:
-        for name in ("video", "animation", "audio", "voice", "document", "sticker", "video_note"):
+        for name in (
+            "video", "animation", "audio", "voice",
+            "document", "sticker", "video_note",
+        ):
             value = getattr(message, name, None)
             if value is not None:
                 media_type, file_obj = name, value
@@ -274,18 +303,29 @@ def messages_to_blocks(messages: list[Message]) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
     for message in sorted(messages, key=lambda item: item.message_id):
         blocks.extend(message_to_blocks(message, len(blocks)))
-    normalized = normalize_block_positions(blocks)
-    media_store.remember_blocks(normalized)
-    return normalized
+    normalize_blocks(blocks)
+    return _remember(blocks)
+
+
+def replacement_block(message: Message, block_type: str) -> dict[str, Any] | None:
+    parsed = message_to_blocks(message)
+    wanted = "text" if block_type in {"text", "caption", "quote"} else block_type
+    return next((item for item in parsed if item["type"] == wanted), None)
 
 
 def replacement_data(message: Message, block_type: str) -> dict[str, Any] | None:
-    parsed = message_to_blocks(message)
-    wanted = "text" if block_type in {"text", "caption", "quote"} else block_type
-    replacement = next((item for item in parsed if item["type"] == wanted), None)
+    replacement = replacement_block(message, block_type)
     if replacement is None:
         return None
     data = replacement["data"]
     if block_type == "caption":
         data = {**data, "caption": True}
     return data
+
+
+__all__ = [
+    "message_to_blocks",
+    "messages_to_blocks",
+    "replacement_block",
+    "replacement_data",
+]
