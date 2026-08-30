@@ -6,10 +6,11 @@ from typing import Any
 from app.editor.document import (
     add_block,
     delete_block,
+    duplicate_block,
     move_block,
     replace_block,
 )
-from app.editor.models import clone_blocks, normalize_blocks
+from app.editor.models import clone_blocks
 from app.editor.registry import block_registry
 
 
@@ -47,7 +48,8 @@ class EditorWorkflow:
     ) -> MutationResult:
         working = clone_blocks(blocks)
         changed = move_block(working, block_id, new_index)
-        return MutationResult(working, changed)
+        moved = next((item for item in working if item.get("id") == block_id), None)
+        return MutationResult(working, changed, moved)
 
     def replace(
         self,
@@ -58,6 +60,17 @@ class EditorWorkflow:
         working = clone_blocks(blocks)
         updated = replace_block(working, block_id, replacement)
         return MutationResult(working, updated is not None, updated)
+
+    def duplicate(
+        self,
+        blocks: list[dict[str, Any]],
+        block_id: str,
+        *,
+        after: bool = True,
+    ) -> MutationResult:
+        working = clone_blocks(blocks)
+        duplicate = duplicate_block(working, block_id, after=after)
+        return MutationResult(working, duplicate is not None, duplicate)
 
     def import_blocks(self, blocks: list[dict[str, Any]]) -> MutationResult:
         imported = clone_blocks(blocks)
