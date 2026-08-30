@@ -548,6 +548,8 @@ async def receive_details_add(
     data = await state.get_data()
     if data.get("pending_add_type") != DETAILS_TYPE:
         raise SkipHandler
+    if await core._defer_text_for_user_buttons(message, state, "adding_block"):
+        return
 
     step = data.get("add_step")
     payload = dict(data.get("add_payload") or {})
@@ -1063,7 +1065,11 @@ async def receive_nested_replacement(
         child["source"] = "generated"
         child["data"].pop("native", None)
         child["data"].pop("native_data", None)
-        child["data"]["caption_html"] = message.html_text
+        child["data"]["caption_html"] = (
+            None
+            if message.text.strip().lower() == "/remove"
+            else message.html_text
+        )
     elif action == "credit":
         detach_native_details(details)
         child["source"] = "generated"
@@ -1071,7 +1077,7 @@ async def receive_nested_replacement(
         child["data"].pop("native_data", None)
         child["data"]["credit_html"] = (
             None
-            if message.text.strip().lower() == "/skip"
+            if message.text.strip().lower() in {"/remove", "/skip"}
             else message.html_text
         )
     else:
@@ -1144,6 +1150,14 @@ async def receive_details_edit(
     bot: Bot,
 ) -> None:
     data = await state.get_data()
+    owns_details_edit = bool(
+        data.get("nested_details_id")
+        or data.get("expected_type") == DETAILS_TYPE
+    )
+    if owns_details_edit and await core._defer_text_for_user_buttons(
+        message, state, "editing_block",
+    ):
+        return
     if data.get("nested_details_id"):
         handled = await receive_nested_replacement(message, state, bot, data)
         if handled:
