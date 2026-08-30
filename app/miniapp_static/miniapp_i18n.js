@@ -197,18 +197,24 @@
     },
   };
 
+  Object.entries(window.MiniAppLocaleOverrides || {}).forEach(([code, translations]) => {
+    dictionaries[code] = {...dictionaries.en, ...(dictionaries[code] || {}), ...translations};
+  });
+
   function normalize(raw) {
     const value = String(raw || "").toLowerCase().replaceAll("_", "-");
     if (value.startsWith("ar")) return "ar";
     if (value.startsWith("ru")) return "ru";
     if (["zh-tw","zh-hk","zh-mo","zh-hant"].some(code => value.startsWith(code))) return "zh-hant";
     if (value.startsWith("zh")) return "zh-hans";
+    const primary = value.split("-", 1)[0];
+    if (dictionaries[primary]) return primary;
     return "en";
   }
 
   const telegramLanguage = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code;
   const language = normalize(telegramLanguage || navigator.language);
-  const rtl = language === "ar";
+  const rtl = ["ar","fa","ur"].includes(language);
 
   function t(key, vars = {}) {
     const template = dictionaries[language]?.[key] ?? dictionaries.en[key] ?? dictionaries.ar[key] ?? key;
