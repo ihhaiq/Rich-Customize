@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.i18n import t
-from app.keyboards import build_block_editor_keyboard, build_heading_level_keyboard
+from app.keyboards import build_heading_level_keyboard
 from app.services.factory import (
     MEDIA_CAPTION_TYPES,
     QUOTE_TYPES,
@@ -21,6 +21,7 @@ from app.services.parser import message_to_blocks, messages_to_blocks, replaceme
 from app.states import RichEditorStates
 
 from app.routers import editor_core as core
+from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_support import block_by_id, replace_payload
 
 
@@ -233,11 +234,8 @@ async def receive_replacement(
         await message.answer("نوع المحتوى غير صحيح. أرسل نفس نوع الجزء المطلوب.")
         return
 
-    for key in ("native", "native_data", "native_type", "html"):
-        if key == "html" and expected in {"paragraph", "heading", "preformatted", "footer", "anchor", "list", "table"}:
-            continue
-        if key != "html":
-            replacement.pop(key, None)
+    for key in ("native", "native_data", "native_type"):
+        replacement.pop(key, None)
 
     updated = await replace_payload(
         state,
@@ -263,7 +261,7 @@ async def receive_replacement(
         bot,
         state,
         core._block_page(updated, blocks),
-        build_block_editor_keyboard(updated, blocks),
+        build_managed_block_keyboard(updated, blocks),
     )
 
 
@@ -296,8 +294,8 @@ async def toggle_checklist_task(callback: CallbackQuery, state: FSMContext) -> N
     item = replacement_items[item_index]
     item["has_checkbox"] = True
     item["is_checked"] = not bool(item.get("is_checked"))
-    replacement.pop("native", None)
-    replacement.pop("native_data", None)
+    for key in ("native", "native_data", "native_type"):
+        replacement.pop(key, None)
     updated = await replace_payload(state, blocks, block_id, replacement)
     if updated is None:
         await callback.answer(t("list.missing_task"), show_alert=True)
@@ -305,7 +303,7 @@ async def toggle_checklist_task(callback: CallbackQuery, state: FSMContext) -> N
     await core._edit_ui(
         callback.message,
         core._block_page(updated, blocks),
-        build_block_editor_keyboard(updated, blocks),
+        build_managed_block_keyboard(updated, blocks),
     )
     await callback.answer(
         t("list.marked_done") if item["is_checked"] else t("list.marked_pending"),
