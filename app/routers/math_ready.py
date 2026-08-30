@@ -11,10 +11,10 @@ from app.editor.importer import first_block_of_type
 from app.editor.registry import block_registry
 from app.editor.workflow import editor_workflow
 from app.i18n import t
-from app.keyboards import build_block_editor_keyboard
 from app.states import RichEditorStates
 
 from app.routers import editor_core
+from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_support import save_blocks
 from app.routers.details import (
     receive_nested_replacement,
@@ -113,7 +113,7 @@ async def receive_ready_math_edit(message: Message, state: FSMContext, bot: Bot)
         bot,
         state,
         editor_core._block_page(result.block, result.blocks),
-        build_block_editor_keyboard(result.block, result.blocks),
+        build_managed_block_keyboard(result.block, result.blocks),
     )
 
 
