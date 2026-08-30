@@ -14,13 +14,26 @@ from app.editor.session import load_editor_session as _session
 from app.editor.history import UNDO_KEY
 from app.routers.editor_entry import new_editor
 from app.routers.editor_preview import import_rich_message_into_editor
-from app.routers.editor_ui import editor_overview_text as _editor_overview_text
-from app.routers.editor_core import (
-    _ask_for_button_user, _block_page, _code_input_prompt,
-    _delete_stored_block_prompt, _math_input_prompt,
-    _opened_page_text, _page_screen, _saved_pages_text,
-    _details_inner_list_text, _details_inner_page, _receive_nested_replacement,
-    _pages_for_user,
+from app.routers.editor_ui import (
+    delete_stored_block_prompt as _delete_stored_block_prompt,
+    editor_overview_text as _editor_overview_text,
+)
+from app.routers.block_input_support import (
+    code_input_prompt as _code_input_prompt,
+    math_input_prompt as _math_input_prompt,
+)
+from app.routers.block_view import block_page as _block_page
+from app.routers.button_target_picker import ask_for_button_user as _ask_for_button_user
+from app.routers.details_edit import receive_nested_replacement as _receive_nested_replacement
+from app.routers.details_support import (
+    details_inner_list_text as _details_inner_list_text,
+    details_inner_page as _details_inner_page,
+)
+from app.routers.page_support import (
+    opened_page_text as _opened_page_text,
+    page_screen as _page_screen,
+    pages_for_user as _pages_for_user,
+    saved_pages_text as _saved_pages_text,
 )
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
@@ -258,8 +271,8 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
         message = SimpleNamespace(text="المصدر", html_text="المصدر")
         state = SimpleNamespace(update_data=AsyncMock(), set_state=AsyncMock())
         with (
-            patch("app.routers.editor_core._delete_add_step_messages", AsyncMock()),
-            patch("app.routers.editor_core._edit_saved_ui", AsyncMock()),
+            patch("app.routers.details_edit.core._delete_add_step_messages", AsyncMock()),
+            patch("app.routers.details_edit.core._edit_saved_ui", AsyncMock()),
         ):
             handled = await _receive_nested_replacement(
                 message, state, SimpleNamespace(), data,

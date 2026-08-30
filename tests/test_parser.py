@@ -11,7 +11,8 @@ from app.services.inline_buttons import (
     find_user_button_markers, inline_button_rich_text, resolve_user_button_marker,
 )
 from app import i18n_core
-from app.routers.editor_core import _button_guide_blocks, _friendly_rich_error
+from app.routers.button_guide import button_guide_blocks as _button_guide_blocks
+from app.routers.editor_ui import friendly_rich_error as _friendly_rich_error
 
 
 class FormattedTextParserTests(unittest.TestCase):
