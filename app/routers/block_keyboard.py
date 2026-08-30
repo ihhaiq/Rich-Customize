@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.i18n import t
 from app.keyboards import build_block_editor_keyboard
 
 
@@ -19,7 +20,7 @@ def build_managed_block_keyboard(
         for button in row
     ):
         duplicate_row = [InlineKeyboardButton(
-            text="📋 نسخ الـBlock",
+            text=t("block.duplicate_button"),
             callback_data=f"r:dup:{block_id}",
         )]
         delete_index = next(
