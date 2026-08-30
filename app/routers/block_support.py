@@ -6,9 +6,10 @@ from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from app.editor.document import get_block_by_id, replace_block_data
+from app.editor.document import get_block_by_id
 from app.editor.draft_store import draft_store
 from app.editor.history import remember
+from app.editor.models import make_block
 from app.editor.workflow import editor_workflow
 from app.keyboards import build_rich_editor_keyboard
 from app.states import RichEditorStates
@@ -64,16 +65,22 @@ async def replace_payload(
     *,
     source: str = "generated",
 ) -> dict[str, Any] | None:
-    await remember(state)
-    updated = replace_block_data(
-        blocks,
-        block_id,
+    current = get_block_by_id(blocks, block_id)
+    if current is None:
+        return None
+    candidate = make_block(
+        str(current.get("type", "content")),
         payload,
         source=source,
+        block_id=str(current.get("id")),
     )
-    if updated is not None:
-        await save_blocks(state, blocks)
-    return updated
+    result = editor_workflow.replace(blocks, block_id, candidate)
+    if not result.changed or result.block is None:
+        return None
+    await remember(state)
+    blocks[:] = result.blocks
+    await save_blocks(state, blocks)
+    return get_block_by_id(blocks, block_id)
 
 
 def block_by_id(
