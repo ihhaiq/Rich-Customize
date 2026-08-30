@@ -7,6 +7,11 @@ from app.locales.common import (
     KEY_TRANSLATIONS as COMMON_KEY_TRANSLATIONS,
     PHRASES as COMMON_PHRASES,
 )
+from app.locales.details_semantic import (
+    DETAILS_AR_PHRASES,
+    DETAILS_KEY_TRANSLATIONS,
+    DETAILS_PHRASES,
+)
 from app.locales.editor_semantic import (
     EDITOR_AR_PHRASES,
     EDITOR_KEY_TRANSLATIONS,
@@ -21,10 +26,13 @@ from app.translations_zh import ZH_HANS, ZH_HANT
 
 # Semantic editor copy is registered in the locale layer, never from routers.
 # This is the single initialization point for prompt overrides.
-COMMON_PHRASES.update(EDITOR_PHRASES)
-COMMON_AR_PHRASES.update(EDITOR_AR_PHRASES)
-for _language_code, _overrides in EDITOR_KEY_TRANSLATIONS.items():
-    COMMON_KEY_TRANSLATIONS.setdefault(_language_code, {}).update(_overrides)
+for _phrases in (EDITOR_PHRASES, DETAILS_PHRASES):
+    COMMON_PHRASES.update(_phrases)
+for _phrases in (EDITOR_AR_PHRASES, DETAILS_AR_PHRASES):
+    COMMON_AR_PHRASES.update(_phrases)
+for _translation_group in (EDITOR_KEY_TRANSLATIONS, DETAILS_KEY_TRANSLATIONS):
+    for _language_code, _overrides in _translation_group.items():
+        COMMON_KEY_TRANSLATIONS.setdefault(_language_code, {}).update(_overrides)
 
 # Register Arabic UI fragments before app.i18n snapshots _core.EN. This keeps
 # every caller using the same Arabic -> English normalization table.
