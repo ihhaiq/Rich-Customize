@@ -1,5 +1,6 @@
 // Beta 0.3.32 — unified editor features: drag/drop, multi-select, preview, commands and button dialog.
 (() => {
+  const tr = (key, fallback, vars) => window.MiniAppI18n?.t?.(key, vars) || fallback;
   const root = document.getElementById("editorView");
   if (!root || typeof renderBlocks !== "function") return;
 
@@ -278,12 +279,12 @@
   }
 
   const BUTTON_TYPES = [
-    {value:"url", label:"رابط", placeholder:"https://example.com"},
-    {value:"copy", label:"نسخ", placeholder:"النص المطلوب نسخه"},
-    {value:"user", label:"Mention", placeholder:"User ID أو @username"},
-    {value:"page_callback", label:"صفحة", placeholder:"رمز الصفحة المحفوظة"},
+    {value:"url", label:tr("button.url", "رابط"), placeholder:"https://example.com"},
+    {value:"copy", label:tr("button.copy", "نسخ"), placeholder:tr("button.copy_placeholder", "النص المطلوب نسخه")},
+    {value:"user", label:tr("button.mention", "Mention"), placeholder:"User ID / @username"},
+    {value:"page_callback", label:tr("button.page", "صفحة"), placeholder:tr("button.page_placeholder", "رمز الصفحة المحفوظة")},
     {value:"callback_data", label:"Callback", placeholder:"callback_data"},
-    {value:"popup", label:"Popup", placeholder:"نص التنبيه"},
+    {value:"popup", label:tr("button.popup", "Popup"), placeholder:tr("button.popup_placeholder", "نص التنبيه")},
   ];
   const BUTTON_STYLES = [
     {label:"Default", color:null},
@@ -304,20 +305,20 @@
     card.className = "rich-button-dialog glass-panel";
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-modal", "true");
-    card.setAttribute("aria-label", "إضافة زر");
+    card.setAttribute("aria-label", tr("button.add", "إضافة زر"));
 
     const preset = BUTTON_TYPES.some(item => item.value === options.presetType) ? options.presetType : "url";
     let chosenType = preset;
     let chosenColor = null;
 
     card.innerHTML = `
-      <h3>إضافة زر</h3>
-      <label class="button-dialog-field"><span>نص الزر</span><input class="button-title-input" maxlength="64" value="${escapeHtml(options.title || "")}" placeholder="اكتب عنوان الزر"></label>
-      <label class="button-separate-option"><input type="checkbox" class="button-separate-input"><span class="button-check"></span><span>زر في سطر منفصل</span></label>
-      <div class="button-style-row" aria-label="نمط الزر"></div>
+      <h3>${escapeHtml(tr("button.add", "إضافة زر"))}</h3>
+      <label class="button-dialog-field"><span>${escapeHtml(tr("button.title", "نص الزر"))}</span><input class="button-title-input" maxlength="64" value="${escapeHtml(options.title || "")}" placeholder="${escapeHtml(tr("button.title_placeholder", "اكتب عنوان الزر"))}"></label>
+      <label class="button-separate-option"><input type="checkbox" class="button-separate-input"><span class="button-check"></span><span>${escapeHtml(tr("button.separate", "زر في سطر منفصل"))}</span></label>
+      <div class="button-style-row" aria-label="${escapeHtml(tr("button.style", "نمط الزر"))}"></div>
       <div class="button-type-list" role="radiogroup"></div>
-      <label class="button-dialog-field button-value-field"><span class="button-value-label">الرابط</span><input class="button-value-input" dir="ltr" placeholder="https://example.com"></label>
-      <div class="button-dialog-actions"><button type="button" data-button-dialog="cancel">إلغاء</button><button type="button" class="save" data-button-dialog="save">حفظ</button></div>`;
+      <label class="button-dialog-field button-value-field"><span class="button-value-label">${escapeHtml(tr("button.url", "الرابط"))}</span><input class="button-value-input" dir="ltr" placeholder="https://example.com"></label>
+      <div class="button-dialog-actions"><button type="button" data-button-dialog="cancel">${escapeHtml(tr("common.cancel", "إلغاء"))}</button><button type="button" class="save" data-button-dialog="save">${escapeHtml(tr("common.save", "حفظ"))}</button></div>`;
 
     const styleRow = card.querySelector(".button-style-row");
     BUTTON_STYLES.forEach((style, index) => {
@@ -338,7 +339,7 @@
     const valueInput = card.querySelector(".button-value-input");
     const updateTypeField = () => {
       const meta = BUTTON_TYPES.find(item => item.value === chosenType) || BUTTON_TYPES[0];
-      valueLabel.textContent = meta.label === "رابط" ? "URL" : meta.label;
+      valueLabel.textContent = chosenType === "url" ? "URL" : meta.label;
       valueInput.placeholder = meta.placeholder;
       valueInput.type = chosenType === "url" ? "url" : "text";
     };
@@ -362,9 +363,9 @@
       const title = String(card.querySelector(".button-title-input")?.value || "").trim();
       let value = String(valueInput.value || "").trim();
       const separateLine = Boolean(card.querySelector(".button-separate-input")?.checked);
-      if (!title) { toast("اكتب نص الزر"); return; }
-      if (chosenType === "url" && value && !/^(https?:\/\/|tg:\/\/)/i.test(value)) { toast("الرابط لازم يبدأ بـ https:// أو tg://"); return; }
-      if (["copy","popup"].includes(chosenType) && !value) { toast("اكتب قيمة الزر"); return; }
+      if (!title) { toast(tr("button.title_required", "اكتب نص الزر")); return; }
+      if (chosenType === "url" && value && !/^(https?:\/\/|tg:\/\/)/i.test(value)) { toast(tr("inline.invalid_link", "الرابط لازم يبدأ بـ https:// أو tg://")); return; }
+      if (["copy","popup"].includes(chosenType) && !value) { toast(tr("button.value_required", "اكتب قيمة الزر")); return; }
       let type = chosenType;
       if (type === "user" && /^@[A-Za-z0-9_]{4,}$/.test(value)) {
         type = "url";
@@ -375,7 +376,7 @@
         color:chosenColor,
         separateLine,
       });
-      if (created === null || created === false) { toast("تعذر إنشاء الزر"); return; }
+      if (created === null || created === false) { toast(tr("button.create_failed", "تعذر إنشاء الزر")); return; }
       closeButtonDialog();
       haptic("medium");
     });
