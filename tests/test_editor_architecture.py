@@ -8,6 +8,7 @@ from app.editor.document import (
     duplicate_block,
     move_block,
     replace_block,
+    replace_block_data,
 )
 from app.editor.draft_store import draft_store
 from app.editor.history import redo, remember, undo
@@ -80,6 +81,29 @@ def test_document_operations_keep_positions_and_identity():
     assert duplicate is not None
     assert duplicate["id"] != old_id
     assert duplicate["type"] == updated["type"]
+
+
+def test_generated_edit_detaches_native_payload():
+    native = make_block(
+        "table",
+        {
+            "native_data": {"type": "table", "cells": [[{"text": "old"}]]},
+            "native": True,
+        },
+        source="native",
+    )
+    blocks = [native]
+
+    updated = replace_block_data(
+        blocks,
+        native["id"],
+        {"rows": [["new"]], "text": "new"},
+    )
+
+    assert updated is not None
+    assert updated["source"] == "generated"
+    assert "native" not in updated["data"]
+    assert "native_data" not in updated["data"]
 
 
 def test_history_supports_multiple_undo_and_redo_steps():
