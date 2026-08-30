@@ -57,11 +57,11 @@ async def duplicate_block_action(callback: CallbackQuery, state: FSMContext) -> 
     if block_by_id(blocks, block_id) is None:
         await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
         return
-    await remember(state)
     result = editor_workflow.duplicate(blocks, block_id, after=True)
     if not result.changed or result.block is None:
         await callback.answer("تعذر نسخ هذا الجزء.", show_alert=True)
         return
+    await remember(state)
     await save_blocks(state, result.blocks)
     await state.update_data(current_block_id=result.block["id"])
     await core._edit_ui(
@@ -69,7 +69,7 @@ async def duplicate_block_action(callback: CallbackQuery, state: FSMContext) -> 
         core._block_page(result.block, result.blocks),
         build_managed_block_keyboard(result.block, result.blocks),
     )
-    await callback.answer("تم نسخ الـBlock")
+    await callback.answer(t("block.duplicated"))
 
 
 @router.callback_query(F.data.startswith("r:d:"))
@@ -100,11 +100,11 @@ async def confirm_delete(callback: CallbackQuery, state: FSMContext) -> None:
             return
         _, blocks = session
         block_id = callback.data.rsplit(":", 1)[-1]
-        await remember(state)
         result = editor_workflow.delete(blocks, block_id)
         if not result.changed:
             await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
             return
+        await remember(state)
         await save_blocks(state, result.blocks)
         await state.set_state(RichEditorStates.managing)
         await state.update_data(current_block_id=None)
@@ -159,11 +159,11 @@ async def move_one_step(callback: CallbackQuery, state: FSMContext) -> None:
         if not 0 <= target_index < len(ordered):
             await callback.answer("هذا الجزء وصل إلى نهاية الترتيب.")
             return
-        await remember(state)
         result = editor_workflow.move(blocks, block_id, target_index)
         if not result.changed or result.block is None:
             await callback.answer("تعذر نقل الجزء.", show_alert=True)
             return
+        await remember(state)
         await save_blocks(state, result.blocks)
         await core._edit_ui(
             callback.message,
@@ -188,11 +188,11 @@ async def move_to(callback: CallbackQuery, state: FSMContext) -> None:
         except (TypeError, ValueError):
             await callback.answer("الموقع الجديد غير صالح.", show_alert=True)
             return
-        await remember(state)
         result = editor_workflow.move(blocks, block_id, target_index)
         if not result.changed:
             await callback.answer("تعذر نقل الجزء؛ ربما تغيرت الجلسة.", show_alert=True)
             return
+        await remember(state)
         await save_blocks(state, result.blocks)
         await state.update_data(current_block_id=None)
         await core._edit_ui(
