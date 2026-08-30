@@ -97,6 +97,35 @@ class PageRegistry:
                 key=lambda page: str(page.get("title") or page["page_id"]).casefold(),
             )
 
+    async def query_for_user(
+        self,
+        owner_id: int,
+        *,
+        query: str = "",
+        sort_mode: str = "updated",
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Return filtered/sorted owned pages and the unfiltered total count."""
+        pages = await self.list_for_user(owner_id)
+        total_count = len(pages)
+        normalized_query = query.strip().casefold()
+        if normalized_query:
+            pages = [
+                page for page in pages
+                if normalized_query in str(page.get("title") or "").casefold()
+                or normalized_query in str(page.get("page_id") or "").casefold()
+            ]
+        title_key = lambda page: str(
+            page.get("title") or page["page_id"]
+        ).casefold()
+        pages.sort(key=title_key)
+        if sort_mode == "oldest":
+            pages.sort(key=lambda page: int(page.get("created_at", 0)))
+        elif sort_mode == "newest":
+            pages.sort(key=lambda page: int(page.get("created_at", 0)), reverse=True)
+        elif sort_mode != "title":
+            pages.sort(key=lambda page: int(page.get("updated_at", 0)), reverse=True)
+        return pages, total_count
+
     async def delete(self, page_id: str, owner_id: int) -> bool:
         async with self._lock:
             pages = self._read()
