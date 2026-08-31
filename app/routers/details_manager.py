@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.context import FSMContext
@@ -14,7 +16,8 @@ from app.keyboards import (
     build_details_inner_blocks_keyboard,
     build_details_inner_delete_keyboard,
 )
-from app.routers import editor_core as core
+from app.editor.session import load_editor_session
+from app.routers.editor_ui import edit_ui, send_add_prompt
 from app.routers.details_support import (
     DETAILS_TYPE,
     delete_details_child,
@@ -30,6 +33,7 @@ from app.states import RichEditorStates
 
 
 router = Router(name="details_manager")
+logger = logging.getLogger(__name__)
 
 
 def _parse_child_callback(
@@ -47,7 +51,7 @@ async def open_details_inner_manager(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -56,7 +60,7 @@ async def open_details_inner_manager(
     if details is None or details.get("type") != DETAILS_TYPE:
         await callback.answer(t("missing_block"), show_alert=True)
         return
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         details_inner_list_text(details),
         build_details_inner_blocks_keyboard(details),
@@ -69,7 +73,7 @@ async def open_details_inner_block(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -87,7 +91,7 @@ async def open_details_inner_block(
     ):
         await callback.answer(t("missing_block"), show_alert=True)
         return
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         details_inner_page(details, child),
         build_details_inner_block_keyboard(details, child),
@@ -101,7 +105,7 @@ async def preview_details_inner_block(
     state: FSMContext,
     bot: Bot,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session:
         return
     _, blocks = session
@@ -119,7 +123,7 @@ async def preview_details_inner_block(
     try:
         await send_preview(bot, callback.from_user.id, [child])
     except (ValueError, TelegramAPIError):
-        core.logger.exception(
+        logger.exception(
             "Failed to preview nested Details block %s",
             child_id,
         )
@@ -134,7 +138,7 @@ async def edit_details_inner_block(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -156,7 +160,7 @@ async def edit_details_inner_block(
         edit_field=None,
     )
     await state.set_state(RichEditorStates.editing_block)
-    await core._send_add_prompt(
+    await send_add_prompt(
         callback.message,
         state,
         t("details.inner_send_content"),
@@ -169,7 +173,7 @@ async def edit_details_inner_field(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -215,7 +219,7 @@ async def edit_details_inner_field(
         "credit": "details.inner_send_credit",
         "add_footer": "details.inner_send_footer",
     }[action]
-    await core._send_add_prompt(
+    await send_add_prompt(
         callback.message,
         state,
         t(prompt_key),
@@ -228,7 +232,7 @@ async def ask_delete_details_inner(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -242,7 +246,7 @@ async def ask_delete_details_inner(
     if child is None:
         await callback.answer(t("missing_block"), show_alert=True)
         return
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         t("details.inner_delete_question"),
         build_details_inner_delete_keyboard(
@@ -258,7 +262,7 @@ async def confirm_delete_details_inner(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -276,7 +280,7 @@ async def confirm_delete_details_inner(
         await callback.answer(t("missing_block"), show_alert=True)
         return
     await save_document(state, blocks)
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         details_inner_list_text(details),
         build_details_inner_blocks_keyboard(details),
@@ -290,7 +294,7 @@ async def move_details_inner(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -326,7 +330,7 @@ async def move_details_inner(
     await save_document(state, blocks)
     moved = details_child(details, child_id)
     assert moved is not None
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         details_inner_page(details, moved),
         build_details_inner_block_keyboard(details, moved),

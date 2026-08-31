@@ -5,18 +5,8 @@ from typing import Any
 from aiogram import Router
 
 from app.routers.button_actions import router as actions_router
-from app.routers.button_input import receive_button_value, router as input_router
-from app.routers.button_support import (
-    buttons_per_row,
-    normalize_button_value,
-    prepare_message_buttons,
-)
-from app.routers.button_target_picker import (
-    ask_for_button_user,
-    complete_button_target,
-    defer_text_for_user_buttons,
-    router as target_picker_router,
-)
+from app.routers.button_input import router as input_router
+from app.routers.button_target_picker import router as target_picker_router
 
 
 router = Router(name="message_buttons")
@@ -94,23 +84,10 @@ def legacy_button_handlers(legacy_module: Any) -> dict[str, tuple[str, ...]]:
     }
 
 
-def install_into(legacy_module: Any) -> dict[str, tuple[str, ...]]:
-    """Install the extracted button feature as the compatibility authority."""
-    legacy_module._buttons_per_row = buttons_per_row
-    legacy_module._prepare_message_buttons = prepare_message_buttons
-    legacy_module._normalize_button_value = normalize_button_value
-    legacy_module._ask_for_button_user = ask_for_button_user
-    legacy_module._defer_text_for_user_buttons = defer_text_for_user_buttons
-    legacy_module._complete_button_target = complete_button_target
-    legacy_module.receive_button_value = receive_button_value
-    return detach_legacy_button_handlers(legacy_module)
-
-
 __all__ = [
     "LEGACY_BUTTON_CALLBACKS",
     "LEGACY_BUTTON_MESSAGES",
     "detach_legacy_button_handlers",
-    "install_into",
     "legacy_button_handlers",
     "router",
 ]

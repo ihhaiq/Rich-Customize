@@ -11,7 +11,8 @@ from app.editor.history import remember
 from app.i18n import t
 from app.keyboards import build_pages_keyboard
 
-from app.routers import editor_core as core
+from app.routers.editor_ui import MAIN_TEXT, edit_saved_ui, edit_ui
+from app.services.page_registry import page_registry
 
 
 PAGES_PER_SCREEN = 4
@@ -27,7 +28,7 @@ def saved_pages_text(page_index: int = 0, total_pages: int = 1) -> str:
 
 
 def opened_page_text() -> str:
-    return core.MAIN_TEXT
+    return MAIN_TEXT
 
 
 def page_screen(
@@ -58,7 +59,7 @@ async def pages_for_user(
     query: str = "",
     sort_mode: str = "updated",
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, int, int]:
-    pages, total_count = await core.page_registry.query_for_user(
+    pages, total_count = await page_registry.query_for_user(
         user_id,
         query=query,
         sort_mode=sort_mode,
@@ -97,7 +98,7 @@ async def render_pages_screen(
         pagination_prefix="r:presults" if query else "r:pages",
     )
     if saved:
-        await core._edit_saved_ui(
+        await edit_saved_ui(
             bot=message.bot,
             state=state,
             text=text,
@@ -105,7 +106,7 @@ async def render_pages_screen(
             parse_mode="HTML",
         )
     else:
-        await core._edit_ui(message, text, keyboard, parse_mode="HTML")
+        await edit_ui(message, text, keyboard, parse_mode="HTML")
     return True
 
 

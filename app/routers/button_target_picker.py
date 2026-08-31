@@ -18,7 +18,8 @@ from aiogram.types import (
 from app.services.inline_buttons import find_user_button_markers, resolve_user_button_marker
 from app.states import RichEditorStates
 
-from app.routers import editor_core as core
+from app.routers.button_guide import answer_with_button_guide
+from app.routers.editor_ui import open_editor
 
 
 router = Router(name="button_target_picker")
@@ -132,7 +133,7 @@ async def complete_button_target(
     await message.answer("✅ تم ربط الوجهة بالزر.", reply_markup=ReplyKeyboardRemove())
     if resume == "open_editor":
         await state.clear()
-        await core._open_editor(message, state, blocks)
+        await open_editor(message, state, blocks)
         return
 
     clean_data = {
@@ -149,9 +150,11 @@ async def complete_button_target(
     )
     original = Message.model_validate(pending_message, context={"bot": message.bot})
     if resume == "adding_block":
-        await core.receive_added_block(original, state, message.bot)
+        from app.routers.block_add import receive_added_block
+        await receive_added_block(original, state, message.bot)
     else:
-        await core.receive_replacement(original, state, message.bot)
+        from app.routers.block_edit import receive_replacement
+        await receive_replacement(original, state, message.bot)
 
     resumed_data = await state.get_data()
     resumed_data.pop("resuming_user_buttons", None)
@@ -233,7 +236,7 @@ async def wait_for_button_user(message: Message, state: FSMContext) -> None:
         await ask_for_button_user(message, state, markers[index])
     else:
         await state.set_state(RichEditorStates.waiting_input)
-        await core._answer_with_button_guide(
+        await answer_with_button_guide(
             message,
             "انتهى طلب اختيار المستخدم. أرسل الرسالة مرة أخرى.",
             reply_markup=ReplyKeyboardRemove(),

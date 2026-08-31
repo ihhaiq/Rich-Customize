@@ -13,7 +13,9 @@ from app.editor.workflow import editor_workflow
 from app.i18n import t
 from app.states import RichEditorStates
 
-from app.routers import editor_core
+from app.routers.block_support import finish_add
+from app.routers.block_view import block_page
+from app.routers.editor_ui import delete_add_step_messages, edit_saved_ui
 from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_support import save_blocks
 from app.routers.details import (
@@ -50,7 +52,7 @@ async def receive_ready_math_add(message: Message, state: FSMContext, bot: Bot) 
         if block is None:
             await _missing_math(message)
             return
-        await editor_core._finish_add(message, state, bot, block)
+        await finish_add(message, state, bot, block)
         return
 
     if (
@@ -102,17 +104,17 @@ async def receive_ready_math_edit(message: Message, state: FSMContext, bot: Bot)
         raise SkipHandler
     await save_blocks(state, result.blocks)
 
-    await editor_core._delete_add_step_messages(bot, message, data, state)
+    await delete_add_step_messages(bot, message, data, state)
     await state.update_data(
         current_block_id=None,
         expected_type=None,
         edit_field=None,
     )
     await state.set_state(RichEditorStates.managing)
-    await editor_core._edit_saved_ui(
+    await edit_saved_ui(
         bot,
         state,
-        editor_core._block_page(result.block, result.blocks),
+        block_page(result.block, result.blocks),
         build_managed_block_keyboard(result.block, result.blocks),
     )
 

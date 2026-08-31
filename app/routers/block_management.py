@@ -5,16 +5,9 @@ from typing import Any
 from aiogram import Router
 
 from app.routers.block_actions import router as actions_router
-from app.routers.block_add import receive_added_block, router as add_router
-from app.routers.block_edit import receive_replacement, router as edit_router
-from app.routers.block_input_support import (
-    code_input_prompt,
-    math_input_prompt,
-    quote_media_payload,
-)
-from app.routers.block_support import finish_add
+from app.routers.block_add import router as add_router
+from app.routers.block_edit import router as edit_router
 from app.routers.block_table import router as table_router
-from app.routers.block_view import block_page
 
 
 router = Router(name="block_management")
@@ -93,29 +86,10 @@ def legacy_block_handlers(legacy_module: Any) -> dict[str, tuple[str, ...]]:
     }
 
 
-def install_into(legacy_module: Any) -> dict[str, tuple[str, ...]]:
-    """Make the extracted block routers authoritative over editor_legacy.
-
-    The two message functions are rebound because the legacy user-picker resume
-    flow calls them by global name after resolving USER buttons. Their Aiogram
-    registrations are removed from the legacy router, so normal updates are
-    handled only by the extracted routers.
-    """
-    legacy_module._finish_add = finish_add
-    legacy_module._block_page = block_page
-    legacy_module._math_input_prompt = math_input_prompt
-    legacy_module._code_input_prompt = code_input_prompt
-    legacy_module._quote_media_payload = quote_media_payload
-    legacy_module.receive_added_block = receive_added_block
-    legacy_module.receive_replacement = receive_replacement
-    return detach_legacy_block_handlers(legacy_module)
-
-
 __all__ = [
     "LEGACY_BLOCK_CALLBACKS",
     "LEGACY_BLOCK_MESSAGES",
     "detach_legacy_block_handlers",
-    "install_into",
     "legacy_block_handlers",
     "router",
 ]

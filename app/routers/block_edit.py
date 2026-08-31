@@ -20,9 +20,22 @@ from app.services.factory import (
 from app.services.parser import message_to_blocks, messages_to_blocks, replacement_data
 from app.states import RichEditorStates
 
-from app.routers import editor_core as core
+from app.editor.session import albums, load_editor_session
+from app.routers.block_input_support import (
+    code_input_prompt,
+    math_input_prompt,
+    quote_media_payload,
+)
 from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_support import block_by_id, replace_payload
+from app.routers.block_view import block_page
+from app.routers.button_target_picker import defer_text_for_user_buttons
+from app.routers.editor_ui import (
+    delete_add_step_messages,
+    edit_saved_ui,
+    edit_ui,
+    send_add_prompt,
+)
 
 
 router = Router(name="block_edit")
@@ -30,7 +43,7 @@ router = Router(name="block_edit")
 
 @router.callback_query(F.data.startswith("r:e:"))
 async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session:
         return
     _, blocks = session
@@ -43,7 +56,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         raise SkipHandler
     if block.get("type") == "heading":
         if isinstance(callback.message, Message):
-            await core._send_add_prompt(
+            await send_add_prompt(
                 callback.message,
                 state,
                 "اختر مستوى العنوان الجديد:",
@@ -57,9 +70,9 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         "caption": "أرسل الوصف الجديد",
         "photo": "أرسل الصورة الجديدة",
         "paragraph": "أرسل نص الفقرة الجديد",
-        "preformatted": core._code_input_prompt(editing=True),
+        "preformatted": code_input_prompt(editing=True),
         "footer": "أرسل التذييل الجديد",
-        "mathematical_expression": core._math_input_prompt(editing=True),
+        "mathematical_expression": math_input_prompt(editing=True),
         "anchor": "أرسل اسم المرساة الجديد",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر",
         "table": "أرسل صفوف الجدول؛ افصل الأعمدة بعلامة |",
@@ -86,7 +99,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
     )
     await state.set_state(RichEditorStates.editing_block)
     if isinstance(callback.message, Message):
-        await core._send_add_prompt(
+        await send_add_prompt(
             callback.message,
             state,
             prompts.get(str(block.get("type")), "أرسل المحتوى الجديد من النوع نفسه"),
@@ -96,7 +109,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("r:f:"))
 async def edit_block_field(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session:
         return
     _, blocks = session
@@ -126,7 +139,7 @@ async def edit_block_field(callback: CallbackQuery, state: FSMContext) -> None:
     )
     await state.set_state(RichEditorStates.editing_block)
     if isinstance(callback.message, Message):
-        await core._send_add_prompt(callback.message, state, prompts[field])
+        await send_add_prompt(callback.message, state, prompts[field])
     await callback.answer()
 
 
@@ -139,7 +152,7 @@ async def receive_replacement(
     data = await state.get_data()
     if data.get("nested_details_id") or data.get("expected_type") == "details":
         raise SkipHandler
-    if await core._defer_text_for_user_buttons(message, state, "editing_block"):
+    if await defer_text_for_user_buttons(message, state, "editing_block"):
         return
 
     blocks = data.get("blocks", [])
@@ -165,7 +178,7 @@ async def receive_replacement(
         replacement[key] = None if remove else message.html_text
     elif expected in {"collage", "slideshow"}:
         if message.media_group_id:
-            collected = await core.albums.collect(message)
+            collected = await albums.collect(message)
             if collected is None:
                 return
             children = messages_to_blocks(collected)
@@ -193,13 +206,13 @@ async def receive_replacement(
             replacement["media_children"] = block.get("data", {}).get("media_children", [])
         else:
             if message.media_group_id:
-                collected = await core.albums.collect(message)
+                collected = await albums.collect(message)
                 if collected is None:
                     return
                 parsed = messages_to_blocks(collected)
             else:
                 parsed = message_to_blocks(message)
-            media_children, caption = core._quote_media_payload(parsed)
+            media_children, caption = quote_media_payload(parsed)
             if media_children:
                 replacement = {**block.get("data", {}), "media_children": media_children}
                 if caption:
@@ -249,7 +262,7 @@ async def receive_replacement(
         await state.set_state(RichEditorStates.managing)
         return
 
-    await core._delete_add_step_messages(bot, message, data, state)
+    await delete_add_step_messages(bot, message, data, state)
     await state.update_data(
         current_block_id=None,
         expected_type=None,
@@ -257,17 +270,17 @@ async def receive_replacement(
         heading_size=None,
     )
     await state.set_state(RichEditorStates.managing)
-    await core._edit_saved_ui(
+    await edit_saved_ui(
         bot,
         state,
-        core._block_page(updated, blocks),
+        block_page(updated, blocks),
         build_managed_block_keyboard(updated, blocks),
     )
 
 
 @router.callback_query(F.data.startswith("r:ct:"))
 async def toggle_checklist_task(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -300,9 +313,9 @@ async def toggle_checklist_task(callback: CallbackQuery, state: FSMContext) -> N
     if updated is None:
         await callback.answer(t("list.missing_task"), show_alert=True)
         return
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
-        core._block_page(updated, blocks),
+        block_page(updated, blocks),
         build_managed_block_keyboard(updated, blocks),
     )
     await callback.answer(

@@ -8,19 +8,14 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.editor.draft_store import draft_store
-from app.editor.history import remember
-from app.editor.workflow import editor_workflow
 from app.i18n import t
 from app.keyboards import (
     build_add_block_keyboard,
     build_heading_level_keyboard,
     build_list_type_keyboard,
-    build_rich_editor_keyboard,
 )
 from app.services.factory import (
     FINAL_RICH_BLOCK_TYPES,
-    MEDIA_CAPTION_TYPES,
     QUOTE_TYPES,
     container_data,
     map_data,
@@ -30,8 +25,16 @@ from app.services.factory import (
 from app.services.parser import message_to_blocks, messages_to_blocks
 from app.states import RichEditorStates
 
-from app.routers import editor_core as core
+from app.editor.document import get_block_by_id
+from app.editor.session import albums, load_editor_session
+from app.routers.block_input_support import (
+    code_input_prompt,
+    math_input_prompt,
+    quote_media_payload,
+)
 from app.routers.block_support import finish_add
+from app.routers.button_target_picker import defer_text_for_user_buttons
+from app.routers.editor_ui import delete_add_step_messages, edit_ui, send_add_prompt
 
 
 router = Router(name="block_add")
@@ -39,10 +42,10 @@ router = Router(name="block_add")
 
 @router.callback_query(F.data == "r:addmenu")
 async def add_block_menu(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         "اختر نوع الـBlock الجديد:",
         build_add_block_keyboard(),
@@ -52,10 +55,10 @@ async def add_block_menu(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "r:add:listmenu")
 async def open_list_type_menu(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         t("list.menu_title"),
         build_list_type_keyboard(),
@@ -65,7 +68,7 @@ async def open_list_type_menu(callback: CallbackQuery, state: FSMContext) -> Non
 
 @router.callback_query(F.data.startswith("r:addlist:"))
 async def choose_list_type(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     list_kind = callback.data.rsplit(":", 1)[-1]
@@ -78,7 +81,7 @@ async def choose_list_type(callback: CallbackQuery, state: FSMContext) -> None:
         add_step="content",
         add_payload={"list_kind": list_kind},
     )
-    await core._send_add_prompt(
+    await send_add_prompt(
         callback.message,
         state,
         t(f"list.{list_kind}_prompt"),
@@ -92,7 +95,7 @@ async def choose_add_block(
     state: FSMContext,
     bot: Bot,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session:
         return
     _, blocks = session
@@ -131,9 +134,9 @@ async def choose_add_block(
 
     prompts = {
         "paragraph": "أرسل نص الفقرة",
-        "preformatted": core._code_input_prompt(),
+        "preformatted": code_input_prompt(),
         "footer": "أرسل نص التذييل",
-        "mathematical_expression": core._math_input_prompt(),
+        "mathematical_expression": math_input_prompt(),
         "anchor": "أرسل اسم المرساة",
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
         "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
@@ -160,13 +163,13 @@ async def choose_add_block(
         add_payload={},
     )
     if isinstance(callback.message, Message):
-        await core._send_add_prompt(callback.message, state, prompts[block_type])
+        await send_add_prompt(callback.message, state, prompts[block_type])
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("r:hs:"))
 async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     parts = callback.data.split(":")
@@ -191,7 +194,7 @@ async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> No
             add_step="content",
             add_payload={"heading_size": heading_size},
         )
-        await core._send_add_prompt(
+        await send_add_prompt(
             callback.message,
             state,
             f"اخترت H{heading_size}. أرسل نص العنوان الآن.",
@@ -202,7 +205,7 @@ async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> No
             return
         block_id = parts[4]
         _, blocks = session
-        block = core.get_block_by_id(blocks, block_id)
+        block = get_block_by_id(blocks, block_id)
         if block is None or block.get("type") != "heading":
             await callback.answer("هذا العنوان لم يعد موجودًا.", show_alert=True)
             return
@@ -213,7 +216,7 @@ async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> No
             edit_field=None,
             heading_size=heading_size,
         )
-        await core._send_add_prompt(
+        await send_add_prompt(
             callback.message,
             state,
             f"اخترت H{heading_size}. أرسل نص العنوان الجديد الآن.",
@@ -235,7 +238,7 @@ async def receive_added_block(
     block_type = data.get("pending_add_type")
     if block_type == "details":
         raise SkipHandler
-    if await core._defer_text_for_user_buttons(message, state, "adding_block"):
+    if await defer_text_for_user_buttons(message, state, "adding_block"):
         return
 
     step = data.get("add_step")
@@ -248,17 +251,17 @@ async def receive_added_block(
     if block_type in QUOTE_TYPES and step == "quote_text":
         if not message.text:
             if message.media_group_id:
-                collected = await core.albums.collect(message)
+                collected = await albums.collect(message)
                 if collected is None:
                     return
                 parsed = messages_to_blocks(collected)
             else:
                 parsed = message_to_blocks(message)
-            media_children, caption = core._quote_media_payload(parsed)
+            media_children, caption = quote_media_payload(parsed)
             if not media_children:
                 await message.answer("أرسل نصًا أو صورة/فيديو/صوتًا/ملفًا للاقتباس البارز.")
                 return
-            await core._delete_add_step_messages(bot, message, data, state)
+            await delete_add_step_messages(bot, message, data, state)
             next_payload: dict[str, Any] = {"media_children": media_children}
             if caption:
                 next_payload.update(
@@ -271,14 +274,14 @@ async def receive_added_block(
                 next_step = "quote_media_text"
                 prompt = "تم إرفاق الوسائط. أرسل الآن نص الاقتباس البارز."
             await state.update_data(add_step=next_step, add_payload=next_payload)
-            await core._send_add_prompt(message, state, prompt)
+            await send_add_prompt(message, state, prompt)
             return
-        await core._delete_add_step_messages(bot, message, data, state)
+        await delete_add_step_messages(bot, message, data, state)
         await state.update_data(
             add_step="quote_credit",
             add_payload={"quote_text": message.text, "quote_html": message.html_text},
         )
-        await core._send_add_prompt(
+        await send_add_prompt(
             message,
             state,
             "أرسل اسم الكاتب، أو /skip لإضافته بدون كاتب",
@@ -289,7 +292,7 @@ async def receive_added_block(
         if not message.text:
             await message.answer("أرسل نص الاقتباس البارز بعد الوسائط.")
             return
-        await core._delete_add_step_messages(bot, message, data, state)
+        await delete_add_step_messages(bot, message, data, state)
         await state.update_data(
             add_step="quote_credit",
             add_payload={
@@ -298,7 +301,7 @@ async def receive_added_block(
                 "quote_html": message.html_text,
             },
         )
-        await core._send_add_prompt(
+        await send_add_prompt(
             message,
             state,
             "أرسل اسم الكاتب، أو /skip لإضافته بدون كاتب",
@@ -320,7 +323,7 @@ async def receive_added_block(
 
     if block_type in {"collage", "slideshow"}:
         if message.media_group_id:
-            collected = await core.albums.collect(message)
+            collected = await albums.collect(message)
             if collected is None:
                 return
             children = messages_to_blocks(collected)

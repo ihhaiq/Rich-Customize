@@ -6,14 +6,12 @@ from types import SimpleNamespace
 from aiogram import F, Router
 
 from app.editor.models import make_block
-from app.routers import editor_core
 from app.routers.details import (
     LEGACY_DETAILS_CALLBACKS,
     add_details_child,
     delete_details_child,
     detach_legacy_details_handlers,
     details_children,
-    install_into,
     legacy_details_handlers,
     move_details_child,
     replace_details_child,
@@ -105,15 +103,12 @@ class DetailsDomainTests(unittest.TestCase):
         }
         self.assertIn("ordinary_callback", remaining_names)
 
-    def test_real_legacy_router_has_no_active_details_callbacks_after_install(self):
-        legacy = editor_core.compat_module
-        before = len(legacy.router.callback_query.handlers)
+    def test_real_router_has_details_without_legacy_fallback(self):
+        from app.routers import rich_editor
 
-        install_into(legacy)
-
-        self.assertEqual(legacy_details_handlers(legacy), ())
-        self.assertEqual(len(legacy.router.callback_query.handlers), 0)
-        self.assertLessEqual(len(legacy.router.callback_query.handlers), before)
+        names = {child.name for child in rich_editor.router.sub_routers}
+        self.assertIn("details", names)
+        self.assertNotIn("rich_editor", names)
 
 
 if __name__ == "__main__":

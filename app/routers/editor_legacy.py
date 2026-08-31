@@ -1,9 +1,7 @@
-"""Temporary compatibility namespace for the staged editor migration.
+"""Empty migration placeholder pending the approved final deletion.
 
-All feature handlers and their implementations now live in dedicated modules.
-This module intentionally owns no handlers; ``rich_editor`` installs explicit
-compatibility exports for modules that have not yet dropped ``editor_core``.
-It remains as a narrow bridge until Stage 9 removes that alias.
+All editor features are owned and registered by dedicated modules. Nothing in
+the application imports or includes this router anymore.
 """
 
 from __future__ import annotations

@@ -128,18 +128,24 @@ class BlockManagementLegacyTests(unittest.TestCase):
         self.assertIn("ordinary_callback", callback_names)
         self.assertIn("ordinary_message", message_names)
 
-    def test_real_editor_legacy_has_no_active_extracted_block_handlers(self):
-        # Importing rich_editor performs the compatibility installation.
-        from app.routers import editor_core
-        from app.routers import rich_editor  # noqa: F401
+    def test_real_router_has_block_handlers_without_legacy_fallback(self):
+        from app.routers import rich_editor
 
-        legacy = editor_core.compat_module
-        self.assertEqual(
-            legacy_block_handlers(legacy),
-            {"callback_query": (), "message": ()},
+        names = []
+        stack = [rich_editor.router]
+        while stack:
+            current = stack.pop()
+            names.extend(
+                handler.callback.__name__
+                for handler in current.message.handlers
+            )
+            stack.extend(current.sub_routers)
+        self.assertEqual(names.count(receive_added_block.__name__), 1)
+        self.assertEqual(names.count(receive_replacement.__name__), 1)
+        self.assertNotIn(
+            "rich_editor",
+            {child.name for child in rich_editor.router.sub_routers},
         )
-        self.assertIs(legacy.receive_added_block, receive_added_block)
-        self.assertIs(legacy.receive_replacement, receive_replacement)
 
 
 if __name__ == "__main__":

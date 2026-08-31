@@ -11,7 +11,14 @@ from app.editor.document import get_block_by_id
 from app.editor.history import remember
 from app.i18n import t
 from app.keyboards import build_details_inner_block_keyboard
-from app.routers import editor_core as core
+from app.editor.session import albums, load_editor_session
+from app.routers.block_view import block_page
+from app.routers.button_target_picker import defer_text_for_user_buttons
+from app.routers.editor_ui import (
+    delete_add_step_messages,
+    edit_saved_ui,
+    send_add_prompt,
+)
 from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.details_support import (
     DETAILS_TYPE,
@@ -102,7 +109,7 @@ async def receive_nested_replacement(
 
         if expected in {"collage", "slideshow"}:
             if message.media_group_id:
-                collected = await core.albums.collect(message)
+                collected = await albums.collect(message)
                 if collected is None:
                     return True
                 parsed = messages_to_blocks(collected)
@@ -147,7 +154,7 @@ async def receive_nested_replacement(
         )
 
     await save_document(state, blocks)
-    await core._delete_add_step_messages(
+    await delete_add_step_messages(
         bot,
         message,
         current_data,
@@ -160,7 +167,7 @@ async def receive_nested_replacement(
         expected_type=None,
     )
     await state.set_state(RichEditorStates.managing)
-    await core._edit_saved_ui(
+    await edit_saved_ui(
         bot,
         state,
         details_inner_page(details, selected),
@@ -182,7 +189,7 @@ async def receive_details_edit(
     )
     if (
         owns_details_edit
-        and await core._defer_text_for_user_buttons(
+        and await defer_text_for_user_buttons(
             message,
             state,
             "editing_block",
@@ -221,7 +228,7 @@ async def receive_details_edit(
         details.setdefault("data", {})["summary_html"] = message.html_text
     else:
         if message.media_group_id:
-            collected = await core.albums.collect(message)
+            collected = await albums.collect(message)
             if collected is None:
                 return
             incoming = messages_to_blocks(collected)
@@ -249,17 +256,17 @@ async def receive_details_edit(
         replace_details_children(details, incoming)
 
     await save_document(state, blocks)
-    await core._delete_add_step_messages(bot, message, data, state)
+    await delete_add_step_messages(bot, message, data, state)
     await state.update_data(
         current_block_id=None,
         expected_type=None,
         edit_field=None,
     )
     await state.set_state(RichEditorStates.managing)
-    await core._edit_saved_ui(
+    await edit_saved_ui(
         bot,
         state,
-        core._block_page(details, blocks),
+        block_page(details, blocks),
         build_managed_block_keyboard(details, blocks),
     )
 
@@ -269,7 +276,7 @@ async def edit_details_content(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -283,7 +290,7 @@ async def edit_details_content(
         expected_type=DETAILS_TYPE,
         edit_field=None,
     )
-    await core._send_add_prompt(
+    await send_add_prompt(
         callback.message,
         state,
         t("details.replace_content_prompt"),
@@ -296,7 +303,7 @@ async def edit_details_summary(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -317,7 +324,7 @@ async def edit_details_summary(
         expected_type=DETAILS_TYPE,
         edit_field="summary",
     )
-    await core._send_add_prompt(
+    await send_add_prompt(
         callback.message,
         state,
         t("details.summary_edit_prompt"),

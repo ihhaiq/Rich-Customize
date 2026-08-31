@@ -45,10 +45,10 @@ class GuestNavigationTests(unittest.IsolatedAsyncioTestCase):
                     )
 
                     with (
-                        patch("app.routers.editor_core.page_registry", pages),
-                        patch("app.routers.editor_core.guest_message_registry", guests),
+                        patch("app.routers.page_navigation_router.page_registry", pages),
+                        patch("app.routers.page_navigation_router.guest_message_registry", guests),
                         patch(
-                            "app.routers.editor_core.page_navigation_registry",
+                            "app.routers.page_navigation_router.page_navigation_registry",
                             navigation,
                         ),
                     ):

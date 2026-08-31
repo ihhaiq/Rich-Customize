@@ -12,7 +12,7 @@ from aiogram.types import CallbackQuery
 from app.keyboards import build_post_chats_keyboard
 from app.services.chat_registry import managed_chat_registry
 
-from app.routers import editor_core as core
+from app.routers.editor_ui import edit_ui
 
 
 logger = logging.getLogger(__name__)
@@ -137,7 +137,7 @@ async def render_post_chat_picker(
     selected = [chat_id for chat_id in selected_chat_ids if chat_id in available_ids]
     channel_url, group_url = await bot_add_links(bot)
     await state.update_data(post_selected_chat_ids=selected)
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         post_chats_text(chats, len(selected)),
         build_post_chats_keyboard(chats, channel_url, group_url, selected),

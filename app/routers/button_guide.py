@@ -115,10 +115,3 @@ async def answer_with_button_guide(
             f"{localized_prompt}\n\n{tr('📘 Inline button guide:')}\n{examples}",
             reply_markup=reply_markup,
         )
-
-
-def install_into(editor_core) -> None:
-    """Patch the compatibility core until button handlers are fully split out."""
-    editor_core._button_guide_blocks = button_guide_blocks
-    editor_core._answer_with_button_guide = answer_with_button_guide
-    editor_core.BUTTON_SYNTAX_EXAMPLES = button_syntax_examples()

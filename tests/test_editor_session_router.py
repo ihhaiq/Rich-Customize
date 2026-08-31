@@ -92,29 +92,8 @@ class EditorSessionRouterTests(unittest.TestCase):
             {"callback_query": (), "message": (), "channel_post": ()},
         )
 
-    def test_real_router_has_zero_active_legacy_handlers(self):
-        from app.routers import editor_core
+    def test_real_router_has_session_handlers_without_legacy_fallback(self):
         from app.routers import rich_editor
-
-        legacy = editor_core.compat_module
-        self.assertEqual(
-            legacy_session_handlers(legacy),
-            {"callback_query": (), "message": (), "channel_post": ()},
-        )
-        self.assertEqual(
-            sum(
-                len(getattr(legacy.router, name).handlers)
-                for name in (
-                    "message",
-                    "callback_query",
-                    "my_chat_member",
-                    "inline_query",
-                    "guest_message",
-                    "channel_post",
-                )
-            ),
-            0,
-        )
         sets = {
             "callback_query": LEGACY_SESSION_CALLBACKS,
             "message": LEGACY_SESSION_MESSAGES,
@@ -128,10 +107,7 @@ class EditorSessionRouterTests(unittest.TestCase):
                 self.assertEqual(len({id(callback) for callback in matches}), 1, name)
 
         top_level_names = [child.name for child in rich_editor.router.sub_routers]
-        self.assertLess(
-            top_level_names.index("editor_session"),
-            top_level_names.index("rich_editor"),
-        )
+        self.assertNotIn("rich_editor", top_level_names)
 
 
 if __name__ == "__main__":

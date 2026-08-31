@@ -15,7 +15,15 @@ from app.keyboards import (
 )
 from app.states import RichEditorStates
 
-from app.routers import editor_core as core
+from app.editor.session import load_editor_session
+from app.routers.editor_ui import (
+    MAIN_TEXT,
+    delete_add_step_messages,
+    edit_saved_ui,
+    edit_ui,
+    send_add_prompt,
+)
+from app.services.page_registry import page_registry
 from app.routers.page_support import (
     opened_page_text,
     pages_for_user,
@@ -29,7 +37,7 @@ router = Router(name="page_actions")
 
 @router.callback_query(F.data == "r:savepage")
 async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -37,7 +45,7 @@ async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer("لا توجد أجزاء لحفظها.", show_alert=True)
         return
     await state.set_state(RichEditorStates.saving_page_name)
-    await core._send_add_prompt(
+    await send_add_prompt(
         callback.message,
         state,
         "أرسل اسم الصفحة لحفظها؛ الحد الأقصى 64 حرفًا.",
@@ -61,7 +69,7 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
         await message.answer("انتهت جلسة المحرّر. أرسل /editor وابدأ من جديد.")
         return
     existing_id = before.current_page_id
-    code = await core.page_registry.save(
+    code = await page_registry.save(
         message.from_user.id,
         title,
         before.blocks,
@@ -70,7 +78,7 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
         before.buttons_align,
         page_id=existing_id,
     )
-    await core._delete_add_step_messages(bot, message, data, state)
+    await delete_add_step_messages(bot, message, data, state)
     after = copy.deepcopy(before)
     after.current_page_id = code
     after.current_page_title = title
@@ -85,10 +93,10 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
         f"{prefix}{code}\n\nتقدر تستعمله داخل النص هكذا:\n"
         f"{{التالي:cbd {code}#b}}\n\nأو اختَر «CBD — فتح صفحة» من قائمة الأزرار."
     )
-    await core._edit_saved_ui(
+    await edit_saved_ui(
         bot,
         state,
-        f"✅ تم حفظ الصفحة «{title}».\n\n{core.MAIN_TEXT}",
+        f"✅ تم حفظ الصفحة «{title}».\n\n{MAIN_TEXT}",
         build_rich_editor_keyboard(after.blocks),
     )
 
@@ -103,13 +111,13 @@ async def request_page_rename(callback: CallbackQuery, state: FSMContext) -> Non
     except (ValueError, TypeError):
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
-    page = await core.page_registry.get(page_id)
+    page = await page_registry.get(page_id)
     if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
         await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
         return
     await state.set_state(RichEditorStates.renaming_page)
     await state.update_data(rename_page_id=page_id, pages_page_index=page_index)
-    await core._send_add_prompt(
+    await send_add_prompt(
         callback.message,
         state,
         t("pages.rename_prompt", title=str(page.get("title") or page_id)),
@@ -128,11 +136,11 @@ async def receive_page_rename(message: Message, state: FSMContext, bot: Bot) -> 
         return
     data = await state.get_data()
     page_id = str(data.get("rename_page_id") or "")
-    if not await core.page_registry.rename(page_id, message.from_user.id, title):
+    if not await page_registry.rename(page_id, message.from_user.id, title):
         await state.set_state(RichEditorStates.managing)
         await message.answer("الصفحة محذوفة أو لا تخصك.")
         return
-    await core._delete_add_step_messages(bot, message, data, state)
+    await delete_add_step_messages(bot, message, data, state)
     before = await draft_store.load(state)
     after = copy.deepcopy(before)
     if before.current_page_id == page_id:
@@ -159,12 +167,12 @@ async def confirm_page_delete(callback: CallbackQuery, state: FSMContext) -> Non
     except (ValueError, TypeError):
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
-    page = await core.page_registry.get(page_id)
+    page = await page_registry.get(page_id)
     if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
         await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
         return
     title = html.escape(str(page.get("title") or page_id))
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         t("pages.delete_confirm", title=title),
         build_page_delete_confirmation_keyboard(page_id, page_index),
@@ -183,7 +191,7 @@ async def delete_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     except (ValueError, TypeError):
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
-    if not await core.page_registry.delete(page_id, callback.from_user.id):
+    if not await page_registry.delete(page_id, callback.from_user.id):
         await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
         return
     data = await state.get_data()
@@ -195,9 +203,9 @@ async def delete_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     )
     if total_count == 0:
         draft = await draft_store.load(state)
-        await core._edit_ui(
+        await edit_ui(
             callback.message,
-            t("editor.empty_hint") if not draft.blocks else core.MAIN_TEXT,
+            t("editor.empty_hint") if not draft.blocks else MAIN_TEXT,
             build_rich_editor_keyboard(draft.blocks),
         )
     else:
@@ -221,7 +229,7 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     if not isinstance(callback.message, Message):
         return
     page_id = callback.data.rsplit(":", 1)[-1]
-    page = await core.page_registry.get(page_id)
+    page = await page_registry.get(page_id)
     if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
         await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
         return
@@ -236,7 +244,7 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     await save_changed_draft(state, before, after)
     await state.set_state(RichEditorStates.managing)
     await state.update_data(current_block_id=None, current_button_id=None)
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         opened_page_text(),
         build_rich_editor_keyboard(after.blocks),

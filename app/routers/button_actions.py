@@ -31,7 +31,7 @@ from app.services.page_registry import page_registry
 from app.services.popup_registry import popup_registry
 from app.states import RichEditorStates
 
-from app.routers import editor_core as core
+from app.editor.session import load_editor_session
 from app.routers.button_support import (
     answer_with_button_guide,
     edit_button_ui,
@@ -50,7 +50,7 @@ def _manager_text(count: int) -> str:
 
 @router.callback_query(F.data == "r:buttons")
 async def open_buttons_manager(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     data, _ = session
@@ -67,7 +67,7 @@ async def open_buttons_manager(callback: CallbackQuery, state: FSMContext) -> No
 
 @router.callback_query(F.data == "r:brow")
 async def change_buttons_per_row(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     before = await draft_store.load(state)
@@ -84,7 +84,7 @@ async def change_buttons_per_row(callback: CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data == "r:ba")
 async def start_add_button(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session:
         return
     draft = await draft_store.load(state)
@@ -100,7 +100,7 @@ async def start_add_button(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("r:bat:"))
 async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     data, _ = session
@@ -167,7 +167,7 @@ async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data.startswith("r:bs:"))
 async def choose_button_action(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     draft = await draft_store.load(state)
@@ -197,7 +197,7 @@ async def choose_button_action(callback: CallbackQuery, state: FSMContext) -> No
 
 @router.callback_query(F.data.startswith("r:bt:"))
 async def select_message_button(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     try:
@@ -270,7 +270,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
 
 @router.callback_query(F.data.startswith("r:bct:"))
 async def change_button_type(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     try:
@@ -331,7 +331,7 @@ async def change_button_type(callback: CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(F.data.startswith("r:bpg:"))
 async def select_button_page(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     data, _ = session
@@ -384,7 +384,7 @@ async def select_button_page(callback: CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(F.data.startswith("r:bsc:"))
 async def change_button_style(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     try:
@@ -414,7 +414,7 @@ async def change_button_style(callback: CallbackQuery, state: FSMContext) -> Non
 
 @router.callback_query(F.data.startswith("r:bmv:"))
 async def change_button_position(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     try:
@@ -439,7 +439,7 @@ async def change_button_position(callback: CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data == "r:bpreview")
 async def preview_message_buttons(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session:
         return
     data, _ = session

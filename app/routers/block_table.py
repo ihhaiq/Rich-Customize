@@ -13,7 +13,8 @@ from app.services.blocks import (
     table_rows,
 )
 
-from app.routers import editor_core as core
+from app.editor.session import load_editor_session, user_locks
+from app.routers.editor_ui import edit_ui
 from app.routers.block_support import block_by_id, replace_payload
 
 
@@ -44,7 +45,7 @@ def _editable_table(block: dict) -> dict:
 
 @router.callback_query(F.data.startswith("r:tm:"))
 async def table_options(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -53,7 +54,7 @@ async def table_options(callback: CallbackQuery, state: FSMContext) -> None:
     if block is None or block.get("type") != "table" or not table_rows(block):
         await callback.answer("هذا الجدول لم يعد موجودًا أو لا يحتوي خلايا.", show_alert=True)
         return
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         "إعدادات خلايا الجدول\n\nاختر العملية التي تريد تطبيقها:",
         build_table_options_keyboard(block_id),
@@ -63,7 +64,7 @@ async def table_options(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("r:ta:"))
 async def choose_table_action(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -92,7 +93,7 @@ async def choose_table_action(callback: CallbackQuery, state: FSMContext) -> Non
         if updated is None:
             await callback.answer("هذا الجدول لم يعد موجودًا.", show_alert=True)
             return
-        await core._edit_ui(
+        await edit_ui(
             callback.message,
             "إعدادات خلايا الجدول\n\nاختر العملية التي تريد تطبيقها:",
             build_table_options_keyboard(block_id),
@@ -103,7 +104,7 @@ async def choose_table_action(callback: CallbackQuery, state: FSMContext) -> Non
     if action not in TABLE_CELL_ACTIONS or not table_rows(block):
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         "اختر الخلية المطلوبة\n\nالرقم الأول للصف، والثاني للعمود:",
         build_table_cell_keyboard(block, action),
@@ -115,8 +116,8 @@ async def choose_table_action(callback: CallbackQuery, state: FSMContext) -> Non
 async def apply_table_cell_action(callback: CallbackQuery, state: FSMContext) -> None:
     if not callback.from_user or not isinstance(callback.message, Message):
         return
-    async with core.user_locks[callback.from_user.id]:
-        session = await core._session(callback, state)
+    async with user_locks[callback.from_user.id]:
+        session = await load_editor_session(callback, state)
         if not session:
             return
         _, blocks = session
@@ -151,7 +152,7 @@ async def apply_table_cell_action(callback: CallbackQuery, state: FSMContext) ->
         if updated is None:
             await callback.answer("هذا الجدول لم يعد موجودًا.", show_alert=True)
             return
-        await core._edit_ui(
+        await edit_ui(
             callback.message,
             "إعدادات خلايا الجدول\n\nاختر العملية التي تريد تطبيقها:",
             build_table_options_keyboard(block_id),

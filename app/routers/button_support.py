@@ -21,7 +21,16 @@ from app.services.buttons import (
 )
 from app.services.popup_registry import popup_registry
 
-from app.routers import editor_core as core
+from app.routers.button_guide import (
+    answer_with_button_guide as render_button_guide,
+    button_guide_blocks,
+)
+from app.routers.editor_ui import (
+    delete_input_message as remove_input_message,
+    edit_button_ui as render_button_ui,
+    edit_saved_button_ui as render_saved_button_ui,
+)
+from app.services.renderer import build_input_rich_message
 
 
 def buttons_per_row(data: dict[str, Any]) -> int:
@@ -90,11 +99,11 @@ def normalize_button_value(button_type: str, value: str) -> tuple[str | None, st
 
 
 async def answer_with_button_guide(message: Message, prompt: str, reply_markup=None) -> Message:
-    return await core._answer_with_button_guide(message, prompt, reply_markup)
+    return await render_button_guide(message, prompt, reply_markup)
 
 
 async def edit_button_ui(message: Message, text: str, reply_markup) -> None:
-    await core._edit_button_ui(message, text, reply_markup)
+    await render_button_ui(message, text, reply_markup)
 
 
 async def edit_saved_button_ui(
@@ -103,11 +112,11 @@ async def edit_saved_button_ui(
     text: str,
     reply_markup,
 ) -> None:
-    await core._edit_saved_button_ui(bot, state, text, reply_markup)
+    await render_saved_button_ui(bot, state, text, reply_markup)
 
 
 async def delete_input_message(message: Message) -> None:
-    await core._delete_input_message(message)
+    await remove_input_message(message)
 
 
 async def preview_buttons(
@@ -119,8 +128,8 @@ async def preview_buttons(
     with preserve_user_content():
         return await bot.send_rich_message(
             chat_id=user_id,
-            rich_message=core.build_input_rich_message(
-                core._button_guide_blocks(tr("معاينة الأزرار:")),
+            rich_message=build_input_rich_message(
+                button_guide_blocks(tr("معاينة الأزرار:")),
             ),
             reply_markup=build_message_buttons_keyboard(
                 buttons,
