@@ -4,19 +4,16 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from app import i18n_core
-from app.i18n import t, tr
-from app.locales import TRANSLATIONS
-from app.locales.common import (
-    DETAILS_INNER_KEYS, EDITOR_UX_KEYS, KEY_TRANSLATIONS, LIST_UI_KEYS,
-    RICH_IMPORT_KEYS,
-)
-from app.editor.session import load_editor_session as _session
 from app.editor.history import UNDO_KEY
-from app.routers.editor_entry import new_editor
-from app.routers.editor_preview import import_rich_message_into_editor
-from app.routers.editor_ui import (
-    delete_stored_block_prompt as _delete_stored_block_prompt,
-    editor_overview_text as _editor_overview_text,
+from app.editor.session import load_editor_session as _session
+from app.i18n import t, tr
+from app.lang import TRANSLATIONS
+from app.lang.catalogs.common import (
+    DETAILS_INNER_KEYS,
+    EDITOR_UX_KEYS,
+    KEY_TRANSLATIONS,
+    LIST_UI_KEYS,
+    RICH_IMPORT_KEYS,
 )
 from app.routers.block_input_support import (
     code_input_prompt as _code_input_prompt,
@@ -29,11 +26,19 @@ from app.routers.details_support import (
     details_inner_list_text as _details_inner_list_text,
     details_inner_page as _details_inner_page,
 )
+from app.routers.editor_entry import new_editor
+from app.routers.editor_preview import import_rich_message_into_editor
+from app.routers.editor_ui import (
+    delete_stored_block_prompt as _delete_stored_block_prompt,
+    editor_overview_text as _editor_overview_text,
+)
 from app.routers.page_support import (
     opened_page_text as _opened_page_text,
-    page_screen as _page_screen,
-    pages_for_user as _pages_for_user,
     saved_pages_text as _saved_pages_text,
+)
+from app.services.page_editor import (
+    paginate_pages as _page_screen,
+    query_user_pages as _pages_for_user,
 )
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
@@ -59,7 +64,11 @@ class SavedPagesLocalizationTests(unittest.TestCase):
                 i18n_core._language.reset(token)
 
             self.assertTrue(prompt.endswith("\\ "), language)
-            self.assertNotEqual(prompt, "Send the formula in LaTeX.\n\nTo add a space between text, use: \\ ", language)
+            self.assertNotEqual(
+                prompt,
+                "Send the formula in LaTeX.\n\nTo add a space between text, use: \\ ",
+                language,
+            )
 
     def test_every_locale_explains_how_to_set_code_language(self):
         english = (
@@ -157,11 +166,15 @@ class SavedPagesLocalizationTests(unittest.TestCase):
 
     def test_details_inner_overview_shows_names_and_live_positions(self):
         details = {
-            "id": "details", "type": "details", "position": 0,
-            "data": {"children": [
-                {"id": "photo", "type": "photo", "position": 1, "data": {}},
-                {"id": "text", "type": "paragraph", "position": 0, "data": {}},
-            ]},
+            "id": "details",
+            "type": "details",
+            "position": 0,
+            "data": {
+                "children": [
+                    {"id": "photo", "type": "photo", "position": 1, "data": {}},
+                    {"id": "text", "type": "paragraph", "position": 0, "data": {}},
+                ]
+            },
         }
         token = i18n_core._language.set("ar")
         try:
@@ -244,14 +257,31 @@ class SavedPagesLocalizationTests(unittest.TestCase):
 
     def test_every_added_locale_translates_saved_pages_heading(self):
         expected = {
-            "es", "fr", "de", "it", "pt", "ru", "tr", "fa", "ku",
-            "hi", "ur", "id", "ja", "ko", "uk", "nl", "pl", "vi", "th",
+            "es",
+            "fr",
+            "de",
+            "it",
+            "pt",
+            "ru",
+            "tr",
+            "fa",
+            "ku",
+            "hi",
+            "ur",
+            "id",
+            "ja",
+            "ko",
+            "uk",
+            "nl",
+            "pl",
+            "vi",
+            "th",
         }
         for language in expected:
-            pack = TRANSLATIONS[language]
-            self.assertIn("📚 Your saved pages", pack, language)
-            self.assertIn("Choose a page to open and edit:", pack, language)
-            self.assertIn("You don't have any saved pages yet.", pack, language)
+            locale = TRANSLATIONS[language]
+            self.assertIn("📚 Your saved pages", locale, language)
+            self.assertIn("Choose a page to open and edit:", locale, language)
+            self.assertIn("You don't have any saved pages yet.", locale, language)
 
 
 class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
@@ -261,12 +291,16 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
             {"id": "second", "type": "photo", "position": 1, "data": {}},
         ]
         details = {
-            "id": "details", "type": "details", "position": 0,
+            "id": "details",
+            "type": "details",
+            "position": 0,
             "data": {"children": children, "native": True, "native_data": {}},
         }
         data = {
-            "blocks": [details], "nested_details_id": "details",
-            "nested_child_id": "first", "nested_action": "add_footer",
+            "blocks": [details],
+            "nested_details_id": "details",
+            "nested_child_id": "first",
+            "nested_action": "add_footer",
         }
         message = SimpleNamespace(text="المصدر", html_text="المصدر")
         state = SimpleNamespace(update_data=AsyncMock(), set_state=AsyncMock())
@@ -275,7 +309,10 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
             patch("app.routers.details_edit.edit_saved_ui", AsyncMock()),
         ):
             handled = await _receive_nested_replacement(
-                message, state, SimpleNamespace(), data,
+                message,
+                state,
+                SimpleNamespace(),
+                data,
             )
 
         self.assertTrue(handled)
@@ -350,11 +387,14 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
             {"page_id": "c", "title": "Other", "updated_at": 50},
         ]
         with patch(
-            "app.routers.page_support.page_registry.list_for_user",
-            AsyncMock(return_value=pages),
+            "app.services.page_editor.page_registry.query_for_user",
+            AsyncMock(return_value=([pages[1], pages[0]], 3)),
         ):
             found, visible, page_index, total_pages, total_count = await _pages_for_user(
-                7, 0, "a", "updated",
+                7,
+                0,
+                "a",
+                "updated",
             )
 
         self.assertEqual([page["page_id"] for page in found], ["b", "a"])
