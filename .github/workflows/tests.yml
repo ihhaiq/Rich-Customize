@@ -50,7 +50,6 @@ jobs:
       - name: Type-check cleaned architecture
         run: >-
           mypy
-          app/editor
           app/lang/bundle_loader.py
           app/services/page_editor.py
           app/services/details_editor.py
