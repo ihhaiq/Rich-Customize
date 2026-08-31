@@ -12,8 +12,10 @@ from app.lang import (
     PHRASES,
     TRANSLATIONS,
 )
+from app.lang.bundle_loader import SOURCE_NORMALIZATION
 
 EN = _core.EN
+EN.update(SOURCE_NORMALIZATION)
 EN.update({
     "👁 معاينة هذا الـBlock": "👁 Preview this Block",
     "جاري إنشاء معاينة الجزء…": "Generating block preview…",
@@ -51,7 +53,11 @@ def tr(text: str) -> str:
         translated = text
         locale = TRANSLATIONS.get("ar")
         if locale:
-            for source, target in sorted(locale.items(), key=lambda item: len(item[0]), reverse=True):
+            for source, target in sorted(
+                locale.items(),
+                key=lambda item: len(item[0]),
+                reverse=True,
+            ):
                 translated = translated.replace(source, target)
         return translated
 
@@ -60,7 +66,11 @@ def tr(text: str) -> str:
         translated = translated.replace(source, target)
     locale = TRANSLATIONS.get(language)
     if locale:
-        for source, target in sorted(locale.items(), key=lambda item: len(item[0]), reverse=True):
+        for source, target in sorted(
+            locale.items(),
+            key=lambda item: len(item[0]),
+            reverse=True,
+        ):
             translated = translated.replace(source, target)
     return translated
 
