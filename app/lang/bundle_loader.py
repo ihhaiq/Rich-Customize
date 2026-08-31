@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from app import i18n_core as _core
 from app.lang.catalogs.asia import PROFILES as ASIA_PROFILES, TRANSLATIONS as ASIA_TRANSLATIONS
 from app.lang.catalogs.catalog import CATALOG_AR, CATALOG_EN, CATALOG_TRANSLATIONS
 from app.lang.catalogs.chinese import ZH_HANS, ZH_HANT
@@ -28,6 +27,11 @@ class LocaleBundle:
     catalog: dict[str, str]
     profile: dict[str, Any] | None = None
 
+
+SOURCE_NORMALIZATION: dict[str, str] = {
+    **PAGE_AR_TO_EN,
+    **RECENT_AR_TO_EN,
+}
 
 _BASE_TRANSLATIONS: dict[str, dict[str, str]] = {
     **WESTERN_TRANSLATIONS,
@@ -88,9 +92,4 @@ def build_bundle(code: str) -> LocaleBundle:
     )
 
 
-def install_source_normalization() -> None:
-    _core.EN.update(PAGE_AR_TO_EN)
-    _core.EN.update(RECENT_AR_TO_EN)
-
-
-__all__ = ["LocaleBundle", "build_bundle", "install_source_normalization"]
+__all__ = ["LocaleBundle", "SOURCE_NORMALIZATION", "build_bundle"]
