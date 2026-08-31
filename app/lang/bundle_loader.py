@@ -6,6 +6,7 @@ from typing import Any
 from app import i18n_core as _core
 from app.lang.catalogs.asia import PROFILES as ASIA_PROFILES, TRANSLATIONS as ASIA_TRANSLATIONS
 from app.lang.catalogs.catalog import CATALOG_AR, CATALOG_EN, CATALOG_TRANSLATIONS
+from app.lang.catalogs.chinese import ZH_HANS, ZH_HANT
 from app.lang.catalogs.common import AR_PHRASES as COMMON_AR_PHRASES
 from app.lang.catalogs.common import KEY_TRANSLATIONS as COMMON_KEY_TRANSLATIONS
 from app.lang.catalogs.common import PHRASES as COMMON_PHRASES
@@ -16,7 +17,6 @@ from app.lang.catalogs.pages import PAGE_AR_TO_EN, PAGE_TRANSLATIONS
 from app.lang.catalogs.recent_ui import RECENT_AR_TO_EN, RECENT_TRANSLATIONS
 from app.lang.catalogs.regional import PROFILES as REGIONAL_PROFILES, TRANSLATIONS as REGIONAL_TRANSLATIONS
 from app.lang.catalogs.western import PROFILES as WESTERN_PROFILES, TRANSLATIONS as WESTERN_TRANSLATIONS
-from app.translations_zh import ZH_HANS, ZH_HANT
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,12 +72,18 @@ def _source_translations(code: str) -> dict[str, str]:
 
 
 def build_bundle(code: str) -> LocaleBundle:
+    if code == "en":
+        catalog = dict(CATALOG_EN)
+    elif code == "ar":
+        catalog = dict(CATALOG_AR)
+    else:
+        catalog = dict(CATALOG_TRANSLATIONS.get(code, {}))
     return LocaleBundle(
         code=code,
         phrases=_semantic_phrases(code),
         translations=_source_translations(code),
         keyed=_keyed(code),
-        catalog=(dict(CATALOG_EN) if code == "en" else dict(CATALOG_AR) if code == "ar" else dict(CATALOG_TRANSLATIONS.get(code, {}))),
+        catalog=catalog,
         profile=dict(_BASE_PROFILES[code]) if code in _BASE_PROFILES else None,
     )
 
