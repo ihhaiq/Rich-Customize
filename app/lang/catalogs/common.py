@@ -1,0 +1,1011 @@
+from __future__ import annotations
+
+from typing import Any
+
+
+PHRASES: dict[str, str] = {
+    "customize": "Customize message",
+    "choose_block": "Choose the block you want to edit:",
+    "block_added": "Block added successfully.",
+    "welcome": "Welcome to the Rich Message Editor.",
+    "start_editor": "Send /editor to start a new message.",
+    "send_message": "Send the message you want to customize.",
+    "unsupported": "This type is not supported. Send text, media, or a Rich Message.",
+    "expired": "The session has expired. Send /editor to start again.",
+    "add_block": "➕ Add Block",
+    "result": "✅ Result",
+    "create_post": "📝 Create Post",
+    "save_page": "💾 Save Page",
+    "pages": "📚 My Pages",
+    "edit": "✏️ Edit",
+    "edit_content": "✏️ Edit content",
+    "delete": "🗑 Delete",
+    "move": "↕️ Change position",
+    "back": "🔙 Back",
+    "navigation.home": "🏠 Home",
+    "navigation.message_missing": "Couldn't identify the navigation message.",
+    "navigation.original_above": "The main message is above.",
+    "navigation.expired": "The navigation session expired. Open the page again.",
+    "navigation.back_failed": "Couldn't go back: {error}",
+    "navigation.home_failed": "Couldn't open the home page: {error}",
+    "preview_block": "👁 Preview this Block",
+    "preview_generating": "Generating preview…",
+    "preview_ready": "Preview is ready.",
+    "preview_failed": "Preview failed.",
+    "add_buttons": "🔘 Add Buttons",
+    "buttons_manage": "Manage rich-message buttons",
+    "add": "➕ Add",
+    "remove": "➖ Remove",
+    "color": "🎨 Change color",
+    "reorder": "↕️ Reorder",
+    "change_content": "🧩 Change action content",
+    "change_title": "✏️ Change title",
+    "button_preview": "👁 Preview buttons",
+    "post_settings": "Post settings",
+    "send_now": "📤 Send post now",
+    "select_chat": "Select at least one chat.",
+    "details": "Details",
+    "photo": "Photo",
+    "video": "Video",
+    "audio": "Audio",
+    "voice": "Voice note",
+    "document": "Document",
+    "table": "Table",
+    "list": "List",
+    "paragraph": "Paragraph",
+    "heading": "Section heading",
+    "footer": "Footer",
+    "divider": "Divider",
+    "map": "Map",
+    "invalid": "Invalid selection.",
+    "missing_block": "This block no longer exists.",
+    "choose_action": "Choose an action:",
+    "send_file": "Send a document.",
+    "send_photo": "Send a photo.",
+    "send_video": "Send a video.",
+    "send_audio": "Send an audio file.",
+    "send_voice": "Send a voice note.",
+    "math.add_prompt": "Send the formula in LaTeX.\n\nTo add a space between text, use: \\ ",
+    "math.edit_prompt": "Send the new LaTeX formula.\n\nTo add a space between text, use: \\ ",
+    "code.add_prompt": "Send the code.\n\nTo set its language, start with /lang python, then put the code on the following lines. You can also use a fenced block such as ```python ... ```.",
+    "code.edit_prompt": "Send the new code.\n\nTo set its language, start with /lang python, then put the code on the following lines. You can also use a fenced block such as ```python ... ```.",
+    "editor.closed_hint": "Use the editor buttons, or send /editor to start a new message.",
+    "editor.start_button": "▶️ Start editor",
+    "editor.new_button": "➕ Start editor",
+    "editor.empty_hint": "Customize message\n\nAdd a Block or open one of your saved pages:",
+    "editor.forward_hint": "You can also forward a Rich Message here to import and customize its blocks.",
+    "editor.imported_title": "✅ Rich Message imported",
+    "editor.block_count": "Block count: {count}",
+    "editor.imported_blocks_title": "Message blocks:",
+    "editor.imported_choose_block": "Choose a block to customize:",
+    "editor.rich_import_failed": "This Rich Message has no supported blocks.",
+    "pages.rename_prompt": "Send a new name for “{title}”; maximum 64 characters.",
+    "pages.delete_confirm": "Permanently delete “{title}”?",
+    "pages.delete_yes": "🗑 Yes, delete",
+    "common.cancel": "Cancel",
+    "pages.deleted": "Page deleted",
+    "editor.tools_button": "🛠 More tools",
+    "editor.tools_text": "🛠 More tools\n\nChoose the tool you need:",
+    "editor.undo_button": "↩️ Undo",
+    "editor.undo_empty": "There is no action to undo.",
+    "editor.undo_done": "Undone",
+    "block.move_up": "⬆️ Move up",
+    "block.move_down": "⬇️ Move down",
+    "block.manage_title": "Manage {name}",
+    "block.position_text": "Current position: {current} of {total}",
+    "block.order_text": "Block order:",
+    "common.choose_action": "Choose an action:",
+    "pages.search_button": "🔎 Search",
+    "pages.sort_button": "⚙️ Sort",
+    "pages.search_prompt": "Send the page name or code to search. Send /all to show every page.",
+    "pages.search_results": "🔎 Results: {query}",
+    "pages.search_none": "🔎 No pages match “{query}”.",
+    "pages.sort_text": "⚙️ Sort pages\n\nChoose how to order the pages:",
+    "pages.sort_updated": "🕘 Last updated",
+    "pages.sort_newest": "🆕 Newest created",
+    "pages.sort_oldest": "🗓 Oldest created",
+    "pages.sort_title": "🔤 By name",
+    "pages.sort_done": "Page order changed",
+    "list.menu_button": "📋 Lists",
+    "list.menu_title": "Choose a list type:",
+    "list.bullet": "• Bulleted list",
+    "list.numbered": "1. Numbered list",
+    "list.checklist": "☑️ Checklist",
+    "list.bullet_prompt": "Send the list items, one per line.",
+    "list.numbered_prompt": "Send the numbered-list items, one per line. Numbers are added automatically.",
+    "list.checklist_prompt": "Send one task per line. Normal lines are pending; prefix completed tasks with [x], ✅, or ☑️.",
+    "list.tasks_title": "Tasks:",
+    "list.unnamed_task": "Task",
+    "list.invalid": "Invalid list selection.",
+    "list.empty": "Send at least one non-empty item.",
+    "list.missing_task": "This task no longer exists.",
+    "list.marked_done": "Task marked as completed",
+    "list.marked_pending": "Task marked as pending",
+    "details.inner_manage_button": "🧩 Inner blocks",
+    "details.inner_credit": "✍️ Source / credit",
+    "details.inner_add_footer": "➕ Add footer / source",
+    "details.inner_list_title": "🧩 Blocks inside Details",
+    "details.inner_count": "Inner blocks: {count}",
+    "details.inner_settings_title": "⚙️ Inner block settings",
+    "details.inner_type": "Type: {name}",
+    "details.inner_position": "Position inside Details: {current} of {total}",
+    "details.inner_send_content": "Send the new content for this inner block.",
+    "details.inner_send_caption": "Send the caption, or /remove to clear it.",
+    "details.inner_send_credit": "Send the source or credit, or /remove to clear it.",
+    "details.inner_send_footer": "Send the footer or source text. It will be inserted directly after this block.",
+    "details.inner_delete_question": "Delete this inner block from Details?",
+    "details.inner_deleted": "Inner block deleted",
+    "details.inner_current_position": "The block is already at that edge.",
+    "details.inner_moved": "Inner block moved",
+    "details.inner_text_required": "Send text for this field.",
+    "details.inner_wrong_content": "Send content of the same type as this inner block.",
+
+    # Canonical Rich Block keys. These are deliberately semantic keys rather
+    # than source-language strings so block names can never get stuck midway
+    # in the old Arabic -> English -> locale replacement chain.
+    "block.content": "📦 Content",
+    "block.text": "📝 Text",
+    "block.paragraph": "📝 Paragraph",
+    "block.heading": "🔠 Section heading",
+    "block.preformatted": "💻 Preformatted",
+    "block.footer": "🔻 Footer",
+    "block.caption": "💬 Caption",
+    "block.photo": "🖼 Photo",
+    "block.video": "🎬 Video",
+    "block.animation": "🎞 GIF",
+    "block.audio": "🎵 Audio",
+    "block.voice": "🎙 Voice note",
+    "block.document": "📄 Document",
+    "block.sticker": "🏷 Sticker",
+    "block.video_note": "⭕ Video note",
+    "block.divider": "➖ Divider",
+    "block.list": "📋 List",
+    "block.table": "▦ Table",
+    "block.blockquote": "❝ Blockquote",
+    "block.pullquote": "💬 Pull quote",
+    "block.details": "📂 Details",
+    "block.mathematical_expression": "∑ Formula",
+    "block.anchor": "⚓ Anchor",
+    "block.collage": "🖼 Collage",
+    "block.slideshow": "🎞 Slideshow",
+    "block.map": "🗺 Map",
+    "block.buttons": "🔘 Rich buttons",
+}
+
+
+AR_PHRASES: dict[str, str] = {
+    "math.add_prompt": "أرسل المعادلة بصيغة LaTeX.\n\nلإضافة مسافة بين النصوص استخدم: \\ ",
+    "math.edit_prompt": "أرسل معادلة LaTeX الجديدة.\n\nلإضافة مسافة بين النصوص استخدم: \\ ",
+    "code.add_prompt": "أرسل النص البرمجي.\n\nلتحديد لغة الكود اكتب في أول سطر: /lang python ثم اكتب الكود في الأسطر التالية. وتكدر أيضًا تستخدم: ```python ... ```.",
+    "code.edit_prompt": "أرسل النص البرمجي الجديد.\n\nلتحديد لغة الكود اكتب في أول سطر: /lang python ثم اكتب الكود في الأسطر التالية. وتكدر أيضًا تستخدم: ```python ... ```.",
+    "editor.closed_hint": "استخدم أزرار المحرّر، أو أرسل /editor لبدء رسالة جديدة.",
+    "editor.start_button": "▶️ بدء المحرّر",
+    "editor.new_button": "➕ بدء المحرّر",
+    "editor.empty_hint": "تخصيص الرسالة\n\nأضف Block أو افتح إحدى صفحاتك المحفوظة:",
+    "editor.forward_hint": "وتكدر أيضًا تحوّل رسالة غنية هنا حتى تستورد بلوكاتها وتخصصها.",
+    "editor.imported_title": "✅ تم استيراد الرسالة الغنية",
+    "editor.block_count": "عدد البلوكات: {count}",
+    "editor.imported_blocks_title": "بلوكات الرسالة:",
+    "editor.imported_choose_block": "اختر البلوك الذي تريد تخصيصه:",
+    "editor.rich_import_failed": "هذه الرسالة الغنية لا تحتوي بلوكات مدعومة.",
+    "pages.rename_prompt": "أرسل الاسم الجديد للصفحة «{title}»؛ الحد الأقصى 64 حرفًا.",
+    "pages.delete_confirm": "هل تريد حذف الصفحة «{title}» نهائيًا؟",
+    "pages.delete_yes": "🗑 نعم، حذف",
+    "common.cancel": "إلغاء",
+    "pages.deleted": "تم حذف الصفحة",
+    "navigation.home": "🏠 الصفحة الرئيسية",
+    "navigation.message_missing": "تعذر تحديد رسالة التنقّل.",
+    "navigation.original_above": "الرسالة الرئيسية موجودة بالأعلى.",
+    "navigation.expired": "انتهت جلسة التنقّل. افتح الصفحة من جديد.",
+    "navigation.back_failed": "تعذر الرجوع: {error}",
+    "navigation.home_failed": "تعذر فتح الصفحة الرئيسية: {error}",
+    "editor.tools_button": "🛠 أدوات إضافية",
+    "editor.tools_text": "🛠 أدوات إضافية\n\nاختر الأداة التي تحتاجها:",
+    "editor.undo_button": "↩️ تراجع",
+    "editor.undo_empty": "ماكو إجراء يمكن التراجع عنه.",
+    "editor.undo_done": "تم التراجع",
+    "block.move_up": "⬆️ للأعلى",
+    "block.move_down": "⬇️ للأسفل",
+    "block.manage_title": "إدارة {name}",
+    "block.position_text": "الموقع الحالي: {current} من {total}",
+    "block.order_text": "ترتيب البلوكات:",
+    "common.choose_action": "اختر العملية:",
+    "pages.search_button": "🔎 بحث",
+    "pages.sort_button": "⚙️ فرز",
+    "pages.search_prompt": "أرسل اسم الصفحة أو كودها للبحث. أرسل /all لإظهار جميع الصفحات.",
+    "pages.search_results": "🔎 نتائج: {query}",
+    "pages.search_none": "🔎 لا توجد صفحات تطابق «{query}».",
+    "pages.sort_text": "⚙️ فرز الصفحات\n\nاختر طريقة ترتيب الصفحات:",
+    "pages.sort_updated": "🕘 آخر تعديل",
+    "pages.sort_newest": "🆕 الأحدث إنشاءً",
+    "pages.sort_oldest": "🗓 الأقدم إنشاءً",
+    "pages.sort_title": "🔤 حسب الاسم",
+    "pages.sort_done": "تم تغيير ترتيب الصفحات",
+    "list.menu_button": "📋 القوائم",
+    "list.menu_title": "اختر نوع القائمة:",
+    "list.bullet": "• قائمة نقطية",
+    "list.numbered": "1. قائمة مرقّمة",
+    "list.checklist": "☑️ قائمة مهام",
+    "list.bullet_prompt": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل.",
+    "list.numbered_prompt": "أرسل عناصر القائمة المرقّمة؛ كل عنصر في سطر، والأرقام تضاف تلقائيًا.",
+    "list.checklist_prompt": "أرسل كل مهمة في سطر. السطر العادي غير منجز، وللمنجز اكتب قبله [x] أو ✅ أو ☑️.",
+    "list.tasks_title": "المهام:",
+    "list.unnamed_task": "مهمة",
+    "list.invalid": "اختيار نوع القائمة غير صالح.",
+    "list.empty": "أرسل عنصرًا واحدًا غير فارغ على الأقل.",
+    "list.missing_task": "هذه المهمة لم تعد موجودة.",
+    "list.marked_done": "تم تحديد المهمة كمنجزة",
+    "list.marked_pending": "تم تحديد المهمة كغير منجزة",
+    "details.inner_manage_button": "🧩 البلوكات الداخلية",
+    "details.inner_credit": "✍️ المصدر / النسبة",
+    "details.inner_add_footer": "➕ إضافة تذييل / مصدر",
+    "details.inner_list_title": "🧩 البلوكات داخل التفاصيل",
+    "details.inner_count": "عدد البلوكات الداخلية: {count}",
+    "details.inner_settings_title": "⚙️ إعدادات البلوك الداخلي",
+    "details.inner_type": "النوع: {name}",
+    "details.inner_position": "الموقع داخل التفاصيل: {current} من {total}",
+    "details.inner_send_content": "أرسل المحتوى الجديد لهذا البلوك الداخلي.",
+    "details.inner_send_caption": "أرسل الوصف، أو /remove لحذفه.",
+    "details.inner_send_credit": "أرسل المصدر أو النسبة، أو /remove لحذفها.",
+    "details.inner_send_footer": "أرسل نص التذييل أو المصدر؛ راح ينضاف مباشرة بعد هذا البلوك.",
+    "details.inner_delete_question": "تحذف هذا البلوك من داخل التفاصيل؟",
+    "details.inner_deleted": "تم حذف البلوك الداخلي",
+    "details.inner_current_position": "البلوك موجود بهذا الطرف بالفعل.",
+    "details.inner_moved": "تم نقل البلوك الداخلي",
+    "details.inner_text_required": "أرسل نصًا لهذا الحقل.",
+    "details.inner_wrong_content": "أرسل محتوى من نفس نوع هذا البلوك الداخلي.",
+    "block.content": "📦 محتوى",
+    "block.text": "📝 نص",
+    "block.paragraph": "📝 فقرة",
+    "block.heading": "🔠 عنوان قسم",
+    "block.preformatted": "💻 نص برمجي",
+    "block.footer": "🔻 تذييل",
+    "block.caption": "💬 وصف",
+    "block.photo": "🖼 صورة",
+    "block.video": "🎬 فيديو",
+    "block.animation": "🎞 GIF",
+    "block.audio": "🎵 صوت",
+    "block.voice": "🎙 بصمة صوتية",
+    "block.document": "📄 ملف",
+    "block.sticker": "🏷 ملصق",
+    "block.video_note": "⭕ فيديو دائري",
+    "block.divider": "➖ فاصل",
+    "block.list": "📋 قائمة",
+    "block.table": "▦ جدول",
+    "block.blockquote": "❝ اقتباس",
+    "block.pullquote": "💬 اقتباس بارز",
+    "block.details": "📂 تفاصيل",
+    "block.mathematical_expression": "∑ معادلة",
+    "block.anchor": "⚓ مرساة",
+    "block.collage": "🖼 كولاج",
+    "block.slideshow": "🎞 عرض شرائح",
+    "block.map": "🗺 خريطة",
+    "block.buttons": "🔘 أزرار غنية",
+}
+
+
+# Keyed translations for labels that were missing from the legacy locale packs.
+# Keeping these in one place guarantees complete parity for every supported
+# locale and avoids having to duplicate the same semantic keys across files.
+BLOCK_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {"content":"📦 Contenido","text":"📝 Texto","paragraph":"📝 Párrafo","heading":"🔠 Encabezado de sección","preformatted":"💻 Preformateado","footer":"🔻 Pie","caption":"💬 Descripción","photo":"🖼 Foto","video":"🎬 Vídeo","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Nota de voz","document":"📄 Documento","sticker":"🏷 Sticker","video_note":"⭕ Nota de vídeo","divider":"➖ Separador","list":"📋 Lista","table":"▦ Tabla","blockquote":"❝ Cita","pullquote":"💬 Cita destacada","details":"📂 Detalles","mathematical_expression":"∑ Fórmula","anchor":"⚓ Ancla","collage":"🖼 Collage","slideshow":"🎞 Presentación","map":"🗺 Mapa","buttons":"🔘 Botones enriquecidos"},
+    "fr": {"content":"📦 Contenu","text":"📝 Texte","paragraph":"📝 Paragraphe","heading":"🔠 Titre de section","preformatted":"💻 Préformaté","footer":"🔻 Pied de page","caption":"💬 Légende","photo":"🖼 Photo","video":"🎬 Vidéo","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Message vocal","document":"📄 Document","sticker":"🏷 Sticker","video_note":"⭕ Message vidéo","divider":"➖ Séparateur","list":"📋 Liste","table":"▦ Tableau","blockquote":"❝ Citation","pullquote":"💬 Citation mise en avant","details":"📂 Détails","mathematical_expression":"∑ Formule","anchor":"⚓ Ancre","collage":"🖼 Collage","slideshow":"🎞 Diaporama","map":"🗺 Carte","buttons":"🔘 Boutons enrichis"},
+    "de": {"content":"📦 Inhalt","text":"📝 Text","paragraph":"📝 Absatz","heading":"🔠 Abschnittsüberschrift","preformatted":"💻 Vorformatiert","footer":"🔻 Fußzeile","caption":"💬 Beschriftung","photo":"🖼 Foto","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Sprachnachricht","document":"📄 Dokument","sticker":"🏷 Sticker","video_note":"⭕ Videonachricht","divider":"➖ Trennlinie","list":"📋 Liste","table":"▦ Tabelle","blockquote":"❝ Zitat","pullquote":"💬 Hervorgehobenes Zitat","details":"📂 Details","mathematical_expression":"∑ Formel","anchor":"⚓ Anker","collage":"🖼 Collage","slideshow":"🎞 Diashow","map":"🗺 Karte","buttons":"🔘 Rich-Buttons"},
+    "it": {"content":"📦 Contenuto","text":"📝 Testo","paragraph":"📝 Paragrafo","heading":"🔠 Titolo di sezione","preformatted":"💻 Preformattato","footer":"🔻 Piè di pagina","caption":"💬 Didascalia","photo":"🖼 Foto","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Messaggio vocale","document":"📄 Documento","sticker":"🏷 Sticker","video_note":"⭕ Videomessaggio","divider":"➖ Divisore","list":"📋 Elenco","table":"▦ Tabella","blockquote":"❝ Citazione","pullquote":"💬 Citazione in evidenza","details":"📂 Dettagli","mathematical_expression":"∑ Formula","anchor":"⚓ Ancora","collage":"🖼 Collage","slideshow":"🎞 Presentazione","map":"🗺 Mappa","buttons":"🔘 Pulsanti avanzati"},
+    "pt": {"content":"📦 Conteúdo","text":"📝 Texto","paragraph":"📝 Parágrafo","heading":"🔠 Título de seção","preformatted":"💻 Pré-formatado","footer":"🔻 Rodapé","caption":"💬 Legenda","photo":"🖼 Foto","video":"🎬 Vídeo","animation":"🎞 GIF","audio":"🎵 Áudio","voice":"🎙 Mensagem de voz","document":"📄 Documento","sticker":"🏷 Sticker","video_note":"⭕ Mensagem de vídeo","divider":"➖ Divisor","list":"📋 Lista","table":"▦ Tabela","blockquote":"❝ Citação","pullquote":"💬 Citação destacada","details":"📂 Detalhes","mathematical_expression":"∑ Fórmula","anchor":"⚓ Âncora","collage":"🖼 Colagem","slideshow":"🎞 Apresentação","map":"🗺 Mapa","buttons":"🔘 Botões ricos"},
+    "nl": {"content":"📦 Inhoud","text":"📝 Tekst","paragraph":"📝 Alinea","heading":"🔠 Sectiekop","preformatted":"💻 Vooraf opgemaakt","footer":"🔻 Voettekst","caption":"💬 Bijschrift","photo":"🖼 Foto","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Spraakbericht","document":"📄 Document","sticker":"🏷 Sticker","video_note":"⭕ Videobericht","divider":"➖ Scheiding","list":"📋 Lijst","table":"▦ Tabel","blockquote":"❝ Citaat","pullquote":"💬 Uitgelicht citaat","details":"📂 Details","mathematical_expression":"∑ Formule","anchor":"⚓ Anker","collage":"🖼 Collage","slideshow":"🎞 Diavoorstelling","map":"🗺 Kaart","buttons":"🔘 Rich-knoppen"},
+    "pl": {"content":"📦 Treść","text":"📝 Tekst","paragraph":"📝 Akapit","heading":"🔠 Nagłówek sekcji","preformatted":"💻 Tekst preformatowany","footer":"🔻 Stopka","caption":"💬 Podpis","photo":"🖼 Zdjęcie","video":"🎬 Wideo","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Wiadomość głosowa","document":"📄 Dokument","sticker":"🏷 Naklejka","video_note":"⭕ Wiadomość wideo","divider":"➖ Separator","list":"📋 Lista","table":"▦ Tabela","blockquote":"❝ Cytat","pullquote":"💬 Wyróżniony cytat","details":"📂 Szczegóły","mathematical_expression":"∑ Wzór","anchor":"⚓ Kotwica","collage":"🖼 Kolaż","slideshow":"🎞 Pokaz slajdów","map":"🗺 Mapa","buttons":"🔘 Przyciski Rich"},
+    "uk": {"content":"📦 Вміст","text":"📝 Текст","paragraph":"📝 Абзац","heading":"🔠 Заголовок розділу","preformatted":"💻 Форматований текст","footer":"🔻 Нижній колонтитул","caption":"💬 Підпис","photo":"🖼 Фото","video":"🎬 Відео","animation":"🎞 GIF","audio":"🎵 Аудіо","voice":"🎙 Голосове повідомлення","document":"📄 Документ","sticker":"🏷 Стікер","video_note":"⭕ Відеоповідомлення","divider":"➖ Роздільник","list":"📋 Список","table":"▦ Таблиця","blockquote":"❝ Цитата","pullquote":"💬 Виділена цитата","details":"📂 Деталі","mathematical_expression":"∑ Формула","anchor":"⚓ Якір","collage":"🖼 Колаж","slideshow":"🎞 Слайд-шоу","map":"🗺 Мапа","buttons":"🔘 Rich-кнопки"},
+    "ru": {"content":"📦 Содержимое","text":"📝 Текст","paragraph":"📝 Абзац","heading":"🔠 Заголовок раздела","preformatted":"💻 Форматированный текст","footer":"🔻 Подвал","caption":"💬 Подпись","photo":"🖼 Фото","video":"🎬 Видео","animation":"🎞 GIF","audio":"🎵 Аудио","voice":"🎙 Голосовое сообщение","document":"📄 Документ","sticker":"🏷 Стикер","video_note":"⭕ Видеосообщение","divider":"➖ Разделитель","list":"📋 Список","table":"▦ Таблица","blockquote":"❝ Цитата","pullquote":"💬 Выделенная цитата","details":"📂 Детали","mathematical_expression":"∑ Формула","anchor":"⚓ Якорь","collage":"🖼 Коллаж","slideshow":"🎞 Слайд-шоу","map":"🗺 Карта","buttons":"🔘 Rich-кнопки"},
+    "tr": {"content":"📦 İçerik","text":"📝 Metin","paragraph":"📝 Paragraf","heading":"🔠 Bölüm başlığı","preformatted":"💻 Ön biçimli metin","footer":"🔻 Alt bilgi","caption":"💬 Açıklama","photo":"🖼 Fotoğraf","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Ses","voice":"🎙 Sesli mesaj","document":"📄 Belge","sticker":"🏷 Çıkartma","video_note":"⭕ Video mesajı","divider":"➖ Ayırıcı","list":"📋 Liste","table":"▦ Tablo","blockquote":"❝ Alıntı","pullquote":"💬 Vurgulu alıntı","details":"📂 Detaylar","mathematical_expression":"∑ Formül","anchor":"⚓ Çapa","collage":"🖼 Kolaj","slideshow":"🎞 Slayt gösterisi","map":"🗺 Harita","buttons":"🔘 Zengin düğmeler"},
+    "fa": {"content":"📦 محتوا","text":"📝 متن","paragraph":"📝 پاراگراف","heading":"🔠 عنوان بخش","preformatted":"💻 متن قالب‌بندی‌شده","footer":"🔻 پاورقی","caption":"💬 توضیح","photo":"🖼 عکس","video":"🎬 ویدیو","animation":"🎞 GIF","audio":"🎵 صدا","voice":"🎙 پیام صوتی","document":"📄 فایل","sticker":"🏷 استیکر","video_note":"⭕ پیام ویدیویی","divider":"➖ جداکننده","list":"📋 فهرست","table":"▦ جدول","blockquote":"❝ نقل‌قول","pullquote":"💬 نقل‌قول برجسته","details":"📂 جزئیات","mathematical_expression":"∑ فرمول","anchor":"⚓ لنگر","collage":"🖼 کلاژ","slideshow":"🎞 نمایش اسلاید","map":"🗺 نقشه","buttons":"🔘 دکمه‌های غنی"},
+    "ku": {"content":"📦 Naverok","text":"📝 Nivîs","paragraph":"📝 Paragraf","heading":"🔠 Sernavê beşê","preformatted":"💻 Nivîsa pêş-formatkirî","footer":"🔻 Binpê","caption":"💬 Şirove","photo":"🖼 Wêne","video":"🎬 Vîdyo","animation":"🎞 GIF","audio":"🎵 Deng","voice":"🎙 Peyama dengî","document":"📄 Belge","sticker":"🏷 Sticker","video_note":"⭕ Peyama vîdyoyî","divider":"➖ Dabeşker","list":"📋 Lîste","table":"▦ Tablo","blockquote":"❝ Vegotin","pullquote":"💬 Vegotina derketî","details":"📂 Hûragahî","mathematical_expression":"∑ Formul","anchor":"⚓ Lenger","collage":"🖼 Kolaj","slideshow":"🎞 Pêşandan","map":"🗺 Nexşe","buttons":"🔘 Bişkokên dewlemend"},
+    "ur": {"content":"📦 مواد","text":"📝 متن","paragraph":"📝 پیراگراف","heading":"🔠 حصے کی سرخی","preformatted":"💻 پہلے سے فارمیٹ شدہ متن","footer":"🔻 فٹر","caption":"💬 کیپشن","photo":"🖼 تصویر","video":"🎬 ویڈیو","animation":"🎞 GIF","audio":"🎵 آڈیو","voice":"🎙 صوتی پیغام","document":"📄 دستاویز","sticker":"🏷 اسٹیکر","video_note":"⭕ ویڈیو پیغام","divider":"➖ جداکار","list":"📋 فہرست","table":"▦ جدول","blockquote":"❝ اقتباس","pullquote":"💬 نمایاں اقتباس","details":"📂 تفصیلات","mathematical_expression":"∑ فارمولا","anchor":"⚓ اینکر","collage":"🖼 کولاج","slideshow":"🎞 سلائیڈ شو","map":"🗺 نقشہ","buttons":"🔘 رِچ بٹن"},
+    "hi": {"content":"📦 सामग्री","text":"📝 टेक्स्ट","paragraph":"📝 अनुच्छेद","heading":"🔠 सेक्शन शीर्षक","preformatted":"💻 पूर्व-स्वरूपित टेक्स्ट","footer":"🔻 फ़ुटर","caption":"💬 कैप्शन","photo":"🖼 फ़ोटो","video":"🎬 वीडियो","animation":"🎞 GIF","audio":"🎵 ऑडियो","voice":"🎙 वॉइस नोट","document":"📄 दस्तावेज़","sticker":"🏷 स्टिकर","video_note":"⭕ वीडियो संदेश","divider":"➖ विभाजक","list":"📋 सूची","table":"▦ तालिका","blockquote":"❝ उद्धरण","pullquote":"💬 प्रमुख उद्धरण","details":"📂 विवरण","mathematical_expression":"∑ सूत्र","anchor":"⚓ एंकर","collage":"🖼 कोलाज","slideshow":"🎞 स्लाइडशो","map":"🗺 मानचित्र","buttons":"🔘 रिच बटन"},
+    "id": {"content":"📦 Konten","text":"📝 Teks","paragraph":"📝 Paragraf","heading":"🔠 Judul bagian","preformatted":"💻 Teks terformat","footer":"🔻 Footer","caption":"💬 Keterangan","photo":"🖼 Foto","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Audio","voice":"🎙 Pesan suara","document":"📄 Dokumen","sticker":"🏷 Stiker","video_note":"⭕ Pesan video","divider":"➖ Pemisah","list":"📋 Daftar","table":"▦ Tabel","blockquote":"❝ Kutipan","pullquote":"💬 Kutipan sorotan","details":"📂 Detail","mathematical_expression":"∑ Rumus","anchor":"⚓ Jangkar","collage":"🖼 Kolase","slideshow":"🎞 Tayangan slide","map":"🗺 Peta","buttons":"🔘 Tombol kaya"},
+    "ja": {"content":"📦 コンテンツ","text":"📝 テキスト","paragraph":"📝 段落","heading":"🔠 セクション見出し","preformatted":"💻 整形済みテキスト","footer":"🔻 フッター","caption":"💬 キャプション","photo":"🖼 写真","video":"🎬 動画","animation":"🎞 GIF","audio":"🎵 音声","voice":"🎙 ボイスメッセージ","document":"📄 ドキュメント","sticker":"🏷 ステッカー","video_note":"⭕ ビデオメッセージ","divider":"➖ 区切り","list":"📋 リスト","table":"▦ 表","blockquote":"❝ 引用","pullquote":"💬 強調引用","details":"📂 詳細","mathematical_expression":"∑ 数式","anchor":"⚓ アンカー","collage":"🖼 コラージュ","slideshow":"🎞 スライドショー","map":"🗺 地図","buttons":"🔘 リッチボタン"},
+    "ko": {"content":"📦 콘텐츠","text":"📝 텍스트","paragraph":"📝 문단","heading":"🔠 섹션 제목","preformatted":"💻 서식 지정 텍스트","footer":"🔻 바닥글","caption":"💬 캡션","photo":"🖼 사진","video":"🎬 동영상","animation":"🎞 GIF","audio":"🎵 오디오","voice":"🎙 음성 메시지","document":"📄 문서","sticker":"🏷 스티커","video_note":"⭕ 비디오 메시지","divider":"➖ 구분선","list":"📋 목록","table":"▦ 표","blockquote":"❝ 인용","pullquote":"💬 강조 인용","details":"📂 세부정보","mathematical_expression":"∑ 수식","anchor":"⚓ 앵커","collage":"🖼 콜라주","slideshow":"🎞 슬라이드쇼","map":"🗺 지도","buttons":"🔘 리치 버튼"},
+    "vi": {"content":"📦 Nội dung","text":"📝 Văn bản","paragraph":"📝 Đoạn văn","heading":"🔠 Tiêu đề phần","preformatted":"💻 Văn bản định dạng sẵn","footer":"🔻 Chân trang","caption":"💬 Chú thích","photo":"🖼 Ảnh","video":"🎬 Video","animation":"🎞 GIF","audio":"🎵 Âm thanh","voice":"🎙 Tin nhắn thoại","document":"📄 Tài liệu","sticker":"🏷 Nhãn dán","video_note":"⭕ Tin nhắn video","divider":"➖ Dấu phân cách","list":"📋 Danh sách","table":"▦ Bảng","blockquote":"❝ Trích dẫn","pullquote":"💬 Trích dẫn nổi bật","details":"📂 Chi tiết","mathematical_expression":"∑ Công thức","anchor":"⚓ Neo","collage":"🖼 Ảnh ghép","slideshow":"🎞 Trình chiếu","map":"🗺 Bản đồ","buttons":"🔘 Nút phong phú"},
+    "th": {"content":"📦 เนื้อหา","text":"📝 ข้อความ","paragraph":"📝 ย่อหน้า","heading":"🔠 หัวข้อส่วน","preformatted":"💻 ข้อความจัดรูปแบบ","footer":"🔻 ส่วนท้าย","caption":"💬 คำอธิบาย","photo":"🖼 รูปภาพ","video":"🎬 วิดีโอ","animation":"🎞 GIF","audio":"🎵 เสียง","voice":"🎙 ข้อความเสียง","document":"📄 เอกสาร","sticker":"🏷 สติกเกอร์","video_note":"⭕ ข้อความวิดีโอ","divider":"➖ ตัวแบ่ง","list":"📋 รายการ","table":"▦ ตาราง","blockquote":"❝ คำอ้างอิง","pullquote":"💬 คำอ้างอิงเด่น","details":"📂 รายละเอียด","mathematical_expression":"∑ สูตร","anchor":"⚓ จุดยึด","collage":"🖼 ภาพตัดปะ","slideshow":"🎞 สไลด์โชว์","map":"🗺 แผนที่","buttons":"🔘 ปุ่ม Rich"},
+    "zh-hans": {"content":"📦 内容","text":"📝 文本","paragraph":"📝 段落","heading":"🔠 章节标题","preformatted":"💻 预格式化","footer":"🔻 页脚","caption":"💬 说明","photo":"🖼 照片","video":"🎬 视频","animation":"🎞 GIF","audio":"🎵 音频","voice":"🎙 语音消息","document":"📄 文件","sticker":"🏷 贴纸","video_note":"⭕ 视频消息","divider":"➖ 分隔线","list":"📋 列表","table":"▦ 表格","blockquote":"❝ 引用块","pullquote":"💬 醒目引用","details":"📂 详情","mathematical_expression":"∑ 公式","anchor":"⚓ 锚点","collage":"🖼 拼贴","slideshow":"🎞 幻灯片","map":"🗺 地图","buttons":"🔘 富按钮"},
+    "zh-hant": {"content":"📦 內容","text":"📝 文字","paragraph":"📝 段落","heading":"🔠 章節標題","preformatted":"💻 預格式化","footer":"🔻 頁尾","caption":"💬 說明","photo":"🖼 照片","video":"🎬 影片","animation":"🎞 GIF","audio":"🎵 音訊","voice":"🎙 語音訊息","document":"📄 文件","sticker":"🏷 貼圖","video_note":"⭕ 影片訊息","divider":"➖ 分隔線","list":"📋 列表","table":"▦ 表格","blockquote":"❝ 引用區塊","pullquote":"💬 醒目引用","details":"📂 詳情","mathematical_expression":"∑ 公式","anchor":"⚓ 錨點","collage":"🖼 拼貼","slideshow":"🎞 幻燈片","map":"🗺 地圖","buttons":"🔘 富按鈕"},
+}
+
+
+MATH_PROMPT_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {
+        "math.add_prompt": "Envía la fórmula en LaTeX.\n\nPara añadir un espacio entre textos, usa: \\ ",
+        "math.edit_prompt": "Envía la nueva fórmula en LaTeX.\n\nPara añadir un espacio entre textos, usa: \\ ",
+    },
+    "fr": {
+        "math.add_prompt": "Envoyez la formule en LaTeX.\n\nPour ajouter un espace entre les textes, utilisez : \\ ",
+        "math.edit_prompt": "Envoyez la nouvelle formule en LaTeX.\n\nPour ajouter un espace entre les textes, utilisez : \\ ",
+    },
+    "de": {
+        "math.add_prompt": "Sende die Formel in LaTeX.\n\nFür ein Leerzeichen zwischen Texten verwende: \\ ",
+        "math.edit_prompt": "Sende die neue LaTeX-Formel.\n\nFür ein Leerzeichen zwischen Texten verwende: \\ ",
+    },
+    "it": {
+        "math.add_prompt": "Invia la formula in LaTeX.\n\nPer aggiungere uno spazio tra i testi, usa: \\ ",
+        "math.edit_prompt": "Invia la nuova formula in LaTeX.\n\nPer aggiungere uno spazio tra i testi, usa: \\ ",
+    },
+    "pt": {
+        "math.add_prompt": "Envie a fórmula em LaTeX.\n\nPara adicionar um espaço entre textos, use: \\ ",
+        "math.edit_prompt": "Envie a nova fórmula em LaTeX.\n\nPara adicionar um espaço entre textos, use: \\ ",
+    },
+    "nl": {
+        "math.add_prompt": "Stuur de formule in LaTeX.\n\nGebruik voor een spatie tussen teksten: \\ ",
+        "math.edit_prompt": "Stuur de nieuwe LaTeX-formule.\n\nGebruik voor een spatie tussen teksten: \\ ",
+    },
+    "pl": {
+        "math.add_prompt": "Wyślij formułę w LaTeX.\n\nAby dodać odstęp między tekstami, użyj: \\ ",
+        "math.edit_prompt": "Wyślij nową formułę w LaTeX.\n\nAby dodać odstęp między tekstami, użyj: \\ ",
+    },
+    "uk": {
+        "math.add_prompt": "Надішліть формулу у форматі LaTeX.\n\nЩоб додати пробіл між текстами, використайте: \\ ",
+        "math.edit_prompt": "Надішліть нову формулу у форматі LaTeX.\n\nЩоб додати пробіл між текстами, використайте: \\ ",
+    },
+    "ru": {
+        "math.add_prompt": "Отправьте формулу в формате LaTeX.\n\nЧтобы добавить пробел между текстами, используйте: \\ ",
+        "math.edit_prompt": "Отправьте новую формулу в формате LaTeX.\n\nЧтобы добавить пробел между текстами, используйте: \\ ",
+    },
+    "tr": {
+        "math.add_prompt": "Formülü LaTeX biçiminde gönderin.\n\nMetinler arasına boşluk eklemek için şunu kullanın: \\ ",
+        "math.edit_prompt": "Yeni LaTeX formülünü gönderin.\n\nMetinler arasına boşluk eklemek için şunu kullanın: \\ ",
+    },
+    "fa": {
+        "math.add_prompt": "فرمول را با قالب LaTeX ارسال کنید.\n\nبرای افزودن فاصله بین متن‌ها از این استفاده کنید: \\ ",
+        "math.edit_prompt": "فرمول جدید LaTeX را ارسال کنید.\n\nبرای افزودن فاصله بین متن‌ها از این استفاده کنید: \\ ",
+    },
+    "ku": {
+        "math.add_prompt": "Formulê bi formata LaTeX bişînin.\n\nJi bo zêdekirina valahiyê di navbera nivîsan de, vê bikar bînin: \\ ",
+        "math.edit_prompt": "Formula nû ya LaTeX bişînin.\n\nJi bo zêdekirina valahiyê di navbera nivîsan de, vê bikar bînin: \\ ",
+    },
+    "ur": {
+        "math.add_prompt": "فارمولا LaTeX میں بھیجیں۔\n\nمتن کے درمیان فاصلہ شامل کرنے کے لیے استعمال کریں: \\ ",
+        "math.edit_prompt": "نیا LaTeX فارمولا بھیجیں۔\n\nمتن کے درمیان فاصلہ شامل کرنے کے لیے استعمال کریں: \\ ",
+    },
+    "hi": {
+        "math.add_prompt": "सूत्र LaTeX में भेजें।\n\nटेक्स्ट के बीच स्पेस जोड़ने के लिए इसका उपयोग करें: \\ ",
+        "math.edit_prompt": "नया LaTeX सूत्र भेजें।\n\nटेक्स्ट के बीच स्पेस जोड़ने के लिए इसका उपयोग करें: \\ ",
+    },
+    "id": {
+        "math.add_prompt": "Kirim rumus dalam LaTeX.\n\nUntuk menambahkan spasi di antara teks, gunakan: \\ ",
+        "math.edit_prompt": "Kirim rumus LaTeX yang baru.\n\nUntuk menambahkan spasi di antara teks, gunakan: \\ ",
+    },
+    "ja": {
+        "math.add_prompt": "LaTeX形式で数式を送信してください。\n\nテキスト間に空白を追加するには、次を使用します: \\ ",
+        "math.edit_prompt": "新しいLaTeX数式を送信してください。\n\nテキスト間に空白を追加するには、次を使用します: \\ ",
+    },
+    "ko": {
+        "math.add_prompt": "LaTeX 형식으로 수식을 보내세요.\n\n텍스트 사이에 공백을 추가하려면 다음을 사용하세요: \\ ",
+        "math.edit_prompt": "새 LaTeX 수식을 보내세요.\n\n텍스트 사이에 공백을 추가하려면 다음을 사용하세요: \\ ",
+    },
+    "vi": {
+        "math.add_prompt": "Gửi công thức ở định dạng LaTeX.\n\nĐể thêm khoảng trắng giữa các đoạn văn bản, hãy dùng: \\ ",
+        "math.edit_prompt": "Gửi công thức LaTeX mới.\n\nĐể thêm khoảng trắng giữa các đoạn văn bản, hãy dùng: \\ ",
+    },
+    "th": {
+        "math.add_prompt": "ส่งสูตรในรูปแบบ LaTeX\n\nหากต้องการเพิ่มช่องว่างระหว่างข้อความ ให้ใช้: \\ ",
+        "math.edit_prompt": "ส่งสูตร LaTeX ใหม่\n\nหากต้องการเพิ่มช่องว่างระหว่างข้อความ ให้ใช้: \\ ",
+    },
+    "zh-hans": {
+        "math.add_prompt": "请发送 LaTeX 公式。\n\n要在文本之间添加空格，请使用：\\ ",
+        "math.edit_prompt": "请发送新的 LaTeX 公式。\n\n要在文本之间添加空格，请使用：\\ ",
+    },
+    "zh-hant": {
+        "math.add_prompt": "請傳送 LaTeX 公式。\n\n若要在文字之間加入空格，請使用：\\ ",
+        "math.edit_prompt": "請傳送新的 LaTeX 公式。\n\n若要在文字之間加入空格，請使用：\\ ",
+    },
+}
+
+CODE_PROMPT_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {"code.add_prompt": "Envía el código.\n\nPara indicar el lenguaje, comienza con /lang python y escribe el código en las líneas siguientes. También puedes usar ```python ... ```.", "code.edit_prompt": "Envía el código nuevo.\n\nPara indicar el lenguaje, comienza con /lang python y escribe el código en las líneas siguientes. También puedes usar ```python ... ```."},
+    "fr": {"code.add_prompt": "Envoyez le code.\n\nPour définir le langage, commencez par /lang python puis écrivez le code sur les lignes suivantes. Vous pouvez aussi utiliser ```python ... ```.", "code.edit_prompt": "Envoyez le nouveau code.\n\nPour définir le langage, commencez par /lang python puis écrivez le code sur les lignes suivantes. Vous pouvez aussi utiliser ```python ... ```."},
+    "de": {"code.add_prompt": "Sende den Code.\n\nBeginne zur Sprachauswahl mit /lang python und schreibe den Code in die folgenden Zeilen. Du kannst auch ```python ... ``` verwenden.", "code.edit_prompt": "Sende den neuen Code.\n\nBeginne zur Sprachauswahl mit /lang python und schreibe den Code in die folgenden Zeilen. Du kannst auch ```python ... ``` verwenden."},
+    "it": {"code.add_prompt": "Invia il codice.\n\nPer impostare il linguaggio, inizia con /lang python e scrivi il codice nelle righe successive. Puoi anche usare ```python ... ```.", "code.edit_prompt": "Invia il nuovo codice.\n\nPer impostare il linguaggio, inizia con /lang python e scrivi il codice nelle righe successive. Puoi anche usare ```python ... ```."},
+    "pt": {"code.add_prompt": "Envie o código.\n\nPara definir a linguagem, comece com /lang python e escreva o código nas linhas seguintes. Você também pode usar ```python ... ```.", "code.edit_prompt": "Envie o novo código.\n\nPara definir a linguagem, comece com /lang python e escreva o código nas linhas seguintes. Você também pode usar ```python ... ```."},
+    "nl": {"code.add_prompt": "Stuur de code.\n\nBegin met /lang python om de taal in te stellen en zet de code op de volgende regels. Je kunt ook ```python ... ``` gebruiken.", "code.edit_prompt": "Stuur de nieuwe code.\n\nBegin met /lang python om de taal in te stellen en zet de code op de volgende regels. Je kunt ook ```python ... ``` gebruiken."},
+    "pl": {"code.add_prompt": "Wyślij kod.\n\nAby ustawić język, zacznij od /lang python i wpisz kod w kolejnych wierszach. Możesz też użyć ```python ... ```.", "code.edit_prompt": "Wyślij nowy kod.\n\nAby ustawić język, zacznij od /lang python i wpisz kod w kolejnych wierszach. Możesz też użyć ```python ... ```."},
+    "uk": {"code.add_prompt": "Надішліть код.\n\nЩоб указати мову, почніть з /lang python і напишіть код у наступних рядках. Також можна використати ```python ... ```.", "code.edit_prompt": "Надішліть новий код.\n\nЩоб указати мову, почніть з /lang python і напишіть код у наступних рядках. Також можна використати ```python ... ```."},
+    "ru": {"code.add_prompt": "Отправьте код.\n\nЧтобы указать язык, начните с /lang python и напишите код в следующих строках. Также можно использовать ```python ... ```.", "code.edit_prompt": "Отправьте новый код.\n\nЧтобы указать язык, начните с /lang python и напишите код в следующих строках. Также можно использовать ```python ... ```."},
+    "tr": {"code.add_prompt": "Kodu gönderin.\n\nDili belirlemek için /lang python ile başlayın ve kodu sonraki satırlara yazın. ```python ... ``` da kullanabilirsiniz.", "code.edit_prompt": "Yeni kodu gönderin.\n\nDili belirlemek için /lang python ile başlayın ve kodu sonraki satırlara yazın. ```python ... ``` da kullanabilirsiniz."},
+    "fa": {"code.add_prompt": "کد را ارسال کنید.\n\nبرای تعیین زبان، با /lang python شروع کنید و کد را در خط‌های بعد بنویسید. می‌توانید از ```python ... ``` نیز استفاده کنید.", "code.edit_prompt": "کد جدید را ارسال کنید.\n\nبرای تعیین زبان، با /lang python شروع کنید و کد را در خط‌های بعد بنویسید. می‌توانید از ```python ... ``` نیز استفاده کنید."},
+    "ku": {"code.add_prompt": "Kodê bişîne.\n\nJi bo diyarkirina zimanî bi /lang python dest pê bike û kodê li rêzên paşîn binivîse. ```python ... ``` jî dikarî bikar bînî.", "code.edit_prompt": "Koda nû bişîne.\n\nJi bo diyarkirina zimanî bi /lang python dest pê bike û kodê li rêzên paşîn binivîse. ```python ... ``` jî dikarî bikar bînî."},
+    "ur": {"code.add_prompt": "کوڈ بھیجیں۔\n\nزبان مقرر کرنے کے لیے /lang python سے شروع کریں اور اگلی سطروں میں کوڈ لکھیں۔ آپ ```python ... ``` بھی استعمال کر سکتے ہیں۔", "code.edit_prompt": "نیا کوڈ بھیجیں۔\n\nزبان مقرر کرنے کے لیے /lang python سے شروع کریں اور اگلی سطروں میں کوڈ لکھیں۔ آپ ```python ... ``` بھی استعمال کر سکتے ہیں۔"},
+    "hi": {"code.add_prompt": "कोड भेजें।\n\nभाषा तय करने के लिए /lang python से शुरू करें और अगली पंक्तियों में कोड लिखें। आप ```python ... ``` भी इस्तेमाल कर सकते हैं।", "code.edit_prompt": "नया कोड भेजें।\n\nभाषा तय करने के लिए /lang python से शुरू करें और अगली पंक्तियों में कोड लिखें। आप ```python ... ``` भी इस्तेमाल कर सकते हैं।"},
+    "id": {"code.add_prompt": "Kirim kode.\n\nUntuk menentukan bahasa, mulai dengan /lang python lalu tulis kode di baris berikutnya. Anda juga dapat memakai ```python ... ```.", "code.edit_prompt": "Kirim kode baru.\n\nUntuk menentukan bahasa, mulai dengan /lang python lalu tulis kode di baris berikutnya. Anda juga dapat memakai ```python ... ```."},
+    "ja": {"code.add_prompt": "コードを送信してください。\n\n言語を指定するには /lang python で始め、次の行からコードを書きます。```python ... ``` も使用できます。", "code.edit_prompt": "新しいコードを送信してください。\n\n言語を指定するには /lang python で始め、次の行からコードを書きます。```python ... ``` も使用できます。"},
+    "ko": {"code.add_prompt": "코드를 보내세요.\n\n언어를 지정하려면 /lang python으로 시작하고 다음 줄부터 코드를 작성하세요. ```python ... ```도 사용할 수 있습니다.", "code.edit_prompt": "새 코드를 보내세요.\n\n언어를 지정하려면 /lang python으로 시작하고 다음 줄부터 코드를 작성하세요. ```python ... ```도 사용할 수 있습니다."},
+    "vi": {"code.add_prompt": "Gửi mã.\n\nĐể chọn ngôn ngữ, hãy bắt đầu bằng /lang python rồi viết mã ở các dòng tiếp theo. Bạn cũng có thể dùng ```python ... ```.", "code.edit_prompt": "Gửi mã mới.\n\nĐể chọn ngôn ngữ, hãy bắt đầu bằng /lang python rồi viết mã ở các dòng tiếp theo. Bạn cũng có thể dùng ```python ... ```."},
+    "th": {"code.add_prompt": "ส่งโค้ด\n\nหากต้องการระบุภาษา ให้เริ่มด้วย /lang python แล้วเขียนโค้ดในบรรทัดถัดไป หรือใช้ ```python ... ```", "code.edit_prompt": "ส่งโค้ดใหม่\n\nหากต้องการระบุภาษา ให้เริ่มด้วย /lang python แล้วเขียนโค้ดในบรรทัดถัดไป หรือใช้ ```python ... ```"},
+    "zh-hans": {"code.add_prompt": "请发送代码。\n\n要指定语言，请以 /lang python 开头，并在后续行中编写代码。也可以使用 ```python ... ```。", "code.edit_prompt": "请发送新代码。\n\n要指定语言，请以 /lang python 开头，并在后续行中编写代码。也可以使用 ```python ... ```。"},
+    "zh-hant": {"code.add_prompt": "請傳送程式碼。\n\n若要指定語言，請以 /lang python 開頭，並在後續行中撰寫程式碼。也可以使用 ```python ... ```。", "code.edit_prompt": "請傳送新程式碼。\n\n若要指定語言，請以 /lang python 開頭，並在後續行中撰寫程式碼。也可以使用 ```python ... ```。"},
+}
+
+
+EDITOR_START_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {"editor.closed_hint": "Usa los botones del editor o envía /editor para comenzar un mensaje nuevo.", "editor.start_button": "▶️ Iniciar editor", "editor.new_button": "➕ Iniciar editor", "editor.empty_hint": "Personalizar mensaje\n\nAñade un Block o abre una de tus páginas guardadas:"},
+    "fr": {"editor.closed_hint": "Utilisez les boutons de l’éditeur ou envoyez /editor pour commencer un nouveau message.", "editor.start_button": "▶️ Démarrer l’éditeur", "editor.new_button": "➕ Démarrer l’éditeur", "editor.empty_hint": "Personnaliser le message\n\nAjoutez un Block ou ouvrez l’une de vos pages enregistrées :"},
+    "de": {"editor.closed_hint": "Verwende die Editor-Schaltflächen oder sende /editor, um eine neue Nachricht zu beginnen.", "editor.start_button": "▶️ Editor starten", "editor.new_button": "➕ Editor starten", "editor.empty_hint": "Nachricht anpassen\n\nFüge einen Block hinzu oder öffne eine deiner gespeicherten Seiten:"},
+    "it": {"editor.closed_hint": "Usa i pulsanti dell’editor oppure invia /editor per iniziare un nuovo messaggio.", "editor.start_button": "▶️ Avvia editor", "editor.new_button": "➕ Avvia editor", "editor.empty_hint": "Personalizza il messaggio\n\nAggiungi un Block o apri una delle pagine salvate:"},
+    "pt": {"editor.closed_hint": "Use os botões do editor ou envie /editor para iniciar uma nova mensagem.", "editor.start_button": "▶️ Iniciar editor", "editor.new_button": "➕ Iniciar editor", "editor.empty_hint": "Personalizar mensagem\n\nAdicione um Block ou abra uma das suas páginas salvas:"},
+    "nl": {"editor.closed_hint": "Gebruik de editorknoppen of stuur /editor om een nieuw bericht te beginnen.", "editor.start_button": "▶️ Editor starten", "editor.new_button": "➕ Editor starten", "editor.empty_hint": "Bericht aanpassen\n\nVoeg een Block toe of open een van je opgeslagen pagina’s:"},
+    "pl": {"editor.closed_hint": "Użyj przycisków edytora lub wyślij /editor, aby rozpocząć nową wiadomość.", "editor.start_button": "▶️ Uruchom edytor", "editor.new_button": "➕ Uruchom edytor", "editor.empty_hint": "Dostosuj wiadomość\n\nDodaj Block lub otwórz jedną z zapisanych stron:"},
+    "uk": {"editor.closed_hint": "Скористайтеся кнопками редактора або надішліть /editor, щоб почати нове повідомлення.", "editor.start_button": "▶️ Запустити редактор", "editor.new_button": "➕ Запустити редактор", "editor.empty_hint": "Налаштувати повідомлення\n\nДодайте Block або відкрийте одну зі збережених сторінок:"},
+    "ru": {"editor.closed_hint": "Используйте кнопки редактора или отправьте /editor, чтобы начать новое сообщение.", "editor.start_button": "▶️ Запустить редактор", "editor.new_button": "➕ Запустить редактор", "editor.empty_hint": "Настроить сообщение\n\nДобавьте Block или откройте одну из сохранённых страниц:"},
+    "tr": {"editor.closed_hint": "Düzenleyici düğmelerini kullanın veya yeni bir mesaj başlatmak için /editor gönderin.", "editor.start_button": "▶️ Düzenleyiciyi başlat", "editor.new_button": "➕ Düzenleyiciyi başlat", "editor.empty_hint": "Mesajı özelleştir\n\nBir Block ekleyin veya kayıtlı sayfalarınızdan birini açın:"},
+    "fa": {"editor.closed_hint": "از دکمه‌های ویرایشگر استفاده کنید یا برای شروع پیام جدید /editor را ارسال کنید.", "editor.start_button": "▶️ شروع ویرایشگر", "editor.new_button": "➕ شروع ویرایشگر", "editor.empty_hint": "سفارشی‌سازی پیام\n\nیک Block اضافه کنید یا یکی از صفحه‌های ذخیره‌شده را باز کنید:"},
+    "ku": {"editor.closed_hint": "Bişkokên edîtorê bikar bînin an ji bo destpêkirina peyameke nû /editor bişînin.", "editor.start_button": "▶️ Edîtorê dest pê bike", "editor.new_button": "➕ Edîtorê dest pê bike", "editor.empty_hint": "Peyamê taybet bikin\n\nBlockek zêde bikin an yek ji rûpelên tomarkirî vekin:"},
+    "ur": {"editor.closed_hint": "ایڈیٹر کے بٹن استعمال کریں یا نیا پیغام شروع کرنے کے لیے /editor بھیجیں۔", "editor.start_button": "▶️ ایڈیٹر شروع کریں", "editor.new_button": "➕ ایڈیٹر شروع کریں", "editor.empty_hint": "پیغام کو حسب ضرورت بنائیں\n\nایک Block شامل کریں یا اپنے محفوظ صفحات میں سے کوئی صفحہ کھولیں:"},
+    "hi": {"editor.closed_hint": "एडिटर के बटन इस्तेमाल करें या नया संदेश शुरू करने के लिए /editor भेजें।", "editor.start_button": "▶️ एडिटर शुरू करें", "editor.new_button": "➕ एडिटर शुरू करें", "editor.empty_hint": "संदेश को अनुकूलित करें\n\nएक Block जोड़ें या अपने सहेजे गए पेज में से कोई पेज खोलें:"},
+    "id": {"editor.closed_hint": "Gunakan tombol editor atau kirim /editor untuk memulai pesan baru.", "editor.start_button": "▶️ Mulai editor", "editor.new_button": "➕ Mulai editor", "editor.empty_hint": "Sesuaikan pesan\n\nTambahkan Block atau buka salah satu halaman tersimpan Anda:"},
+    "ja": {"editor.closed_hint": "エディターのボタンを使用するか、/editor を送信して新しいメッセージを開始してください。", "editor.start_button": "▶️ エディターを開始", "editor.new_button": "➕ エディターを開始", "editor.empty_hint": "メッセージをカスタマイズ\n\nBlockを追加するか、保存済みページを開いてください:"},
+    "ko": {"editor.closed_hint": "편집기 버튼을 사용하거나 /editor를 보내 새 메시지를 시작하세요.", "editor.start_button": "▶️ 편집기 시작", "editor.new_button": "➕ 편집기 시작", "editor.empty_hint": "메시지 사용자 지정\n\nBlock을 추가하거나 저장된 페이지 중 하나를 여세요:"},
+    "vi": {"editor.closed_hint": "Hãy dùng các nút của trình chỉnh sửa hoặc gửi /editor để bắt đầu tin nhắn mới.", "editor.start_button": "▶️ Bắt đầu trình chỉnh sửa", "editor.new_button": "➕ Bắt đầu trình chỉnh sửa", "editor.empty_hint": "Tùy chỉnh tin nhắn\n\nThêm một Block hoặc mở một trong các trang đã lưu:"},
+    "th": {"editor.closed_hint": "ใช้ปุ่มของตัวแก้ไข หรือส่ง /editor เพื่อเริ่มข้อความใหม่", "editor.start_button": "▶️ เริ่มตัวแก้ไข", "editor.new_button": "➕ เริ่มตัวแก้ไข", "editor.empty_hint": "ปรับแต่งข้อความ\n\nเพิ่ม Block หรือเปิดหน้าที่บันทึกไว้:"},
+    "zh-hans": {"editor.closed_hint": "请使用编辑器按钮，或发送 /editor 开始新消息。", "editor.start_button": "▶️ 启动编辑器", "editor.new_button": "➕ 启动编辑器", "editor.empty_hint": "自定义消息\n\n添加一个 Block 或打开已保存的页面："},
+    "zh-hant": {"editor.closed_hint": "請使用編輯器按鈕，或傳送 /editor 開始新訊息。", "editor.start_button": "▶️ 啟動編輯器", "editor.new_button": "➕ 啟動編輯器", "editor.empty_hint": "自訂訊息\n\n新增一個 Block 或開啟已儲存的頁面："},
+}
+
+PAGE_MANAGEMENT_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {"pages.rename_prompt": "Envía un nombre nuevo para «{title}»; máximo 64 caracteres.", "pages.delete_confirm": "¿Eliminar «{title}» permanentemente?", "pages.delete_yes": "🗑 Sí, eliminar", "common.cancel": "Cancelar", "pages.deleted": "Página eliminada"},
+    "fr": {"pages.rename_prompt": "Envoyez un nouveau nom pour « {title} » ; 64 caractères maximum.", "pages.delete_confirm": "Supprimer définitivement « {title} » ?", "pages.delete_yes": "🗑 Oui, supprimer", "common.cancel": "Annuler", "pages.deleted": "Page supprimée"},
+    "de": {"pages.rename_prompt": "Sende einen neuen Namen für „{title}“; maximal 64 Zeichen.", "pages.delete_confirm": "„{title}“ dauerhaft löschen?", "pages.delete_yes": "🗑 Ja, löschen", "common.cancel": "Abbrechen", "pages.deleted": "Seite gelöscht"},
+    "it": {"pages.rename_prompt": "Invia un nuovo nome per «{title}»; massimo 64 caratteri.", "pages.delete_confirm": "Eliminare definitivamente «{title}»?", "pages.delete_yes": "🗑 Sì, elimina", "common.cancel": "Annulla", "pages.deleted": "Pagina eliminata"},
+    "pt": {"pages.rename_prompt": "Envie um novo nome para “{title}”; máximo de 64 caracteres.", "pages.delete_confirm": "Excluir “{title}” permanentemente?", "pages.delete_yes": "🗑 Sim, excluir", "common.cancel": "Cancelar", "pages.deleted": "Página excluída"},
+    "nl": {"pages.rename_prompt": "Stuur een nieuwe naam voor ‘{title}’; maximaal 64 tekens.", "pages.delete_confirm": "‘{title}’ permanent verwijderen?", "pages.delete_yes": "🗑 Ja, verwijderen", "common.cancel": "Annuleren", "pages.deleted": "Pagina verwijderd"},
+    "pl": {"pages.rename_prompt": "Wyślij nową nazwę dla „{title}”; maksymalnie 64 znaki.", "pages.delete_confirm": "Trwale usunąć „{title}”?", "pages.delete_yes": "🗑 Tak, usuń", "common.cancel": "Anuluj", "pages.deleted": "Strona usunięta"},
+    "uk": {"pages.rename_prompt": "Надішліть нову назву для «{title}»; максимум 64 символи.", "pages.delete_confirm": "Назавжди видалити «{title}»?", "pages.delete_yes": "🗑 Так, видалити", "common.cancel": "Скасувати", "pages.deleted": "Сторінку видалено"},
+    "ru": {"pages.rename_prompt": "Отправьте новое название для «{title}»; максимум 64 символа.", "pages.delete_confirm": "Навсегда удалить «{title}»?", "pages.delete_yes": "🗑 Да, удалить", "common.cancel": "Отмена", "pages.deleted": "Страница удалена"},
+    "tr": {"pages.rename_prompt": "“{title}” için yeni bir ad gönderin; en fazla 64 karakter.", "pages.delete_confirm": "“{title}” kalıcı olarak silinsin mi?", "pages.delete_yes": "🗑 Evet, sil", "common.cancel": "İptal", "pages.deleted": "Sayfa silindi"},
+    "fa": {"pages.rename_prompt": "نام جدید «{title}» را ارسال کنید؛ حداکثر ۶۴ نویسه.", "pages.delete_confirm": "«{title}» برای همیشه حذف شود؟", "pages.delete_yes": "🗑 بله، حذف", "common.cancel": "لغو", "pages.deleted": "صفحه حذف شد"},
+    "ku": {"pages.rename_prompt": "Navekî nû ji bo “{title}” bişînin; herî zêde 64 tîp.", "pages.delete_confirm": "“{title}” bi temamî were jêbirin?", "pages.delete_yes": "🗑 Erê, jê bibe", "common.cancel": "Betal", "pages.deleted": "Rûpel hate jêbirin"},
+    "ur": {"pages.rename_prompt": "“{title}” کے لیے نیا نام بھیجیں؛ زیادہ سے زیادہ 64 حروف۔", "pages.delete_confirm": "“{title}” کو مستقل حذف کریں؟", "pages.delete_yes": "🗑 ہاں، حذف کریں", "common.cancel": "منسوخ", "pages.deleted": "صفحہ حذف ہوگیا"},
+    "hi": {"pages.rename_prompt": "“{title}” के लिए नया नाम भेजें; अधिकतम 64 अक्षर।", "pages.delete_confirm": "“{title}” को हमेशा के लिए हटाएँ?", "pages.delete_yes": "🗑 हाँ, हटाएँ", "common.cancel": "रद्द करें", "pages.deleted": "पेज हटा दिया गया"},
+    "id": {"pages.rename_prompt": "Kirim nama baru untuk “{title}”; maksimal 64 karakter.", "pages.delete_confirm": "Hapus “{title}” secara permanen?", "pages.delete_yes": "🗑 Ya, hapus", "common.cancel": "Batal", "pages.deleted": "Halaman dihapus"},
+    "ja": {"pages.rename_prompt": "「{title}」の新しい名前を送信してください（最大64文字）。", "pages.delete_confirm": "「{title}」を完全に削除しますか？", "pages.delete_yes": "🗑 はい、削除", "common.cancel": "キャンセル", "pages.deleted": "ページを削除しました"},
+    "ko": {"pages.rename_prompt": "‘{title}’의 새 이름을 보내세요. 최대 64자입니다.", "pages.delete_confirm": "‘{title}’을(를) 영구 삭제할까요?", "pages.delete_yes": "🗑 예, 삭제", "common.cancel": "취소", "pages.deleted": "페이지가 삭제되었습니다"},
+    "vi": {"pages.rename_prompt": "Gửi tên mới cho “{title}”; tối đa 64 ký tự.", "pages.delete_confirm": "Xóa vĩnh viễn “{title}”?", "pages.delete_yes": "🗑 Có, xóa", "common.cancel": "Hủy", "pages.deleted": "Đã xóa trang"},
+    "th": {"pages.rename_prompt": "ส่งชื่อใหม่สำหรับ “{title}” สูงสุด 64 อักขระ", "pages.delete_confirm": "ลบ “{title}” อย่างถาวรหรือไม่", "pages.delete_yes": "🗑 ใช่ ลบ", "common.cancel": "ยกเลิก", "pages.deleted": "ลบหน้าแล้ว"},
+    "zh-hans": {"pages.rename_prompt": "请发送“{title}”的新名称，最多 64 个字符。", "pages.delete_confirm": "永久删除“{title}”？", "pages.delete_yes": "🗑 是，删除", "common.cancel": "取消", "pages.deleted": "页面已删除"},
+    "zh-hant": {"pages.rename_prompt": "請傳送「{title}」的新名稱，最多 64 個字元。", "pages.delete_confirm": "永久刪除「{title}」？", "pages.delete_yes": "🗑 是，刪除", "common.cancel": "取消", "pages.deleted": "頁面已刪除"},
+}
+
+EDITOR_UX_KEYS = (
+    "editor.tools_button", "editor.tools_text", "editor.undo_button",
+    "editor.undo_empty", "editor.undo_done", "block.move_up", "block.move_down",
+    "block.manage_title", "block.position_text", "block.order_text",
+    "common.choose_action", "pages.search_button", "pages.sort_button",
+    "pages.search_prompt", "pages.search_results", "pages.search_none",
+    "pages.sort_text", "pages.sort_updated", "pages.sort_newest",
+    "pages.sort_oldest", "pages.sort_title", "pages.sort_done",
+)
+
+EDITOR_UX_VALUES: dict[str, tuple[str, ...]] = {
+    "es": (
+        "🛠 Más herramientas", "🛠 Más herramientas\n\nElige la herramienta que necesitas:", "↩️ Deshacer",
+        "No hay ninguna acción que deshacer.", "Acción deshecha", "⬆️ Subir", "⬇️ Bajar",
+        "Administrar {name}", "Posición actual: {current} de {total}", "Orden de los bloques:",
+        "Elige una acción:", "🔎 Buscar", "⚙️ Ordenar", "Envía el nombre o código de la página. Envía /all para mostrar todas.",
+        "🔎 Resultados: {query}", "🔎 No hay páginas que coincidan con «{query}».", "⚙️ Ordenar páginas\n\nElige cómo ordenar las páginas:",
+        "🕘 Última actualización", "🆕 Más recientes", "🗓 Más antiguas", "🔤 Por nombre", "Orden de páginas actualizado",
+    ),
+    "fr": (
+        "🛠 Plus d’outils", "🛠 Plus d’outils\n\nChoisissez l’outil nécessaire :", "↩️ Annuler",
+        "Aucune action à annuler.", "Action annulée", "⬆️ Monter", "⬇️ Descendre",
+        "Gérer {name}", "Position actuelle : {current} sur {total}", "Ordre des blocs :",
+        "Choisissez une action :", "🔎 Rechercher", "⚙️ Trier", "Envoyez le nom ou le code de la page. Envoyez /all pour tout afficher.",
+        "🔎 Résultats : {query}", "🔎 Aucune page ne correspond à « {query} ».", "⚙️ Trier les pages\n\nChoisissez l’ordre des pages :",
+        "🕘 Dernière modification", "🆕 Plus récentes", "🗓 Plus anciennes", "🔤 Par nom", "Ordre des pages modifié",
+    ),
+    "de": (
+        "🛠 Weitere Werkzeuge", "🛠 Weitere Werkzeuge\n\nWähle das benötigte Werkzeug:", "↩️ Rückgängig",
+        "Keine Aktion zum Rückgängigmachen.", "Rückgängig gemacht", "⬆️ Nach oben", "⬇️ Nach unten",
+        "{name} verwalten", "Aktuelle Position: {current} von {total}", "Blockreihenfolge:",
+        "Wähle eine Aktion:", "🔎 Suchen", "⚙️ Sortieren", "Sende Seitenname oder Code. Sende /all für alle Seiten.",
+        "🔎 Ergebnisse: {query}", "🔎 Keine Seiten entsprechen „{query}“.", "⚙️ Seiten sortieren\n\nWähle die Reihenfolge:",
+        "🕘 Zuletzt geändert", "🆕 Neueste", "🗓 Älteste", "🔤 Nach Name", "Seitenreihenfolge geändert",
+    ),
+    "it": (
+        "🛠 Altri strumenti", "🛠 Altri strumenti\n\nScegli lo strumento necessario:", "↩️ Annulla",
+        "Nessuna azione da annullare.", "Azione annullata", "⬆️ Sposta su", "⬇️ Sposta giù",
+        "Gestisci {name}", "Posizione attuale: {current} di {total}", "Ordine dei blocchi:",
+        "Scegli un’azione:", "🔎 Cerca", "⚙️ Ordina", "Invia il nome o il codice della pagina. Invia /all per mostrarle tutte.",
+        "🔎 Risultati: {query}", "🔎 Nessuna pagina corrisponde a «{query}».", "⚙️ Ordina pagine\n\nScegli come ordinare le pagine:",
+        "🕘 Ultima modifica", "🆕 Più recenti", "🗓 Più vecchie", "🔤 Per nome", "Ordine delle pagine modificato",
+    ),
+    "pt": (
+        "🛠 Mais ferramentas", "🛠 Mais ferramentas\n\nEscolha a ferramenta necessária:", "↩️ Desfazer",
+        "Não há ação para desfazer.", "Ação desfeita", "⬆️ Mover para cima", "⬇️ Mover para baixo",
+        "Gerenciar {name}", "Posição atual: {current} de {total}", "Ordem dos blocos:",
+        "Escolha uma ação:", "🔎 Pesquisar", "⚙️ Ordenar", "Envie o nome ou código da página. Envie /all para mostrar todas.",
+        "🔎 Resultados: {query}", "🔎 Nenhuma página corresponde a “{query}”.", "⚙️ Ordenar páginas\n\nEscolha a ordem das páginas:",
+        "🕘 Última atualização", "🆕 Mais recentes", "🗓 Mais antigas", "🔤 Por nome", "Ordem das páginas alterada",
+    ),
+    "nl": (
+        "🛠 Meer hulpmiddelen", "🛠 Meer hulpmiddelen\n\nKies het benodigde hulpmiddel:", "↩️ Ongedaan maken",
+        "Er is geen actie om ongedaan te maken.", "Ongedaan gemaakt", "⬆️ Omhoog", "⬇️ Omlaag",
+        "{name} beheren", "Huidige positie: {current} van {total}", "Blokvolgorde:",
+        "Kies een actie:", "🔎 Zoeken", "⚙️ Sorteren", "Stuur de paginanaam of code. Stuur /all om alles te tonen.",
+        "🔎 Resultaten: {query}", "🔎 Geen pagina’s gevonden voor ‘{query}’.", "⚙️ Pagina’s sorteren\n\nKies de volgorde:",
+        "🕘 Laatst bijgewerkt", "🆕 Nieuwste", "🗓 Oudste", "🔤 Op naam", "Paginavolgorde gewijzigd",
+    ),
+    "pl": (
+        "🛠 Więcej narzędzi", "🛠 Więcej narzędzi\n\nWybierz potrzebne narzędzie:", "↩️ Cofnij",
+        "Brak działania do cofnięcia.", "Cofnięto", "⬆️ Przenieś wyżej", "⬇️ Przenieś niżej",
+        "Zarządzaj {name}", "Bieżąca pozycja: {current} z {total}", "Kolejność bloków:",
+        "Wybierz działanie:", "🔎 Szukaj", "⚙️ Sortuj", "Wyślij nazwę lub kod strony. Wyślij /all, aby pokazać wszystkie.",
+        "🔎 Wyniki: {query}", "🔎 Brak stron pasujących do „{query}”.", "⚙️ Sortuj strony\n\nWybierz kolejność stron:",
+        "🕘 Ostatnio zmienione", "🆕 Najnowsze", "🗓 Najstarsze", "🔤 Według nazwy", "Zmieniono kolejność stron",
+    ),
+    "uk": (
+        "🛠 Інші інструменти", "🛠 Інші інструменти\n\nВиберіть потрібний інструмент:", "↩️ Скасувати",
+        "Немає дії для скасування.", "Дію скасовано", "⬆️ Перемістити вгору", "⬇️ Перемістити вниз",
+        "Керування {name}", "Поточна позиція: {current} з {total}", "Порядок блоків:",
+        "Виберіть дію:", "🔎 Пошук", "⚙️ Сортування", "Надішліть назву або код сторінки. Надішліть /all, щоб показати всі.",
+        "🔎 Результати: {query}", "🔎 Немає сторінок за запитом «{query}».", "⚙️ Сортування сторінок\n\nВиберіть порядок:",
+        "🕘 Остання зміна", "🆕 Найновіші", "🗓 Найстаріші", "🔤 За назвою", "Порядок сторінок змінено",
+    ),
+    "ru": (
+        "🛠 Другие инструменты", "🛠 Другие инструменты\n\nВыберите нужный инструмент:", "↩️ Отменить",
+        "Нет действия для отмены.", "Действие отменено", "⬆️ Переместить выше", "⬇️ Переместить ниже",
+        "Управление {name}", "Текущая позиция: {current} из {total}", "Порядок блоков:",
+        "Выберите действие:", "🔎 Поиск", "⚙️ Сортировка", "Отправьте название или код страницы. Отправьте /all, чтобы показать все.",
+        "🔎 Результаты: {query}", "🔎 Нет страниц по запросу «{query}».", "⚙️ Сортировка страниц\n\nВыберите порядок:",
+        "🕘 Последнее изменение", "🆕 Самые новые", "🗓 Самые старые", "🔤 По имени", "Порядок страниц изменён",
+    ),
+    "tr": (
+        "🛠 Diğer araçlar", "🛠 Diğer araçlar\n\nİhtiyacınız olan aracı seçin:", "↩️ Geri al",
+        "Geri alınacak işlem yok.", "Geri alındı", "⬆️ Yukarı taşı", "⬇️ Aşağı taşı",
+        "{name} yönetimi", "Geçerli konum: {current}/{total}", "Blok sırası:",
+        "Bir işlem seçin:", "🔎 Ara", "⚙️ Sırala", "Sayfa adını veya kodunu gönderin. Tümünü göstermek için /all gönderin.",
+        "🔎 Sonuçlar: {query}", "🔎 “{query}” ile eşleşen sayfa yok.", "⚙️ Sayfaları sırala\n\nSıralama yöntemini seçin:",
+        "🕘 Son güncellenen", "🆕 En yeni", "🗓 En eski", "🔤 Ada göre", "Sayfa sırası değiştirildi",
+    ),
+    "fa": (
+        "🛠 ابزارهای بیشتر", "🛠 ابزارهای بیشتر\n\nابزار موردنیاز را انتخاب کنید:", "↩️ واگرد",
+        "عملی برای واگرد وجود ندارد.", "واگرد انجام شد", "⬆️ انتقال به بالا", "⬇️ انتقال به پایین",
+        "مدیریت {name}", "جایگاه فعلی: {current} از {total}", "ترتیب بلوک‌ها:",
+        "یک عملیات انتخاب کنید:", "🔎 جستجو", "⚙️ مرتب‌سازی", "نام یا کد صفحه را بفرستید. برای نمایش همه /all را ارسال کنید.",
+        "🔎 نتایج: {query}", "🔎 صفحه‌ای مطابق «{query}» نیست.", "⚙️ مرتب‌سازی صفحه‌ها\n\nروش مرتب‌سازی را انتخاب کنید:",
+        "🕘 آخرین ویرایش", "🆕 جدیدترین", "🗓 قدیمی‌ترین", "🔤 بر اساس نام", "ترتیب صفحه‌ها تغییر کرد",
+    ),
+    "ku": (
+        "🛠 Amûrên din", "🛠 Amûrên din\n\nAmûra pêwîst hilbijêre:", "↩️ Vegerîne",
+        "Çalakiyek ji bo vegerandinê tune.", "Hat vegerandin", "⬆️ Bibe jor", "⬇️ Bibe jêr",
+        "{name} bi rê ve bibe", "Cihê niha: {current} ji {total}", "Rêza blokan:",
+        "Çalakiyek hilbijêre:", "🔎 Lêgerîn", "⚙️ Rêzkirin", "Nav an koda rûpelê bişîne. Ji bo hemûyan /all bişîne.",
+        "🔎 Encam: {query}", "🔎 Rûpelek bi “{query}” re tune.", "⚙️ Rûpelan rêz bike\n\nAwayê rêzkirinê hilbijêre:",
+        "🕘 Guherandina dawî", "🆕 Nûtirîn", "🗓 Kevintirîn", "🔤 Li gor navî", "Rêza rûpelan hat guhertin",
+    ),
+    "ur": (
+        "🛠 مزید ٹولز", "🛠 مزید ٹولز\n\nضروری ٹول منتخب کریں:", "↩️ واپس کریں",
+        "واپس کرنے کے لیے کوئی عمل نہیں۔", "عمل واپس ہوگیا", "⬆️ اوپر لے جائیں", "⬇️ نیچے لے جائیں",
+        "{name} کا انتظام", "موجودہ مقام: {current} از {total}", "بلاکس کی ترتیب:",
+        "ایک عمل منتخب کریں:", "🔎 تلاش", "⚙️ ترتیب", "صفحے کا نام یا کوڈ بھیجیں۔ سب دکھانے کے لیے /all بھیجیں۔",
+        "🔎 نتائج: {query}", "🔎 “{query}” سے کوئی صفحہ نہیں ملا۔", "⚙️ صفحات ترتیب دیں\n\nترتیب کا طریقہ منتخب کریں:",
+        "🕘 آخری ترمیم", "🆕 تازہ ترین", "🗓 قدیم ترین", "🔤 نام کے مطابق", "صفحات کی ترتیب بدل گئی",
+    ),
+    "hi": (
+        "🛠 अधिक टूल", "🛠 अधिक टूल\n\nज़रूरी टूल चुनें:", "↩️ पूर्ववत करें",
+        "पूर्ववत करने के लिए कोई कार्रवाई नहीं है।", "पूर्ववत किया गया", "⬆️ ऊपर ले जाएँ", "⬇️ नीचे ले जाएँ",
+        "{name} प्रबंधित करें", "वर्तमान स्थान: {current}/{total}", "ब्लॉक क्रम:",
+        "एक कार्रवाई चुनें:", "🔎 खोजें", "⚙️ क्रमबद्ध करें", "पेज का नाम या कोड भेजें। सभी दिखाने के लिए /all भेजें।",
+        "🔎 परिणाम: {query}", "🔎 “{query}” से मिलता कोई पेज नहीं।", "⚙️ पेज क्रमबद्ध करें\n\nक्रम चुनें:",
+        "🕘 अंतिम अपडेट", "🆕 नवीनतम", "🗓 सबसे पुराने", "🔤 नाम से", "पेज क्रम बदल गया",
+    ),
+    "id": (
+        "🛠 Alat lainnya", "🛠 Alat lainnya\n\nPilih alat yang diperlukan:", "↩️ Urungkan",
+        "Tidak ada tindakan untuk diurungkan.", "Tindakan diurungkan", "⬆️ Pindah ke atas", "⬇️ Pindah ke bawah",
+        "Kelola {name}", "Posisi saat ini: {current} dari {total}", "Urutan blok:",
+        "Pilih tindakan:", "🔎 Cari", "⚙️ Urutkan", "Kirim nama atau kode halaman. Kirim /all untuk menampilkan semua.",
+        "🔎 Hasil: {query}", "🔎 Tidak ada halaman yang cocok dengan “{query}”.", "⚙️ Urutkan halaman\n\nPilih urutan halaman:",
+        "🕘 Terakhir diperbarui", "🆕 Terbaru", "🗓 Terlama", "🔤 Berdasarkan nama", "Urutan halaman diubah",
+    ),
+    "ja": (
+        "🛠 その他のツール", "🛠 その他のツール\n\n必要なツールを選択してください：", "↩️ 元に戻す",
+        "元に戻せる操作はありません。", "元に戻しました", "⬆️ 上へ", "⬇️ 下へ",
+        "{name}を管理", "現在の位置：{current}/{total}", "ブロックの順序：",
+        "操作を選択：", "🔎 検索", "⚙️ 並べ替え", "ページ名またはコードを送信してください。すべて表示するには /all を送信します。",
+        "🔎 結果：{query}", "🔎「{query}」に一致するページはありません。", "⚙️ ページを並べ替え\n\n順序を選択してください：",
+        "🕘 最終更新", "🆕 新しい順", "🗓 古い順", "🔤 名前順", "ページの順序を変更しました",
+    ),
+    "ko": (
+        "🛠 추가 도구", "🛠 추가 도구\n\n필요한 도구를 선택하세요:", "↩️ 실행 취소",
+        "취소할 작업이 없습니다.", "실행 취소됨", "⬆️ 위로", "⬇️ 아래로",
+        "{name} 관리", "현재 위치: {current}/{total}", "블록 순서:",
+        "작업 선택:", "🔎 검색", "⚙️ 정렬", "페이지 이름이나 코드를 보내세요. 모두 보려면 /all을 보내세요.",
+        "🔎 결과: {query}", "🔎 ‘{query}’와 일치하는 페이지가 없습니다.", "⚙️ 페이지 정렬\n\n정렬 방식을 선택하세요:",
+        "🕘 최근 수정", "🆕 최신 생성", "🗓 오래된 생성", "🔤 이름순", "페이지 순서가 변경되었습니다",
+    ),
+    "vi": (
+        "🛠 Công cụ khác", "🛠 Công cụ khác\n\nChọn công cụ bạn cần:", "↩️ Hoàn tác",
+        "Không có thao tác để hoàn tác.", "Đã hoàn tác", "⬆️ Di chuyển lên", "⬇️ Di chuyển xuống",
+        "Quản lý {name}", "Vị trí hiện tại: {current}/{total}", "Thứ tự Block:",
+        "Chọn thao tác:", "🔎 Tìm kiếm", "⚙️ Sắp xếp", "Gửi tên hoặc mã trang. Gửi /all để hiển thị tất cả.",
+        "🔎 Kết quả: {query}", "🔎 Không có trang khớp “{query}”.", "⚙️ Sắp xếp trang\n\nChọn thứ tự:",
+        "🕘 Cập nhật gần nhất", "🆕 Mới nhất", "🗓 Cũ nhất", "🔤 Theo tên", "Đã đổi thứ tự trang",
+    ),
+    "th": (
+        "🛠 เครื่องมือเพิ่มเติม", "🛠 เครื่องมือเพิ่มเติม\n\nเลือกเครื่องมือที่ต้องการ:", "↩️ เลิกทำ",
+        "ไม่มีการทำงานให้เลิกทำ", "เลิกทำแล้ว", "⬆️ เลื่อนขึ้น", "⬇️ เลื่อนลง",
+        "จัดการ {name}", "ตำแหน่งปัจจุบัน: {current}/{total}", "ลำดับ Block:",
+        "เลือกการทำงาน:", "🔎 ค้นหา", "⚙️ จัดเรียง", "ส่งชื่อหรือรหัสหน้า ส่ง /all เพื่อแสดงทั้งหมด",
+        "🔎 ผลลัพธ์: {query}", "🔎 ไม่พบหน้าที่ตรงกับ “{query}”", "⚙️ จัดเรียงหน้า\n\nเลือกลำดับ:",
+        "🕘 แก้ไขล่าสุด", "🆕 สร้างล่าสุด", "🗓 สร้างเก่าสุด", "🔤 ตามชื่อ", "เปลี่ยนลำดับหน้าแล้ว",
+    ),
+    "zh-hans": (
+        "🛠 更多工具", "🛠 更多工具\n\n请选择所需工具：", "↩️ 撤销",
+        "没有可撤销的操作。", "已撤销", "⬆️ 上移", "⬇️ 下移",
+        "管理{name}", "当前位置：{current}/{total}", "Block 顺序：",
+        "请选择操作：", "🔎 搜索", "⚙️ 排序", "请发送页面名称或代码。发送 /all 显示全部页面。",
+        "🔎 结果：{query}", "🔎 没有与“{query}”匹配的页面。", "⚙️ 页面排序\n\n请选择排序方式：",
+        "🕘 最近修改", "🆕 最新创建", "🗓 最早创建", "🔤 按名称", "页面顺序已更改",
+    ),
+    "zh-hant": (
+        "🛠 更多工具", "🛠 更多工具\n\n請選擇所需工具：", "↩️ 復原",
+        "沒有可復原的操作。", "已復原", "⬆️ 上移", "⬇️ 下移",
+        "管理{name}", "目前位置：{current}/{total}", "Block 順序：",
+        "請選擇操作：", "🔎 搜尋", "⚙️ 排序", "請傳送頁面名稱或代碼。傳送 /all 顯示全部頁面。",
+        "🔎 結果：{query}", "🔎 沒有與「{query}」相符的頁面。", "⚙️ 頁面排序\n\n請選擇排序方式：",
+        "🕘 最近修改", "🆕 最新建立", "🗓 最早建立", "🔤 按名稱", "頁面順序已變更",
+    ),
+}
+
+EDITOR_UX_TRANSLATIONS = {
+    language: dict(zip(EDITOR_UX_KEYS, values, strict=True))
+    for language, values in EDITOR_UX_VALUES.items()
+}
+
+LIST_UI_KEYS = (
+    "list.menu_button", "list.menu_title", "list.bullet", "list.numbered",
+    "list.checklist", "list.bullet_prompt", "list.numbered_prompt",
+    "list.checklist_prompt", "list.tasks_title", "list.unnamed_task",
+    "list.invalid", "list.empty", "list.missing_task", "list.marked_done",
+    "list.marked_pending",
+)
+
+LIST_UI_VALUES = {
+    "es": ("📋 Listas", "Elige un tipo de lista:", "• Lista con viñetas", "1. Lista numerada", "☑️ Lista de tareas", "Envía un elemento por línea.", "Envía un elemento por línea; los números se añaden automáticamente.", "Envía una tarea por línea. Las líneas normales están pendientes; usa [x], ✅ o ☑️ para las completadas.", "Tareas:", "Tarea", "Selección de lista no válida.", "Envía al menos un elemento no vacío.", "Esta tarea ya no existe.", "Tarea marcada como completada", "Tarea marcada como pendiente"),
+    "fr": ("📋 Listes", "Choisissez un type de liste :", "• Liste à puces", "1. Liste numérotée", "☑️ Liste de tâches", "Envoyez un élément par ligne.", "Envoyez un élément par ligne ; les numéros sont ajoutés automatiquement.", "Envoyez une tâche par ligne. Les lignes normales sont en attente ; utilisez [x], ✅ ou ☑️ pour les tâches terminées.", "Tâches :", "Tâche", "Sélection de liste invalide.", "Envoyez au moins un élément non vide.", "Cette tâche n’existe plus.", "Tâche marquée comme terminée", "Tâche marquée comme en attente"),
+    "de": ("📋 Listen", "Listentyp auswählen:", "• Aufzählung", "1. Nummerierte Liste", "☑️ Checkliste", "Sende einen Eintrag pro Zeile.", "Sende einen Eintrag pro Zeile; Nummern werden automatisch ergänzt.", "Sende eine Aufgabe pro Zeile. Normale Zeilen sind offen; verwende [x], ✅ oder ☑️ für erledigte Aufgaben.", "Aufgaben:", "Aufgabe", "Ungültige Listenauswahl.", "Sende mindestens einen nicht leeren Eintrag.", "Diese Aufgabe existiert nicht mehr.", "Aufgabe als erledigt markiert", "Aufgabe als offen markiert"),
+    "it": ("📋 Elenchi", "Scegli un tipo di elenco:", "• Elenco puntato", "1. Elenco numerato", "☑️ Elenco attività", "Invia un elemento per riga.", "Invia un elemento per riga; i numeri vengono aggiunti automaticamente.", "Invia un’attività per riga. Le righe normali sono da fare; usa [x], ✅ o ☑️ per quelle completate.", "Attività:", "Attività", "Selezione elenco non valida.", "Invia almeno un elemento non vuoto.", "Questa attività non esiste più.", "Attività segnata come completata", "Attività segnata come da fare"),
+    "pt": ("📋 Listas", "Escolha um tipo de lista:", "• Lista com marcadores", "1. Lista numerada", "☑️ Lista de tarefas", "Envie um item por linha.", "Envie um item por linha; os números são adicionados automaticamente.", "Envie uma tarefa por linha. Linhas normais ficam pendentes; use [x], ✅ ou ☑️ nas concluídas.", "Tarefas:", "Tarefa", "Seleção de lista inválida.", "Envie pelo menos um item não vazio.", "Esta tarefa não existe mais.", "Tarefa marcada como concluída", "Tarefa marcada como pendente"),
+    "nl": ("📋 Lijsten", "Kies een lijsttype:", "• Opsomming", "1. Genummerde lijst", "☑️ Takenlijst", "Stuur één item per regel.", "Stuur één item per regel; nummers worden automatisch toegevoegd.", "Stuur één taak per regel. Gewone regels zijn open; gebruik [x], ✅ of ☑️ voor voltooide taken.", "Taken:", "Taak", "Ongeldige lijstkeuze.", "Stuur minstens één niet-leeg item.", "Deze taak bestaat niet meer.", "Taak als voltooid gemarkeerd", "Taak als open gemarkeerd"),
+    "pl": ("📋 Listy", "Wybierz typ listy:", "• Lista punktowana", "1. Lista numerowana", "☑️ Lista zadań", "Wyślij jeden element w każdym wierszu.", "Wyślij jeden element w każdym wierszu; numery zostaną dodane automatycznie.", "Wyślij jedno zadanie w każdym wierszu. Zwykłe wiersze są oczekujące; użyj [x], ✅ lub ☑️ dla ukończonych.", "Zadania:", "Zadanie", "Nieprawidłowy wybór listy.", "Wyślij co najmniej jeden niepusty element.", "To zadanie już nie istnieje.", "Zadanie oznaczono jako ukończone", "Zadanie oznaczono jako oczekujące"),
+    "uk": ("📋 Списки", "Виберіть тип списку:", "• Маркований список", "1. Нумерований список", "☑️ Список завдань", "Надішліть по одному елементу в рядку.", "Надішліть по одному елементу в рядку; номери додадуться автоматично.", "Надішліть по одному завданню в рядку. Звичайні рядки незавершені; використовуйте [x], ✅ або ☑️ для завершених.", "Завдання:", "Завдання", "Неприпустимий вибір списку.", "Надішліть хоча б один непорожній елемент.", "Цього завдання більше немає.", "Завдання позначено виконаним", "Завдання позначено невиконаним"),
+    "ru": ("📋 Списки", "Выберите тип списка:", "• Маркированный список", "1. Нумерованный список", "☑️ Список задач", "Отправьте по одному элементу в строке.", "Отправьте по одному элементу в строке; номера добавятся автоматически.", "Отправьте по одной задаче в строке. Обычные строки не выполнены; используйте [x], ✅ или ☑️ для выполненных.", "Задачи:", "Задача", "Неверный выбор списка.", "Отправьте хотя бы один непустой элемент.", "Этой задачи больше нет.", "Задача отмечена выполненной", "Задача отмечена невыполненной"),
+    "tr": ("📋 Listeler", "Liste türünü seçin:", "• Madde işaretli liste", "1. Numaralı liste", "☑️ Görev listesi", "Her satıra bir öğe gönderin.", "Her satıra bir öğe gönderin; numaralar otomatik eklenir.", "Her satıra bir görev gönderin. Normal satırlar beklemededir; tamamlananlar için [x], ✅ veya ☑️ kullanın.", "Görevler:", "Görev", "Geçersiz liste seçimi.", "En az bir boş olmayan öğe gönderin.", "Bu görev artık yok.", "Görev tamamlandı olarak işaretlendi", "Görev beklemede olarak işaretlendi"),
+    "fa": ("📋 فهرست‌ها", "نوع فهرست را انتخاب کنید:", "• فهرست نشانه‌دار", "1. فهرست شماره‌دار", "☑️ فهرست کارها", "هر مورد را در یک خط بفرستید.", "هر مورد را در یک خط بفرستید؛ شماره‌ها خودکار افزوده می‌شوند.", "هر کار را در یک خط بفرستید. خط عادی انجام‌نشده است؛ برای انجام‌شده از [x]، ✅ یا ☑️ استفاده کنید.", "کارها:", "کار", "انتخاب فهرست نامعتبر است.", "حداقل یک مورد غیرخالی بفرستید.", "این کار دیگر وجود ندارد.", "کار انجام‌شده علامت خورد", "کار انجام‌نشده علامت خورد"),
+    "ku": ("📋 Lîste", "Cureyê lîsteyê hilbijêre:", "• Lîsteya xalî", "1. Lîsteya hejmartî", "☑️ Lîsteya peywiran", "Her hêmanekê di rêzekê de bişîne.", "Her hêmanekê di rêzekê de bişîne; hejmar bixwe têne zêdekirin.", "Her peywirekê di rêzekê de bişîne. Rêzên asayî neqediyayî ne; ji bo yên qediyayî [x], ✅ an ☑️ bikar bîne.", "Peywir:", "Peywir", "Hilbijartina lîsteyê nederbasdar e.", "Herî kêm hêmanek nevala bişîne.", "Ev peywir êdî tune ye.", "Peywir wek qediyayî hate nîşankirin", "Peywir wek neqediyayî hate nîşankirin"),
+    "ur": ("📋 فہرستیں", "فہرست کی قسم منتخب کریں:", "• نقطہ دار فہرست", "1. نمبر والی فہرست", "☑️ کاموں کی فہرست", "ہر سطر میں ایک آئٹم بھیجیں۔", "ہر سطر میں ایک آئٹم بھیجیں؛ نمبر خود شامل ہوں گے۔", "ہر سطر میں ایک کام بھیجیں۔ عام سطر نامکمل ہوگی؛ مکمل کام کے لیے [x]، ✅ یا ☑️ لگائیں۔", "کام:", "کام", "فہرست کا انتخاب درست نہیں۔", "کم از کم ایک غیر خالی آئٹم بھیجیں۔", "یہ کام اب موجود نہیں۔", "کام مکمل نشان زد ہوا", "کام نامکمل نشان زد ہوا"),
+    "hi": ("📋 सूचियाँ", "सूची का प्रकार चुनें:", "• बुलेट सूची", "1. क्रमांकित सूची", "☑️ कार्य सूची", "हर पंक्ति में एक आइटम भेजें।", "हर पंक्ति में एक आइटम भेजें; नंबर अपने आप जुड़ेंगे।", "हर पंक्ति में एक कार्य भेजें। सामान्य पंक्तियाँ लंबित होंगी; पूर्ण कार्य के लिए [x], ✅ या ☑️ लगाएँ।", "कार्य:", "कार्य", "अमान्य सूची चयन।", "कम से कम एक गैर-खाली आइटम भेजें।", "यह कार्य अब मौजूद नहीं है।", "कार्य पूर्ण चिह्नित किया गया", "कार्य लंबित चिह्नित किया गया"),
+    "id": ("📋 Daftar", "Pilih jenis daftar:", "• Daftar berpoin", "1. Daftar bernomor", "☑️ Daftar tugas", "Kirim satu item per baris.", "Kirim satu item per baris; nomor ditambahkan otomatis.", "Kirim satu tugas per baris. Baris biasa berstatus tertunda; gunakan [x], ✅, atau ☑️ untuk yang selesai.", "Tugas:", "Tugas", "Pilihan daftar tidak valid.", "Kirim setidaknya satu item yang tidak kosong.", "Tugas ini sudah tidak ada.", "Tugas ditandai selesai", "Tugas ditandai tertunda"),
+    "ja": ("📋 リスト", "リストの種類を選択:", "• 箇条書き", "1. 番号付きリスト", "☑️ チェックリスト", "1行に1項目を送信してください。", "1行に1項目を送信してください。番号は自動で追加されます。", "1行に1つのタスクを送信してください。通常の行は未完了です。完了済みには [x]、✅、☑️ を付けます。", "タスク:", "タスク", "リストの選択が無効です。", "空でない項目を1つ以上送信してください。", "このタスクは存在しません。", "タスクを完了にしました", "タスクを未完了にしました"),
+    "ko": ("📋 목록", "목록 유형 선택:", "• 글머리 기호 목록", "1. 번호 매기기 목록", "☑️ 작업 목록", "한 줄에 하나씩 보내세요.", "한 줄에 하나씩 보내면 번호가 자동으로 추가됩니다.", "한 줄에 작업 하나씩 보내세요. 일반 줄은 미완료이며, 완료 작업에는 [x], ✅ 또는 ☑️를 붙이세요.", "작업:", "작업", "잘못된 목록 선택입니다.", "비어 있지 않은 항목을 하나 이상 보내세요.", "이 작업은 더 이상 없습니다.", "작업을 완료로 표시했습니다", "작업을 미완료로 표시했습니다"),
+    "vi": ("📋 Danh sách", "Chọn loại danh sách:", "• Danh sách dấu đầu dòng", "1. Danh sách đánh số", "☑️ Danh sách việc", "Gửi mỗi dòng một mục.", "Gửi mỗi dòng một mục; số sẽ được thêm tự động.", "Gửi mỗi dòng một việc. Dòng thường là chưa xong; dùng [x], ✅ hoặc ☑️ cho việc đã xong.", "Công việc:", "Công việc", "Lựa chọn danh sách không hợp lệ.", "Gửi ít nhất một mục không trống.", "Công việc này không còn tồn tại.", "Đã đánh dấu hoàn thành", "Đã đánh dấu chưa hoàn thành"),
+    "th": ("📋 รายการ", "เลือกประเภทรายการ:", "• รายการแบบหัวข้อย่อย", "1. รายการแบบมีหมายเลข", "☑️ รายการงาน", "ส่งหนึ่งรายการต่อบรรทัด", "ส่งหนึ่งรายการต่อบรรทัด ระบบจะใส่หมายเลขให้อัตโนมัติ", "ส่งหนึ่งงานต่อบรรทัด บรรทัดปกติคือยังไม่เสร็จ งานที่เสร็จแล้วให้ใส่ [x], ✅ หรือ ☑️", "งาน:", "งาน", "การเลือกรายการไม่ถูกต้อง", "ส่งอย่างน้อยหนึ่งรายการที่ไม่ว่าง", "งานนี้ไม่มีอยู่แล้ว", "ทำเครื่องหมายว่าเสร็จแล้ว", "ทำเครื่องหมายว่ายังไม่เสร็จ"),
+    "zh-hans": ("📋 列表", "选择列表类型：", "• 项目符号列表", "1. 编号列表", "☑️ 任务列表", "每行发送一个项目。", "每行发送一个项目，编号会自动添加。", "每行发送一个任务。普通行默认为未完成；已完成任务请加 [x]、✅ 或 ☑️。", "任务：", "任务", "列表选择无效。", "请至少发送一个非空项目。", "此任务已不存在。", "任务已标记为完成", "任务已标记为未完成"),
+    "zh-hant": ("📋 列表", "選擇列表類型：", "• 項目符號列表", "1. 編號列表", "☑️ 任務列表", "每行傳送一個項目。", "每行傳送一個項目，編號會自動加入。", "每行傳送一個任務。普通行預設為未完成；已完成任務請加 [x]、✅ 或 ☑️。", "任務：", "任務", "列表選擇無效。", "請至少傳送一個非空項目。", "此任務已不存在。", "任務已標記為完成", "任務已標記為未完成"),
+}
+
+LIST_UI_TRANSLATIONS = {
+    language: dict(zip(LIST_UI_KEYS, values, strict=True))
+    for language, values in LIST_UI_VALUES.items()
+}
+
+RICH_IMPORT_KEYS = (
+    "editor.forward_hint", "editor.imported_title", "editor.block_count",
+    "editor.imported_blocks_title", "editor.imported_choose_block",
+    "editor.rich_import_failed",
+)
+
+RICH_IMPORT_VALUES = {
+    "es": ("También puedes reenviar aquí un mensaje enriquecido para importar y personalizar sus bloques.", "✅ Mensaje enriquecido importado", "Cantidad de bloques: {count}", "Bloques del mensaje:", "Elige un bloque para personalizar:", "Este mensaje enriquecido no contiene bloques compatibles."),
+    "fr": ("Vous pouvez aussi transférer ici un message enrichi pour importer et personnaliser ses blocs.", "✅ Message enrichi importé", "Nombre de blocs : {count}", "Blocs du message :", "Choisissez un bloc à personnaliser :", "Ce message enrichi ne contient aucun bloc compatible."),
+    "de": ("Du kannst auch eine Rich Message hierher weiterleiten, um ihre Blöcke zu importieren und anzupassen.", "✅ Rich Message importiert", "Blockanzahl: {count}", "Nachrichtenblöcke:", "Wähle einen Block zum Anpassen:", "Diese Rich Message enthält keine unterstützten Blöcke."),
+    "it": ("Puoi anche inoltrare qui un messaggio avanzato per importarne e personalizzarne i blocchi.", "✅ Messaggio avanzato importato", "Numero di blocchi: {count}", "Blocchi del messaggio:", "Scegli un blocco da personalizzare:", "Questo messaggio avanzato non contiene blocchi supportati."),
+    "pt": ("Você também pode encaminhar uma mensagem rica aqui para importar e personalizar seus blocos.", "✅ Mensagem rica importada", "Quantidade de blocos: {count}", "Blocos da mensagem:", "Escolha um bloco para personalizar:", "Esta mensagem rica não contém blocos compatíveis."),
+    "nl": ("Je kunt hier ook een Rich Message doorsturen om de blokken te importeren en aan te passen.", "✅ Rich Message geïmporteerd", "Aantal blokken: {count}", "Berichtblokken:", "Kies een blok om aan te passen:", "Deze Rich Message bevat geen ondersteunde blokken."),
+    "pl": ("Możesz też przekazać tutaj wiadomość Rich Message, aby zaimportować i dostosować jej bloki.", "✅ Zaimportowano Rich Message", "Liczba bloków: {count}", "Bloki wiadomości:", "Wybierz blok do dostosowania:", "Ta Rich Message nie zawiera obsługiwanych bloków."),
+    "uk": ("Також можна переслати сюди Rich Message, щоб імпортувати й налаштувати її блоки.", "✅ Rich Message імпортовано", "Кількість блоків: {count}", "Блоки повідомлення:", "Виберіть блок для налаштування:", "Ця Rich Message не містить підтримуваних блоків."),
+    "ru": ("Также можно переслать сюда Rich Message, чтобы импортировать и настроить её блоки.", "✅ Rich Message импортировано", "Количество блоков: {count}", "Блоки сообщения:", "Выберите блок для настройки:", "Эта Rich Message не содержит поддерживаемых блоков."),
+    "tr": ("Bloklarını içe aktarıp özelleştirmek için buraya bir zengin mesaj da iletebilirsiniz.", "✅ Zengin mesaj içe aktarıldı", "Blok sayısı: {count}", "Mesaj blokları:", "Özelleştirilecek bloğu seçin:", "Bu zengin mesajda desteklenen blok yok."),
+    "fa": ("همچنین می‌توانید یک پیام غنی را اینجا فوروارد کنید تا بلوک‌هایش وارد و سفارشی شوند.", "✅ پیام غنی وارد شد", "تعداد بلوک‌ها: {count}", "بلوک‌های پیام:", "یک بلوک را برای سفارشی‌سازی انتخاب کنید:", "این پیام غنی بلوک پشتیبانی‌شده‌ای ندارد."),
+    "ku": ("Her weha dikarî peyameke dewlemend vir bişînî da ku blokên wê were anîn û taybetkirin.", "✅ Peyama dewlemend hate anîn", "Hejmara blokan: {count}", "Blokên peyamê:", "Blokek ji bo taybetkirinê hilbijêre:", "Di vê peyama dewlemend de blokeke piştgirîkirî tune ye."),
+    "ur": ("آپ رِچ میسج یہاں فارورڈ بھی کر سکتے ہیں تاکہ اس کے بلاکس درآمد اور حسب ضرورت کیے جا سکیں۔", "✅ رِچ میسج درآمد ہو گیا", "بلاکس کی تعداد: {count}", "پیغام کے بلاکس:", "حسب ضرورت بنانے کے لیے بلاک منتخب کریں:", "اس رِچ میسج میں کوئی معاون بلاک نہیں ہے۔"),
+    "hi": ("आप रिच मैसेज को यहाँ फ़ॉरवर्ड करके उसके ब्लॉक आयात और अनुकूलित भी कर सकते हैं।", "✅ रिच मैसेज आयात हुआ", "ब्लॉक की संख्या: {count}", "संदेश के ब्लॉक:", "अनुकूलित करने के लिए ब्लॉक चुनें:", "इस रिच मैसेज में कोई समर्थित ब्लॉक नहीं है।"),
+    "id": ("Anda juga dapat meneruskan Rich Message ke sini untuk mengimpor dan menyesuaikan bloknya.", "✅ Rich Message diimpor", "Jumlah blok: {count}", "Blok pesan:", "Pilih blok untuk disesuaikan:", "Rich Message ini tidak memiliki blok yang didukung."),
+    "ja": ("リッチメッセージをここに転送して、ブロックを読み込み編集することもできます。", "✅ リッチメッセージを読み込みました", "ブロック数: {count}", "メッセージのブロック:", "編集するブロックを選択:", "このリッチメッセージには対応ブロックがありません。"),
+    "ko": ("리치 메시지를 여기로 전달하여 블록을 가져오고 맞춤 설정할 수도 있습니다.", "✅ 리치 메시지를 가져왔습니다", "블록 수: {count}", "메시지 블록:", "맞춤 설정할 블록을 선택하세요:", "이 리치 메시지에는 지원되는 블록이 없습니다."),
+    "vi": ("Bạn cũng có thể chuyển tiếp Rich Message vào đây để nhập và tùy chỉnh các khối của nó.", "✅ Đã nhập Rich Message", "Số khối: {count}", "Các khối của tin nhắn:", "Chọn một khối để tùy chỉnh:", "Rich Message này không có khối được hỗ trợ."),
+    "th": ("คุณยังสามารถส่งต่อ Rich Message มาที่นี่เพื่อนำเข้าและปรับแต่งบล็อกได้", "✅ นำเข้า Rich Message แล้ว", "จำนวนบล็อก: {count}", "บล็อกของข้อความ:", "เลือกบล็อกที่จะปรับแต่ง:", "Rich Message นี้ไม่มีบล็อกที่รองรับ"),
+    "zh-hans": ("你也可以将富消息转发到这里，以导入并自定义其中的区块。", "✅ 已导入富消息", "区块数量：{count}", "消息区块：", "选择要自定义的区块：", "此富消息不包含受支持的区块。"),
+    "zh-hant": ("你也可以將富訊息轉傳到這裡，以匯入並自訂其中的區塊。", "✅ 已匯入富訊息", "區塊數量：{count}", "訊息區塊：", "選擇要自訂的區塊：", "此富訊息不包含支援的區塊。"),
+}
+
+RICH_IMPORT_TRANSLATIONS = {
+    language: dict(zip(RICH_IMPORT_KEYS, values, strict=True))
+    for language, values in RICH_IMPORT_VALUES.items()
+}
+
+DETAILS_INNER_KEYS = (
+    "details.inner_manage_button", "details.inner_credit", "details.inner_add_footer",
+    "details.inner_list_title", "details.inner_count", "details.inner_settings_title",
+    "details.inner_type", "details.inner_position", "details.inner_send_content",
+    "details.inner_send_caption", "details.inner_send_credit", "details.inner_send_footer",
+    "details.inner_delete_question", "details.inner_deleted", "details.inner_current_position",
+    "details.inner_moved", "details.inner_text_required", "details.inner_wrong_content",
+)
+
+DETAILS_INNER_VALUES = {
+    "es": (
+        "🧩 Bloques internos", "✍️ Fuente / crédito", "➕ Añadir pie / fuente",
+        "🧩 Bloques dentro de Detalles", "Bloques internos: {count}", "⚙️ Ajustes del bloque interno",
+        "Tipo: {name}", "Posición en Detalles: {current} de {total}", "Envía el nuevo contenido de este bloque interno.",
+        "Envía el pie de foto o /remove para borrarlo.", "Envía la fuente o crédito, o /remove para borrarlo.", "Envía el texto del pie o la fuente. Se insertará justo después de este bloque.",
+        "¿Eliminar este bloque interno de Detalles?", "Bloque interno eliminado", "El bloque ya está en ese extremo.",
+        "Bloque interno movido", "Envía texto para este campo.", "Envía contenido del mismo tipo que este bloque interno.",
+    ),
+    "fr": (
+        "🧩 Blocs internes", "✍️ Source / crédit", "➕ Ajouter un pied / une source",
+        "🧩 Blocs dans Détails", "Blocs internes : {count}", "⚙️ Paramètres du bloc interne",
+        "Type : {name}", "Position dans Détails : {current} sur {total}", "Envoyez le nouveau contenu de ce bloc interne.",
+        "Envoyez la légende, ou /remove pour l’effacer.", "Envoyez la source ou le crédit, ou /remove pour l’effacer.", "Envoyez le texte du pied ou de la source. Il sera inséré juste après ce bloc.",
+        "Supprimer ce bloc interne de Détails ?", "Bloc interne supprimé", "Le bloc est déjà à cette extrémité.",
+        "Bloc interne déplacé", "Envoyez du texte pour ce champ.", "Envoyez un contenu du même type que ce bloc interne.",
+    ),
+    "de": (
+        "🧩 Innere Blöcke", "✍️ Quelle / Urheber", "➕ Fußzeile / Quelle hinzufügen",
+        "🧩 Blöcke in Details", "Innere Blöcke: {count}", "⚙️ Einstellungen des inneren Blocks",
+        "Typ: {name}", "Position in Details: {current} von {total}", "Sende den neuen Inhalt für diesen inneren Block.",
+        "Sende die Beschriftung oder /remove zum Entfernen.", "Sende Quelle oder Urheber, oder /remove zum Entfernen.", "Sende den Text für Fußzeile oder Quelle. Er wird direkt nach diesem Block eingefügt.",
+        "Diesen inneren Block aus Details löschen?", "Innerer Block gelöscht", "Der Block befindet sich bereits an diesem Rand.",
+        "Inneren Block verschoben", "Sende Text für dieses Feld.", "Sende Inhalt vom selben Typ wie dieser innere Block.",
+    ),
+    "it": (
+        "🧩 Blocchi interni", "✍️ Fonte / credito", "➕ Aggiungi piè di pagina / fonte",
+        "🧩 Blocchi in Dettagli", "Blocchi interni: {count}", "⚙️ Impostazioni del blocco interno",
+        "Tipo: {name}", "Posizione in Dettagli: {current} di {total}", "Invia il nuovo contenuto per questo blocco interno.",
+        "Invia la didascalia o /remove per rimuoverla.", "Invia la fonte o il credito, oppure /remove per rimuoverlo.", "Invia il testo del piè di pagina o della fonte. Verrà inserito subito dopo questo blocco.",
+        "Eliminare questo blocco interno da Dettagli?", "Blocco interno eliminato", "Il blocco è già a questa estremità.",
+        "Blocco interno spostato", "Invia del testo per questo campo.", "Invia contenuto dello stesso tipo di questo blocco interno.",
+    ),
+    "pt": (
+        "🧩 Blocos internos", "✍️ Fonte / crédito", "➕ Adicionar rodapé / fonte",
+        "🧩 Blocos em Detalhes", "Blocos internos: {count}", "⚙️ Configurações do bloco interno",
+        "Tipo: {name}", "Posição em Detalhes: {current} de {total}", "Envie o novo conteúdo deste bloco interno.",
+        "Envie a legenda ou /remove para apagá-la.", "Envie a fonte ou crédito, ou /remove para apagar.", "Envie o texto do rodapé ou da fonte. Ele será inserido logo após este bloco.",
+        "Excluir este bloco interno de Detalhes?", "Bloco interno excluído", "O bloco já está nessa extremidade.",
+        "Bloco interno movido", "Envie texto para este campo.", "Envie conteúdo do mesmo tipo deste bloco interno.",
+    ),
+    "nl": (
+        "🧩 Interne blokken", "✍️ Bron / vermelding", "➕ Voettekst / bron toevoegen",
+        "🧩 Blokken in Details", "Interne blokken: {count}", "⚙️ Instellingen intern blok",
+        "Type: {name}", "Positie in Details: {current} van {total}", "Stuur de nieuwe inhoud voor dit interne blok.",
+        "Stuur het bijschrift, of /remove om het te wissen.", "Stuur de bron of vermelding, of /remove om die te wissen.", "Stuur de voettekst of bron. Deze wordt direct na dit blok ingevoegd.",
+        "Dit interne blok uit Details verwijderen?", "Intern blok verwijderd", "Het blok staat al aan die rand.",
+        "Intern blok verplaatst", "Stuur tekst voor dit veld.", "Stuur inhoud van hetzelfde type als dit interne blok.",
+    ),
+    "pl": (
+        "🧩 Bloki wewnętrzne", "✍️ Źródło / autor", "➕ Dodaj stopkę / źródło",
+        "🧩 Bloki w Szczegółach", "Bloki wewnętrzne: {count}", "⚙️ Ustawienia bloku wewnętrznego",
+        "Typ: {name}", "Pozycja w Szczegółach: {current} z {total}", "Wyślij nową zawartość tego bloku wewnętrznego.",
+        "Wyślij podpis lub /remove, aby go usunąć.", "Wyślij źródło lub autora, albo /remove, aby usunąć.", "Wyślij tekst stopki lub źródła. Zostanie wstawiony bezpośrednio po tym bloku.",
+        "Usunąć ten blok wewnętrzny ze Szczegółów?", "Usunięto blok wewnętrzny", "Blok jest już na tej krawędzi.",
+        "Przeniesiono blok wewnętrzny", "Wyślij tekst dla tego pola.", "Wyślij zawartość tego samego typu co ten blok wewnętrzny.",
+    ),
+    "uk": (
+        "🧩 Внутрішні блоки", "✍️ Джерело / автор", "➕ Додати підвал / джерело",
+        "🧩 Блоки в Деталях", "Внутрішніх блоків: {count}", "⚙️ Налаштування внутрішнього блоку",
+        "Тип: {name}", "Позиція в Деталях: {current} з {total}", "Надішліть новий вміст цього внутрішнього блоку.",
+        "Надішліть підпис або /remove, щоб видалити його.", "Надішліть джерело чи автора або /remove, щоб видалити.", "Надішліть текст підвалу або джерела. Його буде вставлено одразу після цього блоку.",
+        "Видалити цей внутрішній блок із Деталей?", "Внутрішній блок видалено", "Блок уже розташований на цьому краю.",
+        "Внутрішній блок переміщено", "Надішліть текст для цього поля.", "Надішліть вміст того самого типу, що й цей внутрішній блок.",
+    ),
+    "ru": (
+        "🧩 Внутренние блоки", "✍️ Источник / автор", "➕ Добавить подвал / источник",
+        "🧩 Блоки в Деталях", "Внутренних блоков: {count}", "⚙️ Настройки внутреннего блока",
+        "Тип: {name}", "Позиция в Деталях: {current} из {total}", "Отправьте новое содержимое этого внутреннего блока.",
+        "Отправьте подпись или /remove, чтобы удалить её.", "Отправьте источник или автора либо /remove, чтобы удалить.", "Отправьте текст подвала или источника. Он будет вставлен сразу после этого блока.",
+        "Удалить этот внутренний блок из Деталей?", "Внутренний блок удалён", "Блок уже находится с этого края.",
+        "Внутренний блок перемещён", "Отправьте текст для этого поля.", "Отправьте содержимое того же типа, что и этот внутренний блок.",
+    ),
+    "tr": (
+        "🧩 İç bloklar", "✍️ Kaynak / atıf", "➕ Alt bilgi / kaynak ekle",
+        "🧩 Detaylar içindeki bloklar", "İç bloklar: {count}", "⚙️ İç blok ayarları",
+        "Tür: {name}", "Detaylar içindeki konum: {current}/{total}", "Bu iç blok için yeni içeriği gönderin.",
+        "Açıklamayı gönderin veya silmek için /remove yazın.", "Kaynak veya atfı gönderin ya da silmek için /remove yazın.", "Alt bilgi veya kaynak metnini gönderin. Bu bloktan hemen sonra eklenecektir.",
+        "Bu iç blok Detaylar'dan silinsin mi?", "İç blok silindi", "Blok zaten o uçta.",
+        "İç blok taşındı", "Bu alan için metin gönderin.", "Bu iç blokla aynı türde içerik gönderin.",
+    ),
+    "fa": (
+        "🧩 بلوک‌های داخلی", "✍️ منبع / اعتبار", "➕ افزودن پاورقی / منبع",
+        "🧩 بلوک‌های داخل جزئیات", "بلوک‌های داخلی: {count}", "⚙️ تنظیمات بلوک داخلی",
+        "نوع: {name}", "جایگاه در جزئیات: {current} از {total}", "محتوای جدید این بلوک داخلی را بفرستید.",
+        "توضیح را بفرستید یا برای حذف /remove را ارسال کنید.", "منبع یا اعتبار را بفرستید یا برای حذف /remove را ارسال کنید.", "متن پاورقی یا منبع را بفرستید؛ بلافاصله پس از این بلوک درج می‌شود.",
+        "این بلوک داخلی از جزئیات حذف شود؟", "بلوک داخلی حذف شد", "بلوک از قبل در این انتهاست.",
+        "بلوک داخلی جابه‌جا شد", "برای این فیلد متن بفرستید.", "محتوایی هم‌نوع با این بلوک داخلی بفرستید.",
+    ),
+    "ku": (
+        "🧩 Blokên hundirîn", "✍️ Çavkanî / nav", "➕ Binpê / çavkanî lê zêde bike",
+        "🧩 Blokên di Hûragahiyan de", "Blokên hundirîn: {count}", "⚙️ Mîhengên bloka hundirîn",
+        "Cure: {name}", "Cih di Hûragahiyan de: {current} ji {total}", "Naveroka nû ya vê bloka hundirîn bişîne.",
+        "Şiroveyê bişîne an ji bo jêbirinê /remove bişîne.", "Çavkanî an navê bişîne; ji bo jêbirinê /remove bişîne.", "Nivîsa binpê an çavkaniyê bişîne. Ew rasterast piştî vê blokê tê danîn.",
+        "Vê bloka hundirîn ji Hûragahiyan jê bibî?", "Bloka hundirîn hate jêbirin", "Blok jixwe li wê dawiyê ye.",
+        "Bloka hundirîn hate veguhastin", "Ji bo vê qadê nivîs bişîne.", "Naverokeke ji heman cureya vê bloka hundirîn bişîne.",
+    ),
+    "ur": (
+        "🧩 اندرونی بلاکس", "✍️ ماخذ / کریڈٹ", "➕ فٹر / ماخذ شامل کریں",
+        "🧩 تفصیلات کے اندر بلاکس", "اندرونی بلاکس: {count}", "⚙️ اندرونی بلاک کی ترتیبات",
+        "قسم: {name}", "تفصیلات میں مقام: {current} از {total}", "اس اندرونی بلاک کا نیا مواد بھیجیں۔",
+        "کیپشن بھیجیں، یا ہٹانے کے لیے /remove۔", "ماخذ یا کریڈٹ بھیجیں، یا ہٹانے کے لیے /remove۔", "فٹر یا ماخذ کا متن بھیجیں۔ یہ اس بلاک کے فوراً بعد شامل ہوگا۔",
+        "یہ اندرونی بلاک تفصیلات سے حذف کریں؟", "اندرونی بلاک حذف ہوگیا", "بلاک پہلے ہی اس کنارے پر ہے۔",
+        "اندرونی بلاک منتقل ہوگیا", "اس خانے کے لیے متن بھیجیں۔", "اسی قسم کا مواد بھیجیں جو اس اندرونی بلاک کا ہے۔",
+    ),
+    "hi": (
+        "🧩 अंदरूनी ब्लॉक", "✍️ स्रोत / श्रेय", "➕ फ़ुटर / स्रोत जोड़ें",
+        "🧩 विवरण के अंदर ब्लॉक", "अंदरूनी ब्लॉक: {count}", "⚙️ अंदरूनी ब्लॉक सेटिंग",
+        "प्रकार: {name}", "विवरण में स्थान: {current} / {total}", "इस अंदरूनी ब्लॉक की नई सामग्री भेजें।",
+        "कैप्शन भेजें, या हटाने के लिए /remove भेजें।", "स्रोत या श्रेय भेजें, या हटाने के लिए /remove भेजें।", "फ़ुटर या स्रोत का टेक्स्ट भेजें। यह इस ब्लॉक के ठीक बाद जोड़ा जाएगा।",
+        "इस अंदरूनी ब्लॉक को विवरण से हटाएँ?", "अंदरूनी ब्लॉक हटा दिया गया", "ब्लॉक पहले से उस किनारे पर है।",
+        "अंदरूनी ब्लॉक खिसकाया गया", "इस फ़ील्ड के लिए टेक्स्ट भेजें।", "इस अंदरूनी ब्लॉक के समान प्रकार की सामग्री भेजें।",
+    ),
+    "id": (
+        "🧩 Blok internal", "✍️ Sumber / kredit", "➕ Tambah footer / sumber",
+        "🧩 Blok di dalam Detail", "Blok internal: {count}", "⚙️ Pengaturan blok internal",
+        "Jenis: {name}", "Posisi di Detail: {current} dari {total}", "Kirim konten baru untuk blok internal ini.",
+        "Kirim keterangan, atau /remove untuk menghapusnya.", "Kirim sumber atau kredit, atau /remove untuk menghapusnya.", "Kirim teks footer atau sumber. Teks akan disisipkan tepat setelah blok ini.",
+        "Hapus blok internal ini dari Detail?", "Blok internal dihapus", "Blok sudah berada di ujung tersebut.",
+        "Blok internal dipindahkan", "Kirim teks untuk bidang ini.", "Kirim konten dengan jenis yang sama seperti blok internal ini.",
+    ),
+    "ja": (
+        "🧩 内部ブロック", "✍️ 出典 / クレジット", "➕ フッター / 出典を追加",
+        "🧩 詳細内のブロック", "内部ブロック数：{count}", "⚙️ 内部ブロック設定",
+        "種類：{name}", "詳細内の位置：{current}/{total}", "この内部ブロックの新しい内容を送信してください。",
+        "キャプションを送信するか、/remove で削除してください。", "出典またはクレジットを送信するか、/remove で削除してください。", "フッターまたは出典のテキストを送信してください。このブロックの直後に挿入されます。",
+        "この内部ブロックを詳細から削除しますか？", "内部ブロックを削除しました", "ブロックはすでにその端にあります。",
+        "内部ブロックを移動しました", "この項目のテキストを送信してください。", "この内部ブロックと同じ種類の内容を送信してください。",
+    ),
+    "ko": (
+        "🧩 내부 블록", "✍️ 출처 / 크레딧", "➕ 바닥글 / 출처 추가",
+        "🧩 세부정보 안의 블록", "내부 블록: {count}개", "⚙️ 내부 블록 설정",
+        "유형: {name}", "세부정보 내 위치: {current}/{total}", "이 내부 블록의 새 내용을 보내세요.",
+        "캡션을 보내거나 /remove로 삭제하세요.", "출처 또는 크레딧을 보내거나 /remove로 삭제하세요.", "바닥글 또는 출처 텍스트를 보내세요. 이 블록 바로 뒤에 삽입됩니다.",
+        "이 내부 블록을 세부정보에서 삭제할까요?", "내부 블록을 삭제했습니다", "블록이 이미 해당 끝에 있습니다.",
+        "내부 블록을 이동했습니다", "이 필드에 사용할 텍스트를 보내세요.", "이 내부 블록과 같은 유형의 내용을 보내세요.",
+    ),
+    "vi": (
+        "🧩 Khối bên trong", "✍️ Nguồn / ghi công", "➕ Thêm chân trang / nguồn",
+        "🧩 Các khối trong Chi tiết", "Số khối bên trong: {count}", "⚙️ Cài đặt khối bên trong",
+        "Loại: {name}", "Vị trí trong Chi tiết: {current}/{total}", "Gửi nội dung mới cho khối bên trong này.",
+        "Gửi chú thích hoặc /remove để xóa.", "Gửi nguồn hoặc ghi công, hoặc /remove để xóa.", "Gửi văn bản chân trang hoặc nguồn. Nội dung sẽ được chèn ngay sau khối này.",
+        "Xóa khối bên trong này khỏi Chi tiết?", "Đã xóa khối bên trong", "Khối đã ở đầu đó.",
+        "Đã di chuyển khối bên trong", "Gửi văn bản cho trường này.", "Gửi nội dung cùng loại với khối bên trong này.",
+    ),
+    "th": (
+        "🧩 บล็อกภายใน", "✍️ แหล่งที่มา / เครดิต", "➕ เพิ่มส่วนท้าย / แหล่งที่มา",
+        "🧩 บล็อกในรายละเอียด", "บล็อกภายใน: {count}", "⚙️ การตั้งค่าบล็อกภายใน",
+        "ประเภท: {name}", "ตำแหน่งในรายละเอียด: {current} จาก {total}", "ส่งเนื้อหาใหม่สำหรับบล็อกภายในนี้",
+        "ส่งคำอธิบาย หรือ /remove เพื่อลบ", "ส่งแหล่งที่มาหรือเครดิต หรือ /remove เพื่อลบ", "ส่งข้อความส่วนท้ายหรือแหล่งที่มา ข้อความจะถูกแทรกต่อจากบล็อกนี้ทันที",
+        "ลบบล็อกภายในนี้ออกจากรายละเอียดหรือไม่?", "ลบบล็อกภายในแล้ว", "บล็อกอยู่ที่ขอบนั้นแล้ว",
+        "ย้ายบล็อกภายในแล้ว", "ส่งข้อความสำหรับช่องนี้", "ส่งเนื้อหาประเภทเดียวกับบล็อกภายในนี้",
+    ),
+    "zh-hans": (
+        "🧩 内部区块", "✍️ 来源 / 署名", "➕ 添加页脚 / 来源",
+        "🧩 详情中的区块", "内部区块：{count}", "⚙️ 内部区块设置",
+        "类型：{name}", "在详情中的位置：{current}/{total}", "请发送此内部区块的新内容。",
+        "请发送说明，或用 /remove 清除。", "请发送来源或署名，或用 /remove 清除。", "请发送页脚或来源文字，它会紧接在此区块之后插入。",
+        "从详情中删除此内部区块？", "内部区块已删除", "区块已经位于该端。",
+        "内部区块已移动", "请为此字段发送文字。", "请发送与此内部区块相同类型的内容。",
+    ),
+    "zh-hant": (
+        "🧩 內部區塊", "✍️ 來源 / 署名", "➕ 新增頁尾 / 來源",
+        "🧩 詳情中的區塊", "內部區塊：{count}", "⚙️ 內部區塊設定",
+        "類型：{name}", "在詳情中的位置：{current}/{total}", "請傳送此內部區塊的新內容。",
+        "請傳送說明，或用 /remove 清除。", "請傳送來源或署名，或用 /remove 清除。", "請傳送頁尾或來源文字，它會緊接在此區塊之後插入。",
+        "從詳情中刪除此內部區塊？", "內部區塊已刪除", "區塊已經位於該端。",
+        "內部區塊已移動", "請為此欄位傳送文字。", "請傳送與此內部區塊相同類型的內容。",
+    ),
+}
+
+DETAILS_INNER_TRANSLATIONS = {
+    language: dict(zip(DETAILS_INNER_KEYS, values, strict=True))
+    for language, values in DETAILS_INNER_VALUES.items()
+}
+
+KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
+    language: {f"block.{name}": value for name, value in values.items()}
+    for language, values in BLOCK_KEY_TRANSLATIONS.items()
+}
+
+for language, translations in MATH_PROMPT_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in CODE_PROMPT_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in EDITOR_START_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in PAGE_MANAGEMENT_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in EDITOR_UX_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in LIST_UI_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in RICH_IMPORT_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in DETAILS_INNER_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+NAVIGATION_KEYS = (
+    "navigation.home", "navigation.message_missing",
+    "navigation.original_above", "navigation.expired",
+    "navigation.back_failed", "navigation.home_failed",
+)
+
+NAVIGATION_VALUES: dict[str, tuple[str, ...]] = {
+    "es": ("🏠 Página principal", "No se pudo identificar el mensaje de navegación.", "El mensaje principal está arriba.", "La sesión de navegación caducó. Abre la página de nuevo.", "No se pudo volver: {error}", "No se pudo abrir la página principal: {error}"),
+    "fr": ("🏠 Accueil", "Impossible d’identifier le message de navigation.", "Le message principal se trouve au-dessus.", "La session de navigation a expiré. Ouvrez de nouveau la page.", "Impossible de revenir : {error}", "Impossible d’ouvrir la page d’accueil : {error}"),
+    "de": ("🏠 Startseite", "Die Navigationsnachricht konnte nicht erkannt werden.", "Die Hauptnachricht befindet sich oben.", "Die Navigationssitzung ist abgelaufen. Öffne die Seite erneut.", "Zurückgehen nicht möglich: {error}", "Die Startseite konnte nicht geöffnet werden: {error}"),
+    "it": ("🏠 Pagina iniziale", "Impossibile identificare il messaggio di navigazione.", "Il messaggio principale si trova sopra.", "La sessione di navigazione è scaduta. Apri di nuovo la pagina.", "Impossibile tornare indietro: {error}", "Impossibile aprire la pagina iniziale: {error}"),
+    "pt": ("🏠 Página inicial", "Não foi possível identificar a mensagem de navegação.", "A mensagem principal está acima.", "A sessão de navegação expirou. Abra a página novamente.", "Não foi possível voltar: {error}", "Não foi possível abrir a página inicial: {error}"),
+    "nl": ("🏠 Startpagina", "Het navigatiebericht kon niet worden herkend.", "Het hoofdbericht staat hierboven.", "De navigatiesessie is verlopen. Open de pagina opnieuw.", "Teruggaan is mislukt: {error}", "De startpagina kon niet worden geopend: {error}"),
+    "pl": ("🏠 Strona główna", "Nie udało się rozpoznać wiadomości nawigacyjnej.", "Główna wiadomość znajduje się powyżej.", "Sesja nawigacji wygasła. Otwórz stronę ponownie.", "Nie udało się wrócić: {error}", "Nie udało się otworzyć strony głównej: {error}"),
+    "uk": ("🏠 Головна", "Не вдалося визначити навігаційне повідомлення.", "Головне повідомлення знаходиться вище.", "Сеанс навігації завершився. Відкрийте сторінку знову.", "Не вдалося повернутися: {error}", "Не вдалося відкрити головну сторінку: {error}"),
+    "ru": ("🏠 Главная", "Не удалось определить навигационное сообщение.", "Главное сообщение находится выше.", "Сеанс навигации истёк. Откройте страницу снова.", "Не удалось вернуться: {error}", "Не удалось открыть главную страницу: {error}"),
+    "tr": ("🏠 Ana sayfa", "Gezinme mesajı belirlenemedi.", "Ana mesaj yukarıda.", "Gezinme oturumunun süresi doldu. Sayfayı yeniden açın.", "Geri dönülemedi: {error}", "Ana sayfa açılamadı: {error}"),
+    "fa": ("🏠 صفحه اصلی", "پیام پیمایش شناسایی نشد.", "پیام اصلی در بالاست.", "نشست پیمایش منقضی شد. صفحه را دوباره باز کنید.", "بازگشت ممکن نشد: {error}", "صفحه اصلی باز نشد: {error}"),
+    "ku": ("🏠 Rûpela sereke", "Peyama navîgasyonê nehat diyarkirin.", "Peyama sereke li jor e.", "Danişîna navîgasyonê qediya. Rûpelê dîsa veke.", "Vegera paş ne pêkan bû: {error}", "Rûpela sereke nehat vekirin: {error}"),
+    "ur": ("🏠 مرکزی صفحہ", "نیویگیشن پیغام کی شناخت نہیں ہو سکی۔", "مرکزی پیغام اوپر موجود ہے۔", "نیویگیشن سیشن ختم ہو گیا۔ صفحہ دوبارہ کھولیں۔", "واپس نہیں جا سکے: {error}", "مرکزی صفحہ نہیں کھل سکا: {error}"),
+    "hi": ("🏠 मुख्य पृष्ठ", "नेविगेशन संदेश की पहचान नहीं हो सकी।", "मुख्य संदेश ऊपर है।", "नेविगेशन सत्र समाप्त हो गया। पेज फिर से खोलें।", "वापस नहीं जा सके: {error}", "मुख्य पृष्ठ नहीं खुल सका: {error}"),
+    "id": ("🏠 Halaman utama", "Pesan navigasi tidak dapat dikenali.", "Pesan utama berada di atas.", "Sesi navigasi berakhir. Buka kembali halamannya.", "Tidak dapat kembali: {error}", "Tidak dapat membuka halaman utama: {error}"),
+    "ja": ("🏠 ホーム", "ナビゲーションメッセージを特定できませんでした。", "メインメッセージは上にあります。", "ナビゲーションセッションの期限が切れました。ページをもう一度開いてください。", "戻れませんでした：{error}", "ホームページを開けませんでした：{error}"),
+    "ko": ("🏠 홈", "탐색 메시지를 확인할 수 없습니다.", "기본 메시지는 위에 있습니다.", "탐색 세션이 만료되었습니다. 페이지를 다시 여세요.", "뒤로 갈 수 없습니다: {error}", "홈 페이지를 열 수 없습니다: {error}"),
+    "vi": ("🏠 Trang chủ", "Không thể xác định tin nhắn điều hướng.", "Tin nhắn chính nằm ở phía trên.", "Phiên điều hướng đã hết hạn. Hãy mở lại trang.", "Không thể quay lại: {error}", "Không thể mở trang chủ: {error}"),
+    "th": ("🏠 หน้าหลัก", "ไม่สามารถระบุข้อความนำทางได้", "ข้อความหลักอยู่ด้านบน", "เซสชันการนำทางหมดอายุ โปรดเปิดหน้าอีกครั้ง", "ไม่สามารถย้อนกลับได้: {error}", "ไม่สามารถเปิดหน้าหลักได้: {error}"),
+    "zh-hans": ("🏠 主页", "无法识别导航消息。", "主消息位于上方。", "导航会话已过期，请重新打开页面。", "无法返回：{error}", "无法打开主页：{error}"),
+    "zh-hant": ("🏠 首頁", "無法識別導覽訊息。", "主訊息位於上方。", "導覽工作階段已過期，請重新開啟頁面。", "無法返回：{error}", "無法開啟首頁：{error}"),
+}
+
+NAVIGATION_TRANSLATIONS = {
+    language: dict(zip(NAVIGATION_KEYS, values, strict=True))
+    for language, values in NAVIGATION_VALUES.items()
+}
+
+for language, translations in NAVIGATION_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+
+def pack(**values: str) -> dict[str, str]:
+    return {
+        PHRASES[key]: value
+        for key, value in values.items()
+        if key in PHRASES and value
+    }
+
+
+def profile(
+    name: str,
+    description: str,
+    short: str,
+    editor: str,
+    draft: str,
+    start: str,
+) -> dict[str, Any]:
+    return {
+        "name": name,
+        "description": description,
+        "short": short,
+        "commands": {
+            "editor": editor,
+            "draft": draft,
+            "start": start,
+        },
+    }
