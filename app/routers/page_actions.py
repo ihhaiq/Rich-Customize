@@ -8,14 +8,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
+from app.editor.session import load_editor_session
 from app.i18n import t
 from app.keyboards import (
     build_page_delete_confirmation_keyboard,
     build_rich_editor_keyboard,
 )
-from app.states import RichEditorStates
-
-from app.editor.session import load_editor_session
 from app.routers.editor_ui import (
     MAIN_TEXT,
     delete_add_step_messages,
@@ -23,13 +21,10 @@ from app.routers.editor_ui import (
     edit_ui,
     send_add_prompt,
 )
+from app.routers.page_support import opened_page_text, render_pages_screen
+from app.services.page_editor import persist_page_draft_change, query_user_pages
 from app.services.page_registry import page_registry
-from app.routers.page_support import (
-    opened_page_text,
-    pages_for_user,
-    render_pages_screen,
-    save_changed_draft,
-)
+from app.states import RichEditorStates
 
 
 router = Router(name="page_actions")
@@ -82,7 +77,7 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
     after = copy.deepcopy(before)
     after.current_page_id = code
     after.current_page_title = title
-    await save_changed_draft(state, before, after)
+    await persist_page_draft_change(state, before, after)
     await state.set_state(RichEditorStates.managing)
     prefix = (
         "✅ تم تحديث الصفحة المحفوظة.\n\nالكود: "
@@ -145,7 +140,7 @@ async def receive_page_rename(message: Message, state: FSMContext, bot: Bot) -> 
     after = copy.deepcopy(before)
     if before.current_page_id == page_id:
         after.current_page_title = title
-    await save_changed_draft(state, before, after)
+    await persist_page_draft_change(state, before, after)
     await state.set_state(RichEditorStates.managing)
     await state.update_data(rename_page_id=None)
     await render_pages_screen(
@@ -195,7 +190,7 @@ async def delete_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
         return
     data = await state.get_data()
-    _, _, _, _, total_count = await pages_for_user(
+    _, _, _, _, total_count = await query_user_pages(
         callback.from_user.id,
         requested_index,
         str(data.get("pages_search_query") or ""),
@@ -220,7 +215,7 @@ async def delete_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     if before.current_page_id == page_id:
         after.current_page_id = None
         after.current_page_title = None
-    await save_changed_draft(state, before, after)
+    await persist_page_draft_change(state, before, after)
     await callback.answer(t("pages.deleted"))
 
 
@@ -241,7 +236,7 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     after.buttons_align = str(page.get("buttons_align", "center"))
     after.current_page_id = page_id
     after.current_page_title = str(page.get("title") or page_id)
-    await save_changed_draft(state, before, after)
+    await persist_page_draft_change(state, before, after)
     await state.set_state(RichEditorStates.managing)
     await state.update_data(current_block_id=None, current_button_id=None)
     await edit_ui(
