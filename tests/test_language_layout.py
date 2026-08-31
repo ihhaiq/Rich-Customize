@@ -38,7 +38,12 @@ class LanguageFolderLayoutTests(unittest.TestCase):
 
     def test_new_registry_preserves_existing_translation_data(self):
         self.assertEqual(SUPPORTED_LANGUAGES, LEGACY_SUPPORTED_LANGUAGES)
-        self.assertEqual(TRANSLATIONS, LEGACY_TRANSLATIONS)
+        self.assertEqual(
+            {code: values for code, values in TRANSLATIONS.items() if code != "ar"},
+            LEGACY_TRANSLATIONS,
+        )
+        self.assertEqual(TRANSLATIONS["ar"], BUNDLES["ar"].translations)
+        self.assertTrue(TRANSLATIONS["ar"])
         self.assertEqual(PROFILES, LEGACY_PROFILES)
         self.assertEqual(PHRASES, LEGACY_PHRASES)
         self.assertEqual(AR_PHRASES, LEGACY_AR_PHRASES)
