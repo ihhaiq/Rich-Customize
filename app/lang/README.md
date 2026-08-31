@@ -10,15 +10,15 @@ Each supported Telegram locale has its own package:
 - `hi/`, `id/`, `ja/`, `ko/`, `vi/`, `th/`
 - `zh_hans/`, `zh_hant/` for locale codes `zh-hans` and `zh-hant`
 
-Application code must import locale registries from `app.lang`, not from
-`app.locales.*`.
+Application code imports locale registries from `app.lang`. Shared historical
+translation catalogs live under `app/lang/catalogs/`; there is no second
+`app.locales` runtime source.
 
-The old `app/locales/` modules are a compatibility source while the historical
-translation dictionaries are being physically migrated. They must not receive
-new router/UI strings. New language-specific copy belongs to the matching
-`app/lang/<locale>/` package so the compatibility source can be deleted after
-migration.
-
-`app.lang` deliberately preserves the existing public dictionaries
+Each language package exposes a `BUNDLE` built by `app.lang.bundle_loader`.
+`app.lang` preserves the public dictionaries used by the application
 (`PHRASES`, `AR_PHRASES`, `KEY_TRANSLATIONS`, `TRANSLATIONS`, catalog data and
-profiles), so `t()` and `tr()` do not change behavior during the reorganization.
+profiles), so `t()` and the temporary source-text `tr()` compatibility path keep
+their existing behavior while semantic-key migration continues.
+
+New UI copy should use semantic keys and be registered in the language/catalog
+layer rather than embedded in routers or keyboards.
