@@ -3,7 +3,7 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
-from app.lang.bundle_loader import LocaleBundle, install_source_normalization
+from app.lang.bundle_loader import LocaleBundle
 
 
 LANGUAGE_MODULES: dict[str, str] = {
@@ -45,8 +45,6 @@ BUNDLES: dict[str, LocaleBundle] = {
     code: _load_bundle(code, module_name)
     for code, module_name in LANGUAGE_MODULES.items()
 }
-
-install_source_normalization()
 
 PHRASES = dict(BUNDLES["en"].phrases)
 AR_PHRASES = dict(BUNDLES["ar"].phrases)
