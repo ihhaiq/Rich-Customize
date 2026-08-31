@@ -55,10 +55,13 @@ KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     for code, bundle in BUNDLES.items()
     if code not in {"ar", "en"} and bundle.keyed
 }
+# Legacy tr() translates English source strings for Arabic too (for example the
+# inline button guide). Keep Arabic source translations exposed here instead of
+# dropping them from the registry; English itself does not need a translation map.
 TRANSLATIONS: dict[str, dict[str, str]] = {
     code: dict(bundle.translations)
     for code, bundle in BUNDLES.items()
-    if code not in {"ar", "en"} and bundle.translations
+    if code != "en" and bundle.translations
 }
 CATALOG_EN = dict(BUNDLES["en"].catalog)
 CATALOG_AR = dict(BUNDLES["ar"].catalog)
