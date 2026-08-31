@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
 from app.keyboards import build_chat_reached_keyboard
 from app.services.chat_registry import managed_chat_registry
 
-from app.routers import editor_core as core
+from app.editor.session import load_editor_session
 from app.routers.publish_support import (
     can_publish_to_chat,
     chat_type_value,
@@ -64,7 +64,7 @@ async def remember_publish_chat(update: ChatMemberUpdated, bot: Bot) -> None:
 
 @router.callback_query(F.data == "r:post")
 async def open_post_chats(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     await state.update_data(
@@ -82,7 +82,7 @@ async def return_to_post_chats(
     state: FSMContext,
     bot: Bot,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     data, _ = session
@@ -93,7 +93,7 @@ async def return_to_post_chats(
 
 @router.callback_query(F.data.startswith("r:postchat:"))
 async def select_post_chat(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     data, _ = session

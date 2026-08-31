@@ -8,15 +8,20 @@ from aiogram.enums import ButtonStyle
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from app.editor.session import load_editor_session
+from app.keyboards import build_rich_editor_keyboard
+from app.routers.button_support import buttons_per_row
+from app.routers.editor_ui import (
+    MAIN_TEXT,
+    delete_add_step_messages,
+    edit_saved_ui,
+    edit_ui,
+    send_add_prompt,
+)
 from app.services.blocks import get_block_by_id, table_rows
 from app.services.page_registry import page_registry
 from app.services import renderer as rich_renderer
 from app.states import RichEditorStates
-
-# Reuse the compatibility editor's session/UI helpers while table-specific
-# controls are kept isolated in this feature module.
-from app.routers import editor_core
-
 
 router = Router(name="table_features")
 _original_editor_input_block = rich_renderer._editor_input_block
@@ -143,13 +148,12 @@ def _editor_input_block_with_table_features(block: dict[str, Any], path: str) ->
 
 def install() -> None:
     """Install table controls and Bot API 10.3 serialization support."""
-    editor_core.build_table_options_keyboard = build_table_options_keyboard
     rich_renderer._editor_input_block = _editor_input_block_with_table_features
 
 
 @router.callback_query(F.data.startswith("r:tdisplay:"))
 async def open_table_display(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await editor_core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -158,7 +162,7 @@ async def open_table_display(callback: CallbackQuery, state: FSMContext) -> None
     if block is None or block.get("type") != "table":
         await callback.answer("هذا الجدول لم يعد موجودًا.", show_alert=True)
         return
-    await editor_core._edit_ui(
+    await edit_ui(
         callback.message,
         TABLE_DISPLAY_HELP_TEXT,
         build_table_display_keyboard(block),
@@ -168,7 +172,7 @@ async def open_table_display(callback: CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(F.data.startswith("r:ttoggle:"))
 async def toggle_table_display(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await editor_core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -191,7 +195,7 @@ async def toggle_table_display(callback: CallbackQuery, state: FSMContext) -> No
         return
     data[field] = not current
     await state.update_data(blocks=blocks)
-    await editor_core._edit_ui(
+    await edit_ui(
         callback.message,
         TABLE_DISPLAY_HELP_TEXT,
         build_table_display_keyboard(block),
@@ -206,7 +210,7 @@ async def toggle_table_display(callback: CallbackQuery, state: FSMContext) -> No
 
 @router.callback_query(F.data.startswith("r:tcaption:"))
 async def request_table_caption(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await editor_core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -217,7 +221,7 @@ async def request_table_caption(callback: CallbackQuery, state: FSMContext) -> N
         return
     await state.set_state(RichEditorStates.editing_table_caption)
     await state.update_data(table_caption_block_id=block_id)
-    await editor_core._send_add_prompt(
+    await send_add_prompt(
         callback.message,
         state,
         "أرسل عنوان الجدول. لإزالة العنوان أرسل /empty",
@@ -253,9 +257,9 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
         table_data["caption_html"] = message.html_text or text
         table_data["caption_text"] = text
     await state.update_data(blocks=blocks, table_caption_block_id=None)
-    await editor_core._delete_add_step_messages(bot, message, data, state)
+    await delete_add_step_messages(bot, message, data, state)
     await state.set_state(RichEditorStates.managing)
-    await editor_core._edit_saved_ui(
+    await edit_saved_ui(
         bot,
         state,
         TABLE_DISPLAY_HELP_TEXT,
@@ -266,7 +270,7 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
 @router.callback_query(F.data == "r:savepage")
 async def save_or_update_page(callback: CallbackQuery, state: FSMContext) -> None:
     """Update an opened saved page immediately; ask for a title only for new pages."""
-    session = await editor_core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -278,7 +282,7 @@ async def save_or_update_page(callback: CallbackQuery, state: FSMContext) -> Non
     existing_id = str(data.get("current_page_id") or "")
     if not existing_id:
         await state.set_state(RichEditorStates.saving_page_name)
-        await editor_core._send_add_prompt(
+        await send_add_prompt(
             callback.message,
             state,
             "أرسل اسم الصفحة لحفظها؛ الحد الأقصى 64 حرفًا.",
@@ -290,7 +294,7 @@ async def save_or_update_page(callback: CallbackQuery, state: FSMContext) -> Non
     if existing is None or int(existing.get("owner_id", 0)) != callback.from_user.id:
         await state.update_data(current_page_id=None, current_page_title=None)
         await state.set_state(RichEditorStates.saving_page_name)
-        await editor_core._send_add_prompt(
+        await send_add_prompt(
             callback.message,
             state,
             "الصفحة الأصلية لم تعد موجودة. أرسل اسمًا لحفظها كصفحة جديدة.",
@@ -304,15 +308,15 @@ async def save_or_update_page(callback: CallbackQuery, state: FSMContext) -> Non
         title,
         blocks,
         data.get("message_buttons") or [],
-        editor_core._buttons_per_row(data),
+        buttons_per_row(data),
         str(data.get("buttons_align", "center")),
         page_id=existing_id,
     )
     await state.set_state(RichEditorStates.managing)
     await state.update_data(current_page_id=code, current_page_title=title)
-    await editor_core._edit_ui(
+    await edit_ui(
         callback.message,
-        f"✅ تم تحديث الصفحة المحفوظة «{title}».\n\n{editor_core.MAIN_TEXT}",
-        editor_core.build_rich_editor_keyboard(blocks),
+        f"✅ تم تحديث الصفحة المحفوظة «{title}».\n\n{MAIN_TEXT}",
+        build_rich_editor_keyboard(blocks),
     )
     await callback.answer("✅ تم حفظ التعديلات بنفس الكود")

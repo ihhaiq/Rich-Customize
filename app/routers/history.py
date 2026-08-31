@@ -13,7 +13,7 @@ from app.keyboards import build_rich_editor_keyboard
 from app.services.blocks import normalize_block_positions
 from app.states import RichEditorStates
 
-from app.routers import editor_core as core
+from app.routers.editor_ui import MAIN_TEXT, edit_ui
 
 
 router = Router(name="editor_history")
@@ -64,21 +64,16 @@ async def undo_editor_action(
 
     draft = await draft_store.load(state)
     await state.set_state(RichEditorStates.managing)
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
-        t("editor.empty_hint") if not draft.blocks else core.MAIN_TEXT,
+        t("editor.empty_hint") if not draft.blocks else MAIN_TEXT,
         build_rich_editor_keyboard(draft.blocks),
     )
     await callback.answer(t("editor.undo_done"))
 
 
-def install_into(legacy_module: Any) -> tuple[str, ...]:
-    return detach_legacy_history_handlers(legacy_module)
-
-
 __all__ = [
     "LEGACY_HISTORY_CALLBACKS",
     "detach_legacy_history_handlers",
-    "install_into",
     "router",
 ]

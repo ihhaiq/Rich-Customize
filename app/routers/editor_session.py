@@ -4,26 +4,10 @@ from typing import Any
 
 from aiogram import Router
 
-from app.editor.session import albums, load_editor_session, user_locks
 from app.routers.editor_entry import router as entry_router
 from app.routers.editor_navigation import router as navigation_router
 from app.routers.editor_preview import router as preview_router
-from app.routers.editor_showcase import missing_media_text, router as showcase_router
-from app.routers.editor_ui import (
-    MAIN_TEXT,
-    delete_add_step_messages,
-    delete_input_message,
-    delete_stored_block_prompt,
-    edit_button_ui,
-    edit_saved_button_ui,
-    edit_saved_ui,
-    edit_ui,
-    editor_overview_text,
-    friendly_rich_error,
-    open_editor,
-    repost_saved_ui,
-    send_add_prompt,
-)
+from app.routers.editor_showcase import router as showcase_router
 
 
 router = Router(name="editor_session")
@@ -103,33 +87,11 @@ def legacy_session_handlers(legacy_module: Any) -> dict[str, tuple[str, ...]]:
     }
 
 
-def install_into(legacy_module: Any) -> dict[str, tuple[str, ...]]:
-    legacy_module.albums = albums
-    legacy_module.user_locks = user_locks
-    legacy_module.MAIN_TEXT = MAIN_TEXT
-    legacy_module._session = load_editor_session
-    legacy_module._friendly_rich_error = friendly_rich_error
-    legacy_module._missing_media_text = missing_media_text
-    legacy_module._edit_ui = edit_ui
-    legacy_module._edit_button_ui = edit_button_ui
-    legacy_module._edit_saved_ui = edit_saved_ui
-    legacy_module._edit_saved_button_ui = edit_saved_button_ui
-    legacy_module._repost_saved_ui = repost_saved_ui
-    legacy_module._editor_overview_text = editor_overview_text
-    legacy_module._open_editor = open_editor
-    legacy_module._send_add_prompt = send_add_prompt
-    legacy_module._delete_stored_block_prompt = delete_stored_block_prompt
-    legacy_module._delete_input_message = delete_input_message
-    legacy_module._delete_add_step_messages = delete_add_step_messages
-    return detach_legacy_session_handlers(legacy_module)
-
-
 __all__ = [
     "LEGACY_SESSION_CALLBACKS",
     "LEGACY_SESSION_CHANNEL_POSTS",
     "LEGACY_SESSION_MESSAGES",
     "detach_legacy_session_handlers",
-    "install_into",
     "legacy_session_handlers",
     "router",
 ]

@@ -12,8 +12,9 @@ from app.keyboards import build_post_settings_keyboard
 from app.services.chat_registry import managed_chat_registry
 from app.services.renderer import RichMessageRenderError, send_rich_message_post
 
-from app.routers import editor_core as core
+from app.editor.session import load_editor_session, user_locks
 from app.routers.button_support import prepare_message_buttons
+from app.routers.editor_ui import edit_ui, friendly_rich_error
 from app.routers.publish_support import can_publish_to_chat
 
 
@@ -25,8 +26,8 @@ logger = logging.getLogger(__name__)
 async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     if not callback.from_user:
         return
-    async with core.user_locks[callback.from_user.id]:
-        session = await core._session(callback, state)
+    async with user_locks[callback.from_user.id]:
+        session = await load_editor_session(callback, state)
         if not session or not isinstance(callback.message, Message):
             return
         data, _ = session
@@ -70,7 +71,7 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
                     error,
                 )
                 failed.append(title)
-                failed_reasons.append(core._friendly_rich_error(error))
+                failed_reasons.append(friendly_rich_error(error))
             else:
                 succeeded.append(title)
 
@@ -82,7 +83,7 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
         if len(succeeded) + len(failed) > 20:
             lines.append("… تم اختصار قائمة النتائج")
         lines.append("\nيمكنك تغيير الإعدادات وإرسال المنشور مرة أخرى.")
-        await core._edit_ui(
+        await edit_ui(
             callback.message,
             "\n".join(lines),
             build_post_settings_keyboard(

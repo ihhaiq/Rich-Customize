@@ -131,20 +131,8 @@ class PagesRouterTests(unittest.TestCase):
             },
         )
 
-    def test_real_router_setup_has_one_active_copy_and_zero_legacy_copies(self):
-        from app.routers import editor_core
+    def test_real_router_setup_has_one_active_copy_without_legacy_fallback(self):
         from app.routers import rich_editor
-
-        legacy = editor_core.compat_module
-        self.assertEqual(
-            legacy_page_handlers(legacy),
-            {
-                "callback_query": (),
-                "message": (),
-                "inline_query": (),
-                "guest_message": (),
-            },
-        )
         sets = {
             "callback_query": LEGACY_PAGE_CALLBACKS,
             "message": LEGACY_PAGE_MESSAGES,
@@ -157,13 +145,11 @@ class PagesRouterTests(unittest.TestCase):
                 matches = [callback for callback in registered if callback.__name__ == name]
                 self.assertGreaterEqual(len(matches), 1, name)
                 self.assertEqual(len({id(callback) for callback in matches}), 1, name)
-        self.assertIs(editor_core.open_page_link, open_page_link)
-        self.assertIs(editor_core.restore_original_message, restore_original_message)
         self.assertIs(rich_editor.open_page_link, open_page_link)
         self.assertIs(rich_editor.restore_original_message, restore_original_message)
 
         top_level_names = [child.name for child in rich_editor.router.sub_routers]
-        self.assertLess(top_level_names.index("pages"), top_level_names.index("rich_editor"))
+        self.assertNotIn("rich_editor", top_level_names)
 
 
 if __name__ == "__main__":

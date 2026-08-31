@@ -22,23 +22,17 @@ class LegacyPhysicalPruneTests(unittest.TestCase):
         self.assertNotIn("@router.", source)
         self.assertLessEqual(len(source.splitlines()), 50)
 
-    def test_real_legacy_router_is_an_empty_compatibility_namespace(self):
-        from app.routers import editor_core
-        from app.routers import rich_editor  # noqa: F401
+    def test_final_router_does_not_include_the_legacy_fallback(self):
+        from app.routers import rich_editor
 
-        legacy = editor_core.compat_module
-        observer_names = (
-            "message",
-            "callback_query",
-            "channel_post",
-            "my_chat_member",
-            "inline_query",
-            "guest_message",
+        self.assertNotIn(
+            "rich_editor",
+            {child.name for child in rich_editor.router.sub_routers},
         )
-        self.assertEqual(
-            {name: len(getattr(legacy.router, name).handlers) for name in observer_names},
-            {name: 0 for name in observer_names},
-        )
+
+    def test_editor_core_alias_has_been_removed(self):
+        path = Path(__file__).parents[1] / "app" / "routers" / "editor_core.py"
+        self.assertFalse(path.exists())
 
     def test_quote_media_helper_keeps_only_media_and_live_caption(self):
         parsed = [

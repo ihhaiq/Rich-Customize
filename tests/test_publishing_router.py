@@ -64,15 +64,8 @@ class PublishingRouterTests(unittest.TestCase):
             {"callback_query": (), "my_chat_member": ()},
         )
 
-    def test_real_router_has_one_active_copy_and_zero_legacy_copies(self):
-        from app.routers import editor_core
+    def test_real_router_has_one_active_copy_without_legacy_fallback(self):
         from app.routers import rich_editor
-
-        legacy = editor_core.compat_module
-        self.assertEqual(
-            legacy_publish_handlers(legacy),
-            {"callback_query": (), "my_chat_member": ()},
-        )
         sets = {
             "callback_query": LEGACY_PUBLISH_CALLBACKS,
             "my_chat_member": LEGACY_PUBLISH_MEMBERS,
@@ -85,10 +78,7 @@ class PublishingRouterTests(unittest.TestCase):
                 self.assertEqual(len({id(callback) for callback in matches}), 1, name)
 
         top_level_names = [child.name for child in rich_editor.router.sub_routers]
-        self.assertLess(
-            top_level_names.index("publishing"),
-            top_level_names.index("rich_editor"),
-        )
+        self.assertNotIn("rich_editor", top_level_names)
 
 
 if __name__ == "__main__":

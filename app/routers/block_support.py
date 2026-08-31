@@ -14,7 +14,11 @@ from app.editor.workflow import editor_workflow
 from app.keyboards import build_rich_editor_keyboard
 from app.states import RichEditorStates
 
-from app.routers import editor_core as core
+from app.routers.editor_ui import (
+    MAIN_TEXT,
+    delete_add_step_messages,
+    repost_saved_ui,
+)
 
 
 async def save_blocks(state: FSMContext, blocks: list[dict[str, Any]]) -> None:
@@ -46,11 +50,11 @@ async def finish_add(
         add_prompt_message_id=None,
         heading_size=None,
     )
-    await core._delete_add_step_messages(bot, message, data, state)
-    await core._repost_saved_ui(
+    await delete_add_step_messages(bot, message, data, state)
+    await repost_saved_ui(
         bot,
         state,
-        f"✅ تمت إضافة الـBlock بنجاح.\n\n{core.MAIN_TEXT}",
+        f"✅ تمت إضافة الـBlock بنجاح.\n\n{MAIN_TEXT}",
         build_rich_editor_keyboard(result.blocks),
     )
     assert result.block is not None

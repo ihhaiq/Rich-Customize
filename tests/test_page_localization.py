@@ -271,8 +271,8 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
         message = SimpleNamespace(text="المصدر", html_text="المصدر")
         state = SimpleNamespace(update_data=AsyncMock(), set_state=AsyncMock())
         with (
-            patch("app.routers.details_edit.core._delete_add_step_messages", AsyncMock()),
-            patch("app.routers.details_edit.core._edit_saved_ui", AsyncMock()),
+            patch("app.routers.details_edit.delete_add_step_messages", AsyncMock()),
+            patch("app.routers.details_edit.edit_saved_ui", AsyncMock()),
         ):
             handled = await _receive_nested_replacement(
                 message, state, SimpleNamespace(), data,
@@ -350,7 +350,7 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
             {"page_id": "c", "title": "Other", "updated_at": 50},
         ]
         with patch(
-            "app.routers.editor_core.page_registry.list_for_user",
+            "app.routers.page_support.page_registry.list_for_user",
             AsyncMock(return_value=pages),
         ):
             found, visible, page_index, total_pages, total_count = await _pages_for_user(

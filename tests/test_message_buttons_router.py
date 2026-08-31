@@ -124,19 +124,8 @@ class MessageButtonsRouterTests(unittest.TestCase):
             {handler.callback.__name__ for handler in legacy.router.message.handlers},
         )
 
-    def test_real_router_setup_detaches_legacy_and_rebinds_picker_bridge(self):
-        from app.routers import editor_core
-        from app.routers import rich_editor  # noqa: F401
-
-        legacy = editor_core.compat_module
-        self.assertEqual(
-            legacy_button_handlers(legacy),
-            {"callback_query": (), "message": ()},
-        )
-        self.assertIs(legacy._ask_for_button_user, ask_for_button_user)
-        self.assertIs(legacy._complete_button_target, complete_button_target)
-        self.assertIs(legacy._defer_text_for_user_buttons, defer_text_for_user_buttons)
-        self.assertIs(legacy.receive_button_value, receive_button_value)
+    def test_real_router_has_one_active_copy_without_legacy_fallback(self):
+        from app.routers import rich_editor
 
         callback_names = self._registered_names(rich_editor.router, "callback_query")
         message_names = self._registered_names(rich_editor.router, "message")
@@ -145,10 +134,9 @@ class MessageButtonsRouterTests(unittest.TestCase):
         for name in LEGACY_BUTTON_MESSAGES:
             self.assertEqual(message_names.count(name), 1, name)
 
-        top_level_names = [child.name for child in rich_editor.router.sub_routers]
-        self.assertLess(
-            top_level_names.index("message_buttons"),
-            top_level_names.index("rich_editor"),
+        self.assertNotIn(
+            "rich_editor",
+            {child.name for child in rich_editor.router.sub_routers},
         )
 
 

@@ -19,7 +19,17 @@ from app.keyboards import (
     build_list_type_keyboard,
     build_rich_editor_keyboard,
 )
-from app.routers import editor_core as core
+from app.editor.session import albums, load_editor_session
+from app.routers.block_input_support import code_input_prompt, quote_media_payload
+from app.routers.button_target_picker import defer_text_for_user_buttons
+from app.routers.editor_ui import (
+    MAIN_TEXT,
+    delete_add_step_messages,
+    edit_saved_ui,
+    edit_ui,
+    repost_saved_ui,
+    send_add_prompt,
+)
 from app.routers.details_support import (
     DETAILS_TYPE,
     details_builder_text,
@@ -63,11 +73,11 @@ async def _finish_details_add(
         add_prompt_chat_id=None,
         add_prompt_message_id=None,
     )
-    await core._delete_add_step_messages(bot, message, data, state)
-    await core._repost_saved_ui(
+    await delete_add_step_messages(bot, message, data, state)
+    await repost_saved_ui(
         bot,
         state,
-        f"{t('details.added')}\n\n{core.MAIN_TEXT}",
+        f"{t('details.added')}\n\n{MAIN_TEXT}",
         build_rich_editor_keyboard(result.blocks),
     )
 
@@ -90,14 +100,14 @@ async def store_pending_details_child(
         "child_list_kind",
     ):
         payload.pop(key, None)
-    await core._delete_add_step_messages(bot, message, data, state)
+    await delete_add_step_messages(bot, message, data, state)
     await state.update_data(
         pending_add_type=DETAILS_TYPE,
         pending_child_type=None,
         add_step="details_content",
         add_payload=payload,
     )
-    await core._send_add_prompt(
+    await send_add_prompt(
         message,
         state,
         details_builder_text(payload),
@@ -110,7 +120,7 @@ async def start_add_details(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session:
         return
     await state.set_state(RichEditorStates.adding_block)
@@ -121,7 +131,7 @@ async def start_add_details(
         add_payload={},
     )
     if isinstance(callback.message, Message):
-        await core._send_add_prompt(
+        await send_add_prompt(
             callback.message,
             state,
             t("details.summary_prompt"),
@@ -145,7 +155,7 @@ async def open_details_inner_blocks(
         add_step="details_child_select",
         pending_child_type=None,
     )
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         t("details.choose_child"),
         build_inner_block_keyboard(DETAILS_TYPE),
@@ -172,7 +182,7 @@ async def return_to_details_content(
         pending_child_type=None,
         add_payload=payload,
     )
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         details_builder_text(payload),
         build_details_content_keyboard(len(children)),
@@ -190,7 +200,7 @@ async def cancel_details_builder(
     if not isinstance(callback.message, Message):
         return
     draft = await draft_store.load(state)
-    await core._delete_add_step_messages(
+    await delete_add_step_messages(
         bot,
         callback.message,
         data,
@@ -203,10 +213,10 @@ async def cancel_details_builder(
         add_step=None,
         add_payload=None,
     )
-    await core._edit_saved_ui(
+    await edit_saved_ui(
         bot,
         state,
-        core.MAIN_TEXT,
+        MAIN_TEXT,
         build_rich_editor_keyboard(draft.blocks),
     )
     await callback.answer(t("details.cancelled"))
@@ -279,7 +289,7 @@ async def choose_details_child_type(
             add_step="details_child_heading",
             pending_child_type="heading",
         )
-        await core._edit_ui(
+        await edit_ui(
             callback.message,
             t("details.choose_heading"),
             build_heading_level_keyboard("details"),
@@ -287,7 +297,7 @@ async def choose_details_child_type(
         await callback.answer()
         return
     if child_type == "list":
-        await core._edit_ui(
+        await edit_ui(
             callback.message,
             t("list.menu_title"),
             build_list_type_keyboard(
@@ -300,7 +310,7 @@ async def choose_details_child_type(
 
     prompts = {
         "paragraph": t("details.send_paragraph"),
-        "preformatted": core._code_input_prompt(),
+        "preformatted": code_input_prompt(),
         "footer": t("details.send_footer"),
         "mathematical_expression": t("math.add_prompt"),
         "anchor": t("details.send_anchor"),
@@ -325,7 +335,7 @@ async def choose_details_child_type(
         ),
         pending_child_type=child_type,
     )
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         prompts[child_type],
         build_inner_block_input_keyboard(),
@@ -354,7 +364,7 @@ async def choose_details_list_type(
         pending_child_type="list",
         add_payload=payload,
     )
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         t(f"list.{list_kind}_prompt"),
         build_inner_block_input_keyboard(),
@@ -391,7 +401,7 @@ async def choose_details_heading_level(
         pending_child_type="heading",
         add_payload=payload,
     )
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         t("details.heading_selected", level=heading_size),
         build_inner_block_input_keyboard(),
@@ -408,7 +418,7 @@ async def receive_details_add(
     data = await state.get_data()
     if data.get("pending_add_type") != DETAILS_TYPE:
         raise SkipHandler
-    if await core._defer_text_for_user_buttons(
+    if await defer_text_for_user_buttons(
         message,
         state,
         "adding_block",
@@ -422,7 +432,7 @@ async def receive_details_add(
         if not message.text:
             await message.answer(t("details.summary_text_required"))
             return
-        await core._delete_add_step_messages(bot, message, data, state)
+        await delete_add_step_messages(bot, message, data, state)
         payload = {
             "summary_html": message.html_text,
             "children": [],
@@ -431,7 +441,7 @@ async def receive_details_add(
             add_step="details_content",
             add_payload=payload,
         )
-        await core._send_add_prompt(
+        await send_add_prompt(
             message,
             state,
             details_builder_text(payload),
@@ -446,19 +456,19 @@ async def receive_details_add(
             return
         if not message.text:
             if message.media_group_id:
-                collected = await core.albums.collect(message)
+                collected = await albums.collect(message)
                 if collected is None:
                     return
                 parsed = messages_to_blocks(collected)
             else:
                 parsed = message_to_blocks(message)
-            media_children, caption = core._quote_media_payload(parsed)
+            media_children, caption = quote_media_payload(parsed)
             if not media_children:
                 await message.answer(
                     t("details.quote_content_required"),
                 )
                 return
-            await core._delete_add_step_messages(
+            await delete_add_step_messages(
                 bot,
                 message,
                 data,
@@ -481,7 +491,7 @@ async def receive_details_add(
                 add_step=next_step,
                 add_payload=payload,
             )
-            await core._send_add_prompt(
+            await send_add_prompt(
                 message,
                 state,
                 prompt,
@@ -489,7 +499,7 @@ async def receive_details_add(
             )
             return
 
-        await core._delete_add_step_messages(
+        await delete_add_step_messages(
             bot,
             message,
             data,
@@ -501,7 +511,7 @@ async def receive_details_add(
             add_step="details_child_quote_credit",
             add_payload=payload,
         )
-        await core._send_add_prompt(
+        await send_add_prompt(
             message,
             state,
             t("details.quote_credit_prompt"),
@@ -519,7 +529,7 @@ async def receive_details_add(
             add_step="details_child_quote_credit",
             add_payload=payload,
         )
-        await core._send_add_prompt(
+        await send_add_prompt(
             message,
             state,
             t("details.quote_credit_prompt"),
@@ -565,7 +575,7 @@ async def receive_details_add(
 
         if child_type in {"collage", "slideshow"}:
             if message.media_group_id:
-                collected = await core.albums.collect(message)
+                collected = await albums.collect(message)
                 if collected is None:
                     return
                 children = messages_to_blocks(collected)
@@ -659,7 +669,7 @@ async def receive_details_add(
 
     if step == "details_content":
         if message.media_group_id:
-            collected = await core.albums.collect(message)
+            collected = await albums.collect(message)
             if collected is None:
                 return
             incoming = messages_to_blocks(collected)

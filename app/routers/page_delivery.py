@@ -9,7 +9,9 @@ from aiogram.types import InlineQuery, InlineQueryResultArticle, InputRichMessag
 from app.services.buttons import normalize_page_code
 from app.services.renderer import RichMessageRenderError, build_input_rich_message
 
-from app.routers import editor_core as core
+from app.routers.publish_support import chat_type_value
+from app.services.guest_message_registry import guest_message_registry
+from app.services.page_registry import page_registry
 from app.routers.button_support import prepare_message_buttons
 
 
@@ -18,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 async def saved_page_query_result(page_id: str) -> InlineQueryResultArticle | None:
-    page = await core.page_registry.get(page_id)
+    page = await page_registry.get(page_id)
     if page is None:
         return None
     prepared_buttons = await prepare_message_buttons(page.get("buttons") or [])
@@ -76,10 +78,10 @@ async def summon_saved_rich_page(message: Message, bot: Bot) -> None:
             guest_query_id=message.guest_query_id,
             result=result,
         )
-        await core.guest_message_registry.remember(
+        await guest_message_registry.remember(
             sent.inline_message_id,
             message.chat.id,
-            core._chat_type_value(message.chat),
+            chat_type_value(message.chat),
         )
     except (RichMessageRenderError, TelegramAPIError, ValueError):
         logger.exception("Failed to answer guest query with a saved rich page")

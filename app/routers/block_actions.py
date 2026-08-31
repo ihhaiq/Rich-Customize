@@ -14,7 +14,9 @@ from app.keyboards import (
 )
 from app.states import RichEditorStates
 
-from app.routers import editor_core as core
+from app.editor.session import load_editor_session, user_locks
+from app.routers.block_view import block_page
+from app.routers.editor_ui import MAIN_TEXT, edit_ui
 from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_support import block_by_id, save_blocks
 
@@ -24,7 +26,7 @@ router = Router(name="block_actions")
 
 @router.callback_query(F.data.startswith("r:b:"))
 async def open_block(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -32,16 +34,16 @@ async def open_block(callback: CallbackQuery, state: FSMContext) -> None:
     block = block_by_id(blocks, block_id)
     if block is None:
         await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
-        await core._edit_ui(
+        await edit_ui(
             callback.message,
-            core.MAIN_TEXT,
+            MAIN_TEXT,
             build_rich_editor_keyboard(blocks),
         )
         return
     await state.update_data(current_block_id=block_id)
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
-        core._block_page(block, blocks),
+        block_page(block, blocks),
         build_managed_block_keyboard(block, blocks),
     )
     await callback.answer()
@@ -49,7 +51,7 @@ async def open_block(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("r:dup:"))
 async def duplicate_block_action(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -64,9 +66,9 @@ async def duplicate_block_action(callback: CallbackQuery, state: FSMContext) -> 
     await remember(state)
     await save_blocks(state, result.blocks)
     await state.update_data(current_block_id=result.block["id"])
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
-        core._block_page(result.block, result.blocks),
+        block_page(result.block, result.blocks),
         build_managed_block_keyboard(result.block, result.blocks),
     )
     await callback.answer(t("block.duplicated"))
@@ -74,7 +76,7 @@ async def duplicate_block_action(callback: CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data.startswith("r:d:"))
 async def ask_delete(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -82,7 +84,7 @@ async def ask_delete(callback: CallbackQuery, state: FSMContext) -> None:
     if block_by_id(blocks, block_id) is None:
         await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
         return
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         "هل تريد حذف هذا الجزء؟",
         build_delete_confirmation_keyboard(block_id),
@@ -94,8 +96,8 @@ async def ask_delete(callback: CallbackQuery, state: FSMContext) -> None:
 async def confirm_delete(callback: CallbackQuery, state: FSMContext) -> None:
     if not callback.from_user or not isinstance(callback.message, Message):
         return
-    async with core.user_locks[callback.from_user.id]:
-        session = await core._session(callback, state)
+    async with user_locks[callback.from_user.id]:
+        session = await load_editor_session(callback, state)
         if not session:
             return
         _, blocks = session
@@ -108,9 +110,9 @@ async def confirm_delete(callback: CallbackQuery, state: FSMContext) -> None:
         await save_blocks(state, result.blocks)
         await state.set_state(RichEditorStates.managing)
         await state.update_data(current_block_id=None)
-        await core._edit_ui(
+        await edit_ui(
             callback.message,
-            core.MAIN_TEXT if result.blocks else t("editor.empty_hint"),
+            MAIN_TEXT if result.blocks else t("editor.empty_hint"),
             build_rich_editor_keyboard(result.blocks),
         )
         await callback.answer("تم الحذف")
@@ -118,7 +120,7 @@ async def confirm_delete(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("r:m:"))
 async def move_menu(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await core._session(callback, state)
+    session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
     _, blocks = session
@@ -126,7 +128,7 @@ async def move_menu(callback: CallbackQuery, state: FSMContext) -> None:
     if block_by_id(blocks, block_id) is None:
         await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
         return
-    await core._edit_ui(
+    await edit_ui(
         callback.message,
         "اختر الموقع الجديد:",
         build_block_position_keyboard(blocks, block_id),
@@ -139,8 +141,8 @@ async def move_menu(callback: CallbackQuery, state: FSMContext) -> None:
 async def move_one_step(callback: CallbackQuery, state: FSMContext) -> None:
     if not callback.from_user or not isinstance(callback.message, Message):
         return
-    async with core.user_locks[callback.from_user.id]:
-        session = await core._session(callback, state)
+    async with user_locks[callback.from_user.id]:
+        session = await load_editor_session(callback, state)
         if not session:
             return
         _, blocks = session
@@ -165,9 +167,9 @@ async def move_one_step(callback: CallbackQuery, state: FSMContext) -> None:
             return
         await remember(state)
         await save_blocks(state, result.blocks)
-        await core._edit_ui(
+        await edit_ui(
             callback.message,
-            core._block_page(result.block, result.blocks),
+            block_page(result.block, result.blocks),
             build_managed_block_keyboard(result.block, result.blocks),
         )
         await callback.answer("تم تغيير الموقع")
@@ -177,8 +179,8 @@ async def move_one_step(callback: CallbackQuery, state: FSMContext) -> None:
 async def move_to(callback: CallbackQuery, state: FSMContext) -> None:
     if not callback.from_user or not isinstance(callback.message, Message):
         return
-    async with core.user_locks[callback.from_user.id]:
-        session = await core._session(callback, state)
+    async with user_locks[callback.from_user.id]:
+        session = await load_editor_session(callback, state)
         if not session:
             return
         _, blocks = session
@@ -195,9 +197,9 @@ async def move_to(callback: CallbackQuery, state: FSMContext) -> None:
         await remember(state)
         await save_blocks(state, result.blocks)
         await state.update_data(current_block_id=None)
-        await core._edit_ui(
+        await edit_ui(
             callback.message,
-            core.MAIN_TEXT,
+            MAIN_TEXT,
             build_rich_editor_keyboard(result.blocks),
         )
         await callback.answer("تم تغيير الموقع")

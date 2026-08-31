@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCAN_PATHS = [
     ROOT / "app" / "keyboards.py",
     ROOT / "app" / "routers" / "block_preview.py",
-    ROOT / "app" / "routers" / "editor_core.py",
+    ROOT / "app" / "routers" / "editor_ui.py",
     ROOT / "app" / "services" / "blocks.py",
 ]
 
