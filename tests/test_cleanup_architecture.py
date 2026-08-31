@@ -69,7 +69,7 @@ class CleanupArchitectureTests(unittest.TestCase):
         service = (APP / "services" / "details_editor.py").read_text(encoding="utf-8")
         for name in (
             "details_children",
-            "details_child",
+            "find_details_child",
             "add_details_child",
             "delete_details_child",
             "move_details_child",
