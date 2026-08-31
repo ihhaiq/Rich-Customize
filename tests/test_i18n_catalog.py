@@ -8,8 +8,7 @@ from pathlib import Path
 
 from app import i18n_core
 from app.i18n import t
-from app.locales import SUPPORTED_LANGUAGES
-from app.locales.catalog import CATALOG_AR, CATALOG_EN, CATALOG_TRANSLATIONS
+from app.lang import CATALOG_AR, CATALOG_EN, CATALOG_TRANSLATIONS, SUPPORTED_LANGUAGES
 
 ROOT = Path(__file__).resolve().parents[1]
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
@@ -41,11 +40,7 @@ class SemanticCatalogTests(unittest.TestCase):
             expected = _fields(english)
             self.assertEqual(_fields(CATALOG_AR[key]), expected, f"ar:{key}")
             for language, translations in CATALOG_TRANSLATIONS.items():
-                self.assertEqual(
-                    _fields(translations[key]),
-                    expected,
-                    f"{language}:{key}",
-                )
+                self.assertEqual(_fields(translations[key]), expected, f"{language}:{key}")
 
     def test_t_renders_every_catalog_key_for_every_locale(self):
         values = {"label": "LABEL", "reason": "REASON"}

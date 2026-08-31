@@ -5,109 +5,19 @@ from typing import Any
 from aiogram.fsm.context import FSMContext
 
 from app.editor.draft_store import draft_store
-from app.editor.workflow import editor_workflow
 from app.i18n import t
 from app.services.blocks import BLOCK_LABELS
-
-
-DETAILS_TYPE = "details"
-
-LEGACY_DETAILS_CALLBACKS = frozenset({
-    "open_details_inner_blocks",
-    "return_to_details_content",
-    "cancel_details_builder",
-    "finish_details_builder",
-    "choose_details_child_type",
-    "choose_details_list_type",
-    "open_details_inner_manager",
-    "open_details_inner_block",
-    "preview_details_inner_block",
-    "edit_details_inner_block",
-    "edit_details_inner_field",
-    "ask_delete_details_inner",
-    "confirm_delete_details_inner",
-    "move_details_inner",
-})
-
-
-def details_children(details: dict[str, Any]) -> list[dict[str, Any]]:
-    data = details.setdefault("data", {})
-    children = data.get("children")
-    if not isinstance(children, list):
-        children = []
-        data["children"] = children
-    return children
-
-
-def details_child(details: dict[str, Any], child_id: str) -> dict[str, Any] | None:
-    return next(
-        (child for child in details_children(details) if child.get("id") == child_id),
-        None,
-    )
-
-
-def detach_native_details(details: dict[str, Any]) -> None:
-    data = details.setdefault("data", {})
-    details["source"] = "generated"
-    for key in ("native", "native_data", "native_type", "html"):
-        data.pop(key, None)
-
-
-def replace_details_children(
-    details: dict[str, Any],
-    children: list[dict[str, Any]],
-) -> None:
-    normalized: list[dict[str, Any]] = []
-    for child in children:
-        normalized = editor_workflow.add(normalized, child).blocks
-    detach_native_details(details)
-    details.setdefault("data", {})["children"] = normalized
-
-
-def add_details_child(
-    details: dict[str, Any],
-    child: dict[str, Any],
-    *,
-    index: int | None = None,
-) -> dict[str, Any]:
-    result = editor_workflow.add(details_children(details), child, index=index)
-    detach_native_details(details)
-    details["data"]["children"] = result.blocks
-    assert result.block is not None
-    return result.block
-
-
-def delete_details_child(details: dict[str, Any], child_id: str) -> bool:
-    result = editor_workflow.delete(details_children(details), child_id)
-    if result.changed:
-        detach_native_details(details)
-        details["data"]["children"] = result.blocks
-    return result.changed
-
-
-def move_details_child(details: dict[str, Any], child_id: str, new_index: int) -> bool:
-    result = editor_workflow.move(details_children(details), child_id, new_index)
-    if result.changed:
-        detach_native_details(details)
-        details["data"]["children"] = result.blocks
-    return result.changed
-
-
-def replace_details_child(
-    details: dict[str, Any],
-    child_id: str,
-    replacement: dict[str, Any],
-) -> dict[str, Any] | None:
-    result = editor_workflow.replace(
-        details_children(details),
-        child_id,
-        replacement,
-    )
-    if not result.changed:
-        return None
-    detach_native_details(details)
-    details["data"]["children"] = result.blocks
-    return result.block
+from app.services.details_editor import (
+    DETAILS_TYPE,
+    add_details_child,
+    delete_details_child,
+    detach_native_details,
+    details_child,
+    details_children,
+    move_details_child,
+    replace_details_child,
+    replace_details_children,
+)
 
 
 def details_builder_text(payload: dict[str, Any]) -> str:
@@ -122,25 +32,16 @@ def details_inner_list_text(details: dict[str, Any]) -> str:
         "",
     ]
     for position, child in enumerate(children, start=1):
-        label = BLOCK_LABELS.get(
-            str(child.get("type", "")),
-            t("block.content"),
-        )
+        label = BLOCK_LABELS.get(str(child.get("type", "")), t("block.content"))
         lines.append(f"{position}. {label}")
     lines.extend(["", t("common.choose_action")])
     return "\n".join(lines)
 
 
-def details_inner_page(
-    details: dict[str, Any],
-    child: dict[str, Any],
-) -> str:
+def details_inner_page(details: dict[str, Any], child: dict[str, Any]) -> str:
     children = details_children(details)
     position = children.index(child) + 1
-    label = BLOCK_LABELS.get(
-        str(child.get("type", "")),
-        t("block.content"),
-    )
+    label = BLOCK_LABELS.get(str(child.get("type", "")), t("block.content"))
     return "\n".join([
         t("details.inner_settings_title"),
         t("details.inner_type", name=label),
@@ -150,56 +51,22 @@ def details_inner_page(
     ])
 
 
-async def save_document(
-    state: FSMContext,
-    blocks: list[dict[str, Any]],
-) -> None:
+async def save_document(state: FSMContext, blocks: list[dict[str, Any]]) -> None:
     draft = await draft_store.load(state)
     draft.blocks = blocks
     await draft_store.save(state, draft)
 
 
-def _callback_function_name(handler: Any) -> str:
-    return str(
-        getattr(getattr(handler, "callback", None), "__name__", ""),
-    )
-
-
-def detach_legacy_details_handlers(legacy_module: Any) -> tuple[str, ...]:
-    observer = legacy_module.router.callback_query
-    removed: list[str] = []
-    kept = []
-    for handler in observer.handlers:
-        name = _callback_function_name(handler)
-        if name in LEGACY_DETAILS_CALLBACKS:
-            removed.append(name)
-        else:
-            kept.append(handler)
-    observer.handlers[:] = kept
-    return tuple(removed)
-
-
-def legacy_details_handlers(legacy_module: Any) -> tuple[str, ...]:
-    return tuple(
-        name
-        for handler in legacy_module.router.callback_query.handlers
-        if (name := _callback_function_name(handler)) in LEGACY_DETAILS_CALLBACKS
-    )
-
-
 __all__ = [
     "DETAILS_TYPE",
-    "LEGACY_DETAILS_CALLBACKS",
     "add_details_child",
     "delete_details_child",
-    "detach_legacy_details_handlers",
     "detach_native_details",
     "details_builder_text",
     "details_child",
     "details_children",
     "details_inner_list_text",
     "details_inner_page",
-    "legacy_details_handlers",
     "move_details_child",
     "replace_details_child",
     "replace_details_children",

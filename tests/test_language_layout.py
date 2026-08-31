@@ -3,28 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from app.lang import (
-    AR_PHRASES,
-    BUNDLES,
-    CATALOG_AR,
-    CATALOG_EN,
-    CATALOG_TRANSLATIONS,
-    KEY_TRANSLATIONS,
-    LANGUAGE_MODULES,
-    PHRASES,
-    PROFILES,
-    SUPPORTED_LANGUAGES,
-    TRANSLATIONS,
-)
-from app.locales import PROFILES as LEGACY_PROFILES
-from app.locales import SUPPORTED_LANGUAGES as LEGACY_SUPPORTED_LANGUAGES
-from app.locales import TRANSLATIONS as LEGACY_TRANSLATIONS
-from app.locales.catalog import CATALOG_AR as LEGACY_CATALOG_AR
-from app.locales.catalog import CATALOG_EN as LEGACY_CATALOG_EN
-from app.locales.catalog import CATALOG_TRANSLATIONS as LEGACY_CATALOG_TRANSLATIONS
-from app.locales.common import AR_PHRASES as LEGACY_AR_PHRASES
-from app.locales.common import KEY_TRANSLATIONS as LEGACY_KEY_TRANSLATIONS
-from app.locales.common import PHRASES as LEGACY_PHRASES
+from app.lang import BUNDLES, LANGUAGE_MODULES, SUPPORTED_LANGUAGES, TRANSLATIONS
 
 
 class LanguageFolderLayoutTests(unittest.TestCase):
@@ -36,28 +15,27 @@ class LanguageFolderLayoutTests(unittest.TestCase):
             self.assertTrue(package.is_file(), f"missing language package for {code}: {package}")
             self.assertEqual(BUNDLES[code].code, code)
 
-    def test_new_registry_preserves_existing_translation_data(self):
-        self.assertEqual(SUPPORTED_LANGUAGES, LEGACY_SUPPORTED_LANGUAGES)
-        self.assertEqual(
-            {code: values for code, values in TRANSLATIONS.items() if code != "ar"},
-            LEGACY_TRANSLATIONS,
-        )
+    def test_arabic_source_translation_is_available_for_legacy_tr(self):
+        self.assertIn("ar", TRANSLATIONS)
         self.assertEqual(TRANSLATIONS["ar"], BUNDLES["ar"].translations)
         self.assertTrue(TRANSLATIONS["ar"])
-        self.assertEqual(PROFILES, LEGACY_PROFILES)
-        self.assertEqual(PHRASES, LEGACY_PHRASES)
-        self.assertEqual(AR_PHRASES, LEGACY_AR_PHRASES)
-        self.assertEqual(KEY_TRANSLATIONS, LEGACY_KEY_TRANSLATIONS)
-        self.assertEqual(CATALOG_EN, LEGACY_CATALOG_EN)
-        self.assertEqual(CATALOG_AR, LEGACY_CATALOG_AR)
-        self.assertEqual(CATALOG_TRANSLATIONS, LEGACY_CATALOG_TRANSLATIONS)
 
-    def test_i18n_uses_new_language_registry(self):
-        source = (Path(__file__).resolve().parents[1] / "app" / "i18n.py").read_text(encoding="utf-8")
-        self.assertIn("from app.lang import (", source)
-        self.assertNotIn("from app.locales import PROFILES", source)
-        self.assertNotIn("from app.locales.catalog import", source)
-        self.assertNotIn("from app.locales.common import", source)
+    def test_language_runtime_has_no_locales_dependency(self):
+        root = Path(__file__).resolve().parents[1] / "app"
+        checked = [
+            root / "lang" / "__init__.py",
+            root / "lang" / "bundle_loader.py",
+            root / "i18n.py",
+            root / "i18n_runtime.py",
+            root / "i18n_profile.py",
+        ]
+        for path in checked:
+            source = path.read_text(encoding="utf-8")
+            self.assertNotIn("app.locales", source, str(path))
+
+    def test_historical_locales_package_is_removed(self):
+        root = Path(__file__).resolve().parents[1] / "app"
+        self.assertFalse((root / "locales").exists())
 
 
 if __name__ == "__main__":

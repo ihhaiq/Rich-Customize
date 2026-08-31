@@ -7,20 +7,25 @@ from pathlib import Path
 
 from app import i18n_core
 from app.i18n import EN, t, tr
-from app.locales import SUPPORTED_LANGUAGES, TRANSLATIONS
-from app.locales.common import AR_PHRASES, KEY_TRANSLATIONS, PHRASES
-from app.locales.pages import PAGE_AR_TO_EN
-from app.locales.recent_ui import RECENT_AR_TO_EN
+from app.lang import AR_PHRASES, KEY_TRANSLATIONS, PHRASES, SUPPORTED_LANGUAGES, TRANSLATIONS
+from app.lang.catalogs.pages import PAGE_AR_TO_EN
+from app.lang.catalogs.recent_ui import RECENT_AR_TO_EN
 from app.services.blocks import BLOCK_LABEL_KEYS, get_block_label
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 ROOT = Path(__file__).resolve().parents[1]
 SCAN_PATHS = [
-    ROOT / "app" / "keyboards.py",
+    ROOT / "app" / "keyboards",
     ROOT / "app" / "routers" / "block_preview.py",
     ROOT / "app" / "routers" / "editor_ui.py",
     ROOT / "app" / "services" / "blocks.py",
 ]
+
+
+def _python_paths(path: Path) -> list[Path]:
+    if path.is_dir():
+        return sorted(path.rglob("*.py"))
+    return [path] if path.is_file() else []
 
 
 def _english_normalize(text: str) -> str:
@@ -32,11 +37,12 @@ def _english_normalize(text: str) -> str:
 
 def _arabic_literals() -> list[tuple[str, int, str]]:
     found: list[tuple[str, int, str]] = []
-    for path in SCAN_PATHS:
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and isinstance(node.value, str) and ARABIC_RE.search(node.value):
-                found.append((str(path.relative_to(ROOT)), getattr(node, "lineno", 0), node.value))
+    for scan_path in SCAN_PATHS:
+        for path in _python_paths(scan_path):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Constant) and isinstance(node.value, str) and ARABIC_RE.search(node.value):
+                    found.append((str(path.relative_to(ROOT)), getattr(node, "lineno", 0), node.value))
     return found
 
 
@@ -91,9 +97,6 @@ class I18nCoverageTests(unittest.TestCase):
     def test_recent_ui_never_leaks_arabic_in_non_arabic_locales(self):
         sources = list(PAGE_AR_TO_EN) + list(RECENT_AR_TO_EN)
         for language in TRANSLATIONS:
-            # Arabic, Persian, Sorani Kurdish, and Urdu intentionally use the
-            # Arabic Unicode script; the script detector cannot distinguish a
-            # correct translation from leaked Arabic UI in those locales.
             if language in {"ar", "fa", "ku", "ur"}:
                 continue
             token = i18n_core._language.set(language)

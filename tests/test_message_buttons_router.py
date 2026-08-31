@@ -2,26 +2,13 @@ from __future__ import annotations
 
 import copy
 import unittest
-from types import SimpleNamespace
-
-from aiogram import F, Router
 
 from app.editor.draft_store import EditorDraft
 from app.editor.history import UNDO_KEY
 from app.routers.button_input import receive_button_value
 from app.routers.button_support import save_changed_draft
-from app.routers.button_target_picker import (
-    ask_for_button_user,
-    complete_button_target,
-    defer_text_for_user_buttons,
-)
-from app.routers.message_buttons import (
-    LEGACY_BUTTON_CALLBACKS,
-    LEGACY_BUTTON_MESSAGES,
-    detach_legacy_button_handlers,
-    legacy_button_handlers,
-    router as message_buttons_router,
-)
+from app.routers.button_target_picker import ask_for_button_user
+from app.routers.message_buttons import router as message_buttons_router
 
 
 class FakeState:
@@ -85,59 +72,13 @@ class MessageButtonsRouterTests(unittest.TestCase):
             {"button_target_picker", "button_actions", "button_input"},
         )
 
-    def test_detach_removes_all_named_button_handlers_only(self):
-        legacy = SimpleNamespace(router=Router(name="legacy-button-test"))
-
-        async def ordinary_callback(*args, **kwargs):
-            return None
-
-        async def ordinary_message(*args, **kwargs):
-            return None
-
-        legacy.router.callback_query.register(ordinary_callback, F.data == "ordinary")
-        legacy.router.message.register(ordinary_message)
-        for index, name in enumerate(sorted(LEGACY_BUTTON_CALLBACKS)):
-            async def callback(*args, **kwargs):
-                return None
-            callback.__name__ = name
-            legacy.router.callback_query.register(callback, F.data == f"legacy:{index}")
-        for name in sorted(LEGACY_BUTTON_MESSAGES):
-            async def message(*args, **kwargs):
-                return None
-            message.__name__ = name
-            legacy.router.message.register(message)
-
-        removed = detach_legacy_button_handlers(legacy)
-
-        self.assertEqual(set(removed["callback_query"]), set(LEGACY_BUTTON_CALLBACKS))
-        self.assertEqual(set(removed["message"]), set(LEGACY_BUTTON_MESSAGES))
-        self.assertEqual(
-            legacy_button_handlers(legacy),
-            {"callback_query": (), "message": ()},
-        )
-        self.assertIn(
-            "ordinary_callback",
-            {handler.callback.__name__ for handler in legacy.router.callback_query.handlers},
-        )
-        self.assertIn(
-            "ordinary_message",
-            {handler.callback.__name__ for handler in legacy.router.message.handlers},
-        )
-
-    def test_real_router_has_one_active_copy_without_legacy_fallback(self):
+    def test_real_router_has_one_active_copy_of_message_handlers(self):
         from app.routers import rich_editor
 
-        callback_names = self._registered_names(rich_editor.router, "callback_query")
         message_names = self._registered_names(rich_editor.router, "message")
-        for name in LEGACY_BUTTON_CALLBACKS:
-            self.assertEqual(callback_names.count(name), 1, name)
-        for name in LEGACY_BUTTON_MESSAGES:
-            self.assertEqual(message_names.count(name), 1, name)
-
-        self.assertNotIn(
-            "rich_editor",
-            {child.name for child in rich_editor.router.sub_routers},
-        )
+        self.assertEqual(message_names.count(receive_button_value.__name__), 1)
+        self.assertEqual(message_names.count(ask_for_button_user.__name__), 0)
+        self.assertNotIn("rich_editor", {child.name for child in rich_editor.router.sub_routers})
 
 
 if __name__ == "__main__":

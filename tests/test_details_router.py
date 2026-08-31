@@ -1,18 +1,12 @@
 from __future__ import annotations
 
 import unittest
-from types import SimpleNamespace
-
-from aiogram import F, Router
 
 from app.editor.models import make_block
 from app.routers.details import (
-    LEGACY_DETAILS_CALLBACKS,
     add_details_child,
     delete_details_child,
-    detach_legacy_details_handlers,
     details_children,
-    legacy_details_handlers,
     move_details_child,
     replace_details_child,
     router as details_router,
@@ -24,11 +18,7 @@ class DetailsDomainTests(unittest.TestCase):
         details = make_block(
             "details",
             {
-                "native_data": {
-                    "type": "details",
-                    "summary": "S",
-                    "blocks": [],
-                },
+                "native_data": {"type": "details", "summary": "S", "blocks": []},
                 "children": [
                     make_block("paragraph", {"text": "one"}),
                     make_block("footer", {"text": "two"}),
@@ -48,60 +38,23 @@ class DetailsDomainTests(unittest.TestCase):
 
     def test_details_children_use_shared_document_operations(self):
         details = make_block("details", {"children": []})
-        first = add_details_child(
-            details,
-            make_block("paragraph", {"text": "a"}),
-        )
-        second = add_details_child(
-            details,
-            make_block("footer", {"text": "b"}),
-        )
+        first = add_details_child(details, make_block("paragraph", {"text": "a"}))
+        second = add_details_child(details, make_block("footer", {"text": "b"}))
 
-        self.assertEqual(
-            [item["position"] for item in details_children(details)],
-            [0, 1],
-        )
+        self.assertEqual([item["position"] for item in details_children(details)], [0, 1])
         self.assertTrue(move_details_child(details, second["id"], 0))
         self.assertEqual(details_children(details)[0]["id"], second["id"])
         self.assertTrue(delete_details_child(details, first["id"]))
         self.assertEqual(len(details_children(details)), 1)
 
+
+class DetailsRouterTests(unittest.TestCase):
     def test_details_is_an_aggregator_not_a_new_monolith(self):
         self.assertEqual(len(details_router.sub_routers), 3)
         self.assertEqual(
             {child.name for child in details_router.sub_routers},
             {"details_builder", "details_manager", "details_edit"},
         )
-
-    def test_legacy_details_callbacks_are_detached(self):
-        legacy = SimpleNamespace(router=Router(name="legacy-test"))
-
-        async def ordinary_callback(*args, **kwargs):
-            return None
-
-        legacy.router.callback_query.register(
-            ordinary_callback,
-            F.data == "r:ordinary",
-        )
-
-        for index, name in enumerate(sorted(LEGACY_DETAILS_CALLBACKS)):
-            async def callback(*args, **kwargs):
-                return None
-            callback.__name__ = name
-            legacy.router.callback_query.register(
-                callback,
-                F.data == f"r:legacy:{index}",
-            )
-
-        removed = detach_legacy_details_handlers(legacy)
-
-        self.assertEqual(set(removed), set(LEGACY_DETAILS_CALLBACKS))
-        self.assertEqual(legacy_details_handlers(legacy), ())
-        remaining_names = {
-            getattr(handler.callback, "__name__", "")
-            for handler in legacy.router.callback_query.handlers
-        }
-        self.assertIn("ordinary_callback", remaining_names)
 
     def test_real_router_has_details_without_legacy_fallback(self):
         from app.routers import rich_editor

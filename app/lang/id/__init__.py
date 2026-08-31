@@ -1,3 +1,3 @@
-from app.lang._legacy_source import build_bundle
+from app.lang.bundle_loader import build_bundle
 
 BUNDLE = build_bundle("id")

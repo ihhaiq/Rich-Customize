@@ -1,24 +1,19 @@
 # Language packages
 
-`app.lang` is the canonical locale entry point for the bot.
+`app.lang` is the canonical locale package for the bot.
 
-Each supported Telegram locale has its own package:
+Each supported Telegram locale has its own package under `app/lang/<locale>/`.
+Shared translation catalogs and source-string compatibility maps live under
+`app/lang/catalogs/`; no runtime translation data is owned by `app.locales`.
 
-- `ar/`, `en/`
-- `es/`, `fr/`, `de/`, `it/`, `pt/`, `nl/`, `pl/`, `uk/`, `ru/`
-- `tr/`, `fa/`, `ku/`, `ur/`
-- `hi/`, `id/`, `ja/`, `ko/`, `vi/`, `th/`
-- `zh_hans/`, `zh_hant/` for locale codes `zh-hans` and `zh-hant`
+Chinese Telegram locale codes remain `zh-hans` and `zh-hant`, while their
+Python package names are `zh_hans` and `zh_hant`.
 
-Application code must import locale registries from `app.lang`, not from
-`app.locales.*`.
+Application code should import public locale registries from `app.lang` and UI
+code should prefer semantic `t("...")` keys. Historical `tr()` source-string
+translation remains only as a compatibility path while old UI strings are
+migrated.
 
-The old `app/locales/` modules are a compatibility source while the historical
-translation dictionaries are being physically migrated. They must not receive
-new router/UI strings. New language-specific copy belongs to the matching
-`app/lang/<locale>/` package so the compatibility source can be deleted after
-migration.
-
-`app.lang` deliberately preserves the existing public dictionaries
-(`PHRASES`, `AR_PHRASES`, `KEY_TRANSLATIONS`, `TRANSLATIONS`, catalog data and
-profiles), so `t()` and `tr()` do not change behavior during the reorganization.
+`app.lang` exports the existing public registries (`PHRASES`, `AR_PHRASES`,
+`KEY_TRANSLATIONS`, `TRANSLATIONS`, catalog data, profiles and supported
+languages), so the public localization behavior remains stable during cleanup.

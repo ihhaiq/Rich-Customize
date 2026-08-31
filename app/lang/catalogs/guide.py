@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.locales.guide_all import complete_guide_translations
+from app.lang.catalogs.guide_all import complete_guide_translations
 
 # The button-syntax guide is built from English semantic keys after the normal
 # Arabic -> English normalization. Locale-specific packs can override every

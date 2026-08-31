@@ -2,7 +2,7 @@ import unittest
 
 from app import i18n_core
 from app.i18n import _profiles, resolve_language, tr
-from app.locales import PROFILES, TRANSLATIONS
+from app.lang import PROFILES, TRANSLATIONS
 
 
 class LocalePackTests(unittest.TestCase):
@@ -29,6 +29,7 @@ class LocalePackTests(unittest.TestCase):
         self.assertTrue(expected.issubset(TRANSLATIONS))
 
     def test_language_resolution_uses_primary_telegram_code(self):
+        self.assertEqual(resolve_language("ar-IQ"), "ar")
         self.assertEqual(resolve_language("es-MX"), "es")
         self.assertEqual(resolve_language("pt_BR"), "pt")
         self.assertEqual(resolve_language("zh-TW"), "zh-hant")

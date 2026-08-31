@@ -115,7 +115,7 @@ class PageNavigationRenderingTests(unittest.TestCase):
 
     def test_home_label_is_translated_for_every_supported_language(self):
         from app import i18n_core
-        from app.locales import SUPPORTED_LANGUAGES
+        from app.lang import SUPPORTED_LANGUAGES
 
         for language in SUPPORTED_LANGUAGES:
             with self.subTest(language=language):
