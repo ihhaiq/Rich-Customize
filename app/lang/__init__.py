@@ -3,7 +3,7 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
-from app.lang._legacy_source import LocaleBundle, install_legacy_normalization
+from app.lang.bundle_loader import LocaleBundle, install_source_normalization
 
 
 LANGUAGE_MODULES: dict[str, str] = {
@@ -46,7 +46,7 @@ BUNDLES: dict[str, LocaleBundle] = {
     for code, module_name in LANGUAGE_MODULES.items()
 }
 
-install_legacy_normalization()
+install_source_normalization()
 
 PHRASES = dict(BUNDLES["en"].phrases)
 AR_PHRASES = dict(BUNDLES["ar"].phrases)
@@ -55,9 +55,6 @@ KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     for code, bundle in BUNDLES.items()
     if code not in {"ar", "en"} and bundle.keyed
 }
-# Legacy tr() translates English source strings for Arabic too (for example the
-# inline button guide). Keep Arabic source translations exposed here instead of
-# dropping them from the registry; English itself does not need a translation map.
 TRANSLATIONS: dict[str, dict[str, str]] = {
     code: dict(bundle.translations)
     for code, bundle in BUNDLES.items()
