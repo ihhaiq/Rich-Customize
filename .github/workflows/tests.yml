@@ -15,7 +15,47 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install dependencies
-        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+        run: python -m pip install --upgrade pip && pip install -r requirements-dev.txt
+      - name: Ruff correctness checks
+        run: ruff check app tests --select E9,F63,F7,F82
+      - name: Ruff cleanup-surface checks
+        run: >-
+          ruff check
+          app/i18n.py
+          app/i18n_runtime.py
+          app/i18n_profile.py
+          app/lang/bundle_loader.py
+          app/keyboards/blocks.py
+          app/keyboards/details.py
+          app/keyboards/developer.py
+          app/keyboards/editor.py
+          app/keyboards/message_buttons.py
+          app/keyboards/pages.py
+          app/keyboards/publishing.py
+          app/services/page_editor.py
+          app/services/details_editor.py
+          app/routers/block_management.py
+          app/routers/button_actions.py
+          app/routers/button_create.py
+          app/routers/button_manager.py
+          app/routers/button_modify.py
+          app/routers/button_preview_actions.py
+          app/routers/details.py
+          app/routers/details_support.py
+          app/routers/message_buttons.py
+          app/routers/page_actions.py
+          app/routers/page_support.py
+          tests/test_cleanup_architecture.py
+          --select F401,F811,F821
+      - name: Type-check cleaned architecture
+        run: >-
+          mypy
+          app/editor
+          app/lang/bundle_loader.py
+          app/services/page_editor.py
+          app/services/details_editor.py
+          app/i18n_runtime.py
+          app/i18n_profile.py
       - name: Compile Python sources
         run: python -m compileall -q app main.py tests
       - name: Run tests
