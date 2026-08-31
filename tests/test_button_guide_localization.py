@@ -1,9 +1,9 @@
 import unittest
 
 from app import i18n_core
-from app.locales import SUPPORTED_LANGUAGES
-from app.locales.guide import GUIDE_TRANSLATIONS
-from app.locales.guide_all import ACTIVE_GUIDE_KEYS
+from app.lang import SUPPORTED_LANGUAGES
+from app.lang.catalogs.guide import GUIDE_TRANSLATIONS
+from app.lang.catalogs.guide_all import ACTIVE_GUIDE_KEYS
 from app.routers.button_guide import button_guide_blocks, button_syntax_examples
 
 
