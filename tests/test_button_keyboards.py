@@ -88,7 +88,11 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertIsNone(task_buttons[1].style)
 
     def test_empty_editor_starts_with_add_block_and_pages(self):
-        keyboard = build_rich_editor_keyboard([])
+        token = i18n_core._language.set("ar")
+        try:
+            keyboard = build_rich_editor_keyboard([])
+        finally:
+            i18n_core._language.reset(token)
         callbacks = [
             button.callback_data
             for row in keyboard.inline_keyboard
@@ -96,6 +100,8 @@ class ButtonKeyboardTests(unittest.TestCase):
         ]
 
         self.assertEqual(callbacks, ["r:pages", "r:addmenu"])
+        self.assertEqual(keyboard.inline_keyboard[0][0].text, "📚 صفحاتي")
+        self.assertEqual(keyboard.inline_keyboard[-1][0].callback_data, "r:addmenu")
 
     def test_start_editor_button_uses_expected_callback(self):
         keyboard = build_start_editor_keyboard()
@@ -235,9 +241,13 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertEqual(selected.style, ButtonStyle.PRIMARY)
 
     def test_editor_surfaces_the_frequent_actions_on_the_main_panel(self):
-        keyboard = build_rich_editor_keyboard([
-            {"id": "b1", "type": "paragraph", "position": 0, "data": {}},
-        ])
+        token = i18n_core._language.set("ar")
+        try:
+            keyboard = build_rich_editor_keyboard([
+                {"id": "b1", "type": "paragraph", "position": 0, "data": {}},
+            ])
+        finally:
+            i18n_core._language.reset(token)
         by_callback = {
             button.callback_data: button
             for row in keyboard.inline_keyboard
@@ -247,12 +257,17 @@ class ButtonKeyboardTests(unittest.TestCase):
 
         self.assertEqual(by_callback["r:addmenu"].style, ButtonStyle.PRIMARY)
         self.assertIsNone(by_callback["r:tools"].style)
-        self.assertIn("r:buttons", by_callback)
+        self.assertNotIn("r:buttons", by_callback)
         self.assertIn("r:savepage", by_callback)
-        self.assertIn("r:pages", by_callback)
+        self.assertNotIn("r:pages", by_callback)
         self.assertIn("r:undo", by_callback)
         self.assertEqual(by_callback["r:post"].style, ButtonStyle.SUCCESS)
         self.assertEqual(by_callback["r:result"].style, ButtonStyle.PRIMARY)
+        self.assertEqual(by_callback["r:savepage"].text, "💾 حفظ الصفحة")
+        self.assertEqual(
+            [button.callback_data for button in keyboard.inline_keyboard[-1]],
+            ["r:addmenu", "r:post"],
+        )
 
         tools = {
             button.callback_data: button
@@ -262,6 +277,7 @@ class ButtonKeyboardTests(unittest.TestCase):
         }
         self.assertIn("r:buttons", tools)
         self.assertIn("r:pages", tools)
+        self.assertEqual(tools["r:pages"].text, "📚 صفحاتي")
         self.assertNotIn("r:undo", tools)
         self.assertNotIn("r:savepage", tools)
 
