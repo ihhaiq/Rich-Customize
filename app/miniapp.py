@@ -14,6 +14,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
 from app.miniapp_rich_buttons import register_rich_button_routes
 from app.miniapp_uploads import register_upload_routes
+from app.services.buttons import MAX_BUTTONS
 from app.services.chat_registry import managed_chat_registry
 from app.services.page_registry import page_registry
 from app.services.popup_registry import popup_registry
@@ -22,6 +23,7 @@ from app.services.renderer import RichMessageRenderError, send_rich_message_post
 STATIC_DIR = Path(__file__).with_name("miniapp_static")
 _ADMIN_STATUSES = {"administrator", "creator"}
 BETA_VERSION = "0.3"
+MAX_PAGE_BLOCKS = 100
 
 
 def mini_app_url() -> str | None:
@@ -116,6 +118,11 @@ async def index(_: web.Request) -> web.FileResponse:
     return web.FileResponse(STATIC_DIR / "index.html")
 
 
+async def health(_: web.Request) -> web.Response:
+    """Lightweight unauthenticated probe for Railway/container health checks."""
+    return web.json_response({"ok": True, "service": "rich-customize", "beta": BETA_VERSION})
+
+
 async def api_me(request: web.Request) -> web.Response:
     user = _miniapp_user(request)
     return web.json_response({"ok": True, "user": user, "beta": BETA_VERSION})
@@ -155,23 +162,52 @@ async def _json_payload(request: web.Request) -> dict:
     return value
 
 
+def _page_content(
+    payload: dict,
+    *,
+    current: dict | None = None,
+) -> tuple[list[dict], list[dict], int, str]:
+    """Validate the common editable page fields at the HTTP boundary."""
+    fallback = current or {}
+    blocks = payload.get("blocks")
+    buttons = payload.get("buttons", fallback.get("buttons") or [])
+    if not isinstance(blocks, list):
+        raise web.HTTPBadRequest(text="blocks must be a list")
+    if len(blocks) > MAX_PAGE_BLOCKS or any(not isinstance(block, dict) for block in blocks):
+        raise web.HTTPBadRequest(text=f"blocks must contain at most {MAX_PAGE_BLOCKS} objects")
+    if not isinstance(buttons, list):
+        raise web.HTTPBadRequest(text="buttons must be a list")
+    if len(buttons) > MAX_BUTTONS or any(not isinstance(button, dict) for button in buttons):
+        raise web.HTTPBadRequest(text=f"buttons must contain at most {MAX_BUTTONS} objects")
+
+    raw_per_row = payload.get("buttons_per_row", fallback.get("buttons_per_row", 1))
+    try:
+        buttons_per_row = int(raw_per_row or 1)
+    except (TypeError, ValueError) as error:
+        raise web.HTTPBadRequest(text="buttons_per_row must be an integer") from error
+    if not 1 <= buttons_per_row <= 8:
+        raise web.HTTPBadRequest(text="buttons_per_row must be between 1 and 8")
+
+    buttons_align = str(
+        payload.get("buttons_align") or fallback.get("buttons_align") or "center"
+    )
+    if buttons_align not in {"left", "center", "right"}:
+        raise web.HTTPBadRequest(text="buttons_align must be left, center, or right")
+    return blocks, buttons, buttons_per_row, buttons_align
+
+
 async def api_create_page(request: web.Request) -> web.Response:
     user = _miniapp_user(request)
     payload = await _json_payload(request)
-    blocks = payload.get("blocks")
-    buttons = payload.get("buttons", [])
-    if not isinstance(blocks, list):
-        raise web.HTTPBadRequest(text="blocks must be a list")
-    if not isinstance(buttons, list):
-        raise web.HTTPBadRequest(text="buttons must be a list")
+    blocks, buttons, buttons_per_row, buttons_align = _page_content(payload)
     title = str(payload.get("title") or "Untitled")[:64]
     code = await page_registry.save(
         int(user["id"]),
         title,
         blocks,
         buttons,
-        int(payload.get("buttons_per_row") or 1),
-        str(payload.get("buttons_align") or "center"),
+        buttons_per_row,
+        buttons_align,
     )
     return web.json_response({"ok": True, "beta": BETA_VERSION, "page_id": code, "title": title})
 
@@ -183,17 +219,18 @@ async def api_save_page(request: web.Request) -> web.Response:
     if not current or int(current.get("owner_id", 0)) != int(user["id"]):
         raise web.HTTPNotFound(text="Page not found")
     payload = await _json_payload(request)
-    blocks = payload.get("blocks")
-    if not isinstance(blocks, list):
-        raise web.HTTPBadRequest(text="blocks must be a list")
+    blocks, buttons, buttons_per_row, buttons_align = _page_content(
+        payload,
+        current=current,
+    )
     title = str(payload.get("title") or current.get("title") or page_id)[:64]
     code = await page_registry.save(
         int(user["id"]),
         title,
         blocks,
-        current.get("buttons") or [],
-        int(current.get("buttons_per_row") or 1),
-        str(current.get("buttons_align") or "center"),
+        buttons,
+        buttons_per_row,
+        buttons_align,
         page_id=page_id,
     )
     return web.json_response({"ok": True, "beta": BETA_VERSION, "page_id": code, "title": title})
@@ -268,6 +305,7 @@ def build_web_app(bot: Bot, bot_token: str) -> web.Application:
     app["miniapp_user"] = _miniapp_user
     # Compatibility for route modules written while the beta was developer-only.
     app["developer_user"] = _miniapp_user
+    app.router.add_get("/healthz", health)
     app.router.add_get("/miniapp", index)
     app.router.add_get("/miniapp/", index)
     app.router.add_static("/miniapp/static", STATIC_DIR)

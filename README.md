@@ -4,7 +4,7 @@
 
 ## التشغيل
 
-يتطلب Python 3.10 أو أحدث.
+يتطلب Python 3.12 أو أحدث.
 
 ```bash
 python -m venv .venv
@@ -112,7 +112,11 @@ DEVELOPER_ID=123456789
 
 ## البنية
 
-- `app/routers/rich_editor.py`: جميع Handlers والتنقل بين الصفحات.
+- `app/routers/rich_editor.py`: نقطة تجميع Router المحرّر بعد تفكيك الملف القديم.
+- `app/routers/editor_*.py` و`block_*.py`: جلسة المحرّر وواجهة الـBlocks وتعديلها ومعاينتها.
+- `app/routers/button_*.py`: إنشاء الأزرار وتعديلها ومعاينتها واختيار أهدافها.
+- `app/routers/page_*.py`: الصفحات المحفوظة والبحث والتنقّل والتسليم.
+- `app/routers/publish_*.py`: اختيار الوجهات وإعدادات النشر والتنفيذ.
 - `app/services/parser.py`: تحويل رسائل Telegram إلى Blocks وتحديث بيانات Block.
 - `app/services/blocks.py`: البحث والحذف والنقل وتطبيع المواقع.
 - `app/services/buttons.py`: التحقق من روابط الأزرار وإضافتها وحذفها وإعادة ترتيبها.
@@ -124,8 +128,11 @@ DEVELOPER_ID=123456789
 - `app/services/renderer.py`: إنشاء `InputRichMessage` والمعاينة الاحتياطية.
 - `app/services/factory.py`: إنشاء الأنواع الجديدة وتحويل مدخلات المستخدم إلى بيانات Rich Blocks.
 - `app/services/albums.py`: تجميع الألبومات بصورة متزامنة وآمنة.
-- `app/keyboards.py`: جميع Keyboard Builders المركزية.
+- `app/keyboards/`: Keyboard Builders مقسمة حسب المجال.
 - `app/states.py`: حالات FSM.
+
+يوفر السيرفر المسار `/healthz` لفحص صحة الخدمة من Railway أو Docker من دون الحاجة
+إلى Telegram `initData`.
 
 ## الحالات الجديدة
 

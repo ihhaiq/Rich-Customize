@@ -19,7 +19,7 @@ from aiogram.utils.token import TokenValidationError
 
 from app.config import Settings
 from app.i18n import LocaleMiddleware, LocalizedBot, configure_bot_profile
-from app.miniapp import start_mini_app_server
+from app.miniapp import BETA_VERSION, start_mini_app_server
 from app.routers import router
 from app.services.media import cleanup_interval_seconds, media_store
 from app.services.page_registry import page_registry
@@ -121,10 +121,10 @@ async def prepare_telegram(bot: LocalizedBot) -> bool:
             if webhook.url:
                 stage = "deleteWebhook"
                 await bot.delete_webhook(
-                    drop_pending_updates=True,
+                    drop_pending_updates=False,
                     request_timeout=TELEGRAM_REQUEST_TIMEOUT,
                 )
-                logger.info("Telegram webhook deleted; pending updates dropped")
+                logger.info("Telegram webhook deleted; pending updates preserved")
             else:
                 logger.info("No Telegram webhook is configured; polling can start")
 
@@ -205,15 +205,16 @@ async def main() -> None:
     cleanup_task: asyncio.Task[None] | None = None
     miniapp_runner = None
     try:
-        if not await prepare_telegram(bot):
-            return
         try:
             miniapp_runner = await start_mini_app_server(bot, settings.bot_token)
-            logger.info("Developer Mini App Beta 0.2 server started")
+            logger.info("Mini App Beta %s server started", BETA_VERSION)
         except Exception:
             logger.exception(
-                "Developer Mini App Beta 0.2 failed to start; continuing with bot polling"
+                "Mini App Beta %s failed to start; continuing with bot polling",
+                BETA_VERSION,
             )
+        if not await prepare_telegram(bot):
+            return
         await page_registry.rebuild_media_pins()
         media_store.cleanup()
         cleanup_task = asyncio.create_task(_media_cleanup_loop(), name="rich-media-cleanup")
