@@ -35,6 +35,33 @@ class ButtonGuideLocalizationTests(unittest.TestCase):
                 )
                 self.assertIn(locale["{Next page - CBD:code #color}"], examples)
 
+    def test_every_template_is_copyable_in_every_supported_language(self):
+        for language in sorted(SUPPORTED_LANGUAGES):
+            with self.subTest(language=language):
+                token = i18n_core._language.set(language)
+                try:
+                    blocks = button_guide_blocks(
+                        "Send the message you want to customize. "
+                        "You can place button syntax anywhere in the text."
+                    )
+                finally:
+                    i18n_core._language.reset(token)
+
+                examples = [
+                    child for child in blocks[1]["data"]["children"]
+                    if child["type"] == "preformatted"
+                ]
+                self.assertEqual(len(examples), 8)
+                self.assertTrue(
+                    all(
+                        example["data"].get("parse_inline_buttons") is False
+                        for example in examples
+                    )
+                )
+                self.assertTrue(
+                    all(example["data"]["text"].startswith("{") for example in examples)
+                )
+
     def test_arabic_guide_translates_english_semantic_keys(self):
         token = i18n_core._language.set("ar")
         try:

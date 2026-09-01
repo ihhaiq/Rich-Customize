@@ -29,11 +29,11 @@ class FormattedTextParserTests(unittest.TestCase):
         details = rich["blocks"][1]
         self.assertEqual(details["type"], "details")
         self.assertIn("دليل الأزرار", details["summary"])
-        quote_blocks = [
-            block for block in details["blocks"] if block["type"] == "blockquote"
+        copyable_blocks = [
+            block for block in details["blocks"] if block["type"] == "pre"
         ]
-        self.assertGreater(len(quote_blocks), 4)
-        examples = "\n".join(block["blocks"][0]["text"] for block in quote_blocks)
+        self.assertEqual(len(copyable_blocks), 8)
+        examples = "\n".join(block["text"] for block in copyable_blocks)
         self.assertIn("{الملف الشخصي - USER #p}", examples)
         self.assertIn("{الصفحة التالية - CBD:الكود #اللون}", examples)
         self.assertIn("{تنبيه - alert: نص التنبيه #اللون}", examples)

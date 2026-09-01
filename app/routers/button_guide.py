@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from typing import Any
 
 from aiogram.exceptions import TelegramAPIError
@@ -75,9 +76,9 @@ def button_guide_blocks(prompt: str) -> list[dict[str, Any]]:
                 "text": localized_heading,
                 "html": f"<p>{localized_heading}</p>",
             }),
-            new_block("blockquote", {
-                "quote_text": example,
-                "quote_html": example,
+            new_block("preformatted", {
+                "text": example,
+                "html": f"<pre>{html.escape(example)}</pre>",
                 "parse_inline_buttons": False,
             }),
         ])
@@ -112,6 +113,11 @@ async def answer_with_button_guide(
         )
     except TelegramAPIError:
         return await message.answer(
-            f"{localized_prompt}\n\n{tr('📘 Inline button guide:')}\n{examples}",
+            (
+                f"{html.escape(localized_prompt)}\n\n"
+                f"{html.escape(tr('📘 Inline button guide:'))}\n"
+                f"<pre>{html.escape(examples)}</pre>"
+            ),
             reply_markup=reply_markup,
+            parse_mode="HTML",
         )
