@@ -49,9 +49,16 @@ class ButtonGuideLocalizationTests(unittest.TestCase):
 
                 examples = [
                     child for child in blocks[1]["data"]["children"]
-                    if child["type"] == "preformatted"
+                    if child["type"] == "paragraph"
+                    and child["data"].get("rich_text", {}).get("type") == "code"
                 ]
                 self.assertEqual(len(examples), 8)
+                self.assertFalse(
+                    any(
+                        child["type"] == "preformatted"
+                        for child in blocks[1]["data"]["children"]
+                    )
+                )
                 self.assertTrue(
                     all(
                         example["data"].get("parse_inline_buttons") is False
