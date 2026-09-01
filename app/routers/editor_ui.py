@@ -26,13 +26,13 @@ def editor_dashboard_text(draft: EditorDraft, notice: str | None = None) -> str:
     if notice:
         lines.extend([notice, ""])
     lines.extend([
-        t("customize"),
+        tr("تخصيص الرسالة"),
         t("editor.block_count", count=len(draft.blocks)),
         tr(f"عدد الأزرار: {len(draft.message_buttons)}"),
         (
-            f"{t('save_page')}: {draft.current_page_title or draft.current_page_id}"
+            f"{tr('💾 حفظ الصفحة')}: {draft.current_page_title or draft.current_page_id}"
             if draft.current_page_id
-            else f"{t('save_page')}: —"
+            else f"{tr('💾 حفظ الصفحة')}: —"
         ),
         "",
         t("common.choose_action"),
