@@ -117,7 +117,6 @@ class ButtonKeyboardTests(unittest.TestCase):
     def test_welcome_places_start_editor_next_to_showcase(self):
         keyboard = build_welcome_keyboard()
         callbacks = [button.callback_data for button in keyboard.inline_keyboard[0]]
-
         self.assertEqual(callbacks, ["r:showcase", "r:starteditor"])
 
     def test_button_manager_opens_a_focused_editor_for_each_button(self):
@@ -261,12 +260,11 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertEqual(by_callback["r:addmenu"].style, ButtonStyle.PRIMARY)
         self.assertIsNone(by_callback["r:tools"].style)
         self.assertNotIn("r:buttons", by_callback)
-        self.assertIn("r:savepage", by_callback)
+        self.assertNotIn("r:savepage", by_callback)
         self.assertNotIn("r:pages", by_callback)
-        self.assertIn("r:undo", by_callback)
+        self.assertNotIn("r:undo", by_callback)
         self.assertEqual(by_callback["r:post"].style, ButtonStyle.SUCCESS)
         self.assertEqual(by_callback["r:result"].style, ButtonStyle.PRIMARY)
-        self.assertEqual(by_callback["r:savepage"].text, "💾 حفظ الصفحة")
         self.assertEqual(
             [button.callback_data for button in keyboard.inline_keyboard[-1]],
             ["r:addmenu", "r:post"],
@@ -280,9 +278,10 @@ class ButtonKeyboardTests(unittest.TestCase):
         }
         self.assertIn("r:buttons", tools)
         self.assertIn("r:pages", tools)
+        self.assertIn("r:savepage", tools)
         self.assertEqual(tools["r:pages"].text, "📚 صفحاتي")
+        self.assertEqual(tools["r:savepage"].text, "💾 حفظ الصفحة")
         self.assertNotIn("r:undo", tools)
-        self.assertNotIn("r:savepage", tools)
 
     def test_post_toggles_are_single_stateful_buttons_and_send_is_confirmed(self):
         settings = build_post_settings_keyboard(
