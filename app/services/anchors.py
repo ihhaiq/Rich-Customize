@@ -21,6 +21,39 @@ def anchor_display_name(block: dict[str, Any]) -> str:
     return str(data.get("display_name") or anchor_name(block)).strip()
 
 
+def anchor_navigation_rich_text(
+    blocks: Iterable[dict[str, Any]],
+) -> Any:
+    """Build the visible table-of-contents links for managed anchors.
+
+    Telegram anchor blocks are intentionally invisible.  New anchors created
+    by the editor carry a separate ``display_name``; render that label as an
+    anchor link at the beginning of the message so the user gets an actual
+    control to press in previews and published posts.  Imported/legacy anchors
+    without a display label retain their original invisible behavior.
+    """
+    links: list[Any] = []
+    ordered = sorted(blocks, key=lambda item: int(item.get("position", 0)))
+    for block in ordered:
+        if block.get("type") != "anchor":
+            continue
+        data = block.get("data", {})
+        label = " ".join(str(data.get("display_name") or "").split()).strip()
+        name = anchor_name(block)
+        if not label or not name:
+            continue
+        if links:
+            links.append(" · ")
+        links.append({
+            "type": "anchor_link",
+            "text": label,
+            "anchor_name": name,
+        })
+    if not links:
+        return None
+    return links[0] if len(links) == 1 else links
+
+
 def anchor_target_id(block: dict[str, Any]) -> str | None:
     if block.get("type") != "anchor":
         return None
@@ -168,6 +201,7 @@ __all__ = [
     "align_linked_anchors",
     "anchor_display_name",
     "anchor_name",
+    "anchor_navigation_rich_text",
     "anchor_target_id",
     "anchor_targets",
     "linked_anchors",

@@ -78,9 +78,52 @@ class AnchorRelationshipTests(unittest.TestCase):
             exclude_none=True,
         )
         self.assertEqual(rendered["blocks"][0], {
+            "type": "paragraph",
+            "text": {
+                "type": "anchor_link",
+                "text": "الأسعار",
+                "anchor_name": anchor_name(self.anchor),
+            },
+        })
+        self.assertEqual(rendered["blocks"][1], {
             "type": "anchor",
             "name": anchor_name(self.anchor),
         })
+
+    def test_renamed_anchor_updates_visible_link_without_breaking_target(self):
+        original_name = anchor_name(self.anchor)
+        set_anchor_display_name(self.anchor, "الأسعار الجديدة")
+        rendered = build_input_rich_message([self.anchor, self.second]).model_dump(
+            mode="json",
+            exclude_none=True,
+        )
+        self.assertEqual(rendered["blocks"][0]["text"]["text"], "الأسعار الجديدة")
+        self.assertEqual(rendered["blocks"][0]["text"]["anchor_name"], original_name)
+
+    def test_multiple_anchors_render_as_clickable_navigation_row(self):
+        second_anchor = make_block(
+            "anchor",
+            new_anchor_data("التفاصيل", self.first["id"]),
+            block_id="anchor-two",
+        )
+        rendered = build_input_rich_message([
+            second_anchor,
+            self.first,
+            self.anchor,
+            self.second,
+        ]).model_dump(mode="json", exclude_none=True)
+        navigation = rendered["blocks"][0]["text"]
+        self.assertEqual(navigation[0]["text"], "التفاصيل")
+        self.assertEqual(navigation[1], " · ")
+        self.assertEqual(navigation[2]["text"], "الأسعار")
+
+    def test_legacy_anchor_without_display_name_stays_invisible(self):
+        legacy = make_block("anchor", {"text": "legacy"}, block_id="legacy")
+        rendered = build_input_rich_message([legacy, self.second]).model_dump(
+            mode="json",
+            exclude_none=True,
+        )
+        self.assertEqual(rendered["blocks"][0], {"type": "anchor", "name": "legacy"})
 
     def test_target_picker_lists_content_blocks_but_not_anchors(self):
         blocks = [self.first, self.anchor, self.second]

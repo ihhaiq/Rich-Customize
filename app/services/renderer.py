@@ -18,6 +18,7 @@ from aiogram.types import (
 from pydantic import ValidationError
 
 from app.i18n import preserve_user_content, tr
+from app.services.anchors import anchor_navigation_rich_text
 from app.services.inline_buttons import inline_button_rich_text
 
 logger = logging.getLogger(__name__)
@@ -561,6 +562,9 @@ def _typed_input_rich_message(
     if not blocks:
         raise RichMessageRenderError("The rich message has no blocks")
     payloads: list[dict[str, Any]] = []
+    anchor_navigation = anchor_navigation_rich_text(blocks)
+    if anchor_navigation is not None:
+        payloads.append({"type": "paragraph", "text": anchor_navigation})
     for index, block in enumerate(sorted(blocks, key=lambda item: item.get("position", 0))):
         kind = block.get("type", "unknown")
         path = f"blocks[{index}]<{kind}>"
