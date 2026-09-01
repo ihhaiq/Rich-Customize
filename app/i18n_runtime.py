@@ -99,7 +99,7 @@ def t(key: str, **values: Any) -> str:
             text = keyed[key]
         else:
             english = PHRASES[key]
-            text = TRANSLATIONS.get(language, {}).get(english, english)
+            text = TRANSLATIONS.get(language, {}).get(english, tr(english))
 
     return text.format(**values) if values else text
 

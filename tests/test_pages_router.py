@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import copy
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from aiogram import F, Router
 
@@ -22,6 +25,7 @@ from app.routers.pages import (
     legacy_page_handlers,
     router as pages_router,
 )
+from app.services.page_registry import PageRegistry
 
 
 class FakeState:
@@ -73,6 +77,45 @@ class PageDraftHistoryTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(changed)
         self.assertNotIn(UNDO_KEY, state.data)
+
+
+class PageRestoreTests(unittest.IsolatedAsyncioTestCase):
+    async def test_restore_keeps_original_page_code_and_content(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            registry = PageRegistry(Path(temporary_dir) / "pages.json")
+            snapshot = {
+                "owner_id": 42,
+                "title": "Recovered",
+                "blocks": [{"id": "one", "type": "paragraph", "data": {}}],
+                "buttons": [{"id": "button-one", "title": "Open"}],
+                "buttons_per_row": 2,
+                "buttons_align": "center",
+                "created_at": 10,
+                "updated_at": 20,
+            }
+            with (
+                patch("app.services.page_registry.media_store.remember_blocks"),
+                patch("app.services.page_registry.media_store.pin_page"),
+            ):
+                restored = await registry.restore("fixed-code", 42, snapshot)
+
+            self.assertTrue(restored)
+            page = await registry.get("fixed-code")
+            self.assertIsNotNone(page)
+            self.assertEqual(page["title"], "Recovered")
+            self.assertEqual(page["blocks"], snapshot["blocks"])
+
+    async def test_restore_rejects_wrong_owner_and_existing_code(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            registry = PageRegistry(Path(temporary_dir) / "pages.json")
+            snapshot = {"owner_id": 42, "title": "Mine", "blocks": []}
+            self.assertFalse(await registry.restore("fixed-code", 7, snapshot))
+            with (
+                patch("app.services.page_registry.media_store.remember_blocks"),
+                patch("app.services.page_registry.media_store.pin_page"),
+            ):
+                self.assertTrue(await registry.restore("fixed-code", 42, snapshot))
+                self.assertFalse(await registry.restore("fixed-code", 42, snapshot))
 
 
 class PagesRouterTests(unittest.TestCase):

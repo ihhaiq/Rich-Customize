@@ -8,6 +8,7 @@ from aiogram.types import Message
 from app.i18n import t
 from app.keyboards import build_pages_keyboard
 from app.routers.editor_ui import MAIN_TEXT, edit_saved_ui, edit_ui
+from app.routers.button_support import save_changed_draft
 from app.services.page_editor import query_user_pages
 
 
@@ -72,5 +73,6 @@ async def render_pages_screen(
 __all__ = [
     "opened_page_text",
     "render_pages_screen",
+    "save_changed_draft",
     "saved_pages_text",
 ]

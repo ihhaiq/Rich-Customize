@@ -13,6 +13,9 @@ def details_children(details: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(children, list):
         children = []
         data["children"] = children
+    children.sort(key=lambda child: int(child.get("position", 0)))
+    for position, child in enumerate(children):
+        child["position"] = position
     return children
 
 
@@ -23,7 +26,8 @@ def find_details_child(details: dict[str, Any], child_id: str) -> dict[str, Any]
 def detach_native_details(details: dict[str, Any]) -> None:
     data = details.setdefault("data", {})
     details["source"] = "generated"
-    for key in ("native", "native_data", "native_type", "html"):
+    data["native"] = False
+    for key in ("native_data", "native_type", "html"):
         data.pop(key, None)
 
 

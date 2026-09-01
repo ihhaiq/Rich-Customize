@@ -251,7 +251,8 @@ class FormattedTextParserTests(unittest.TestCase):
     def test_domain_error_explains_botfather_fix(self):
         reason = _friendly_rich_error(ValueError("Bad Request: BOT_DOMAIN_INVALID"))
         self.assertIn("/setdomain", reason)
-        self.assertIn("URL عادي", reason)
+        self.assertIn("@BotFather", reason)
+        self.assertIn("URL", reason)
 
     def test_document_is_a_native_rich_block(self):
         document = new_block("document", {

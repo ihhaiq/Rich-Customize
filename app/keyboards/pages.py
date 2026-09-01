@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from aiogram.enums import ButtonStyle
-from aiogram.types import CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import CopyTextButton, DisabledButton, InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.i18n import t
 
@@ -37,12 +37,16 @@ def build_pages_keyboard(
         rows.append([
             InlineKeyboardButton(
                 text="◀️",
-                callback_data="r:no" if page_index <= 0 else f"{pagination_prefix}:{page_index - 1}",
+                callback_data=None if page_index <= 0 else f"{pagination_prefix}:{page_index - 1}",
+                disabled=DisabledButton() if page_index <= 0 else None,
             ),
-            InlineKeyboardButton(text=f"{page_index + 1}/{total_pages}", callback_data="r:no"),
+            InlineKeyboardButton(
+                text=f"{page_index + 1}/{total_pages}", disabled=DisabledButton(),
+            ),
             InlineKeyboardButton(
                 text="▶️",
-                callback_data="r:no" if page_index >= total_pages - 1 else f"{pagination_prefix}:{page_index + 1}",
+                callback_data=None if page_index >= total_pages - 1 else f"{pagination_prefix}:{page_index + 1}",
+                disabled=DisabledButton() if page_index >= total_pages - 1 else None,
             ),
         ])
     if show_controls:
@@ -50,7 +54,7 @@ def build_pages_keyboard(
             InlineKeyboardButton(text=t("pages.search_button"), callback_data="r:psearch"),
             InlineKeyboardButton(text=t("pages.sort_button"), callback_data="r:psort"),
         ])
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
+    rows.append([InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -66,7 +70,7 @@ def build_page_sort_keyboard(current_sort: str) -> InlineKeyboardMarkup:
         callback_data=f"r:psortset:{value}",
         style=ButtonStyle.PRIMARY if current_sort == value else None,
     )] for label, value in choices]
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:pages:0")])
+    rows.append([InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:pages:0")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -80,8 +84,21 @@ def build_page_delete_confirmation_keyboard(page_id: str, page_index: int) -> In
     ]])
 
 
+def build_page_restore_keyboard(page_index: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=t("ux.pages.restore"), callback_data="r:prestore",
+            style=ButtonStyle.SUCCESS,
+        )],
+        [InlineKeyboardButton(
+            text=t("ux.common.back"), callback_data=f"r:pages:{page_index}",
+        )],
+    ])
+
+
 __all__ = [
     "build_page_delete_confirmation_keyboard",
     "build_page_sort_keyboard",
+    "build_page_restore_keyboard",
     "build_pages_keyboard",
 ]

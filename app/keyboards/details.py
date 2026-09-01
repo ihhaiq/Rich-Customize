@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from aiogram.enums import ButtonStyle
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import DisabledButton, InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.i18n import t
 from app.services.blocks import BLOCK_LABELS
@@ -60,11 +60,15 @@ def build_details_inner_block_keyboard(
         [
             InlineKeyboardButton(
                 text=t("block.move_up"),
-                callback_data="r:no" if position <= 0 else f"r:dimu:{prefix}",
+                callback_data=None if position <= 0 else f"r:dimu:{prefix}",
+                disabled=DisabledButton() if position <= 0 else None,
             ),
             InlineKeyboardButton(
                 text=t("block.move_down"),
-                callback_data="r:no" if position >= len(children) - 1 else f"r:dimd:{prefix}",
+                callback_data=None if position >= len(children) - 1 else f"r:dimd:{prefix}",
+                disabled=(
+                    DisabledButton() if position >= len(children) - 1 else None
+                ),
             ),
         ],
         [InlineKeyboardButton(text=t("back"), callback_data=f"r:dim:{details_id}")],

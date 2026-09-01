@@ -4,7 +4,8 @@ from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.keyboards import build_post_settings_keyboard
+from app.i18n import t
+from app.keyboards import build_post_confirmation_keyboard, build_post_settings_keyboard
 from app.services.chat_registry import managed_chat_registry
 
 from app.editor.session import load_editor_session
@@ -83,4 +84,22 @@ async def toggle_post_option(callback: CallbackQuery, state: FSMContext) -> None
     await callback.answer()
 
 
-__all__ = ["open_post_settings", "router", "settings_text", "toggle_post_option"]
+@router.callback_query(F.data == "r:postconfirm")
+async def confirm_post(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await load_editor_session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    data, _ = session
+    selected = [int(item) for item in data.get("post_selected_chat_ids", [])]
+    if not selected:
+        await callback.answer(t("select_chat"), show_alert=True)
+        return
+    await edit_ui(
+        callback.message,
+        t("ux.publish.confirm", count=len(selected)),
+        build_post_confirmation_keyboard(len(selected)),
+    )
+    await callback.answer()
+
+
+__all__ = ["confirm_post", "open_post_settings", "router", "settings_text", "toggle_post_option"]

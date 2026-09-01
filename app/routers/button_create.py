@@ -13,6 +13,7 @@ from app.keyboards import (
     build_buttons_manager_keyboard,
     build_page_target_keyboard,
 )
+from app.i18n import t
 from app.routers.button_support import answer_with_button_guide, edit_button_ui, save_changed_draft
 from app.services.buttons import BUTTON_TYPES, MAX_BUTTONS, add_message_button, change_message_button_type, get_message_button
 from app.services.page_registry import page_registry
@@ -33,7 +34,7 @@ async def start_add_button(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(RichEditorStates.editing_button)
     await state.update_data(pending_button_action="add_title", current_button_id=None)
     if isinstance(callback.message, Message):
-        await answer_with_button_guide(callback.message, "أرسل عنوان الزر الجديد.")
+        await answer_with_button_guide(callback.message, t("ux.buttons.step.title"))
     await callback.answer()
 
 
@@ -100,7 +101,10 @@ async def choose_new_button_type(callback: CallbackQuery, state: FSMContext) -> 
         pending_button_action=f"add_{button_type}",
         pending_button_type=button_type,
     )
-    await answer_with_button_guide(callback.message, prompts[button_type])
+    await answer_with_button_guide(
+        callback.message,
+        t("ux.buttons.step.value", prompt=prompts[button_type]),
+    )
     await callback.answer()
 
 

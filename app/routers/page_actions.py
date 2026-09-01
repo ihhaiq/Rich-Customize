@@ -12,17 +12,18 @@ from app.editor.session import load_editor_session
 from app.i18n import t
 from app.keyboards import (
     build_page_delete_confirmation_keyboard,
+    build_page_restore_keyboard,
     build_rich_editor_keyboard,
 )
 from app.routers.editor_ui import (
-    MAIN_TEXT,
     delete_add_step_messages,
     edit_saved_ui,
     edit_ui,
+    editor_dashboard_text,
     send_add_prompt,
 )
-from app.routers.page_support import opened_page_text, render_pages_screen
-from app.services.page_editor import persist_page_draft_change, query_user_pages
+from app.routers.page_support import render_pages_screen
+from app.services.page_editor import persist_page_draft_change
 from app.services.page_registry import page_registry
 from app.states import RichEditorStates
 
@@ -91,8 +92,8 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
     await edit_saved_ui(
         bot,
         state,
-        f"✅ تم حفظ الصفحة «{title}».\n\n{MAIN_TEXT}",
-        build_rich_editor_keyboard(after.blocks),
+        editor_dashboard_text(after, f"✅ تم حفظ الصفحة «{title}»."),
+        build_rich_editor_keyboard(after.blocks, after.message_buttons),
     )
 
 
@@ -186,37 +187,73 @@ async def delete_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     except (ValueError, TypeError):
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
+    page = await page_registry.get(page_id)
+    if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
+        await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
+        return
+    before = await draft_store.load(state)
+    was_current = before.current_page_id == page_id
     if not await page_registry.delete(page_id, callback.from_user.id):
         await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
         return
-    data = await state.get_data()
-    _, _, _, _, total_count = await query_user_pages(
-        callback.from_user.id,
-        requested_index,
-        str(data.get("pages_search_query") or ""),
-        str(data.get("pages_sort_mode") or "updated"),
+    await state.update_data(
+        deleted_page_id=page_id,
+        deleted_page_snapshot=page,
+        deleted_page_index=requested_index,
+        deleted_page_was_current=was_current,
     )
-    if total_count == 0:
-        draft = await draft_store.load(state)
-        await edit_ui(
-            callback.message,
-            t("editor.empty_hint") if not draft.blocks else MAIN_TEXT,
-            build_rich_editor_keyboard(draft.blocks),
-        )
-    else:
-        await render_pages_screen(
-            callback.message,
-            state,
-            callback.from_user.id,
-            requested_index,
-        )
-    before = await draft_store.load(state)
     after = copy.deepcopy(before)
-    if before.current_page_id == page_id:
+    if was_current:
         after.current_page_id = None
         after.current_page_title = None
     await persist_page_draft_change(state, before, after)
+    await edit_ui(
+        callback.message,
+        t("ux.pages.deleted_recoverable"),
+        build_page_restore_keyboard(requested_index),
+    )
     await callback.answer(t("pages.deleted"))
+
+
+@router.callback_query(F.data == "r:prestore")
+async def restore_deleted_page(callback: CallbackQuery, state: FSMContext) -> None:
+    if not isinstance(callback.message, Message):
+        return
+    data = await state.get_data()
+    page_id = str(data.get("deleted_page_id") or "")
+    snapshot = data.get("deleted_page_snapshot")
+    if not page_id or not isinstance(snapshot, dict):
+        await callback.answer(t("ux.pages.restore_unavailable"), show_alert=True)
+        return
+    restored = await page_registry.restore(
+        page_id,
+        callback.from_user.id,
+        snapshot,
+    )
+    if not restored:
+        await callback.answer(t("ux.pages.restore_unavailable"), show_alert=True)
+        return
+    before = await draft_store.load(state)
+    after = copy.deepcopy(before)
+    if bool(data.get("deleted_page_was_current")):
+        after.current_page_id = page_id
+        after.current_page_title = str(snapshot.get("title") or page_id)
+    await persist_page_draft_change(state, before, after)
+    page_index = max(0, int(data.get("deleted_page_index", 0)))
+    await state.update_data(
+        deleted_page_id=None,
+        deleted_page_snapshot=None,
+        deleted_page_index=None,
+        deleted_page_was_current=None,
+    )
+    await render_pages_screen(
+        callback.message,
+        state,
+        callback.from_user.id,
+        page_index,
+        saved=True,
+    )
+    await callback.answer(t("ux.pages.restored"))
 
 
 @router.callback_query(F.data.startswith("r:pageopen:"))
@@ -241,8 +278,8 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(current_block_id=None, current_button_id=None)
     await edit_ui(
         callback.message,
-        opened_page_text(),
-        build_rich_editor_keyboard(after.blocks),
+        editor_dashboard_text(after),
+        build_rich_editor_keyboard(after.blocks, after.message_buttons),
         parse_mode="HTML",
     )
     await callback.answer("تم فتح الصفحة")
@@ -255,6 +292,7 @@ __all__ = [
     "receive_page_name",
     "receive_page_rename",
     "request_page_rename",
+    "restore_deleted_page",
     "router",
     "save_page",
 ]

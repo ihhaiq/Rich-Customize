@@ -5,6 +5,8 @@ from typing import Any
 from aiogram.enums import ButtonStyle
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.i18n import t
+
 
 def build_post_chats_keyboard(
     chats: list[dict[str, Any]],
@@ -54,24 +56,39 @@ def build_post_settings_keyboard(
     *, silent: bool, protected: bool, selected_count: int = 1,
 ) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🔕 منشور صامت", callback_data="r:pt:silent"),
-            InlineKeyboardButton(text="✅" if silent else "❌", callback_data="r:pt:silent"),
-        ],
-        [
-            InlineKeyboardButton(text="🛡 منشور محمي", callback_data="r:pt:protected"),
-            InlineKeyboardButton(text="✅" if protected else "❌", callback_data="r:pt:protected"),
-        ],
         [InlineKeyboardButton(
-            text=f"📤 إرسال إلى {selected_count} محادثة", callback_data="r:postsend",
+            text=t("ux.publish.silent_on" if silent else "ux.publish.silent_off"),
+            callback_data="r:pt:silent",
+            style=ButtonStyle.SUCCESS if silent else None,
+        )],
+        [InlineKeyboardButton(
+            text=t("ux.publish.protected_on" if protected else "ux.publish.protected_off"),
+            callback_data="r:pt:protected",
+            style=ButtonStyle.SUCCESS if protected else None,
+        )],
+        [InlineKeyboardButton(
+            text=t("ux.publish.send", count=selected_count), callback_data="r:postconfirm",
             style=ButtonStyle.SUCCESS,
         )],
-        [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:postlist")],
+        [InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:postlist")],
+    ])
+
+
+def build_post_confirmation_keyboard(selected_count: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=t("ux.publish.confirm_yes"), callback_data="r:postsend",
+            style=ButtonStyle.SUCCESS,
+        )],
+        [InlineKeyboardButton(
+            text=t("ux.common.cancel"), callback_data="r:postsettings",
+        )],
     ])
 
 
 __all__ = [
     "build_chat_reached_keyboard",
     "build_post_chats_keyboard",
+    "build_post_confirmation_keyboard",
     "build_post_settings_keyboard",
 ]

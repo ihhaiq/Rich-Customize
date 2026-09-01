@@ -114,9 +114,8 @@ class PageRegistry:
                 if normalized_query in str(page.get("title") or "").casefold()
                 or normalized_query in str(page.get("page_id") or "").casefold()
             ]
-        title_key = lambda page: str(
-            page.get("title") or page["page_id"]
-        ).casefold()
+        def title_key(page: dict[str, Any]) -> str:
+            return str(page.get("title") or page["page_id"]).casefold()
         pages.sort(key=title_key)
         if sort_mode == "oldest":
             pages.sort(key=lambda page: int(page.get("created_at", 0)))
@@ -135,6 +134,32 @@ class PageRegistry:
             pages.pop(page_id, None)
             self._write(pages)
             media_store.unpin_page(page_id)
+            return True
+
+    async def restore(
+        self,
+        page_id: str,
+        owner_id: int,
+        snapshot: dict[str, Any],
+    ) -> bool:
+        """Restore a just-deleted owned page without changing its public code."""
+        if int(snapshot.get("owner_id", 0)) != owner_id:
+            return False
+        async with self._lock:
+            pages = self._read()
+            if page_id in pages:
+                return False
+            page = copy.deepcopy(snapshot)
+            page["owner_id"] = owner_id
+            page["title"] = str(page.get("title") or "صفحة بلا اسم").strip()[:64]
+            page["blocks"] = copy.deepcopy(page.get("blocks") or [])
+            page["buttons"] = copy.deepcopy(page.get("buttons") or [])
+            page["buttons_per_row"] = int(page.get("buttons_per_row", 1))
+            page["buttons_align"] = str(page.get("buttons_align", "center"))
+            pages[page_id] = page
+            self._write(pages)
+            media_store.remember_blocks(page["blocks"])
+            media_store.pin_page(page_id, page["blocks"])
             return True
 
     async def rename(self, page_id: str, owner_id: int, title: str) -> bool:

@@ -7,7 +7,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.editor.draft_store import draft_store
-from app.keyboards import build_button_type_keyboard, build_buttons_manager_keyboard
+from app.i18n import t
+from app.keyboards import (
+    build_button_style_keyboard,
+    build_button_type_keyboard,
+    build_buttons_manager_keyboard,
+)
 from app.services.buttons import (
     add_message_button,
     change_message_button_type,
@@ -49,7 +54,7 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
         await edit_saved_button_ui(
             bot,
             state,
-            f"نوع الزر الجديد: {value}\n\nاختر وظيفة الزر:",
+            t("ux.buttons.step.type"),
             build_button_type_keyboard(),
         )
         await delete_input_message(message)
@@ -58,6 +63,7 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
     before = await draft_store.load(state)
     after = copy.deepcopy(before)
     buttons = after.message_buttons
+    added_button_id: str | None = None
     if isinstance(action, str) and action.startswith("add_") and action != "add_title":
         button_type = str(data.get("pending_button_type") or action.removeprefix("add_"))
         normalized_value, error = normalize_button_value(button_type, value)
@@ -74,7 +80,8 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
             await message.answer("تعذر إضافة الزر؛ وصلت إلى الحد الأقصى.")
             await state.set_state(RichEditorStates.managing)
             return
-        notice = "✅ تمت إضافة الزر. اختر لونه من لوحة التعديل."
+        notice = t("ux.buttons.added")
+        added_button_id = str(button["id"])
     else:
         button = get_message_button(buttons, str(data.get("current_button_id", "")))
         if button is None:
@@ -127,8 +134,16 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
     await edit_saved_button_ui(
         bot,
         state,
-        f"{notice}\n\nإدارة أزرار الرسالة الغنية\nعدد الأزرار: {len(buttons)}",
-        build_buttons_manager_keyboard(buttons, after.buttons_per_row),
+        (
+            t("ux.buttons.step.color")
+            if added_button_id is not None
+            else f"{notice}\n\n{t('ux.buttons.title')}\n{t('ux.buttons.count', count=len(buttons))}"
+        ),
+        (
+            build_button_style_keyboard(added_button_id, "default")
+            if added_button_id is not None
+            else build_buttons_manager_keyboard(buttons, after.buttons_per_row)
+        ),
     )
     await delete_input_message(message)
 

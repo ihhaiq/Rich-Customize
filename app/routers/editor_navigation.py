@@ -4,10 +4,11 @@ from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+from app.editor.draft_store import draft_store
 from app.editor.session import load_editor_session
 from app.i18n import t
 from app.keyboards import build_editor_tools_keyboard, build_rich_editor_keyboard
-from app.routers.editor_ui import MAIN_TEXT, delete_stored_block_prompt, edit_ui
+from app.routers.editor_ui import delete_stored_block_prompt, edit_ui, editor_dashboard_text
 from app.services.chat_registry import managed_chat_registry
 from app.states import RichEditorStates
 
@@ -29,7 +30,12 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
     await delete_stored_block_prompt(
         bot, state, data, protected_message=callback.message,
     )
-    await edit_ui(callback.message, MAIN_TEXT, build_rich_editor_keyboard(blocks))
+    draft = await draft_store.load(state)
+    await edit_ui(
+        callback.message,
+        editor_dashboard_text(draft),
+        build_rich_editor_keyboard(blocks, draft.message_buttons),
+    )
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
         current_block_id=None,

@@ -12,13 +12,12 @@ from app.editor.draft_store import draft_store
 from app.editor.history import remember
 from app.editor.session import load_editor_session
 from app.i18n import t
-from app.keyboards import build_rich_editor_keyboard
+from app.keyboards import build_error_recovery_keyboard, build_rich_editor_keyboard
 from app.routers.button_support import prepare_message_buttons
 from app.routers.editor_ui import (
-    MAIN_TEXT,
     delete_input_message,
     edit_saved_ui,
-    editor_overview_text,
+    editor_dashboard_text,
     friendly_rich_error,
     repost_saved_ui,
 )
@@ -39,7 +38,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     data, blocks = session
     draft = await draft_store.load(state)
     await callback.answer("جاري إنشاء المعاينة…")
-    panel_text = f"✅ المعاينة جاهزة.\n\n{MAIN_TEXT}"
+    panel_text = editor_dashboard_text(draft, "✅ المعاينة جاهزة.")
     try:
         prepared_buttons = await prepare_message_buttons(draft.message_buttons)
         sent_messages = await send_rich_message_preview(
@@ -75,8 +74,9 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             callback.from_user.id,
             "تعذر إرسال النتيجة كرسالة غنية واحدة؛ لم يتم تقسيمها إلى رسائل منفصلة.\n"
             f"السبب: {friendly_rich_error(error)}",
+            reply_markup=build_error_recovery_keyboard(),
         )
-        panel_text = f"⚠️ تعذرت المعاينة.\n\n{MAIN_TEXT}"
+        panel_text = editor_dashboard_text(draft, "⚠️ تعذرت المعاينة.")
     except Exception:
         logger.exception(
             "Failed to render preview for user_id=%s", callback.from_user.id,
@@ -84,8 +84,9 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
         await bot.send_message(
             callback.from_user.id,
             "تعذر إنشاء المعاينة. راجع السجل لمعرفة الخطأ.",
+            reply_markup=build_error_recovery_keyboard(),
         )
-        panel_text = f"⚠️ تعذرت المعاينة.\n\n{MAIN_TEXT}"
+        panel_text = editor_dashboard_text(draft, "⚠️ تعذرت المعاينة.")
     if isinstance(callback.message, Message):
         management_id = data.get("management_message_id")
         if callback.message.message_id != management_id:
@@ -94,7 +95,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             except TelegramBadRequest:
                 pass
     await repost_saved_ui(
-        bot, state, panel_text, build_rich_editor_keyboard(blocks),
+        bot, state, panel_text, build_rich_editor_keyboard(blocks, draft.message_buttons),
     )
 
 
@@ -124,8 +125,8 @@ async def import_rich_message_into_editor(
     await edit_saved_ui(
         bot,
         state,
-        editor_overview_text(blocks),
-        build_rich_editor_keyboard(blocks),
+        editor_dashboard_text(after),
+        build_rich_editor_keyboard(blocks, after.message_buttons),
     )
 
 

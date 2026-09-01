@@ -2,12 +2,15 @@ import unittest
 
 from aiogram.enums import ButtonStyle
 
+from app import i18n_core
+from app.editor.draft_store import EditorDraft
 from app.keyboards import (
-    build_button_type_keyboard, build_buttons_manager_keyboard,
+    build_button_editor_keyboard, build_button_type_keyboard, build_buttons_manager_keyboard,
     build_developer_import_confirmation_keyboard, build_developer_keyboard,
     build_details_content_keyboard, build_inner_block_keyboard,
     build_details_inner_blocks_keyboard, build_details_inner_block_keyboard,
     build_message_buttons_keyboard, build_post_chats_keyboard,
+    build_post_confirmation_keyboard, build_post_settings_keyboard,
     build_pages_keyboard, build_page_target_keyboard,
     build_block_editor_keyboard, build_editor_tools_keyboard,
     build_page_sort_keyboard, build_rich_editor_keyboard,
@@ -16,9 +19,26 @@ from app.keyboards import (
     build_welcome_keyboard,
 )
 from app.services.buttons import add_message_button
+from app.routers.editor_ui import editor_dashboard_text
 
 
 class ButtonKeyboardTests(unittest.TestCase):
+    def test_editor_dashboard_reports_blocks_buttons_and_saved_page(self):
+        token = i18n_core._language.set("ar")
+        try:
+            text = editor_dashboard_text(EditorDraft(
+                blocks=[{"id": "b", "type": "paragraph", "position": 0, "data": {}}],
+                message_buttons=[{"id": "x", "text": "زر", "type": "disabled"}],
+                current_page_id="deadbeef",
+                current_page_title="صفحتي",
+            ))
+        finally:
+            i18n_core._language.reset(token)
+
+        self.assertIn("البلوكات: 1", text)
+        self.assertIn("عدد الأزرار: 1", text)
+        self.assertIn("صفحتي", text)
+
     def test_developer_panel_has_import_and_export_buttons(self):
         buttons = build_developer_keyboard().inline_keyboard[0]
         button = buttons[0]
@@ -91,7 +111,7 @@ class ButtonKeyboardTests(unittest.TestCase):
 
         self.assertEqual(callbacks, ["r:showcase", "r:starteditor"])
 
-    def test_button_manager_changes_type_through_content_instead_of_extra_button(self):
+    def test_button_manager_opens_a_focused_editor_for_each_button(self):
         buttons = []
         button = add_message_button(buttons, "زر", "https://example.com", "url")
         manager = build_buttons_manager_keyboard(buttons)
@@ -99,8 +119,16 @@ class ButtonKeyboardTests(unittest.TestCase):
             item.callback_data
             for row in manager.inline_keyboard for item in row
         }
-        self.assertNotIn("r:bs:type", callbacks)
-        self.assertIn("r:bs:value", callbacks)
+        self.assertIn(f"r:bed:{button['id']}", callbacks)
+
+        editor_callbacks = {
+            item.callback_data
+            for row in build_button_editor_keyboard(button).inline_keyboard
+            for item in row if item.callback_data
+        }
+        self.assertIn(f"r:bedit:value:{button['id']}", editor_callbacks)
+        self.assertIn(f"r:bedit:type:{button['id']}", editor_callbacks)
+        self.assertIn(f"r:bdel:{button['id']}", editor_callbacks)
 
         picker = build_button_type_keyboard(f"r:bct:{button['id']}")
         picker_callbacks = {
@@ -176,6 +204,7 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertEqual(delete_button.style, ButtonStyle.DANGER)
         self.assertEqual(previous_button.callback_data, "r:pages:1")
         self.assertEqual(counter_button.text, "3/4")
+        self.assertIsNotNone(counter_button.disabled)
         self.assertEqual(next_button.callback_data, "r:pages:3")
 
     def test_saved_page_controls_appear_and_search_results_keep_their_pager(self):
@@ -205,7 +234,7 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertTrue(selected.text.startswith("✅ "))
         self.assertEqual(selected.style, ButtonStyle.PRIMARY)
 
-    def test_editor_keeps_secondary_actions_inside_tools(self):
+    def test_editor_surfaces_the_frequent_actions_on_the_main_panel(self):
         keyboard = build_rich_editor_keyboard([
             {"id": "b1", "type": "paragraph", "position": 0, "data": {}},
         ])
@@ -218,11 +247,12 @@ class ButtonKeyboardTests(unittest.TestCase):
 
         self.assertEqual(by_callback["r:addmenu"].style, ButtonStyle.PRIMARY)
         self.assertIsNone(by_callback["r:tools"].style)
-        self.assertNotIn("r:buttons", by_callback)
-        self.assertNotIn("r:savepage", by_callback)
-        self.assertNotIn("r:pages", by_callback)
-        self.assertEqual(by_callback["r:post"].style, ButtonStyle.PRIMARY)
-        self.assertEqual(by_callback["r:result"].style, ButtonStyle.SUCCESS)
+        self.assertIn("r:buttons", by_callback)
+        self.assertIn("r:savepage", by_callback)
+        self.assertIn("r:pages", by_callback)
+        self.assertIn("r:undo", by_callback)
+        self.assertEqual(by_callback["r:post"].style, ButtonStyle.SUCCESS)
+        self.assertEqual(by_callback["r:result"].style, ButtonStyle.PRIMARY)
 
         tools = {
             button.callback_data: button
@@ -232,8 +262,20 @@ class ButtonKeyboardTests(unittest.TestCase):
         }
         self.assertIn("r:buttons", tools)
         self.assertIn("r:pages", tools)
-        self.assertIn("r:undo", tools)
-        self.assertEqual(tools["r:savepage"].style, ButtonStyle.SUCCESS)
+        self.assertNotIn("r:undo", tools)
+        self.assertNotIn("r:savepage", tools)
+
+    def test_post_toggles_are_single_stateful_buttons_and_send_is_confirmed(self):
+        settings = build_post_settings_keyboard(
+            silent=True, protected=False, selected_count=3,
+        )
+        self.assertEqual([len(row) for row in settings.inline_keyboard[:2]], [1, 1])
+        self.assertEqual(settings.inline_keyboard[0][0].style, ButtonStyle.SUCCESS)
+        self.assertIsNone(settings.inline_keyboard[1][0].style)
+        self.assertEqual(settings.inline_keyboard[2][0].callback_data, "r:postconfirm")
+
+        confirmation = build_post_confirmation_keyboard(3)
+        self.assertEqual(confirmation.inline_keyboard[0][0].callback_data, "r:postsend")
 
     def test_block_editor_moves_one_step_without_number_picker(self):
         blocks = [
@@ -252,6 +294,12 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertIn("r:mu:b", callbacks)
         self.assertIn("r:md:b", callbacks)
         self.assertFalse(any(value.startswith("r:mt:") for value in callbacks))
+
+        first_keyboard = build_block_editor_keyboard(blocks[0], blocks)
+        move_row = first_keyboard.inline_keyboard[-2]
+        self.assertIsNotNone(move_row[0].disabled)
+        self.assertIsNone(move_row[0].callback_data)
+        self.assertEqual(move_row[1].callback_data, "r:md:a")
 
     def test_details_builder_only_finishes_after_an_inner_block(self):
         empty = build_details_content_keyboard(0)

@@ -72,7 +72,7 @@ async def receive_nested_replacement(
         await message.answer(t("details.inner_text_required"))
         return True
 
-    await remember(state)
+    await remember(state, current_data)
     selected = child
 
     if action == "add_footer":
