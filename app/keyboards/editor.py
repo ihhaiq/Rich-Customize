@@ -49,15 +49,16 @@ def build_rich_editor_keyboard(
             text=t("ux.editor.preview"), callback_data="r:result",
             style=ButtonStyle.PRIMARY,
         ),
-        InlineKeyboardButton(
-            text=tr("💾 حفظ الصفحة"), callback_data="r:savepage",
-            style=ButtonStyle.SUCCESS,
-        ),
     ])
-    rows.append([
-        InlineKeyboardButton(text=t("editor.undo_button"), callback_data="r:undo"),
-        InlineKeyboardButton(text=t("editor.tools_button"), callback_data="r:tools"),
-    ])
+    utility_row = []
+    if len(blocks) >= 2:
+        utility_row.append(
+            InlineKeyboardButton(text=t("editor.undo_button"), callback_data="r:undo")
+        )
+    utility_row.append(
+        InlineKeyboardButton(text=t("editor.tools_button"), callback_data="r:tools")
+    )
+    rows.append(utility_row)
     rows.append([
         InlineKeyboardButton(
             text=t("ux.editor.add_block"), callback_data="r:addmenu",
@@ -77,6 +78,10 @@ def build_editor_tools_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=tr("📚 صفحاتي"), callback_data="r:pages"),
             InlineKeyboardButton(text=t("ux.editor.manage_buttons"), callback_data="r:buttons"),
         ],
+        [InlineKeyboardButton(
+            text=tr("💾 حفظ الصفحة"), callback_data="r:savepage",
+            style=ButtonStyle.SUCCESS,
+        )],
         [InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:back")],
     ])
 
