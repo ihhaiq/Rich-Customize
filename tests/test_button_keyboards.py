@@ -176,6 +176,15 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertTrue(keyboard.inline_keyboard[0][0].text.startswith("⬜"))
         self.assertTrue(keyboard.inline_keyboard[1][0].text.startswith("✅"))
         self.assertIn("(1)", keyboard.inline_keyboard[2][0].text)
+        add_row = keyboard.inline_keyboard[-2]
+        self.assertEqual(len(add_row), 2)
+        self.assertEqual(
+            [button.url for button in add_row],
+            [
+                "https://t.me/bot?startchannel",
+                "https://t.me/bot?startgroup",
+            ],
+        )
 
     def test_saved_pages_are_selected_by_name(self):
         pages = [{"page_id": "a1b2c3d4", "title": "الصفحة الثانية"}]
@@ -263,6 +272,7 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertNotIn("r:savepage", by_callback)
         self.assertNotIn("r:pages", by_callback)
         self.assertNotIn("r:undo", by_callback)
+        self.assertNotIn("r:redo", by_callback)
         self.assertEqual(by_callback["r:post"].style, ButtonStyle.SUCCESS)
         self.assertEqual(by_callback["r:result"].style, ButtonStyle.PRIMARY)
         self.assertEqual(

@@ -29,15 +29,15 @@ def build_post_chats_keyboard(
             callback_data="r:postsettings",
             style=ButtonStyle.SUCCESS,
         )])
-    rows.extend([
-        [InlineKeyboardButton(
+    rows.append([
+        InlineKeyboardButton(
             text="➕ إضافة البوت إلى قناة", url=channel_url,
             style=ButtonStyle.PRIMARY,
-        )],
-        [InlineKeyboardButton(
+        ),
+        InlineKeyboardButton(
             text="➕ إضافة البوت إلى مجموعة", url=group_url,
             style=ButtonStyle.PRIMARY,
-        )],
+        ),
     ])
     rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

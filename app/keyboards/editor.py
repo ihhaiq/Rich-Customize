@@ -52,9 +52,10 @@ def build_rich_editor_keyboard(
     ])
     utility_row = []
     if len(blocks) >= 2:
-        utility_row.append(
-            InlineKeyboardButton(text=t("editor.undo_button"), callback_data="r:undo")
-        )
+        utility_row.extend([
+            InlineKeyboardButton(text=t("editor.undo_button"), callback_data="r:undo"),
+            InlineKeyboardButton(text=t("editor.redo_button"), callback_data="r:redo"),
+        ])
     utility_row.append(
         InlineKeyboardButton(text=t("editor.tools_button"), callback_data="r:tools")
     )

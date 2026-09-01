@@ -89,6 +89,9 @@ PHRASES: dict[str, str] = {
     "editor.undo_button": "↩️ Undo",
     "editor.undo_empty": "There is no action to undo.",
     "editor.undo_done": "Undone",
+    "editor.redo_button": "↪️ Redo",
+    "editor.redo_empty": "There is no action to redo.",
+    "editor.redo_done": "Redone",
     "ux.editor.title": "Rich Message Editor",
     "ux.editor.blocks": "Blocks: {count}",
     "ux.editor.buttons": "Buttons: {count}",
@@ -288,6 +291,9 @@ AR_PHRASES: dict[str, str] = {
     "editor.undo_button": "↩️ تراجع",
     "editor.undo_empty": "ماكو إجراء يمكن التراجع عنه.",
     "editor.undo_done": "تم التراجع",
+    "editor.redo_button": "↪️ إعادة",
+    "editor.redo_empty": "ماكو إجراء يمكن إعادته.",
+    "editor.redo_done": "تمت الإعادة",
     "ux.editor.title": "محرّر الرسائل الغنية",
     "ux.editor.blocks": "البلوكات: {count}",
     "ux.editor.buttons": "الأزرار: {count}",
@@ -1287,6 +1293,30 @@ ANCHOR_FLOW_TRANSLATIONS = {
     for language, values in ANCHOR_FLOW_VALUES.items()
 }
 
+REDO_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "es": {"editor.redo_button": "↪️ Rehacer", "editor.redo_empty": "No hay ninguna acción que rehacer.", "editor.redo_done": "Acción rehecha"},
+    "fr": {"editor.redo_button": "↪️ Rétablir", "editor.redo_empty": "Aucune action à rétablir.", "editor.redo_done": "Action rétablie"},
+    "de": {"editor.redo_button": "↪️ Wiederholen", "editor.redo_empty": "Keine Aktion zum Wiederholen vorhanden.", "editor.redo_done": "Wiederholt"},
+    "it": {"editor.redo_button": "↪️ Ripeti", "editor.redo_empty": "Nessuna azione da ripetere.", "editor.redo_done": "Azione ripetuta"},
+    "pt": {"editor.redo_button": "↪️ Refazer", "editor.redo_empty": "Não há ação para refazer.", "editor.redo_done": "Ação refeita"},
+    "nl": {"editor.redo_button": "↪️ Opnieuw", "editor.redo_empty": "Er is geen actie om opnieuw uit te voeren.", "editor.redo_done": "Opnieuw uitgevoerd"},
+    "pl": {"editor.redo_button": "↪️ Ponów", "editor.redo_empty": "Brak działania do ponowienia.", "editor.redo_done": "Działanie ponowione"},
+    "uk": {"editor.redo_button": "↪️ Повторити", "editor.redo_empty": "Немає дії для повторення.", "editor.redo_done": "Дію повторено"},
+    "ru": {"editor.redo_button": "↪️ Повторить", "editor.redo_empty": "Нет действия для повтора.", "editor.redo_done": "Действие повторено"},
+    "tr": {"editor.redo_button": "↪️ Yinele", "editor.redo_empty": "Yinelenecek bir işlem yok.", "editor.redo_done": "İşlem yinelendi"},
+    "fa": {"editor.redo_button": "↪️ انجام دوباره", "editor.redo_empty": "عملی برای انجام دوباره وجود ندارد.", "editor.redo_done": "عمل دوباره انجام شد"},
+    "ku": {"editor.redo_button": "↪️ Dîsa bike", "editor.redo_empty": "Çalakiyek ji bo dubarekirinê tune.", "editor.redo_done": "Çalakî hate dubarekirin"},
+    "ur": {"editor.redo_button": "↪️ دوبارہ کریں", "editor.redo_empty": "دوبارہ کرنے کے لیے کوئی عمل نہیں۔", "editor.redo_done": "عمل دوبارہ کیا گیا"},
+    "hi": {"editor.redo_button": "↪️ फिर से करें", "editor.redo_empty": "फिर से करने के लिए कोई कार्रवाई नहीं है।", "editor.redo_done": "कार्रवाई फिर से की गई"},
+    "id": {"editor.redo_button": "↪️ Ulangi", "editor.redo_empty": "Tidak ada tindakan untuk diulangi.", "editor.redo_done": "Tindakan diulangi"},
+    "ja": {"editor.redo_button": "↪️ やり直す", "editor.redo_empty": "やり直せる操作はありません。", "editor.redo_done": "操作をやり直しました"},
+    "ko": {"editor.redo_button": "↪️ 다시 실행", "editor.redo_empty": "다시 실행할 작업이 없습니다.", "editor.redo_done": "작업을 다시 실행했습니다"},
+    "vi": {"editor.redo_button": "↪️ Làm lại", "editor.redo_empty": "Không có thao tác nào để làm lại.", "editor.redo_done": "Đã làm lại thao tác"},
+    "th": {"editor.redo_button": "↪️ ทำซ้ำ", "editor.redo_empty": "ไม่มีการดำเนินการให้ทำซ้ำ", "editor.redo_done": "ทำซ้ำแล้ว"},
+    "zh-hans": {"editor.redo_button": "↪️ 重做", "editor.redo_empty": "没有可重做的操作。", "editor.redo_done": "已重做"},
+    "zh-hant": {"editor.redo_button": "↪️ 重做", "editor.redo_empty": "沒有可重做的操作。", "editor.redo_done": "已重做"},
+}
+
 KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     language: {f"block.{name}": value for name, value in values.items()}
     for language, values in BLOCK_KEY_TRANSLATIONS.items()
@@ -1317,6 +1347,9 @@ for language, translations in DETAILS_INNER_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 for language, translations in ANCHOR_FLOW_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in REDO_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 NAVIGATION_KEYS = (

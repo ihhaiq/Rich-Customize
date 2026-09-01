@@ -24,6 +24,7 @@ class EditorActionVisibilityTests(unittest.TestCase):
         callbacks = self._callbacks(keyboard)
 
         self.assertNotIn("r:undo", callbacks)
+        self.assertNotIn("r:redo", callbacks)
         self.assertNotIn("r:savepage", callbacks)
         self.assertIn("r:tools", callbacks)
         self.assertIn("r:result", callbacks)
@@ -38,7 +39,16 @@ class EditorActionVisibilityTests(unittest.TestCase):
         callbacks = self._callbacks(keyboard)
 
         self.assertIn("r:undo", callbacks)
+        self.assertIn("r:redo", callbacks)
         self.assertNotIn("r:savepage", callbacks)
+        history_row = next(
+            row for row in keyboard.inline_keyboard
+            if any(button.callback_data == "r:undo" for button in row)
+        )
+        self.assertEqual(
+            [button.callback_data for button in history_row[:2]],
+            ["r:undo", "r:redo"],
+        )
 
     def test_save_page_is_available_inside_more_tools(self):
         token = i18n_core._language.set("ar")
