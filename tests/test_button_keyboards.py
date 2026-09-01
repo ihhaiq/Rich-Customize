@@ -101,7 +101,10 @@ class ButtonKeyboardTests(unittest.TestCase):
 
         self.assertEqual(callbacks, ["r:pages", "r:addmenu"])
         self.assertEqual(keyboard.inline_keyboard[0][0].text, "📚 صفحاتي")
-        self.assertEqual(keyboard.inline_keyboard[-1][0].callback_data, "r:addmenu")
+        self.assertEqual(
+            [button.callback_data for button in keyboard.inline_keyboard[0]],
+            ["r:pages", "r:addmenu"],
+        )
 
     def test_start_editor_button_uses_expected_callback(self):
         keyboard = build_start_editor_keyboard()
