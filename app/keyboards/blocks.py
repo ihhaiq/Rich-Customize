@@ -131,7 +131,6 @@ def build_add_block_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=text, callback_data=f"r:add:{kind}") for text, kind in choices[index:index + 2]]
         for index in range(0, len(choices), 2)
     ]
-    rows.append([InlineKeyboardButton(text="💭 Thinking (للمسودة فقط)", callback_data="r:add:thinking")])
     rows.append([InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
