@@ -32,12 +32,12 @@ def build_start_editor_keyboard() -> InlineKeyboardMarkup:
 def build_rich_editor_keyboard(
     blocks: list[dict[str, Any]], buttons: list[dict[str, Any]] | None = None,
 ) -> InlineKeyboardMarkup:
-    del buttons  # retained in the public signature for compatibility
     if not blocks:
         return InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="📚 صفحاتي", callback_data="r:pages"),
+            InlineKeyboardButton(text=t("pages"), callback_data="r:pages"),
             InlineKeyboardButton(
-                text="➕ إضافة Block", callback_data="r:addmenu", style=ButtonStyle.PRIMARY,
+                text=t("ux.editor.add_block"), callback_data="r:addmenu",
+                style=ButtonStyle.PRIMARY,
             ),
         ]])
     rows = [
@@ -45,18 +45,34 @@ def build_rich_editor_keyboard(
         for index, block in enumerate(sorted(blocks, key=lambda item: item["position"]))
     ]
     rows.append([
-        InlineKeyboardButton(text=t("editor.tools_button"), callback_data="r:tools"),
         InlineKeyboardButton(
-            text="➕ إضافة Block", callback_data="r:addmenu", style=ButtonStyle.PRIMARY,
+            text=t("ux.editor.add_block"), callback_data="r:addmenu",
+            style=ButtonStyle.PRIMARY,
+        ),
+        InlineKeyboardButton(
+            text=t("ux.editor.manage_buttons"), callback_data="r:buttons",
         ),
     ])
     rows.append([
         InlineKeyboardButton(
-            text="📝 إنشاء منشور", callback_data="r:post", style=ButtonStyle.PRIMARY,
+            text=t("ux.editor.preview"), callback_data="r:result",
+            style=ButtonStyle.PRIMARY,
         ),
         InlineKeyboardButton(
-            text="✅ النتيجة", callback_data="r:result", style=ButtonStyle.SUCCESS,
+            text=t("save_page"), callback_data="r:savepage",
+            style=ButtonStyle.SUCCESS,
         ),
+    ])
+    rows.append([
+        InlineKeyboardButton(
+            text=t("ux.editor.publish"), callback_data="r:post",
+            style=ButtonStyle.SUCCESS,
+        ),
+        InlineKeyboardButton(text=t("editor.undo_button"), callback_data="r:undo"),
+    ])
+    rows.append([
+        InlineKeyboardButton(text=t("pages"), callback_data="r:pages"),
+        InlineKeyboardButton(text=t("editor.tools_button"), callback_data="r:tools"),
     ])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -64,17 +80,10 @@ def build_rich_editor_keyboard(
 def build_editor_tools_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="🔘 إضافة أزرار", callback_data="r:buttons"),
-            InlineKeyboardButton(
-                text="💾 حفظ الصفحة", callback_data="r:savepage",
-                style=ButtonStyle.SUCCESS,
-            ),
+            InlineKeyboardButton(text=t("pages"), callback_data="r:pages"),
+            InlineKeyboardButton(text=t("ux.editor.manage_buttons"), callback_data="r:buttons"),
         ],
-        [
-            InlineKeyboardButton(text="📚 صفحاتي", callback_data="r:pages"),
-            InlineKeyboardButton(text=t("editor.undo_button"), callback_data="r:undo"),
-        ],
-        [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")],
+        [InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:back")],
     ])
 
 
@@ -86,8 +95,19 @@ def build_result_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
+def build_error_recovery_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=t("ux.common.retry"), callback_data="r:result",
+            style=ButtonStyle.PRIMARY,
+        ),
+        InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:back"),
+    ]])
+
+
 __all__ = [
     "build_editor_tools_keyboard",
+    "build_error_recovery_keyboard",
     "build_result_keyboard",
     "build_rich_editor_keyboard",
     "build_start_editor_keyboard",

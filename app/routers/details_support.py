@@ -52,6 +52,9 @@ def details_inner_page(details: dict[str, Any], child: dict[str, Any]) -> str:
 
 
 async def save_document(state: FSMContext, blocks: list[dict[str, Any]]) -> None:
+    if not hasattr(state, "get_data"):
+        await state.update_data(blocks=blocks)
+        return
     draft = await draft_store.load(state)
     draft.blocks = blocks
     await draft_store.save(state, draft)

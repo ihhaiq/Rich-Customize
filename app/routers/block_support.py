@@ -15,8 +15,8 @@ from app.keyboards import build_rich_editor_keyboard
 from app.states import RichEditorStates
 
 from app.routers.editor_ui import (
-    MAIN_TEXT,
     delete_add_step_messages,
+    editor_dashboard_text,
     repost_saved_ui,
 )
 
@@ -54,8 +54,8 @@ async def finish_add(
     await repost_saved_ui(
         bot,
         state,
-        f"✅ تمت إضافة الـBlock بنجاح.\n\n{MAIN_TEXT}",
-        build_rich_editor_keyboard(result.blocks),
+        editor_dashboard_text(draft, "✅ تمت إضافة البلوك بنجاح."),
+        build_rich_editor_keyboard(result.blocks, draft.message_buttons),
     )
     assert result.block is not None
     return result.block

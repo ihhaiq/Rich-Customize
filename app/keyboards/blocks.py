@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from aiogram.enums import ButtonStyle
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import DisabledButton, InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.i18n import t
 from app.services.blocks import table_rows
@@ -64,11 +64,13 @@ def build_block_editor_keyboard(
         [
             InlineKeyboardButton(
                 text=t("block.move_up"),
-                callback_data="r:no" if position <= 0 else f"r:mu:{block_id}",
+                callback_data=None if position <= 0 else f"r:mu:{block_id}",
+                disabled=DisabledButton() if position <= 0 else None,
             ),
             InlineKeyboardButton(
                 text=t("block.move_down"),
-                callback_data="r:no" if position >= len(ordered) - 1 else f"r:md:{block_id}",
+                callback_data=None if position >= len(ordered) - 1 else f"r:md:{block_id}",
+                disabled=DisabledButton() if position >= len(ordered) - 1 else None,
             ),
         ],
         [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")],
@@ -113,24 +115,24 @@ def build_table_cell_keyboard(block: dict[str, Any], action: str) -> InlineKeybo
 
 def build_add_block_keyboard() -> InlineKeyboardMarkup:
     choices = [
-        ("📝 Paragraph", "paragraph"), ("🔠 Section Heading", "heading"),
-        ("💻 Preformatted", "preformatted"), ("🔻 Footer", "footer"),
-        ("➖ Divider", "divider"), ("∑ Math", "mathematical_expression"),
-        ("⚓ Anchor", "anchor"), (t("list.menu_button"), "listmenu"),
-        ("❝ Blockquote", "blockquote"), ("💬 Pullquote", "pullquote"),
-        ("🖼 Collage", "collage"), ("🎞 Slideshow", "slideshow"),
-        ("▦ Table", "table"), ("📂 Details", "details"),
-        ("🗺 Map", "map"), ("🎞 Animation", "animation"),
-        ("🎵 Audio", "audio"), ("🖼 Photo", "photo"),
-        ("📄 Document", "document"), ("🎬 Video", "video"),
-        ("🎙 Voice Note", "voice"),
+        (t("block.paragraph"), "paragraph"), (t("block.heading"), "heading"),
+        (t("block.preformatted"), "preformatted"), (t("block.footer"), "footer"),
+        (t("block.divider"), "divider"), (t("block.mathematical_expression"), "mathematical_expression"),
+        (t("block.anchor"), "anchor"), (t("list.menu_button"), "listmenu"),
+        (t("block.blockquote"), "blockquote"), (t("block.pullquote"), "pullquote"),
+        (t("block.collage"), "collage"), (t("block.slideshow"), "slideshow"),
+        (t("block.table"), "table"), (t("block.details"), "details"),
+        (t("block.map"), "map"), (t("block.animation"), "animation"),
+        (t("block.audio"), "audio"), (t("block.photo"), "photo"),
+        (t("block.document"), "document"), (t("block.video"), "video"),
+        (t("block.voice"), "voice"),
     ]
     rows = [
         [InlineKeyboardButton(text=text, callback_data=f"r:add:{kind}") for text, kind in choices[index:index + 2]]
         for index in range(0, len(choices), 2)
     ]
     rows.append([InlineKeyboardButton(text="💭 Thinking (للمسودة فقط)", callback_data="r:add:thinking")])
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
+    rows.append([InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -186,7 +188,8 @@ def build_block_position_keyboard(blocks: list[dict[str, Any]], block_id: str) -
         current = block["id"] == block_id
         rows.append([InlineKeyboardButton(
             text=f"{'✅ ' if current else ''}{index + 1}",
-            callback_data="r:no" if current else f"r:mt:{block_id}:{index}",
+            callback_data=None if current else f"r:mt:{block_id}:{index}",
+            disabled=DisabledButton() if current else None,
         )])
     rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data=f"r:b:{block_id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

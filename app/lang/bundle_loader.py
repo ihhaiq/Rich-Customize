@@ -49,22 +49,22 @@ _BASE_PROFILES: dict[str, dict[str, Any]] = {
 
 def _semantic_phrases(code: str) -> dict[str, str]:
     if code == "en":
-        result = dict(COMMON_PHRASES)
-        result.update(EDITOR_PHRASES)
+        result = dict(EDITOR_PHRASES)
         result.update(DETAILS_PHRASES)
+        result.update(COMMON_PHRASES)
         return result
     if code == "ar":
-        result = dict(COMMON_AR_PHRASES)
-        result.update(EDITOR_AR_PHRASES)
+        result = dict(EDITOR_AR_PHRASES)
         result.update(DETAILS_AR_PHRASES)
+        result.update(COMMON_AR_PHRASES)
         return result
     return {}
 
 
 def _keyed(code: str) -> dict[str, str]:
-    result = dict(COMMON_KEY_TRANSLATIONS.get(code, {}))
-    result.update(EDITOR_KEY_TRANSLATIONS.get(code, {}))
+    result = dict(EDITOR_KEY_TRANSLATIONS.get(code, {}))
     result.update(DETAILS_KEY_TRANSLATIONS.get(code, {}))
+    result.update(COMMON_KEY_TRANSLATIONS.get(code, {}))
     return result
 
 

@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.editor.draft_store import EditorDraft, draft_store
-from app.i18n import t
+from app.i18n import t, tr
 from app.keyboards import build_rich_editor_keyboard
 from app.routers.button_guide import answer_with_button_guide, button_guide_blocks
 from app.services.blocks import BLOCK_LABELS
@@ -21,16 +21,36 @@ logger = logging.getLogger(__name__)
 MAIN_TEXT = "تخصيص الرسالة\n\nاختر الجزء الذي تريد تعديله:"
 
 
+def editor_dashboard_text(draft: EditorDraft, notice: str | None = None) -> str:
+    lines = []
+    if notice:
+        lines.extend([notice, ""])
+    lines.extend([
+        t("customize"),
+        t("editor.block_count", count=len(draft.blocks)),
+        tr(f"عدد الأزرار: {len(draft.message_buttons)}"),
+        (
+            f"{t('save_page')}: {draft.current_page_title or draft.current_page_id}"
+            if draft.current_page_id
+            else f"{t('save_page')}: —"
+        ),
+        "",
+        t("common.choose_action"),
+    ])
+    return "\n".join(lines)
+
+
 def friendly_rich_error(error: Exception) -> str:
     reason = str(error)
     if "BOT_DOMAIN_INVALID" in reason:
-        return (
-            "BOT_DOMAIN_INVALID: دومين زر Login URL غير مربوط بهذا البوت أو لا يطابق "
-            "الرابط. افتح @BotFather، اختر البوت، أرسل /setdomain وسجّل الدومين فقط "
-            "مثل example.com، ثم استعمل رابط HTTPS من الدومين نفسه. إذا ما تحتاج "
-            "تسجيل دخول، غيّر نوع الزر إلى URL عادي."
-        )
-    return reason
+        return t("ux.errors.login_domain")
+    if "BUTTON_DATA_INVALID" in reason or "BUTTON_DATA" in reason:
+        return t("ux.errors.button_data")
+    if "WRONG_HTTP_URL" in reason or "WEBPAGE_CURL_FAILED" in reason:
+        return t("ux.errors.invalid_url")
+    if "too long" in reason.lower():
+        return t("ux.errors.too_long")
+    return t("ux.errors.telegram_rejected", reason=reason)
 
 
 async def edit_ui(
@@ -166,19 +186,22 @@ async def open_editor(
     state: FSMContext,
     blocks: list[dict[str, Any]],
 ) -> None:
+    draft = EditorDraft(blocks=blocks, message_buttons=[])
     text = (
         f"{t('editor.empty_hint')}\n\n{t('editor.forward_hint')}"
         if not blocks
-        else editor_overview_text(blocks)
+        else editor_dashboard_text(draft)
     )
     if blocks:
-        sent = await message.answer(text, reply_markup=build_rich_editor_keyboard(blocks))
+        sent = await message.answer(
+            text, reply_markup=build_rich_editor_keyboard(blocks, draft.message_buttons),
+        )
     else:
         sent = await answer_with_button_guide(
             message, text, reply_markup=build_rich_editor_keyboard(blocks),
         )
     await state.set_state(RichEditorStates.managing)
-    await draft_store.save(state, EditorDraft(blocks=blocks, message_buttons=[]))
+    await draft_store.save(state, draft)
     await state.update_data(
         current_block_id=None,
         pages_search_query="",
@@ -257,6 +280,7 @@ __all__ = [
     "edit_saved_button_ui",
     "edit_saved_ui",
     "edit_ui",
+    "editor_dashboard_text",
     "editor_overview_text",
     "friendly_rich_error",
     "open_editor",

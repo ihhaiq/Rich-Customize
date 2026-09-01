@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.editor.history import remember
+from app.editor.draft_store import draft_store
 from app.editor.workflow import editor_workflow
 from app.i18n import t
 from app.keyboards import (
@@ -16,7 +17,7 @@ from app.states import RichEditorStates
 
 from app.editor.session import load_editor_session, user_locks
 from app.routers.block_view import block_page
-from app.routers.editor_ui import MAIN_TEXT, edit_ui
+from app.routers.editor_ui import MAIN_TEXT, edit_ui, editor_dashboard_text
 from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_support import block_by_id, save_blocks
 
@@ -112,8 +113,13 @@ async def confirm_delete(callback: CallbackQuery, state: FSMContext) -> None:
         await state.update_data(current_block_id=None)
         await edit_ui(
             callback.message,
-            MAIN_TEXT if result.blocks else t("editor.empty_hint"),
-            build_rich_editor_keyboard(result.blocks),
+            (
+                editor_dashboard_text(await draft_store.load(state), t("delete"))
+                if result.blocks else t("editor.empty_hint")
+            ),
+            build_rich_editor_keyboard(
+                result.blocks, (await draft_store.load(state)).message_buttons,
+            ),
         )
         await callback.answer("تم الحذف")
 
@@ -199,8 +205,10 @@ async def move_to(callback: CallbackQuery, state: FSMContext) -> None:
         await state.update_data(current_block_id=None)
         await edit_ui(
             callback.message,
-            MAIN_TEXT,
-            build_rich_editor_keyboard(result.blocks),
+            editor_dashboard_text(await draft_store.load(state)),
+            build_rich_editor_keyboard(
+                result.blocks, (await draft_store.load(state)).message_buttons,
+            ),
         )
         await callback.answer("تم تغيير الموقع")
 

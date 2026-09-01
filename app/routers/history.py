@@ -13,7 +13,7 @@ from app.keyboards import build_rich_editor_keyboard
 from app.services.blocks import normalize_block_positions
 from app.states import RichEditorStates
 
-from app.routers.editor_ui import MAIN_TEXT, edit_ui
+from app.routers.editor_ui import edit_ui, editor_dashboard_text
 
 
 router = Router(name="editor_history")
@@ -66,8 +66,8 @@ async def undo_editor_action(
     await state.set_state(RichEditorStates.managing)
     await edit_ui(
         callback.message,
-        t("editor.empty_hint") if not draft.blocks else MAIN_TEXT,
-        build_rich_editor_keyboard(draft.blocks),
+        t("editor.empty_hint") if not draft.blocks else editor_dashboard_text(draft),
+        build_rich_editor_keyboard(draft.blocks, draft.message_buttons),
     )
     await callback.answer(t("editor.undo_done"))
 
