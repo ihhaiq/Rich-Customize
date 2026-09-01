@@ -33,13 +33,13 @@ def build_rich_editor_keyboard(
     blocks: list[dict[str, Any]], buttons: list[dict[str, Any]] | None = None,
 ) -> InlineKeyboardMarkup:
     if not blocks:
-        return InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=tr("📚 صفحاتي"), callback_data="r:pages")],
-            [InlineKeyboardButton(
+        return InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text=tr("📚 صفحاتي"), callback_data="r:pages"),
+            InlineKeyboardButton(
                 text=t("ux.editor.add_block"), callback_data="r:addmenu",
                 style=ButtonStyle.PRIMARY,
-            )],
-        ])
+            ),
+        ]])
     rows = [
         [InlineKeyboardButton(text=get_block_button_text(block, index), callback_data=f"r:b:{block['id']}")]
         for index, block in enumerate(sorted(blocks, key=lambda item: item["position"]))
