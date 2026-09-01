@@ -116,7 +116,6 @@ async def answer_with_button_guide(
     reply_markup=None,
 ) -> Message:
     localized_prompt = _localized_prompt(prompt)
-    examples = button_syntax_examples()
     try:
         return await message.bot.send_rich_message(
             chat_id=message.chat.id,
