@@ -56,6 +56,17 @@ def button_syntax_examples() -> str:
     return "\n".join(tr(line) if line else "" for line in _GUIDE_LINES)
 
 
+def _copyable_examples_html() -> str:
+    rendered: list[str] = []
+    for line in _GUIDE_LINES:
+        localized = tr(line) if line else ""
+        escaped = html.escape(localized)
+        rendered.append(
+            f"<code>{escaped}</code>" if localized.startswith("{") else escaped
+        )
+    return "<br>".join(rendered)
+
+
 def button_guide_blocks(prompt: str) -> list[dict[str, Any]]:
     localized_prompt = _localized_prompt(prompt)
     syntax = tr("Syntax: {button name - function: content #color}")
@@ -76,9 +87,10 @@ def button_guide_blocks(prompt: str) -> list[dict[str, Any]]:
                 "text": localized_heading,
                 "html": f"<p>{localized_heading}</p>",
             }),
-            new_block("preformatted", {
+            new_block("paragraph", {
                 "text": example,
-                "html": f"<pre>{html.escape(example)}</pre>",
+                "html": f"<p><code>{html.escape(example)}</code></p>",
+                "rich_text": {"type": "code", "text": example},
                 "parse_inline_buttons": False,
             }),
         ])
@@ -104,7 +116,6 @@ async def answer_with_button_guide(
     reply_markup=None,
 ) -> Message:
     localized_prompt = _localized_prompt(prompt)
-    examples = button_syntax_examples()
     try:
         return await message.bot.send_rich_message(
             chat_id=message.chat.id,
@@ -116,7 +127,7 @@ async def answer_with_button_guide(
             (
                 f"{html.escape(localized_prompt)}\n\n"
                 f"{html.escape(tr('📘 Inline button guide:'))}\n"
-                f"<pre>{html.escape(examples)}</pre>"
+                f"{_copyable_examples_html()}"
             ),
             reply_markup=reply_markup,
             parse_mode="HTML",
