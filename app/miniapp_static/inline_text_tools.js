@@ -478,9 +478,31 @@
   function normalizeLink(value) {
     const href = String(value || "").trim();
     if (!href) return "";
+    if (/^#[^\s#]{1,64}$/u.test(href)) return href;
     if (/^(https?:\/\/|tg:\/\/|mailto:|tel:)/i.test(href)) return href;
     if (/^[\w.-]+\.[a-z]{2,}(?:[/?#].*)?$/i.test(href)) return `https://${href}`;
     return "";
+  }
+
+  function availableAnchors() {
+    const found = [];
+    const visit = blocks => (blocks || []).forEach(block => {
+      if (!block || typeof block !== "object") return;
+      if (block.type === "anchor") {
+        const data = block.data || {};
+        const name = String(data.text || data.name || "").trim();
+        if (name && !found.some(item => item.name === name)) {
+          found.push({
+            name,
+            label: String(data.display_name || name).trim() || name,
+          });
+        }
+      }
+      visit(block.data?.children);
+      (block.data?.items || []).forEach(item => visit(item?.blocks));
+    });
+    visit(current?.blocks || []);
+    return found;
   }
 
   function openLinkEditorFromSelection() {
@@ -497,7 +519,33 @@
     input.dir = "ltr";
     input.inputMode = "url";
     input.placeholder = "https://example.com";
-    input.value = existingLink?.getAttribute("href") || "";
+    const existingHref = existingLink?.getAttribute("href") || "";
+    input.value = existingHref;
+    const anchors = availableAnchors();
+    let targetPicker = null;
+    if (anchors.length) {
+      targetPicker = document.createElement("select");
+      targetPicker.className = "rich-button-editor-input";
+      targetPicker.dir = document.dir;
+      const external = document.createElement("option");
+      external.value = "";
+      external.textContent = tr("inline.link", "Link");
+      targetPicker.appendChild(external);
+      anchors.forEach(anchor => {
+        const option = document.createElement("option");
+        option.value = `#${anchor.name}`;
+        option.textContent = `${tr("block.anchor", "Anchor")}: ${anchor.label}`;
+        targetPicker.appendChild(option);
+      });
+      if (existingHref.startsWith("#") && anchors.some(anchor => `#${anchor.name}` === existingHref)) {
+        targetPicker.value = existingHref;
+      }
+      const syncTargetMode = () => {
+        input.classList.toggle("hidden", Boolean(targetPicker.value));
+      };
+      targetPicker.addEventListener("change", syncTargetMode);
+      syncTargetMode();
+    }
     const actions = document.createElement("div");
     actions.className = "rich-button-editor-actions";
     const cancel = document.createElement("button");
@@ -522,7 +570,7 @@
       : tr("inline.add_link", "إضافة الرابط");
     cancel.onclick = () => closeFloatingMenu();
     save.onclick = () => {
-      const href = normalizeLink(input.value);
+      const href = targetPicker?.value || normalizeLink(input.value);
       if (!href) {
         toast(tr("inline.invalid_link", "أدخل رابطًا صحيحًا يبدأ بـ https:// أو tg://"));
         input.focus();
@@ -542,9 +590,12 @@
     actions.append(cancel);
     if (remove) actions.append(remove);
     actions.append(save);
+    if (targetPicker) menu.append(targetPicker);
     menu.append(input,actions);
     placeNearRect(menu, selectionRect, false);
-    requestAnimationFrame(() => input.focus({preventScroll:true}));
+    requestAnimationFrame(() => (
+      targetPicker?.value ? targetPicker : input
+    ).focus({preventScroll:true}));
   }
 
   function makeSelectionToolbar() {

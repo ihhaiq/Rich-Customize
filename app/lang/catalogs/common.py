@@ -213,6 +213,16 @@ PHRASES: dict[str, str] = {
     "details.inner_moved": "Inner block moved",
     "details.inner_text_required": "Send text for this field.",
     "details.inner_wrong_content": "Send content of the same type as this inner block.",
+    "anchor.no_targets": "Add at least one content block before creating an anchor.",
+    "anchor.name_required": "Send a non-empty anchor name.",
+    "anchor.choose_target": "Choose the block that “{name}” should lead to:",
+    "anchor.change_target": "🎯 Change target block",
+    "anchor.move_before_target": "Move the anchor to {target}",
+    "anchor.delete_with_target": "🗑 Delete the block and linked anchor",
+    "anchor.target_delete_warning": "This block has {count} linked anchor(s). Move them to another block or delete them together.",
+    "anchor.added": "Anchor added.",
+    "anchor.deleted": "Block and linked anchor deleted.",
+    "anchor.target_changed": "Anchor target changed.",
 
     # Canonical Rich Block keys. These are deliberately semantic keys rather
     # than source-language strings so block names can never get stuck midway
@@ -402,6 +412,16 @@ AR_PHRASES: dict[str, str] = {
     "details.inner_moved": "تم نقل البلوك الداخلي",
     "details.inner_text_required": "أرسل نصًا لهذا الحقل.",
     "details.inner_wrong_content": "أرسل محتوى من نفس نوع هذا البلوك الداخلي.",
+    "anchor.no_targets": "أضف بلوك محتوى واحدًا على الأقل قبل إنشاء مرساة.",
+    "anchor.name_required": "أرسل اسمًا غير فارغ للمرساة.",
+    "anchor.choose_target": "اختر البلوك الذي تقود إليه المرساة «{name}»:",
+    "anchor.change_target": "🎯 تغيير البلوك الهدف",
+    "anchor.move_before_target": "نقل المرساة إلى {target}",
+    "anchor.delete_with_target": "🗑 حذف البلوك والمرساة المرتبطة",
+    "anchor.target_delete_warning": "هذا البلوك مرتبط بعدد {count} من المراسي. انقلها إلى بلوك آخر أو احذفها معه.",
+    "anchor.added": "تمت إضافة المرساة.",
+    "anchor.deleted": "تم حذف البلوك والمرساة المرتبطة.",
+    "anchor.target_changed": "تم تغيير هدف المرساة.",
     "block.content": "📦 محتوى",
     "block.text": "📝 نص",
     "block.paragraph": "📝 فقرة",
@@ -1063,6 +1083,210 @@ DETAILS_INNER_TRANSLATIONS = {
     for language, values in DETAILS_INNER_VALUES.items()
 }
 
+ANCHOR_FLOW_KEYS = (
+    "anchor.no_targets", "anchor.name_required", "anchor.choose_target",
+    "anchor.change_target", "anchor.move_before_target",
+    "anchor.delete_with_target", "anchor.target_delete_warning",
+    "anchor.added", "anchor.deleted", "anchor.target_changed",
+)
+
+ANCHOR_FLOW_VALUES: dict[str, tuple[str, ...]] = {
+    "es": (
+        "Añade al menos un bloque de contenido antes de crear un ancla.",
+        "Envía un nombre de ancla que no esté vacío.",
+        "Elige el bloque al que debe llevar «{name}»:",
+        "🎯 Cambiar bloque de destino", "Mover el ancla a {target}",
+        "🗑 Eliminar el bloque y el ancla vinculada",
+        "Este bloque tiene {count} ancla(s) vinculada(s). Muévelas a otro bloque o elimínalas juntas.",
+        "Ancla añadida.", "Bloque y ancla vinculada eliminados.", "Destino del ancla cambiado.",
+    ),
+    "fr": (
+        "Ajoutez au moins un bloc de contenu avant de créer une ancre.",
+        "Envoyez un nom d’ancre non vide.",
+        "Choisissez le bloc vers lequel «{name}» doit mener :",
+        "🎯 Changer le bloc cible", "Déplacer l’ancre vers {target}",
+        "🗑 Supprimer le bloc et l’ancre liée",
+        "Ce bloc possède {count} ancre(s) liée(s). Déplacez-les vers un autre bloc ou supprimez-les ensemble.",
+        "Ancre ajoutée.", "Bloc et ancre liée supprimés.", "Cible de l’ancre modifiée.",
+    ),
+    "de": (
+        "Füge mindestens einen Inhaltsblock hinzu, bevor du einen Anker erstellst.",
+        "Sende einen nicht leeren Ankernamen.",
+        "Wähle den Block, zu dem „{name}“ führen soll:",
+        "🎯 Zielblock ändern", "Anker zu {target} verschieben",
+        "🗑 Block und verknüpften Anker löschen",
+        "Dieser Block hat {count} verknüpfte(n) Anker. Verschiebe sie zu einem anderen Block oder lösche sie gemeinsam.",
+        "Anker hinzugefügt.", "Block und verknüpfter Anker gelöscht.", "Ankerziel geändert.",
+    ),
+    "it": (
+        "Aggiungi almeno un blocco di contenuto prima di creare un’ancora.",
+        "Invia un nome non vuoto per l’ancora.",
+        "Scegli il blocco a cui deve portare «{name}»:",
+        "🎯 Cambia blocco di destinazione", "Sposta l’ancora su {target}",
+        "🗑 Elimina il blocco e l’ancora collegata",
+        "Questo blocco ha {count} ancora/e collegata/e. Spostale su un altro blocco o eliminale insieme.",
+        "Ancora aggiunta.", "Blocco e ancora collegata eliminati.", "Destinazione dell’ancora cambiata.",
+    ),
+    "pt": (
+        "Adicione pelo menos um bloco de conteúdo antes de criar uma âncora.",
+        "Envie um nome de âncora que não esteja vazio.",
+        "Escolha o bloco para o qual “{name}” deve levar:",
+        "🎯 Alterar bloco de destino", "Mover a âncora para {target}",
+        "🗑 Excluir o bloco e a âncora vinculada",
+        "Este bloco tem {count} âncora(s) vinculada(s). Mova-as para outro bloco ou exclua-as juntas.",
+        "Âncora adicionada.", "Bloco e âncora vinculada excluídos.", "Destino da âncora alterado.",
+    ),
+    "nl": (
+        "Voeg minstens één inhoudsblok toe voordat je een anker maakt.",
+        "Stuur een niet-lege ankernaam.",
+        "Kies het blok waarnaar ‘{name}’ moet leiden:",
+        "🎯 Doelblok wijzigen", "Anker naar {target} verplaatsen",
+        "🗑 Blok en gekoppeld anker verwijderen",
+        "Dit blok heeft {count} gekoppelde anker(s). Verplaats ze naar een ander blok of verwijder ze samen.",
+        "Anker toegevoegd.", "Blok en gekoppeld anker verwijderd.", "Ankerdoel gewijzigd.",
+    ),
+    "pl": (
+        "Dodaj co najmniej jeden blok treści przed utworzeniem kotwicy.",
+        "Wyślij niepustą nazwę kotwicy.",
+        "Wybierz blok, do którego ma prowadzić „{name}”:",
+        "🎯 Zmień blok docelowy", "Przenieś kotwicę do {target}",
+        "🗑 Usuń blok i połączoną kotwicę",
+        "Ten blok ma {count} połączonych kotwic. Przenieś je do innego bloku albo usuń razem.",
+        "Kotwica dodana.", "Blok i połączona kotwica usunięte.", "Cel kotwicy zmieniony.",
+    ),
+    "uk": (
+        "Додайте принаймні один блок вмісту перед створенням якоря.",
+        "Надішліть непорожню назву якоря.",
+        "Виберіть блок, до якого має вести «{name}»:",
+        "🎯 Змінити цільовий блок", "Перемістити якір до {target}",
+        "🗑 Видалити блок і пов’язаний якір",
+        "Цей блок має {count} пов’язаних якорів. Перемістіть їх до іншого блоку або видаліть разом.",
+        "Якір додано.", "Блок і пов’язаний якір видалено.", "Ціль якоря змінено.",
+    ),
+    "ru": (
+        "Добавьте хотя бы один блок содержимого перед созданием якоря.",
+        "Отправьте непустое имя якоря.",
+        "Выберите блок, к которому должен вести «{name}»:",
+        "🎯 Изменить целевой блок", "Переместить якорь к {target}",
+        "🗑 Удалить блок и связанный якорь",
+        "С этим блоком связано якорей: {count}. Переместите их к другому блоку или удалите вместе.",
+        "Якорь добавлен.", "Блок и связанный якорь удалены.", "Цель якоря изменена.",
+    ),
+    "tr": (
+        "Çapa oluşturmadan önce en az bir içerik bloğu ekleyin.",
+        "Boş olmayan bir çapa adı gönderin.",
+        "“{name}” öğesinin yönlendireceği bloğu seçin:",
+        "🎯 Hedef bloğu değiştir", "Çapayı {target} bloğuna taşı",
+        "🗑 Bloğu ve bağlı çapayı sil",
+        "Bu bloğa bağlı {count} çapa var. Bunları başka bir bloğa taşıyın veya birlikte silin.",
+        "Çapa eklendi.", "Blok ve bağlı çapa silindi.", "Çapa hedefi değiştirildi.",
+    ),
+    "fa": (
+        "پیش از ساخت لنگر، دست‌کم یک بلوک محتوا اضافه کنید.",
+        "یک نام غیرخالی برای لنگر بفرستید.",
+        "بلوکی را انتخاب کنید که «{name}» باید به آن برود:",
+        "🎯 تغییر بلوک مقصد", "انتقال لنگر به {target}",
+        "🗑 حذف بلوک و لنگر پیوندخورده",
+        "این بلوک {count} لنگر پیوندخورده دارد. آن‌ها را به بلوک دیگری منتقل کنید یا با هم حذف کنید.",
+        "لنگر اضافه شد.", "بلوک و لنگر پیوندخورده حذف شدند.", "مقصد لنگر تغییر کرد.",
+    ),
+    "ku": (
+        "Berî afirandina lengerê herî kêm blokeke naverokê lê zêde bikin.",
+        "Navê lengerekî nevala bişînin.",
+        "Bloka ku “{name}” dê ber bi wê ve bibe hilbijêrin:",
+        "🎯 Bloka armancê biguherîne", "Lengerê bibe {target}",
+        "🗑 Blok û lengera girêdayî jê bibe",
+        "Ev blok {count} lengerên girêdayî hene. Wan bibin blokeke din an bi hev re jê bibin.",
+        "Lenger hate zêdekirin.", "Blok û lengera girêdayî hatin jêbirin.", "Armanca lengerê hat guhertin.",
+    ),
+    "ur": (
+        "اینکر بنانے سے پہلے کم از کم ایک مواد کا بلاک شامل کریں۔",
+        "اینکر کا خالی نہ ہونے والا نام بھیجیں۔",
+        "وہ بلاک منتخب کریں جہاں «{name}» لے جائے:",
+        "🎯 ہدف بلاک تبدیل کریں", "اینکر کو {target} پر منتقل کریں",
+        "🗑 بلاک اور منسلک اینکر حذف کریں",
+        "اس بلاک کے ساتھ {count} اینکر منسلک ہیں۔ انہیں دوسرے بلاک پر منتقل کریں یا ایک ساتھ حذف کریں۔",
+        "اینکر شامل ہو گیا۔", "بلاک اور منسلک اینکر حذف ہو گئے۔", "اینکر کا ہدف تبدیل ہو گیا۔",
+    ),
+    "hi": (
+        "एंकर बनाने से पहले कम से कम एक सामग्री ब्लॉक जोड़ें।",
+        "एंकर का कोई खाली न होने वाला नाम भेजें।",
+        "वह ब्लॉक चुनें जहाँ “{name}” ले जाए:",
+        "🎯 लक्ष्य ब्लॉक बदलें", "एंकर को {target} पर ले जाएँ",
+        "🗑 ब्लॉक और जुड़े एंकर को हटाएँ",
+        "इस ब्लॉक से {count} एंकर जुड़े हैं। उन्हें दूसरे ब्लॉक पर ले जाएँ या साथ में हटाएँ।",
+        "एंकर जोड़ दिया गया।", "ब्लॉक और जुड़ा एंकर हटा दिए गए।", "एंकर का लक्ष्य बदल दिया गया।",
+    ),
+    "id": (
+        "Tambahkan setidaknya satu blok konten sebelum membuat jangkar.",
+        "Kirim nama jangkar yang tidak kosong.",
+        "Pilih blok yang akan dituju oleh “{name}”:",
+        "🎯 Ubah blok tujuan", "Pindahkan jangkar ke {target}",
+        "🗑 Hapus blok dan jangkar terkait",
+        "Blok ini memiliki {count} jangkar terkait. Pindahkan ke blok lain atau hapus bersama.",
+        "Jangkar ditambahkan.", "Blok dan jangkar terkait dihapus.", "Tujuan jangkar diubah.",
+    ),
+    "ja": (
+        "アンカーを作成する前に、コンテンツブロックを1つ以上追加してください。",
+        "空でないアンカー名を送信してください。",
+        "「{name}」の移動先ブロックを選択してください：",
+        "🎯 対象ブロックを変更", "アンカーを{target}へ移動",
+        "🗑 ブロックとリンク済みアンカーを削除",
+        "このブロックには{count}個のアンカーがリンクされています。別のブロックへ移動するか、一緒に削除してください。",
+        "アンカーを追加しました。", "ブロックとリンク済みアンカーを削除しました。", "アンカーの対象を変更しました。",
+    ),
+    "ko": (
+        "앵커를 만들기 전에 콘텐츠 블록을 하나 이상 추가하세요.",
+        "비어 있지 않은 앵커 이름을 보내세요.",
+        "‘{name}’이 이동할 블록을 선택하세요:",
+        "🎯 대상 블록 변경", "앵커를 {target}(으)로 이동",
+        "🗑 블록과 연결된 앵커 삭제",
+        "이 블록에는 {count}개의 앵커가 연결되어 있습니다. 다른 블록으로 옮기거나 함께 삭제하세요.",
+        "앵커를 추가했습니다.", "블록과 연결된 앵커를 삭제했습니다.", "앵커 대상을 변경했습니다.",
+    ),
+    "vi": (
+        "Hãy thêm ít nhất một khối nội dung trước khi tạo neo.",
+        "Gửi tên neo không để trống.",
+        "Chọn khối mà “{name}” sẽ dẫn đến:",
+        "🎯 Đổi khối đích", "Chuyển neo đến {target}",
+        "🗑 Xóa khối và neo đã liên kết",
+        "Khối này có {count} neo liên kết. Hãy chuyển chúng sang khối khác hoặc xóa cùng nhau.",
+        "Đã thêm neo.", "Đã xóa khối và neo liên kết.", "Đã đổi đích của neo.",
+    ),
+    "th": (
+        "เพิ่มบล็อกเนื้อหาอย่างน้อยหนึ่งบล็อกก่อนสร้างจุดยึด",
+        "ส่งชื่อจุดยึดที่ไม่ว่างเปล่า",
+        "เลือกบล็อกที่ “{name}” จะพาไป:",
+        "🎯 เปลี่ยนบล็อกเป้าหมาย", "ย้ายจุดยึดไปยัง {target}",
+        "🗑 ลบบล็อกและจุดยึดที่เชื่อมโยง",
+        "บล็อกนี้มีจุดยึดที่เชื่อมโยง {count} จุด ย้ายไปบล็อกอื่นหรือลบพร้อมกัน",
+        "เพิ่มจุดยึดแล้ว", "ลบบล็อกและจุดยึดที่เชื่อมโยงแล้ว", "เปลี่ยนเป้าหมายของจุดยึดแล้ว",
+    ),
+    "zh-hans": (
+        "创建锚点前，请至少添加一个内容区块。",
+        "请发送一个非空的锚点名称。",
+        "请选择“{name}”要跳转到的区块：",
+        "🎯 更改目标区块", "将锚点移到{target}",
+        "🗑 删除区块和关联锚点",
+        "此区块关联了 {count} 个锚点。请将它们移到其他区块，或一起删除。",
+        "已添加锚点。", "已删除区块和关联锚点。", "已更改锚点目标。",
+    ),
+    "zh-hant": (
+        "建立錨點前，請至少新增一個內容區塊。",
+        "請傳送一個非空的錨點名稱。",
+        "請選擇「{name}」要跳轉到的區塊：",
+        "🎯 變更目標區塊", "將錨點移到{target}",
+        "🗑 刪除區塊和關聯錨點",
+        "此區塊關聯了 {count} 個錨點。請將它們移到其他區塊，或一起刪除。",
+        "已新增錨點。", "已刪除區塊和關聯錨點。", "已變更錨點目標。",
+    ),
+}
+
+ANCHOR_FLOW_TRANSLATIONS = {
+    language: dict(zip(ANCHOR_FLOW_KEYS, values, strict=True))
+    for language, values in ANCHOR_FLOW_VALUES.items()
+}
+
 KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
     language: {f"block.{name}": value for name, value in values.items()}
     for language, values in BLOCK_KEY_TRANSLATIONS.items()
@@ -1090,6 +1314,9 @@ for language, translations in RICH_IMPORT_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 for language, translations in DETAILS_INNER_TRANSLATIONS.items():
+    KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
+
+for language, translations in ANCHOR_FLOW_TRANSLATIONS.items():
     KEY_TRANSLATIONS.setdefault(language, {}).update(translations)
 
 NAVIGATION_KEYS = (

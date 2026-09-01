@@ -12,6 +12,7 @@ from app.editor.document import (
 )
 from app.editor.models import clone_blocks
 from app.editor.registry import block_registry
+from app.services.anchors import align_linked_anchors, linked_anchors
 
 
 @dataclass(slots=True)
@@ -33,10 +34,13 @@ class EditorWorkflow:
     ) -> MutationResult:
         working = clone_blocks(blocks)
         added = add_block(working, block, index=index)
+        align_linked_anchors(working)
         return MutationResult(working, True, added)
 
     def delete(self, blocks: list[dict[str, Any]], block_id: str) -> MutationResult:
         working = clone_blocks(blocks)
+        for anchor in linked_anchors(working, block_id):
+            delete_block(working, str(anchor.get("id")))
         changed = delete_block(working, block_id)
         return MutationResult(working, changed)
 
@@ -48,6 +52,7 @@ class EditorWorkflow:
     ) -> MutationResult:
         working = clone_blocks(blocks)
         changed = move_block(working, block_id, new_index)
+        align_linked_anchors(working)
         moved = next((item for item in working if item.get("id") == block_id), None)
         return MutationResult(working, changed, moved)
 
@@ -70,6 +75,11 @@ class EditorWorkflow:
     ) -> MutationResult:
         working = clone_blocks(blocks)
         duplicate = duplicate_block(working, block_id, after=after)
+        if duplicate is not None and duplicate.get("type") == "anchor":
+            data = duplicate.setdefault("data", {})
+            data["text"] = f"anchor_{duplicate['id'][:10]}"
+            data["html"] = f'<a name="{data["text"]}"></a>'
+        align_linked_anchors(working)
         return MutationResult(working, duplicate is not None, duplicate)
 
     def import_blocks(self, blocks: list[dict[str, Any]]) -> MutationResult:

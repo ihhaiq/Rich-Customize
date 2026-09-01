@@ -4,6 +4,7 @@ from typing import Any
 
 from app.i18n import t
 from app.services.blocks import BLOCK_LABELS
+from app.services.anchors import anchor_display_name, anchor_target_id
 
 
 def block_page(block: dict[str, Any], blocks: list[dict[str, Any]]) -> str:
@@ -40,6 +41,19 @@ def block_page(block: dict[str, Any], blocks: list[dict[str, Any]]) -> str:
                 continue
             status = "☑️" if item.get("is_checked") else "☐"
             lines.append(f"{task_index}. {status} {item.get('text', '')}")
+
+    if block.get("type") == "anchor":
+        target_id = anchor_target_id(block)
+        target = next(
+            (item for item in ordered if str(item.get("id")) == target_id),
+            None,
+        )
+        target_label = (
+            BLOCK_LABELS.get(str(target.get("type", "")), t("block.content"))
+            if target is not None
+            else "—"
+        )
+        lines.extend(["", f"⚓ {anchor_display_name(block)}", f"↳ {target_label}"])
 
     lines.extend(["", t("common.choose_action")])
     return "\n".join(lines)

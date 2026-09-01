@@ -11,6 +11,7 @@ from aiogram.types import CallbackQuery, Message
 from app.i18n import t
 from app.keyboards import (
     build_add_block_keyboard,
+    build_anchor_target_keyboard,
     build_heading_level_keyboard,
     build_list_type_keyboard,
 )
@@ -23,6 +24,7 @@ from app.services.factory import (
     text_data,
 )
 from app.services.parser import message_to_blocks, messages_to_blocks
+from app.services.anchors import anchor_name, anchor_targets, new_anchor_data
 from app.states import RichEditorStates
 
 from app.editor.document import get_block_by_id
@@ -112,6 +114,9 @@ async def choose_add_block(
     if block_type not in FINAL_RICH_BLOCK_TYPES:
         await callback.answer("نوع غير معروف.", show_alert=True)
         return
+    if block_type == "anchor" and not anchor_targets(blocks):
+        await callback.answer(t("anchor.no_targets"), show_alert=True)
+        return
     if block_type == "heading":
         if isinstance(callback.message, Message):
             await callback.message.answer(
@@ -137,7 +142,7 @@ async def choose_add_block(
         "preformatted": code_input_prompt(),
         "footer": "أرسل نص التذييل",
         "mathematical_expression": math_input_prompt(),
-        "anchor": "أرسل اسم المرساة",
+        "anchor": t("details.send_anchor"),
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
         "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
         "blockquote": "أرسل نص الاقتباس، أو أرسل وسائط/ملفًا لوضعه داخل الاقتباس",
@@ -246,6 +251,35 @@ async def receive_added_block(
     if block_type not in FINAL_RICH_BLOCK_TYPES:
         await message.answer("انتهت عملية الإضافة. ارجع إلى المحرّر وحاول مجددًا.")
         await state.set_state(RichEditorStates.managing)
+        return
+
+    if block_type == "anchor" and step == "content":
+        display_name = " ".join((message.text or "").split()).strip()[:64]
+        if not display_name:
+            await message.answer(t("anchor.name_required"))
+            return
+        blocks = data.get("blocks") if isinstance(data.get("blocks"), list) else []
+        targets = anchor_targets(blocks)
+        if not targets:
+            await message.answer(t("anchor.no_targets"))
+            return
+        await delete_add_step_messages(bot, message, data, state)
+        await state.update_data(
+            add_step="anchor_target",
+            add_payload={"display_name": display_name},
+        )
+        await send_add_prompt(
+            message,
+            state,
+            t("anchor.choose_target", name=display_name),
+            reply_markup=build_anchor_target_keyboard(blocks),
+        )
+        return
+
+    if block_type == "anchor" and step == "anchor_target":
+        await message.answer(
+            t("anchor.choose_target", name=str(payload.get("display_name", ""))),
+        )
         return
 
     if block_type in QUOTE_TYPES and step == "quote_text":
@@ -395,9 +429,59 @@ async def receive_added_block(
     )
 
 
+@router.callback_query(F.data.startswith("r:at:"))
+async def choose_anchor_target(
+    callback: CallbackQuery,
+    state: FSMContext,
+    bot: Bot,
+) -> None:
+    session = await load_editor_session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    _, blocks = session
+    state_data = await state.get_data()
+    payload = state_data.get("add_payload") or {}
+    if (
+        state_data.get("pending_add_type") != "anchor"
+        or state_data.get("add_step") != "anchor_target"
+        or not payload.get("display_name")
+    ):
+        await callback.answer(t("navigation.expired"), show_alert=True)
+        return
+    target_id = callback.data.rsplit(":", 1)[-1]
+    target = next(
+        (
+            block
+            for block in anchor_targets(blocks)
+            if str(block.get("id")) == target_id
+        ),
+        None,
+    )
+    if target is None:
+        await callback.answer(t("editor.block_missing"), show_alert=True)
+        return
+    anchor = new_block(
+        "anchor",
+        new_anchor_data(
+            str(payload["display_name"]),
+            target_id,
+            existing_names=(anchor_name(block) for block in blocks),
+        ),
+    )
+    await finish_add(
+        callback.message,
+        state,
+        bot,
+        anchor,
+        index=int(target.get("position", 0)),
+    )
+    await callback.answer(t("anchor.added"))
+
+
 __all__ = [
     "add_block_menu",
     "choose_add_block",
+    "choose_anchor_target",
     "choose_heading_level",
     "choose_list_type",
     "open_list_type_menu",

@@ -6,7 +6,8 @@ from aiogram.enums import ButtonStyle
 from aiogram.types import DisabledButton, InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.i18n import t
-from app.services.blocks import table_rows
+from app.services.anchors import anchor_target_id, anchor_targets
+from app.services.blocks import get_block_button_text, table_rows
 from app.services.factory import MEDIA_CAPTION_TYPES, QUOTE_TYPES
 
 
@@ -14,6 +15,7 @@ def build_block_editor_keyboard(
     block: dict[str, Any], blocks: list[dict[str, Any]],
 ) -> InlineKeyboardMarkup:
     block_id = block["id"]
+    linked_anchor = block["type"] == "anchor" and bool(anchor_target_id(block))
     ordered = sorted(blocks, key=lambda item: item["position"])
     position = ordered.index(block)
     rows: list[list[InlineKeyboardButton]] = [[InlineKeyboardButton(
@@ -23,6 +25,10 @@ def build_block_editor_keyboard(
     if block["type"] != "divider":
         label = "✏️ تعديل المحتوى" if block["type"] == "details" else "✏️ تعديل"
         rows.append([InlineKeyboardButton(text=label, callback_data=f"r:e:{block_id}")])
+    if block["type"] == "anchor":
+        rows.append([InlineKeyboardButton(
+            text=t("anchor.change_target"), callback_data=f"r:am:{block_id}",
+        )])
     if block["type"] == "details":
         rows.append([InlineKeyboardButton(
             text="📝 تعديل عنوان التفاصيل", callback_data=f"r:f:{block_id}:summary",
@@ -57,11 +63,11 @@ def build_block_editor_keyboard(
         rows.append([InlineKeyboardButton(
             text="✍️ تعديل الكاتب", callback_data=f"r:f:{block_id}:credit",
         )])
-    rows.extend([
-        [InlineKeyboardButton(
-            text="🗑 حذف", callback_data=f"r:d:{block_id}", style=ButtonStyle.DANGER,
-        )],
-        [
+    rows.append([InlineKeyboardButton(
+        text="🗑 حذف", callback_data=f"r:d:{block_id}", style=ButtonStyle.DANGER,
+    )])
+    if not linked_anchor:
+        rows.append([
             InlineKeyboardButton(
                 text=t("block.move_up"),
                 callback_data=None if position <= 0 else f"r:mu:{block_id}",
@@ -72,9 +78,8 @@ def build_block_editor_keyboard(
                 callback_data=None if position >= len(ordered) - 1 else f"r:md:{block_id}",
                 disabled=DisabledButton() if position >= len(ordered) - 1 else None,
             ),
-        ],
-        [InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")],
-    ])
+        ])
+    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -181,6 +186,48 @@ def build_delete_confirmation_keyboard(block_id: str) -> InlineKeyboardMarkup:
     ]])
 
 
+def build_anchor_target_keyboard(
+    blocks: list[dict[str, Any]],
+    *,
+    callback_prefix: str = "r:at",
+    exclude_ids: set[str] | None = None,
+    back_data: str = "r:addmenu",
+) -> InlineKeyboardMarkup:
+    excluded = exclude_ids or set()
+    ordered = sorted(blocks, key=lambda item: int(item.get("position", 0)))
+    candidates = anchor_targets(ordered, exclude_ids=excluded)
+    rows = [[InlineKeyboardButton(
+        text=get_block_button_text(block, ordered.index(block)),
+        callback_data=f"{callback_prefix}:{block['id']}",
+    )] for block in candidates]
+    rows.append([InlineKeyboardButton(text=t("common.cancel"), callback_data=back_data)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_linked_anchor_delete_keyboard(
+    block_id: str,
+    blocks: list[dict[str, Any]],
+) -> InlineKeyboardMarkup:
+    ordered = sorted(blocks, key=lambda item: int(item.get("position", 0)))
+    candidates = anchor_targets(ordered, exclude_ids={block_id})
+    rows = [[InlineKeyboardButton(
+        text=t(
+            "anchor.move_before_target",
+            target=get_block_button_text(target, ordered.index(target)),
+        ),
+        callback_data=f"r:adr:{block_id}:{target['id']}",
+    )] for target in candidates]
+    rows.append([InlineKeyboardButton(
+        text=t("anchor.delete_with_target"),
+        callback_data=f"r:adc:{block_id}",
+        style=ButtonStyle.DANGER,
+    )])
+    rows.append([InlineKeyboardButton(
+        text=t("common.cancel"), callback_data=f"r:b:{block_id}",
+    )])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def build_block_position_keyboard(blocks: list[dict[str, Any]], block_id: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for index, block in enumerate(sorted(blocks, key=lambda item: item["position"])):
@@ -196,11 +243,13 @@ def build_block_position_keyboard(blocks: list[dict[str, Any]], block_id: str) -
 
 __all__ = [
     "build_add_block_keyboard",
+    "build_anchor_target_keyboard",
     "build_block_editor_keyboard",
     "build_block_position_keyboard",
     "build_delete_confirmation_keyboard",
     "build_heading_level_keyboard",
     "build_list_type_keyboard",
+    "build_linked_anchor_delete_keyboard",
     "build_table_cell_keyboard",
     "build_table_options_keyboard",
 ]

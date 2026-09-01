@@ -18,6 +18,7 @@ from app.services.factory import (
     text_data,
 )
 from app.services.parser import message_to_blocks, messages_to_blocks, replacement_data
+from app.services.anchors import set_anchor_display_name
 from app.states import RichEditorStates
 
 from app.editor.session import albums, load_editor_session
@@ -73,7 +74,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         "preformatted": code_input_prompt(editing=True),
         "footer": "أرسل التذييل الجديد",
         "mathematical_expression": math_input_prompt(editing=True),
-        "anchor": "أرسل اسم المرساة الجديد",
+        "anchor": t("details.send_anchor"),
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر",
         "table": "أرسل صفوف الجدول؛ افصل الأعمدة بعلامة |",
         "blockquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لوضعه داخله",
@@ -121,13 +122,14 @@ async def edit_block_field(callback: CallbackQuery, state: FSMContext) -> None:
     block = block_by_id(blocks, block_id)
     if block is not None and block.get("type") == "details":
         raise SkipHandler
-    field_allowed = bool(block) and (
+    field_allowed = block is not None and (
         (field == "caption" and block.get("type") in MEDIA_CAPTION_TYPES)
         or (field == "credit" and block.get("type") in MEDIA_CAPTION_TYPES | QUOTE_TYPES)
     )
     if not field_allowed:
         await callback.answer("هذا الحقل لم يعد موجودًا.", show_alert=True)
         return
+    assert block is not None
     prompts = {
         "caption": "أرسل تذييل الوسائط الجديد، أو /remove لحذفه",
         "credit": "أرسل اسم الكاتب/المصدر الجديد، أو /remove لحذفه",
@@ -220,9 +222,17 @@ async def receive_replacement(
                     replacement["quote_html"] = caption["data"].get("html", "")
             else:
                 replacement = None
+    elif expected == "anchor":
+        replacement = copy.deepcopy(block.get("data", {}))
+        if not message.text or not set_anchor_display_name(
+            {"type": "anchor", "data": replacement},
+            message.text,
+        ):
+            await message.answer(t("anchor.name_required"))
+            return
     elif expected in {
         "paragraph", "heading", "preformatted", "footer",
-        "mathematical_expression", "anchor", "list", "table",
+        "mathematical_expression", "list", "table",
     }:
         replacement = (
             text_data(

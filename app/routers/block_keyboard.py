@@ -14,7 +14,7 @@ def build_managed_block_keyboard(
     markup = build_block_editor_keyboard(block, blocks)
     rows = [list(row) for row in markup.inline_keyboard]
     block_id = str(block["id"])
-    if not any(
+    if block.get("type") != "anchor" and not any(
         getattr(button, "callback_data", None) == f"r:dup:{block_id}"
         for row in rows
         for button in row

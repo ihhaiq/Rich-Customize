@@ -38,6 +38,14 @@ def test_requested_inline_formats_are_available() -> None:
     assert 'tr("inline.create_button"' in source
 
 
+def test_inline_link_editor_can_target_message_anchors() -> None:
+    source = (STATIC / "inline_text_tools.js").read_text("utf-8")
+    assert "function availableAnchors()" in source
+    assert "data.display_name || name" in source
+    assert "targetPicker?.value || normalizeLink(input.value)" in source
+    assert r"/^#[^\s#]{1,64}$/u" in source
+
+
 def test_russian_catalog_covers_referenced_interface_text() -> None:
     sources = "\n".join(
         path.read_text("utf-8")

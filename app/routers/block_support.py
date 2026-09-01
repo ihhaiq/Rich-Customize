@@ -32,11 +32,13 @@ async def finish_add(
     state: FSMContext,
     bot: Bot,
     block: dict[str, Any],
+    *,
+    index: int | None = None,
 ) -> dict[str, Any]:
     data = await state.get_data()
     draft = await draft_store.load(state)
     await remember(state)
-    result = editor_workflow.add(draft.blocks, block)
+    result = editor_workflow.add(draft.blocks, block, index=index)
     draft.blocks = result.blocks
     await draft_store.save(state, draft)
     await state.set_state(RichEditorStates.managing)

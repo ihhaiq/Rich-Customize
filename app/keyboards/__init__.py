@@ -4,11 +4,13 @@
 
 from app.keyboards.blocks import (
     build_add_block_keyboard,
+    build_anchor_target_keyboard,
     build_block_editor_keyboard,
     build_block_position_keyboard,
     build_delete_confirmation_keyboard,
     build_heading_level_keyboard,
     build_list_type_keyboard,
+    build_linked_anchor_delete_keyboard,
     build_table_cell_keyboard,
     build_table_options_keyboard,
 )
