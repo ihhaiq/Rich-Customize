@@ -267,7 +267,7 @@ class ButtonKeyboardTests(unittest.TestCase):
         }
 
         self.assertEqual(by_callback["r:addmenu"].style, ButtonStyle.PRIMARY)
-        self.assertIsNone(by_callback["r:tools"].style)
+        self.assertEqual(by_callback["r:tools"].style, ButtonStyle.PRIMARY)
         self.assertNotIn("r:buttons", by_callback)
         self.assertNotIn("r:savepage", by_callback)
         self.assertNotIn("r:pages", by_callback)

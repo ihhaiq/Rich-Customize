@@ -30,6 +30,7 @@ class EditorActionVisibilityTests(unittest.TestCase):
         self.assertIn("r:result", callbacks)
         self.assertIn("r:addmenu", callbacks)
         self.assertIn("r:post", callbacks)
+        self.assertEqual(callbacks["r:tools"].style, ButtonStyle.PRIMARY)
 
     def test_two_or_more_blocks_show_undo(self):
         keyboard = build_rich_editor_keyboard([
@@ -49,6 +50,10 @@ class EditorActionVisibilityTests(unittest.TestCase):
             [button.callback_data for button in history_row[:2]],
             ["r:undo", "r:redo"],
         )
+        history_index = keyboard.inline_keyboard.index(history_row)
+        tools_row = keyboard.inline_keyboard[history_index + 1]
+        self.assertEqual([button.callback_data for button in tools_row], ["r:tools"])
+        self.assertEqual(tools_row[0].style, ButtonStyle.PRIMARY)
 
     def test_save_page_is_available_inside_more_tools(self):
         token = i18n_core._language.set("ar")
