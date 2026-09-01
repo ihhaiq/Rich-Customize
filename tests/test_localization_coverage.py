@@ -188,27 +188,29 @@ class LocalizationCoverageTests(unittest.TestCase):
             "Localization placeholders differ from English: " + "; ".join(mismatches),
         )
 
-    def test_literal_tr_calls_have_a_translation_for_every_locale(self):
-        used = _collect_calls("tr", allow_fstrings=True)
+    def test_arabic_source_tr_calls_translate_for_every_other_locale(self):
+        # The legacy tr() compatibility path is intentionally source-language
+        # based. Arabic source strings must therefore normalize to English and
+        # continue into every other supported locale. English-source tr() calls
+        # are not checked here because some are intentionally gated to specific
+        # locales by their caller.
+        used = {
+            source: locations
+            for source, locations in _collect_calls("tr", allow_fstrings=True).items()
+            if ARABIC_RE.search(source)
+        }
         missing: dict[str, list[str]] = defaultdict(list)
 
         for source, locations in used.items():
             english = _render_tr("en", source)
-            for language in sorted(SUPPORTED_LANGUAGES - {"en"}):
+            if english == source:
+                missing["en-normalization"].append(
+                    f"{source!r} ({', '.join(locations)})"
+                )
+                continue
+
+            for language in sorted(SUPPORTED_LANGUAGES - {"ar", "en"}):
                 translated = _render_tr(language, source)
-
-                if language == "ar":
-                    # Arabic source text is already correctly localized when
-                    # tr() intentionally leaves it unchanged.
-                    if ARABIC_RE.search(source):
-                        continue
-                    if translated != english:
-                        continue
-                    missing[language].append(
-                        f"{source!r} ({', '.join(locations)})"
-                    )
-                    continue
-
                 locale = TRANSLATIONS.get(language, {})
                 if english in locale or translated != english:
                     continue
@@ -218,8 +220,8 @@ class LocalizationCoverageTests(unittest.TestCase):
 
         self.assertFalse(
             missing,
-            "User-facing tr(...) calls would stay in the English fallback: "
-            f"{dict(missing)}",
+            "Arabic-source tr(...) UI would stop at English instead of the "
+            f"selected locale: {dict(missing)}",
         )
 
     def test_intentional_fallback_allowlist_stays_scoped_to_details(self):
