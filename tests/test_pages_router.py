@@ -4,10 +4,7 @@ import copy
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
-
-from aiogram import F, Router
 
 from app.editor.draft_store import EditorDraft
 from app.editor.history import UNDO_KEY
@@ -17,12 +14,6 @@ from app.routers.page_navigation_router import (
 )
 from app.routers.page_support import save_changed_draft
 from app.routers.pages import (
-    LEGACY_PAGE_CALLBACKS,
-    LEGACY_PAGE_GUEST_MESSAGES,
-    LEGACY_PAGE_INLINE_QUERIES,
-    LEGACY_PAGE_MESSAGES,
-    detach_legacy_page_handlers,
-    legacy_page_handlers,
     router as pages_router,
 )
 from app.services.page_registry import PageRegistry
@@ -141,46 +132,19 @@ class PagesRouterTests(unittest.TestCase):
             {"page_actions", "page_search", "page_delivery", "page_navigation"},
         )
 
-    def test_detach_removes_page_handlers_from_every_observer(self):
-        legacy = SimpleNamespace(router=Router(name="legacy-pages-test"))
-        sets = {
-            "callback_query": LEGACY_PAGE_CALLBACKS,
-            "message": LEGACY_PAGE_MESSAGES,
-            "inline_query": LEGACY_PAGE_INLINE_QUERIES,
-            "guest_message": LEGACY_PAGE_GUEST_MESSAGES,
-        }
-        for observer_name, names in sets.items():
-            observer = getattr(legacy.router, observer_name)
-            for index, name in enumerate(sorted(names)):
-                async def handler(*args, **kwargs):
-                    return None
-                handler.__name__ = name
-                if observer_name == "callback_query":
-                    observer.register(handler, F.data == f"legacy-page:{index}")
-                else:
-                    observer.register(handler)
-
-        removed = detach_legacy_page_handlers(legacy)
-
-        for observer_name, names in sets.items():
-            self.assertEqual(set(removed[observer_name]), set(names))
-        self.assertEqual(
-            legacy_page_handlers(legacy),
-            {
-                "callback_query": (),
-                "message": (),
-                "inline_query": (),
-                "guest_message": (),
-            },
-        )
-
-    def test_real_router_setup_has_one_active_copy_without_legacy_fallback(self):
+    def test_real_router_setup_has_one_active_copy(self):
         from app.routers import rich_editor
         sets = {
-            "callback_query": LEGACY_PAGE_CALLBACKS,
-            "message": LEGACY_PAGE_MESSAGES,
-            "inline_query": LEGACY_PAGE_INLINE_QUERIES,
-            "guest_message": LEGACY_PAGE_GUEST_MESSAGES,
+            "callback_query": {
+                "save_page", "list_pages", "request_page_search", "open_page_sort",
+                "set_page_sort", "request_page_rename", "confirm_page_delete",
+                "delete_saved_page", "open_saved_page", "open_page_link",
+                "open_gated_page_link", "navigate_page_back", "navigate_page_home",
+                "restore_original_message",
+            },
+            "message": {"receive_page_name", "receive_page_search", "receive_page_rename"},
+            "inline_query": {"find_saved_page_inline"},
+            "guest_message": {"summon_saved_rich_page"},
         }
         for observer_name, names in sets.items():
             registered = self._registered_callbacks(rich_editor.router, observer_name)

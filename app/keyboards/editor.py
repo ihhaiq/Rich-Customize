@@ -5,7 +5,7 @@ from typing import Any
 from aiogram.enums import ButtonStyle
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.i18n import t, tr
+from app.i18n import t
 from app.services.blocks import get_block_button_text
 
 
@@ -34,7 +34,7 @@ def build_rich_editor_keyboard(
 ) -> InlineKeyboardMarkup:
     if not blocks:
         return InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text=tr("📚 صفحاتي"), callback_data="r:pages"),
+            InlineKeyboardButton(text=t("pages"), callback_data="r:pages"),
             InlineKeyboardButton(
                 text=t("ux.editor.add_block"), callback_data="r:addmenu",
                 style=ButtonStyle.PRIMARY,
@@ -75,11 +75,11 @@ def build_rich_editor_keyboard(
 def build_editor_tools_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text=tr("📚 صفحاتي"), callback_data="r:pages"),
+            InlineKeyboardButton(text=t("pages"), callback_data="r:pages"),
             InlineKeyboardButton(text=t("ux.editor.manage_buttons"), callback_data="r:buttons"),
         ],
         [InlineKeyboardButton(
-            text=tr("💾 حفظ الصفحة"), callback_data="r:savepage",
+            text=t("save_page"), callback_data="r:savepage",
             style=ButtonStyle.SUCCESS,
         )],
         [InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:back")],

@@ -3,16 +3,8 @@ from __future__ import annotations
 import unittest
 from types import SimpleNamespace
 
-from aiogram import F, Router
-
 from app.routers.publish_support import chat_type_value, is_administrator
-from app.routers.publishing import (
-    LEGACY_PUBLISH_CALLBACKS,
-    LEGACY_PUBLISH_MEMBERS,
-    detach_legacy_publish_handlers,
-    legacy_publish_handlers,
-    router as publishing_router,
-)
+from app.routers.publishing import router as publishing_router
 
 
 class PublishingSupportTests(unittest.TestCase):
@@ -42,33 +34,14 @@ class PublishingRouterTests(unittest.TestCase):
             {"publish_destinations", "publish_settings", "publish_actions"},
         )
 
-    def test_detach_removes_publish_handlers_from_both_observers(self):
-        legacy = SimpleNamespace(router=Router(name="legacy-publishing-test"))
-        for index, name in enumerate(sorted(LEGACY_PUBLISH_CALLBACKS)):
-            async def callback(*args, **kwargs):
-                return None
-            callback.__name__ = name
-            legacy.router.callback_query.register(callback, F.data == f"legacy:{index}")
-        for name in sorted(LEGACY_PUBLISH_MEMBERS):
-            async def member(*args, **kwargs):
-                return None
-            member.__name__ = name
-            legacy.router.my_chat_member.register(member)
-
-        removed = detach_legacy_publish_handlers(legacy)
-
-        self.assertEqual(set(removed["callback_query"]), set(LEGACY_PUBLISH_CALLBACKS))
-        self.assertEqual(set(removed["my_chat_member"]), set(LEGACY_PUBLISH_MEMBERS))
-        self.assertEqual(
-            legacy_publish_handlers(legacy),
-            {"callback_query": (), "my_chat_member": ()},
-        )
-
-    def test_real_router_has_one_active_copy_without_legacy_fallback(self):
+    def test_real_router_has_one_active_copy(self):
         from app.routers import rich_editor
         sets = {
-            "callback_query": LEGACY_PUBLISH_CALLBACKS,
-            "my_chat_member": LEGACY_PUBLISH_MEMBERS,
+            "callback_query": {
+                "open_post_chats", "return_to_post_chats", "select_post_chat",
+                "open_post_settings", "toggle_post_option", "send_post",
+            },
+            "my_chat_member": {"remember_publish_chat"},
         }
         for observer_name, names in sets.items():
             registered = self._registered_callbacks(rich_editor.router, observer_name)

@@ -1,8 +1,8 @@
 """Compatibility facade for block construction.
 
 New code should import from :mod:`app.editor.builders`,
-:mod:`app.editor.models`, or :mod:`app.editor.registry` directly.  Keeping this
-module thin lets the legacy router continue to run while block-specific logic
+:mod:`app.editor.models`, or :mod:`app.editor.registry` directly. Keeping this
+module thin preserves the stable import surface while block-specific logic
 lives outside the router layer.
 """
 from __future__ import annotations

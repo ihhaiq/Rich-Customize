@@ -1,7 +1,7 @@
 # Editor architecture
 
-The editor is being migrated away from the historical monolithic router without
-changing the user-facing flow.
+The historical monolithic editor router has been fully removed. The editor is
+composed from feature-scoped routers without changing the user-facing flow.
 
 ## Boundaries
 
@@ -15,42 +15,31 @@ changing the user-facing flow.
 - `app/editor/preview.py` is the preview service boundary.
 - `app/editor/draft_store.py` is the draft persistence boundary.
 - `app/editor/history.py` owns multi-step undo/redo snapshots.
-- `app/services/factory.py` and parts of `app/services/blocks.py` are compatibility facades for existing callers.
-- `app/routers/editor_core.py` is now a small compatibility facade.
-- `app/routers/history.py` owns the public Undo callback and falls back to the one-step legacy snapshot only for handlers that have not migrated yet.
+- `app/services/factory.py` is a stable import facade for existing callers.
+- `app/routers/history.py` owns the public multi-step Undo and Redo callbacks.
 - `app/routers/details.py` is only the Details router aggregator.
-- `app/routers/details_support.py` owns Details child/document helpers and legacy callback detachment.
+- `app/routers/details_support.py` owns Details child/document helpers.
 - `app/routers/details_builder.py` owns Details creation and inner-block creation.
 - `app/routers/details_manager.py` owns inner-block navigation, preview, delete, and move callbacks.
 - `app/routers/details_edit.py` owns Details/nested-block editing and replacement.
-- `app/routers/block_management.py` aggregates the extracted top-level Block routers and detaches their old legacy registrations.
+- `app/routers/block_management.py` aggregates the top-level Block routers.
 - `app/routers/block_add.py` owns Add Block, list selection, heading selection, and generic block input.
 - `app/routers/block_actions.py` owns open, delete, move, and duplicate operations.
 - `app/routers/block_edit.py` owns generic block replacement, caption/credit edits, and checklist toggles.
-- `app/routers/block_table.py` owns table-cell editing actions.
+- `app/routers/block_table.py` owns table-cell and table-display editing actions.
 - `app/routers/block_support.py` is the draft/history/workflow bridge for Block mutations.
-- `app/routers/block_keyboard.py` extends the compatibility block keyboard with extracted actions such as Duplicate.
-- `app/routers/editor_legacy.py` contains only the remaining historical areas and must not receive new features.
+- `app/routers/block_keyboard.py` extends the shared block keyboard with managed actions such as Duplicate.
 
-## Legacy migration rule
+## Router composition rule
 
-Extracted feature routers are included before `editor_legacy`. Their legacy
-callback/message registrations are detached during router setup. Compatibility
-global names that are still called from non-migrated flows are rebound to the
-extracted implementations. This lets each feature leave the monolith without a
-flag-day rewrite of unrelated editor behavior.
-
-Details was the first feature migrated through this boundary. Top-level Block
-management is the second major extraction. Once `rich_editor` is installed,
-`editor_legacy` must have no active registrations for generic Block add/edit,
-open/delete/move, checklist, table, or heading handlers. The legacy USER-button
-resume flow may still call `receive_added_block` and `receive_replacement` by
-name, but those names are rebound to the extracted functions and are not
-registered as legacy message handlers.
+Feature aggregators only compose their child routers. They must not register
+handlers, detach another router's handlers, or monkey-patch runtime functions.
+Behavior belongs in the matching feature router or service layer, and each
+callback/message handler must be registered exactly once in the final tree.
 
 All new Block mutations must use `editor_workflow`, write through `draft_store`,
-and snapshot through `app.editor.history`. Do not introduce new `undo_blocks`
-usage. Native blocks edited into generated representations must discard stale
+and snapshot through `app.editor.history`. Native blocks edited into generated
+representations must discard stale
 native-only payload fields at the replacement boundary.
 
 ## Canonical block

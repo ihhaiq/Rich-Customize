@@ -17,7 +17,7 @@ from app.keyboards import (
     build_button_type_keyboard,
     build_buttons_manager_keyboard,
 )
-from app.i18n import t, tr
+from app.i18n import t
 from app.routers.button_support import answer_with_button_guide, edit_button_ui, save_changed_draft
 from app.services.buttons import delete_message_button, get_button_type, get_message_button
 from app.states import RichEditorStates
@@ -26,11 +26,8 @@ router = Router(name="button_manager")
 
 
 def manager_text(count: int) -> str:
-    lines = [t("buttons_manage"), tr(f"عدد الأزرار: {count}"), ""]
-    lines.append(
-        tr("لا توجد أزرار بعد. أضف زرًا أولًا.")
-        if count == 0 else t("common.choose_action")
-    )
+    lines = [t("ux.buttons.title"), t("ux.buttons.count", count=count), ""]
+    lines.append(t("ux.buttons.empty") if count == 0 else t("common.choose_action"))
     return "\n".join(lines)
 
 

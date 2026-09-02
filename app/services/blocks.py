@@ -93,8 +93,8 @@ def table_rows(block: dict[str, Any]) -> list[list[Any]]:
     return []
 
 
-def _editable_table_data(block: dict[str, Any]) -> dict[str, Any] | None:
-    """Detach a received table from its native payload before changing a cell."""
+def editable_table_data(block: dict[str, Any]) -> dict[str, Any] | None:
+    """Detach a received table from its native payload before changing it."""
     if block.get("type") != "table":
         return None
     old = block.setdefault("data", {})
@@ -111,11 +111,20 @@ def _editable_table_data(block: dict[str, Any]) -> dict[str, Any] | None:
         "rows": rows,
         "is_bordered": old.get("is_bordered", native.get("is_bordered", True)),
         "is_striped": old.get("is_striped", native.get("is_striped")),
+        "is_compact": old.get("is_compact", native.get("is_compact")),
         "caption_rich_text": old.get("caption_rich_text", native.get("caption")),
     }
     block["source"] = "generated"
     block["data"] = data
     return data
+
+
+def table_flag(block: dict[str, Any], field: str) -> bool:
+    """Read a table display flag from generated or received native data."""
+    data = block.get("data", {})
+    native = data.get("native_data") if isinstance(data.get("native_data"), dict) else {}
+    default = True if field == "is_bordered" else False
+    return bool(data.get(field, native.get(field, default)))
 
 
 def set_table_cell_style(
@@ -126,7 +135,7 @@ def set_table_cell_style(
     shaded: bool | None = None,
     centered: bool | None = None,
 ) -> bool:
-    data = _editable_table_data(block)
+    data = editable_table_data(block)
     if data is None:
         return False
     rows = data["rows"]
@@ -154,7 +163,7 @@ def set_all_table_cells_style(
     shaded: bool | None = None,
     centered: bool | None = None,
 ) -> bool:
-    data = _editable_table_data(block)
+    data = editable_table_data(block)
     if data is None:
         return False
     changed = False
@@ -183,6 +192,7 @@ __all__ = [
     "delete_block",
     "delete_child",
     "duplicate_block",
+    "editable_table_data",
     "get_block_button_text",
     "get_block_by_id",
     "get_block_label",
@@ -194,6 +204,7 @@ __all__ = [
     "replace_child",
     "set_all_table_cells_style",
     "set_table_cell_style",
+    "table_flag",
     "table_rows",
     "update_block",
 ]

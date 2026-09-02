@@ -40,13 +40,52 @@ async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
     if not blocks:
         await callback.answer("لا توجد أجزاء لحفظها.", show_alert=True)
         return
-    await state.set_state(RichEditorStates.saving_page_name)
-    await send_add_prompt(
-        callback.message,
-        state,
-        "أرسل اسم الصفحة لحفظها؛ الحد الأقصى 64 حرفًا.",
+    draft = await draft_store.load(state)
+    existing_id = draft.current_page_id
+    if not existing_id:
+        await state.set_state(RichEditorStates.saving_page_name)
+        await send_add_prompt(
+            callback.message,
+            state,
+            "أرسل اسم الصفحة لحفظها؛ الحد الأقصى 64 حرفًا.",
+        )
+        await callback.answer()
+        return
+
+    existing = await page_registry.get(existing_id)
+    if existing is None or int(existing.get("owner_id", 0)) != callback.from_user.id:
+        draft.current_page_id = None
+        draft.current_page_title = None
+        await draft_store.save(state, draft)
+        await state.set_state(RichEditorStates.saving_page_name)
+        await send_add_prompt(
+            callback.message,
+            state,
+            "الصفحة الأصلية لم تعد موجودة. أرسل اسمًا لحفظها كصفحة جديدة.",
+        )
+        await callback.answer("الصفحة الأصلية لم تعد موجودة.", show_alert=True)
+        return
+
+    title = str(draft.current_page_title or existing.get("title") or existing_id)[:64]
+    code = await page_registry.save(
+        callback.from_user.id,
+        title,
+        draft.blocks,
+        draft.message_buttons,
+        draft.buttons_per_row,
+        draft.buttons_align,
+        page_id=existing_id,
     )
-    await callback.answer()
+    draft.current_page_id = code
+    draft.current_page_title = title
+    await draft_store.save(state, draft)
+    await state.set_state(RichEditorStates.managing)
+    await edit_ui(
+        callback.message,
+        editor_dashboard_text(draft, f"✅ تم تحديث الصفحة المحفوظة «{title}»."),
+        build_rich_editor_keyboard(draft.blocks, draft.message_buttons),
+    )
+    await callback.answer("✅ تم حفظ التعديلات بنفس الكود")
 
 
 @router.message(RichEditorStates.saving_page_name)

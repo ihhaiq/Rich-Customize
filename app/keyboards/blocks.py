@@ -7,7 +7,7 @@ from aiogram.types import DisabledButton, InlineKeyboardButton, InlineKeyboardMa
 
 from app.i18n import t
 from app.services.anchors import anchor_target_id, anchor_targets
-from app.services.blocks import get_block_button_text, table_rows
+from app.services.blocks import get_block_button_text, table_flag, table_rows
 from app.services.factory import MEDIA_CAPTION_TYPES, QUOTE_TYPES
 
 
@@ -94,8 +94,44 @@ def build_table_options_keyboard(block_id: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=text, callback_data=f"r:ta:{block_id}:{action}") for text, action in choices[index:index + 2]]
         for index in range(0, len(choices), 2)
     ]
+    rows.append([InlineKeyboardButton(
+        text="🧱 إعدادات مظهر الجدول",
+        callback_data=f"r:tdisplay:{block_id}",
+        style=ButtonStyle.PRIMARY,
+    )])
     rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data=f"r:b:{block_id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_table_display_keyboard(block: dict[str, Any]) -> InlineKeyboardMarkup:
+    block_id = str(block["id"])
+    data = block.get("data", {})
+    native = data.get("native_data") if isinstance(data.get("native_data"), dict) else {}
+    has_caption = bool(
+        data.get("caption_rich_text")
+        or data.get("caption_html")
+        or data.get("caption_text")
+        or native.get("caption")
+    )
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=f"{'✅' if table_flag(block, 'is_bordered') else '❌'} الحدود",
+            callback_data=f"r:ttoggle:{block_id}:is_bordered",
+        )],
+        [InlineKeyboardButton(
+            text=f"{'✅' if table_flag(block, 'is_striped') else '❌'} صفوف مخططة",
+            callback_data=f"r:ttoggle:{block_id}:is_striped",
+        )],
+        [InlineKeyboardButton(
+            text=f"{'✅' if table_flag(block, 'is_compact') else '❌'} وضع مضغوط",
+            callback_data=f"r:ttoggle:{block_id}:is_compact",
+        )],
+        [InlineKeyboardButton(
+            text=f"✏️ {'تعديل عنوان الجدول' if has_caption else 'إضافة عنوان للجدول'}",
+            callback_data=f"r:tcaption:{block_id}",
+        )],
+        [InlineKeyboardButton(text="🔙 رجوع", callback_data=f"r:tm:{block_id}")],
+    ])
 
 
 def build_table_cell_keyboard(block: dict[str, Any], action: str) -> InlineKeyboardMarkup:
@@ -251,5 +287,6 @@ __all__ = [
     "build_list_type_keyboard",
     "build_linked_anchor_delete_keyboard",
     "build_table_cell_keyboard",
+    "build_table_display_keyboard",
     "build_table_options_keyboard",
 ]

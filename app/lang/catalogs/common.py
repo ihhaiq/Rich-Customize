@@ -261,6 +261,20 @@ PHRASES: dict[str, str] = {
 
 
 AR_PHRASES: dict[str, str] = {
+    "save_page": "💾 حفظ الصفحة",
+    "pages": "📚 صفحاتي",
+    "delete": "🗑 حذف",
+    "back": "🔙 رجوع",
+    "preview_block": "👁 معاينة هذا الـBlock",
+    "preview_generating": "جاري إنشاء المعاينة…",
+    "preview_failed": "فشلت المعاينة.",
+    "edit_content": "✏️ تعديل المحتوى",
+    "color": "🎨 تغيير اللون",
+    "reorder": "↕️ إعادة الترتيب",
+    "button_preview": "👁 معاينة الأزرار",
+    "select_chat": "اختر محادثة واحدة على الأقل.",
+    "invalid": "اختيار غير صالح.",
+    "missing_block": "هذا البلوك لم يعد موجودًا.",
     "math.add_prompt": "أرسل المعادلة بصيغة LaTeX.\n\nلإضافة مسافة بين النصوص استخدم: \\ ",
     "math.edit_prompt": "أرسل معادلة LaTeX الجديدة.\n\nلإضافة مسافة بين النصوص استخدم: \\ ",
     "code.add_prompt": "أرسل النص البرمجي.\n\nلتحديد لغة الكود اكتب في أول سطر: /lang python ثم اكتب الكود في الأسطر التالية. وتكدر أيضًا تستخدم: ```python ... ```.",

@@ -8,9 +8,63 @@ from app.routers.block_add import receive_added_block
 from app.routers.block_edit import receive_replacement
 from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_management import router as block_management_router
+from app.keyboards import build_table_display_keyboard, build_table_options_keyboard
+from app.services.blocks import set_table_cell_style
+from app.services.renderer import build_input_rich_message
 
 
 class BlockManagementDomainTests(unittest.TestCase):
+    def test_received_native_table_can_be_edited_without_losing_rows(self):
+        block = make_block(
+            "table",
+            {"native_data": {"type": "table", "cells": [[{"text": "old"}]]}},
+            source="native",
+        )
+
+        self.assertTrue(set_table_cell_style(block, 0, 0, shaded=True))
+        self.assertEqual(block["source"], "generated")
+        self.assertEqual(block["data"]["rows"][0][0]["text"], "old")
+        self.assertTrue(block["data"]["rows"][0][0]["is_header"])
+        self.assertNotIn("native_data", block["data"])
+
+    def test_table_options_expose_display_settings(self):
+        keyboard = build_table_options_keyboard("table-one")
+        callbacks = {
+            button.callback_data
+            for row in keyboard.inline_keyboard
+            for button in row
+            if button.callback_data
+        }
+        self.assertIn("r:tdisplay:table-one", callbacks)
+
+    def test_table_display_settings_and_renderer_include_compact_mode(self):
+        block = make_block("table", {
+            "rows": [["one", "two"]],
+            "is_bordered": False,
+            "is_striped": True,
+            "is_compact": True,
+        }, block_id="table-one")
+        callbacks = {
+            button.callback_data
+            for row in build_table_display_keyboard(block).inline_keyboard
+            for button in row
+            if button.callback_data
+        }
+        self.assertEqual(
+            {callback for callback in callbacks if callback.startswith("r:ttoggle:")},
+            {
+                "r:ttoggle:table-one:is_bordered",
+                "r:ttoggle:table-one:is_striped",
+                "r:ttoggle:table-one:is_compact",
+            },
+        )
+        rendered = build_input_rich_message([block]).model_dump(
+            mode="json", exclude_none=True,
+        )["blocks"][0]
+        self.assertNotIn("is_bordered", rendered)
+        self.assertTrue(rendered["is_striped"])
+        self.assertTrue(rendered["is_compact"])
+
     def test_duplicate_creates_new_id_directly_after_source(self):
         first = make_block("paragraph", {"text": "one"})
         second = make_block("footer", {"text": "two"})

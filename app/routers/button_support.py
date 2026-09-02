@@ -9,7 +9,7 @@ from aiogram.types import Message
 
 from app.editor.draft_store import EditorDraft, draft_store
 from app.editor.history import remember
-from app.i18n import preserve_user_content, tr
+from app.i18n import preserve_user_content, t, tr
 from app.keyboards import build_message_buttons_keyboard
 from app.services.buttons import (
     BUTTON_TYPES,
@@ -129,7 +129,7 @@ async def preview_buttons(
         return await bot.send_rich_message(
             chat_id=user_id,
             rich_message=build_input_rich_message(
-                button_guide_blocks(tr("معاينة الأزرار:")),
+                button_guide_blocks(t("button_preview")),
             ),
             reply_markup=build_message_buttons_keyboard(
                 buttons,

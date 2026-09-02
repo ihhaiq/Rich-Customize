@@ -1,8 +1,4 @@
-"""Router package with lazy access to the composed application router.
-
-Keeping package initialization side-effect free avoids circular imports while
-feature routers are split from the legacy editor module.
-"""
+"""Router package with lazy access to the composed application router."""
 from __future__ import annotations
 
 from importlib import import_module

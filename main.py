@@ -23,8 +23,6 @@ from app.miniapp import BETA_VERSION, start_mini_app_server
 from app.routers import router
 from app.services.media import cleanup_interval_seconds, media_store
 from app.services.page_registry import page_registry
-from app.table_features import install as install_table_features
-from app.table_features import router as table_features_router
 
 
 logger = logging.getLogger(__name__)
@@ -198,8 +196,6 @@ async def main() -> None:
     dispatcher.guest_message.outer_middleware(LocaleMiddleware())
     dispatcher.callback_query.outer_middleware(LocaleMiddleware())
     dispatcher.my_chat_member.outer_middleware(LocaleMiddleware())
-    install_table_features()
-    dispatcher.include_router(table_features_router)
     dispatcher.include_router(router)
 
     cleanup_task: asyncio.Task[None] | None = None

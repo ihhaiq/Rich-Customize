@@ -4,17 +4,8 @@ import copy
 import unittest
 from types import SimpleNamespace
 
-from aiogram import F, Router
-
 from app.editor.session import load_editor_session
-from app.routers.editor_session import (
-    LEGACY_SESSION_CALLBACKS,
-    LEGACY_SESSION_CHANNEL_POSTS,
-    LEGACY_SESSION_MESSAGES,
-    detach_legacy_session_handlers,
-    legacy_session_handlers,
-    router as editor_session_router,
-)
+from app.routers.editor_session import router as editor_session_router
 
 
 class FakeState:
@@ -65,39 +56,18 @@ class EditorSessionRouterTests(unittest.TestCase):
             },
         )
 
-    def test_detach_removes_session_handlers_from_all_observers(self):
-        legacy = SimpleNamespace(router=Router(name="legacy-session-test"))
-        sets = {
-            "callback_query": LEGACY_SESSION_CALLBACKS,
-            "message": LEGACY_SESSION_MESSAGES,
-            "channel_post": LEGACY_SESSION_CHANNEL_POSTS,
-        }
-        for observer_name, names in sets.items():
-            observer = getattr(legacy.router, observer_name)
-            for index, name in enumerate(sorted(names)):
-                async def handler(*args, **kwargs):
-                    return None
-                handler.__name__ = name
-                if observer_name == "callback_query":
-                    observer.register(handler, F.data == f"legacy-session:{index}")
-                else:
-                    observer.register(handler)
-
-        removed = detach_legacy_session_handlers(legacy)
-
-        for observer_name, names in sets.items():
-            self.assertEqual(set(removed[observer_name]), set(names))
-        self.assertEqual(
-            legacy_session_handlers(legacy),
-            {"callback_query": (), "message": (), "channel_post": ()},
-        )
-
-    def test_real_router_has_session_handlers_without_legacy_fallback(self):
+    def test_real_router_has_one_copy_of_each_session_handler(self):
         from app.routers import rich_editor
         sets = {
-            "callback_query": LEGACY_SESSION_CALLBACKS,
-            "message": LEGACY_SESSION_MESSAGES,
-            "channel_post": LEGACY_SESSION_CHANNEL_POSTS,
+            "callback_query": {
+                "start_editor_from_button", "showcase_from_button", "no_op",
+                "back_to_main", "open_editor_tools", "preview",
+            },
+            "message": {
+                "start", "new_editor", "showcase_from_message", "receive_source",
+                "import_rich_message_into_editor", "managing_extra_message",
+            },
+            "channel_post": {"remember_showcase_media"},
         }
         for observer_name, names in sets.items():
             registered = self._registered_callbacks(rich_editor.router, observer_name)

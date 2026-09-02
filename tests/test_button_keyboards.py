@@ -36,7 +36,7 @@ class ButtonKeyboardTests(unittest.TestCase):
             i18n_core._language.reset(token)
 
         self.assertIn("البلوكات: 1", text)
-        self.assertIn("عدد الأزرار: 1", text)
+        self.assertIn("الأزرار: 1", text)
         self.assertIn("صفحتي", text)
 
     def test_developer_panel_has_import_and_export_buttons(self):
@@ -257,6 +257,7 @@ class ButtonKeyboardTests(unittest.TestCase):
             keyboard = build_rich_editor_keyboard([
                 {"id": "b1", "type": "paragraph", "position": 0, "data": {}},
             ])
+            tools_keyboard = build_editor_tools_keyboard()
         finally:
             i18n_core._language.reset(token)
         by_callback = {
@@ -282,7 +283,7 @@ class ButtonKeyboardTests(unittest.TestCase):
 
         tools = {
             button.callback_data: button
-            for row in build_editor_tools_keyboard().inline_keyboard
+            for row in tools_keyboard.inline_keyboard
             for button in row
             if button.callback_data
         }

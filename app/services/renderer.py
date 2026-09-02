@@ -17,7 +17,7 @@ from aiogram.types import (
 )
 from pydantic import ValidationError
 
-from app.i18n import preserve_user_content, tr
+from app.i18n import preserve_user_content, t, tr
 from app.services.anchors import anchor_navigation_rich_text
 from app.services.inline_buttons import inline_button_rich_text
 
@@ -380,7 +380,9 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
             cells.append(payload_row)
         return {
             "type": "table", "cells": cells,
-            "is_bordered": data.get("is_bordered", True), "is_striped": data.get("is_striped"),
+            "is_bordered": True if data.get("is_bordered", True) else None,
+            "is_striped": True if data.get("is_striped") else None,
+            "is_compact": True if data.get("is_compact") else None,
             "caption": _data_rich_text(data, "caption_rich_text", "caption_html", "caption_text") or None,
         }
     if kind in {"blockquote", "pullquote"}:
@@ -765,7 +767,7 @@ async def send_rich_message_preview(
                 chat_id=chat_id,
                 draft_id=secrets.randbelow(2_147_483_647) + 1,
                 rich_message=InputRichMessage(
-                    html=f"<tg-thinking>{tr('جاري إنشاء النتيجة…')}</tg-thinking>",
+                    html=f"<tg-thinking>{t('preview_generating')}</tg-thinking>",
                 ),
             )
             # Give Telegram clients enough time to render the animated draft.

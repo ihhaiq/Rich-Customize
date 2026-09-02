@@ -12,6 +12,7 @@ from app.keyboards.blocks import (
     build_list_type_keyboard,
     build_linked_anchor_delete_keyboard,
     build_table_cell_keyboard,
+    build_table_display_keyboard,
     build_table_options_keyboard,
 )
 from app.keyboards.details import (

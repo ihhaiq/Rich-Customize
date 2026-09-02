@@ -31,9 +31,9 @@ def make_block(
 ) -> dict[str, Any]:
     """Create the canonical editor block shape.
 
-    ``source`` lives at block level. ``data["native"]`` is retained only as a
-    renderer-compatibility flag until the legacy editor router is fully removed.
-    New code should inspect the top-level source instead.
+    ``source`` lives at block level. ``data["native"]`` is retained only for
+    imported-payload compatibility. New code should inspect the top-level
+    source instead.
     """
     payload = copy.deepcopy(data or {})
     resolved_source = infer_source(payload, source)

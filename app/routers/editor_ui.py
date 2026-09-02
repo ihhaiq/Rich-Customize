@@ -28,7 +28,7 @@ def editor_dashboard_text(draft: EditorDraft, notice: str | None = None) -> str:
     lines.extend([
         tr("تخصيص الرسالة"),
         t("editor.block_count", count=len(draft.blocks)),
-        tr(f"عدد الأزرار: {len(draft.message_buttons)}"),
+        t("ux.editor.buttons", count=len(draft.message_buttons)),
         (
             f"{tr('💾 حفظ الصفحة')}: {draft.current_page_title or draft.current_page_id}"
             if draft.current_page_id

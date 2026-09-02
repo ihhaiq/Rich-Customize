@@ -9,6 +9,11 @@ APP = ROOT / "app"
 
 
 class CleanupArchitectureTests(unittest.TestCase):
+    def test_temporary_table_feature_patch_is_gone(self):
+        self.assertFalse((APP / "table_features.py").exists())
+        main_source = (ROOT / "main.py").read_text(encoding="utf-8")
+        self.assertNotIn("table_features", main_source)
+
     def test_locales_package_is_gone_and_app_has_no_locales_imports(self):
         self.assertFalse((APP / "locales").exists())
         leaked: list[str] = []
@@ -70,6 +75,7 @@ class CleanupArchitectureTests(unittest.TestCase):
             "build_rich_editor_keyboard",
             "build_start_editor_keyboard",
             "build_table_cell_keyboard",
+            "build_table_display_keyboard",
             "build_table_options_keyboard",
             "build_welcome_keyboard",
         }
@@ -82,6 +88,9 @@ class CleanupArchitectureTests(unittest.TestCase):
             "routers/button_actions.py",
             "routers/message_buttons.py",
             "routers/details.py",
+            "routers/pages.py",
+            "routers/publishing.py",
+            "routers/editor_session.py",
         ):
             path = APP / relative
             source = path.read_text(encoding="utf-8")
