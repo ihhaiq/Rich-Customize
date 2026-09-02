@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
-
 from app.editor.document import (
     add_block,
     delete_block,
@@ -11,15 +9,16 @@ from app.editor.document import (
     replace_block,
 )
 from app.editor.models import clone_blocks
+from app.editor.types import Block, BlockList
 from app.editor.registry import block_registry
 from app.services.anchors import align_linked_anchors, linked_anchors
 
 
 @dataclass(slots=True)
 class MutationResult:
-    blocks: list[dict[str, Any]]
+    blocks: BlockList
     changed: bool
-    block: dict[str, Any] | None = None
+    block: Block | None = None
 
 
 class EditorWorkflow:
@@ -27,8 +26,8 @@ class EditorWorkflow:
 
     def add(
         self,
-        blocks: list[dict[str, Any]],
-        block: dict[str, Any],
+        blocks: BlockList,
+        block: Block,
         *,
         index: int | None = None,
     ) -> MutationResult:
@@ -37,7 +36,7 @@ class EditorWorkflow:
         align_linked_anchors(working)
         return MutationResult(working, True, added)
 
-    def delete(self, blocks: list[dict[str, Any]], block_id: str) -> MutationResult:
+    def delete(self, blocks: BlockList, block_id: str) -> MutationResult:
         working = clone_blocks(blocks)
         for anchor in linked_anchors(working, block_id):
             delete_block(working, str(anchor.get("id")))
@@ -46,7 +45,7 @@ class EditorWorkflow:
 
     def move(
         self,
-        blocks: list[dict[str, Any]],
+        blocks: BlockList,
         block_id: str,
         new_index: int,
     ) -> MutationResult:
@@ -58,9 +57,9 @@ class EditorWorkflow:
 
     def replace(
         self,
-        blocks: list[dict[str, Any]],
+        blocks: BlockList,
         block_id: str,
-        replacement: dict[str, Any],
+        replacement: Block,
     ) -> MutationResult:
         working = clone_blocks(blocks)
         updated = replace_block(working, block_id, replacement)
@@ -68,7 +67,7 @@ class EditorWorkflow:
 
     def duplicate(
         self,
-        blocks: list[dict[str, Any]],
+        blocks: BlockList,
         block_id: str,
         *,
         after: bool = True,
@@ -82,11 +81,11 @@ class EditorWorkflow:
         align_linked_anchors(working)
         return MutationResult(working, duplicate is not None, duplicate)
 
-    def import_blocks(self, blocks: list[dict[str, Any]]) -> MutationResult:
+    def import_blocks(self, blocks: BlockList) -> MutationResult:
         imported = clone_blocks(blocks)
         return MutationResult(imported, bool(imported))
 
-    def validate(self, blocks: list[dict[str, Any]]) -> list[str]:
+    def validate(self, blocks: BlockList) -> list[str]:
         errors: list[str] = []
         normalized = clone_blocks(blocks)
         for index, block in enumerate(normalized):

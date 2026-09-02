@@ -8,7 +8,7 @@ from app.services.buttons import (
     delete_message_button, move_message_button,
     infer_button_type_and_value, normalize_button_url,
 )
-from app.services.factory import list_data, new_block, preformatted_data
+from app.editor.builders import list_data, new_block, preformatted_data
 from app.services.inline_buttons import find_user_button_markers, inline_button_rich_text
 from app.services.renderer import build_input_rich_message
 

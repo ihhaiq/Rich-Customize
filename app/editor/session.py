@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from app.editor.draft_store import draft_store
+from app.editor.types import BlockList
 from app.services.albums import AlbumCollector
 
 
@@ -18,7 +19,7 @@ user_locks: defaultdict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 async def load_editor_session(
     callback: CallbackQuery,
     state: FSMContext,
-) -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
+) -> tuple[dict[str, Any], BlockList] | None:
     data = await state.get_data()
     if not isinstance(data.get("blocks"), list):
         await callback.answer(

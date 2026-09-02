@@ -15,14 +15,8 @@ from app.keyboards import (
     build_heading_level_keyboard,
     build_list_type_keyboard,
 )
-from app.services.factory import (
-    FINAL_RICH_BLOCK_TYPES,
-    QUOTE_TYPES,
-    container_data,
-    map_data,
-    new_block,
-    text_data,
-)
+from app.editor.builders import container_data, map_data, new_block, text_data
+from app.editor.specs import FINAL_RICH_BLOCK_TYPES, QUOTE_TYPES
 from app.services.parser import message_to_blocks, messages_to_blocks
 from app.services.anchors import anchor_name, anchor_targets, new_anchor_data
 from app.states import RichEditorStates

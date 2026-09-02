@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from app.editor.models import normalize_blocks
+from app.editor.types import BlockList
 
 
 class StateLike(Protocol):
@@ -14,7 +15,7 @@ class StateLike(Protocol):
 
 @dataclass(slots=True)
 class EditorDraft:
-    blocks: list[dict[str, Any]]
+    blocks: BlockList
     message_buttons: list[dict[str, Any]]
     buttons_per_row: int = 1
     buttons_align: str = "center"

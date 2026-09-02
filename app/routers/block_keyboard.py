@@ -10,7 +10,7 @@ def build_managed_block_keyboard(
     block: dict,
     blocks: list[dict],
 ) -> InlineKeyboardMarkup:
-    """Extend the compatibility block keyboard with extracted actions."""
+    """Extend the shared block keyboard with managed document actions."""
     markup = build_block_editor_keyboard(block, blocks)
     rows = [list(row) for row in markup.inline_keyboard]
     block_id = str(block["id"])

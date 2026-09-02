@@ -121,7 +121,8 @@ class MediaStore:
                 continue
             fid = str(metadata["file_id"])
             current = items.get(fid, {})
-            refs = current.get("page_refs") if isinstance(current.get("page_refs"), list) else []
+            raw_refs = current.get("page_refs")
+            refs: list[Any] = raw_refs if isinstance(raw_refs, list) else []
             items[fid] = {
                 "kind": str(block.get("type", "media")),
                 "file_unique_id": metadata.get("file_unique_id"),

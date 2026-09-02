@@ -23,7 +23,7 @@ class ShowcaseMediaLibrary:
         self._items = self._load()
 
     def _load(self) -> dict[str, list[str]]:
-        empty = {kind: [] for kind in SUPPORTED_MEDIA}
+        empty: dict[str, list[str]] = {kind: [] for kind in SUPPORTED_MEDIA}
         if not self.path.exists():
             return empty
         try:

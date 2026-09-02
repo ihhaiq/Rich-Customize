@@ -259,10 +259,10 @@ def _remember(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def message_to_blocks(message: Message, start_position: int = 0) -> list[dict[str, Any]]:
     if message.rich_message:
-        blocks = _parse_native_rich(message)
-        for block in blocks:
+        rich_blocks = _parse_native_rich(message)
+        for block in rich_blocks:
             block["position"] += start_position
-        return _remember(blocks)
+        return _remember(rich_blocks)
 
     blocks: list[dict[str, Any]] = []
     position = start_position

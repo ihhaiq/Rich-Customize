@@ -83,6 +83,22 @@ def test_document_operations_keep_positions_and_identity():
     assert duplicate["type"] == updated["type"]
 
 
+def test_normalization_rejects_malformed_external_entries():
+    blocks = [
+        None,
+        "broken",
+        {"type": "paragraph", "position": "4", "data": {"text": "valid"}},
+        {"type": "footer", "position": "invalid", "data": None},
+    ]
+
+    normalize_blocks(blocks)
+
+    assert [block["type"] for block in blocks] == ["footer", "paragraph"]
+    assert [block["position"] for block in blocks] == [0, 1]
+    assert all(isinstance(block["data"], dict) for block in blocks)
+    assert all(block["source"] == "generated" for block in blocks)
+
+
 def test_generated_edit_detaches_native_payload():
     native = make_block(
         "table",

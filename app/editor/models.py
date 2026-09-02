@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import copy
 import uuid
-from typing import Any, Literal
+from typing import Any, cast
 
-BlockSource = Literal["generated", "imported", "native"]
+from app.editor.types import Block, BlockData, BlockList, BlockSource
 
 SOURCE_GENERATED: BlockSource = "generated"
 SOURCE_IMPORTED: BlockSource = "imported"
@@ -12,9 +12,9 @@ SOURCE_NATIVE: BlockSource = "native"
 VALID_SOURCES = frozenset({SOURCE_GENERATED, SOURCE_IMPORTED, SOURCE_NATIVE})
 
 
-def infer_source(data: dict[str, Any] | None, source: str | None = None) -> BlockSource:
+def infer_source(data: BlockData | None, source: str | None = None) -> BlockSource:
     if source in VALID_SOURCES:
-        return source  # type: ignore[return-value]
+        return cast(BlockSource, source)
     payload = data or {}
     if payload.get("native") or isinstance(payload.get("native_data"), dict):
         return SOURCE_NATIVE
@@ -23,12 +23,12 @@ def infer_source(data: dict[str, Any] | None, source: str | None = None) -> Bloc
 
 def make_block(
     block_type: str,
-    data: dict[str, Any] | None = None,
+    data: BlockData | None = None,
     *,
     position: int = 0,
     source: str | None = None,
     block_id: str | None = None,
-) -> dict[str, Any]:
+) -> Block:
     """Create the canonical editor block shape.
 
     ``source`` lives at block level. ``data["native"]`` is retained only for
@@ -51,11 +51,11 @@ def make_block(
 
 
 def normalize_block(
-    block: dict[str, Any],
+    block: Block,
     *,
     position: int | None = None,
-) -> dict[str, Any]:
-    """Upgrade a legacy block in-place to the canonical shape."""
+) -> Block:
+    """Normalize an external block in-place to the canonical editor shape."""
     block.setdefault("id", uuid.uuid4().hex[:12])
     block["type"] = str(block.get("type", "content"))
     if position is not None:
@@ -88,14 +88,17 @@ def normalize_block(
     return block
 
 
-def normalize_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def normalize_blocks(blocks: BlockList) -> BlockList:
+    # FSM and JSON are trust boundaries. Drop malformed entries before any
+    # document operation so every internal caller receives the same shape.
+    blocks[:] = [block for block in blocks if isinstance(block, dict)]
     blocks.sort(key=lambda item: _safe_position(item.get("position")))
     for index, block in enumerate(blocks):
         normalize_block(block, position=index)
     return blocks
 
 
-def clone_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def clone_blocks(blocks: BlockList) -> BlockList:
     cloned = copy.deepcopy(blocks)
     return normalize_blocks(cloned)
 

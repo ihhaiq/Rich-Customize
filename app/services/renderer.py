@@ -398,7 +398,7 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
         nested_blocks: list[dict[str, Any]] = []
         for index, child in enumerate(sorted(children, key=lambda item: item.get("position", 0))):
             nested_blocks.extend(_editor_input_blocks(child, f"{path}.blocks[{index}]"))
-        payload = {
+        payload: dict[str, Any] = {
             "type": kind,
             "blocks": nested_blocks,
         }
@@ -613,30 +613,30 @@ def _render_rich_blocks(
         kind, data = block["type"], block.get("data", {})
         block_path = f"{path}[{index}]<{kind}>"
         if kind == "details" and data.get("children") is not None:
-            nested_fragments: list[str] = []
-            _render_rich_blocks(data["children"], nested_fragments, media, block_path)
+            details_fragments: list[str] = []
+            _render_rich_blocks(data["children"], details_fragments, media, block_path)
             summary = data.get("summary_html") or tr("تفاصيل")
             fragments.append(
                 f"<details><summary>{summary}</summary>"
-                f"{''.join(nested_fragments)}</details>"
+                f"{''.join(details_fragments)}</details>"
             )
             continue
         if kind in {"collage", "slideshow"} and data.get("children") is not None:
-            nested_fragments: list[str] = []
-            _render_rich_blocks(data["children"], nested_fragments, media, block_path)
+            container_fragments: list[str] = []
+            _render_rich_blocks(data["children"], container_fragments, media, block_path)
             tag = "tg-collage" if kind == "collage" else "tg-slideshow"
-            fragments.append(_with_caption(f"<{tag}>{''.join(nested_fragments)}</{tag}>", data))
+            fragments.append(_with_caption(f"<{tag}>{''.join(container_fragments)}</{tag}>", data))
             continue
         if kind in {"blockquote", "pullquote"}:
             quote = data.get("quote_html") or data.get("html") or ""
             credit = data.get("credit_html")
             if kind in {"blockquote", "pullquote"} and data.get("media_children"):
-                nested_fragments: list[str] = []
+                quote_fragments: list[str] = []
                 _render_rich_blocks(
-                    data["media_children"], nested_fragments, media, f"{block_path}.blocks",
+                    data["media_children"], quote_fragments, media, f"{block_path}.blocks",
                 )
                 fragments.append(
-                    f"<blockquote>{''.join(nested_fragments)}{quote}"
+                    f"<blockquote>{''.join(quote_fragments)}{quote}"
                     f"{f'<cite>{credit}</cite>' if credit else ''}</blockquote>"
                 )
             else:

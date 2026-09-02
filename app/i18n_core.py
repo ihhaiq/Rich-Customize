@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import time
+from collections.abc import Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -449,7 +450,7 @@ def _profile_signature(profiles: dict[str | None, dict[str, Any]]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _same_commands(current: list[BotCommand], desired: list[BotCommand]) -> bool:
+def _same_commands(current: Sequence[BotCommand], desired: Sequence[BotCommand]) -> bool:
     return [(item.command, item.description) for item in current] == [
         (item.command, item.description) for item in desired
     ]

@@ -255,8 +255,9 @@ async def api_send_page(request: web.Request) -> web.Response:
     if kind == "private":
         target_chat_id = user_id
     elif kind == "chat":
+        raw_chat_id = payload.get("chat_id")
         try:
-            target_chat_id = int(payload.get("chat_id"))
+            target_chat_id = int(raw_chat_id) if raw_chat_id is not None else 0
         except (TypeError, ValueError):
             raise web.HTTPBadRequest(text="Invalid chat_id")
         known = {

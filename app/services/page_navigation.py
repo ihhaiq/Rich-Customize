@@ -109,9 +109,10 @@ class PageNavigationRegistry:
             self._cleanup(sessions, now)
             current = self._state(token, sessions.get(token, {})) if token else None
             if current is None or current.user_id != user_id:
-                token = secrets.token_hex(6)
-                while token in sessions:
-                    token = secrets.token_hex(6)
+                resolved_token = secrets.token_hex(6)
+                while resolved_token in sessions:
+                    resolved_token = secrets.token_hex(6)
+                token = resolved_token
                 stack = [source_page_id, target_page_id] if source_page_id else [target_page_id]
                 external_root = source_page_id is None
             else:
@@ -124,6 +125,7 @@ class PageNavigationRegistry:
                     stack.append(target_page_id)
                 if len(stack) > MAX_NAVIGATION_DEPTH:
                     stack = ([stack[0]] + stack[-(MAX_NAVIGATION_DEPTH - 1):])
+            assert token is not None
             sessions[token] = {
                 "user_id": int(user_id),
                 "stack": stack,

@@ -52,14 +52,16 @@ async def _send_single_block_preview(
     block: dict[str, Any],
     source_page_id: str | None,
 ) -> list:
-    kwargs = {
-        "buttons": None,
-        "buttons_per_row": 1,
-        "buttons_align": "center",
-        "source_page_id": source_page_id,
-    }
     try:
-        return await send_rich_message_preview(bot, chat_id, [block], **kwargs) or []
+        return await send_rich_message_preview(
+            bot,
+            chat_id,
+            [block],
+            buttons=None,
+            buttons_per_row=1,
+            buttons_align="center",
+            source_page_id=source_page_id,
+        ) or []
     except RichMessageRenderError as error:
         if not _is_empty_rich_message_error(error):
             raise
@@ -72,7 +74,10 @@ async def _send_single_block_preview(
             bot,
             chat_id,
             _standalone_preview_blocks(block),
-            **kwargs,
+            buttons=None,
+            buttons_per_row=1,
+            buttons_align="center",
+            source_page_id=source_page_id,
         ) or []
 
 

@@ -19,16 +19,18 @@ from app.keyboards import (
 from app.editor.session import load_editor_session
 from app.routers.editor_ui import edit_ui, send_add_prompt
 from app.routers.details_support import (
-    DETAILS_TYPE,
-    delete_details_child,
-    details_child,
-    details_children,
     details_inner_list_text,
     details_inner_page,
-    move_details_child,
     save_document,
 )
-from app.services.factory import MEDIA_CAPTION_TYPES, QUOTE_TYPES
+from app.services.details_editor import (
+    DETAILS_TYPE,
+    delete_details_child,
+    details_children,
+    find_details_child,
+    move_details_child,
+)
+from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES
 from app.states import RichEditorStates
 
 
@@ -83,7 +85,7 @@ async def open_details_inner_block(
         return
     details_id, child_id = parsed
     details = get_block_by_id(blocks, details_id)
-    child = details_child(details, child_id) if details else None
+    child = find_details_child(details, child_id) if details else None
     if (
         details is None
         or details.get("type") != DETAILS_TYPE
@@ -115,7 +117,7 @@ async def preview_details_inner_block(
         return
     details_id, child_id = parsed
     details = get_block_by_id(blocks, details_id)
-    child = details_child(details, child_id) if details else None
+    child = find_details_child(details, child_id) if details else None
     if child is None:
         await callback.answer(t("missing_block"), show_alert=True)
         return
@@ -148,7 +150,7 @@ async def edit_details_inner_block(
         return
     details_id, child_id = parsed
     details = get_block_by_id(blocks, details_id)
-    child = details_child(details, child_id) if details else None
+    child = find_details_child(details, child_id) if details else None
     if child is None or child.get("type") == "divider":
         await callback.answer(t("missing_block"), show_alert=True)
         return
@@ -183,7 +185,7 @@ async def edit_details_inner_field(
         return
     details_id, child_id, action = parts
     details = get_block_by_id(blocks, details_id)
-    child = details_child(details, child_id) if details else None
+    child = find_details_child(details, child_id) if details else None
     allowed = bool(
         child
         and (
@@ -206,6 +208,7 @@ async def edit_details_inner_field(
     if not allowed:
         await callback.answer(t("missing_block"), show_alert=True)
         return
+    assert child is not None
     await state.update_data(
         nested_details_id=details_id,
         nested_child_id=child_id,
@@ -242,7 +245,7 @@ async def ask_delete_details_inner(
         return
     details_id, child_id = parsed
     details = get_block_by_id(blocks, details_id)
-    child = details_child(details, child_id) if details else None
+    child = find_details_child(details, child_id) if details else None
     if child is None:
         await callback.answer(t("missing_block"), show_alert=True)
         return
@@ -309,7 +312,7 @@ async def move_details_inner(
         return
     details_id, child_id = parsed
     details = get_block_by_id(blocks, details_id)
-    child = details_child(details, child_id) if details else None
+    child = find_details_child(details, child_id) if details else None
     if details is None or child is None:
         await callback.answer(t("missing_block"), show_alert=True)
         return
@@ -328,7 +331,7 @@ async def move_details_inner(
         )
         return
     await save_document(state, blocks)
-    moved = details_child(details, child_id)
+    moved = find_details_child(details, child_id)
     assert moved is not None
     await edit_ui(
         callback.message,

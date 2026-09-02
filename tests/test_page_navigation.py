@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from app.i18n import t
-from app.services.factory import new_block
+from app.editor.builders import new_block
 from app.services.page_navigation import PageNavigationRegistry
 from app.services.renderer import build_input_rich_message
 

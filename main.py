@@ -47,10 +47,10 @@ def _visible_rich_text(value: Any) -> list[str]:
     if isinstance(value, str):
         return [value]
     if isinstance(value, list):
-        result: list[str] = []
+        list_result: list[str] = []
         for item in value:
-            result.extend(_visible_rich_text(item))
-        return result
+            list_result.extend(_visible_rich_text(item))
+        return list_result
     if hasattr(value, "model_dump"):
         value = value.model_dump(exclude_none=True)
     if not isinstance(value, dict):

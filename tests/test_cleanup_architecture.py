@@ -129,6 +129,11 @@ class CleanupArchitectureTests(unittest.TestCase):
             self.assertIn(f"def {name}", service)
             self.assertNotIn(f"def {name}", support)
 
+    def test_removed_editor_facades_do_not_return(self):
+        self.assertFalse((APP / "services" / "factory.py").exists())
+        details_router = (APP / "routers" / "details.py").read_text(encoding="utf-8")
+        self.assertNotIn("from app.routers.details_support import", details_router)
+
     def test_i18n_public_module_is_a_facade(self):
         source = (APP / "i18n.py").read_text(encoding="utf-8")
         self.assertIn("from app.i18n_runtime import", source)

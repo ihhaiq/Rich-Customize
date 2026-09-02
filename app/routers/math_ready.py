@@ -18,10 +18,8 @@ from app.routers.block_view import block_page
 from app.routers.editor_ui import delete_add_step_messages, edit_saved_ui
 from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_support import save_blocks
-from app.routers.details import (
-    receive_nested_replacement,
-    store_pending_details_child,
-)
+from app.routers.details_builder import store_pending_details_child
+from app.routers.details_edit import receive_nested_replacement
 
 
 router = Router(name="math_ready")

@@ -70,16 +70,13 @@ async def _open_page_link(
     if callback_message is None and guest_context is None:
         await callback.answer("تعذر تحديد محادثة رسالة Guest.", show_alert=True)
         return
-    chat_id = (
-        callback_message.chat.id
-        if callback_message is not None
-        else int(guest_context["chat_id"])
-    )
-    chat_type = (
-        chat_type_value(callback_message.chat)
-        if callback_message is not None
-        else str(guest_context.get("chat_type", ""))
-    )
+    if callback_message is not None:
+        chat_id = callback_message.chat.id
+        chat_type = chat_type_value(callback_message.chat)
+    else:
+        assert guest_context is not None
+        chat_id = int(guest_context["chat_id"])
+        chat_type = str(guest_context.get("chat_type", ""))
     if require_subscription and not await is_chat_subscriber(
         bot, chat_id, callback.from_user.id,
     ):

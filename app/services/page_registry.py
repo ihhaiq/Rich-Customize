@@ -60,7 +60,7 @@ class PageRegistry:
                 and isinstance(existing, dict)
                 and int(existing.get("owner_id", 0)) == owner_id
             )
-            code = page_id if reuse else secrets.token_hex(4)
+            code = page_id if reuse and page_id is not None else secrets.token_hex(4)
             while not reuse and code in pages:
                 code = secrets.token_hex(4)
             now = int(time.time())
@@ -71,7 +71,9 @@ class PageRegistry:
                 "buttons": copy.deepcopy(buttons),
                 "buttons_per_row": buttons_per_row,
                 "buttons_align": buttons_align,
-                "created_at": int(existing.get("created_at", now)) if reuse else now,
+                "created_at": int(existing.get("created_at", now))
+                if reuse and existing is not None
+                else now,
                 "updated_at": now,
             }
             self._write(pages)

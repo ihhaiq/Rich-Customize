@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Iterator, Mapping
-from typing import Any
+from typing import Any, TypeVar, overload
 
 from app.editor.document import (
     add_block,
@@ -20,7 +20,9 @@ from app.editor.document import (
     replace_child,
 )
 from app.i18n import t
+from app.editor.types import Block, BlockData, BlockList
 
+_T = TypeVar("_T")
 
 BLOCK_LABEL_KEYS: dict[str, str] = {
     "text": "block.text",
@@ -62,7 +64,16 @@ class _LocalizedBlockLabels(Mapping[str, str]):
     def __len__(self) -> int:
         return len(BLOCK_LABEL_KEYS)
 
-    def get(self, block_type: str, default: str | None = None) -> str | None:
+    @overload
+    def get(self, block_type: str) -> str | None: ...
+
+    @overload
+    def get(self, block_type: str, default: str) -> str: ...
+
+    @overload
+    def get(self, block_type: str, default: _T) -> str | _T: ...
+
+    def get(self, block_type: str, default: _T | None = None) -> str | _T | None:
         key = BLOCK_LABEL_KEYS.get(block_type)
         return t(key) if key else default
 
@@ -75,11 +86,11 @@ def get_block_label(block_type: str) -> str:
     return t(key) if key else t("block.content")
 
 
-def update_block(blocks: list[dict[str, Any]], block_id: str, data: dict[str, Any]) -> bool:
+def update_block(blocks: BlockList, block_id: str, data: BlockData) -> bool:
     return replace_block_data(blocks, block_id, data) is not None
 
 
-def table_rows(block: dict[str, Any]) -> list[list[Any]]:
+def table_rows(block: Block) -> list[list[Any]]:
     """Return table cells from either an editor-created or received native table."""
     if block.get("type") != "table":
         return []
@@ -93,7 +104,7 @@ def table_rows(block: dict[str, Any]) -> list[list[Any]]:
     return []
 
 
-def editable_table_data(block: dict[str, Any]) -> dict[str, Any] | None:
+def editable_table_data(block: Block) -> BlockData | None:
     """Detach a received table from its native payload before changing it."""
     if block.get("type") != "table":
         return None
@@ -119,7 +130,7 @@ def editable_table_data(block: dict[str, Any]) -> dict[str, Any] | None:
     return data
 
 
-def table_flag(block: dict[str, Any], field: str) -> bool:
+def table_flag(block: Block, field: str) -> bool:
     """Read a table display flag from generated or received native data."""
     data = block.get("data", {})
     native = data.get("native_data") if isinstance(data.get("native_data"), dict) else {}
@@ -128,7 +139,7 @@ def table_flag(block: dict[str, Any], field: str) -> bool:
 
 
 def set_table_cell_style(
-    block: dict[str, Any],
+    block: Block,
     row_index: int,
     column_index: int,
     *,
@@ -158,7 +169,7 @@ def set_table_cell_style(
 
 
 def set_all_table_cells_style(
-    block: dict[str, Any],
+    block: Block,
     *,
     shaded: bool | None = None,
     centered: bool | None = None,
@@ -179,7 +190,7 @@ def set_all_table_cells_style(
     return changed
 
 
-def get_block_button_text(block: dict[str, Any], index: int) -> str:
+def get_block_button_text(block: Block, index: int) -> str:
     return f"{get_block_label(str(block.get('type', '')))} #{index + 1}"
 
 

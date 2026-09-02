@@ -110,11 +110,18 @@ async def complete_button_target(
     pending_message = data.get("pending_user_message")
     resolutions = list(data.get("pending_user_resolutions") or [])
     index = int(data.get("pending_user_marker_index", 0))
+    if not isinstance(blocks, list) or not isinstance(markers, list) or not markers:
+        await state.clear()
+        await message.answer("انتهت بيانات ربط الزر. أعد إضافة الزر من المحرر.")
+        return
+    if not 0 <= index < len(markers) or not isinstance(markers[index], dict):
+        await state.clear()
+        await message.answer("تعذر متابعة ربط الزر بسبب بيانات غير صالحة.")
+        return
     marker = markers[index]
-    if isinstance(blocks, list):
-        resolve_user_button_marker(
-            blocks, str(marker.get("marker", "")), target_id, username,
-        )
+    resolve_user_button_marker(
+        blocks, str(marker.get("marker", "")), target_id, username,
+    )
     resolutions.append({
         "marker": str(marker.get("marker", "")),
         "user_id": target_id,
@@ -122,12 +129,17 @@ async def complete_button_target(
     })
     next_index = index + 1
     if next_index < len(markers):
+        next_marker = markers[next_index]
+        if not isinstance(next_marker, dict):
+            await state.clear()
+            await message.answer("تعذر متابعة ربط الزر بسبب بيانات غير صالحة.")
+            return
         await state.update_data(
             pending_user_blocks=blocks,
             pending_user_marker_index=next_index,
             pending_user_resolutions=resolutions,
         )
-        await ask_for_button_user(message, state, markers[next_index])
+        await ask_for_button_user(message, state, next_marker)
         return
 
     await message.answer("✅ تم ربط الوجهة بالزر.", reply_markup=ReplyKeyboardRemove())

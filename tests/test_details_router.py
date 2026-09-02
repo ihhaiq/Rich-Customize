@@ -3,14 +3,14 @@ from __future__ import annotations
 import unittest
 
 from app.editor.models import make_block
-from app.routers.details import (
+from app.services.details_editor import (
     add_details_child,
     delete_details_child,
     details_children,
     move_details_child,
     replace_details_child,
-    router as details_router,
 )
+from app.routers.details import router as details_router
 
 
 class DetailsDomainTests(unittest.TestCase):

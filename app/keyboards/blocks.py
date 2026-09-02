@@ -8,7 +8,7 @@ from aiogram.types import DisabledButton, InlineKeyboardButton, InlineKeyboardMa
 from app.i18n import t
 from app.services.anchors import anchor_target_id, anchor_targets
 from app.services.blocks import get_block_button_text, table_flag, table_rows
-from app.services.factory import MEDIA_CAPTION_TYPES, QUOTE_TYPES
+from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES
 
 
 def build_block_editor_keyboard(

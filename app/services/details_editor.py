@@ -84,16 +84,11 @@ def replace_details_child(
     return result.block
 
 
-# Short compatibility name retained for callers migrated from details_support.
-details_child = find_details_child
-
-
 __all__ = [
     "DETAILS_TYPE",
     "add_details_child",
     "delete_details_child",
     "detach_native_details",
-    "details_child",
     "details_children",
     "find_details_child",
     "move_details_child",

@@ -21,21 +21,20 @@ from app.routers.editor_ui import (
 )
 from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.details_support import (
+    details_inner_page,
+    save_document,
+)
+from app.services.details_editor import (
     DETAILS_TYPE,
     add_details_child,
     detach_native_details,
-    details_child,
+    find_details_child,
     details_children,
-    details_inner_page,
     replace_details_child,
     replace_details_children,
-    save_document,
 )
-from app.services.factory import (
-    MEDIA_CAPTION_TYPES,
-    new_block,
-    text_data,
-)
+from app.editor.builders import new_block, text_data
+from app.editor.specs import MEDIA_CAPTION_TYPES
 from app.services.parser import (
     message_to_blocks,
     messages_to_blocks,
@@ -62,7 +61,7 @@ async def receive_nested_replacement(
 
     blocks = current_data.get("blocks") or []
     details = get_block_by_id(blocks, str(details_id))
-    child = details_child(details, str(child_id)) if details else None
+    child = find_details_child(details, str(child_id)) if details else None
     if details is None or child is None:
         await message.answer(t("missing_block"))
         await state.set_state(RichEditorStates.managing)

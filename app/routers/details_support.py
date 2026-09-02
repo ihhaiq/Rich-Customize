@@ -7,17 +7,7 @@ from aiogram.fsm.context import FSMContext
 from app.editor.draft_store import draft_store
 from app.i18n import t
 from app.services.blocks import BLOCK_LABELS
-from app.services.details_editor import (
-    DETAILS_TYPE,
-    add_details_child,
-    delete_details_child,
-    detach_native_details,
-    details_child,
-    details_children,
-    move_details_child,
-    replace_details_child,
-    replace_details_children,
-)
+from app.services.details_editor import details_children
 
 
 def details_builder_text(payload: dict[str, Any]) -> str:
@@ -61,17 +51,8 @@ async def save_document(state: FSMContext, blocks: list[dict[str, Any]]) -> None
 
 
 __all__ = [
-    "DETAILS_TYPE",
-    "add_details_child",
-    "delete_details_child",
-    "detach_native_details",
     "details_builder_text",
-    "details_child",
-    "details_children",
     "details_inner_list_text",
     "details_inner_page",
-    "move_details_child",
-    "replace_details_child",
-    "replace_details_children",
     "save_document",
 ]

@@ -1,4 +1,4 @@
-"""Feature-scoped keyboard builders with a stable legacy import surface."""
+"""Public entry point for feature-scoped keyboard builders."""
 
 # ruff: noqa: F401 - imports in this module intentionally form the public facade.
 
@@ -45,7 +45,6 @@ from app.keyboards.message_buttons import (
     build_buttons_manager_keyboard,
     build_message_buttons_keyboard,
     build_page_target_keyboard,
-    resolve_button_style,
 )
 from app.keyboards.pages import (
     build_page_delete_confirmation_keyboard,
@@ -59,8 +58,5 @@ from app.keyboards.publishing import (
     build_post_confirmation_keyboard,
     build_post_settings_keyboard,
 )
-
-# Private compatibility for any old local import that reached into keyboards.py.
-_style = resolve_button_style
 
 __all__ = [name for name in globals() if name.startswith("build_")]

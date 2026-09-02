@@ -30,20 +30,10 @@ from app.routers.editor_ui import (
     repost_saved_ui,
     send_add_prompt,
 )
-from app.routers.details_support import (
-    DETAILS_TYPE,
-    details_builder_text,
-)
-from app.services.factory import (
-    MEDIA_CAPTION_TYPES,
-    QUOTE_TYPES,
-    compatible_child_block_types,
-    container_data,
-    details_data,
-    map_data,
-    new_block,
-    text_data,
-)
+from app.routers.details_support import details_builder_text
+from app.services.details_editor import DETAILS_TYPE
+from app.editor.builders import container_data, details_data, map_data, new_block, text_data
+from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES, compatible_child_block_types
 from app.services.parser import message_to_blocks, messages_to_blocks
 from app.states import RichEditorStates
 

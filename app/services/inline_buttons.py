@@ -234,19 +234,19 @@ def _button_payload(
 def inline_button_rich_text(value: Any) -> Any:
     """Replace valid inline button markers while preserving nested RichText."""
     if isinstance(value, list):
-        result: list[Any] = []
+        nested_result: list[Any] = []
         for item in value:
             parsed = inline_button_rich_text(item)
             if isinstance(parsed, list):
-                result.extend(parsed)
+                nested_result.extend(parsed)
             else:
-                result.append(parsed)
-        return result
+                nested_result.append(parsed)
+        return nested_result
     if isinstance(value, dict):
-        payload = dict(value)
-        if "text" in payload:
-            payload["text"] = inline_button_rich_text(payload["text"])
-        return payload
+        rich_payload = dict(value)
+        if "text" in rich_payload:
+            rich_payload["text"] = inline_button_rich_text(rich_payload["text"])
+        return rich_payload
     if not isinstance(value, str):
         return value
 

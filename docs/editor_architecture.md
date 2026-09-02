@@ -6,6 +6,7 @@ composed from feature-scoped routers without changing the user-facing flow.
 ## Boundaries
 
 - `app/editor/models.py` owns the canonical block shape and `source`.
+- `app/editor/types.py` owns the shared `Block`, `BlockData`, and `BlockList` types.
 - `app/editor/document.py` owns add/delete/move/replace/duplicate operations.
 - `app/editor/adapters/` contains one adapter definition per Rich Block type.
 - `app/editor/registry.py` is the only block-type registry.
@@ -15,7 +16,6 @@ composed from feature-scoped routers without changing the user-facing flow.
 - `app/editor/preview.py` is the preview service boundary.
 - `app/editor/draft_store.py` is the draft persistence boundary.
 - `app/editor/history.py` owns multi-step undo/redo snapshots.
-- `app/services/factory.py` is a stable import facade for existing callers.
 - `app/routers/history.py` owns the public multi-step Undo and Redo callbacks.
 - `app/routers/details.py` is only the Details router aggregator.
 - `app/routers/details_support.py` owns Details child/document helpers.
@@ -41,6 +41,10 @@ All new Block mutations must use `editor_workflow`, write through `draft_store`,
 and snapshot through `app.editor.history`. Native blocks edited into generated
 representations must discard stale
 native-only payload fields at the replacement boundary.
+
+Routers and keyboards import builders and block specifications directly from
+`app.editor`; compatibility factory modules and router-level domain exports are
+not part of the architecture.
 
 ## Canonical block
 

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from aiogram.types import Chat, Message, MessageEntity, User
 
-from app.services.factory import details_data, new_block, table_data
+from app.editor.builders import details_data, new_block, table_data
 from app.services.buttons import add_message_button
 from app.services.parser import message_to_blocks
 from app.services.renderer import build_input_rich_message

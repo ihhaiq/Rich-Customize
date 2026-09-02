@@ -7,7 +7,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message
 
 from app.i18n import tr
-from app.services.factory import new_block
+from app.editor.builders import new_block
 from app.services.renderer import build_input_rich_message
 
 

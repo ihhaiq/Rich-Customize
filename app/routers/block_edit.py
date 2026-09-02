@@ -10,13 +10,8 @@ from aiogram.types import CallbackQuery, Message
 
 from app.i18n import t
 from app.keyboards import build_heading_level_keyboard
-from app.services.factory import (
-    MEDIA_CAPTION_TYPES,
-    QUOTE_TYPES,
-    map_data,
-    quote_data,
-    text_data,
-)
+from app.editor.builders import map_data, quote_data, text_data
+from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES
 from app.services.parser import message_to_blocks, messages_to_blocks, replacement_data
 from app.services.anchors import set_anchor_display_name
 from app.states import RichEditorStates

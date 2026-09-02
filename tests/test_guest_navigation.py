@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from app.routers.rich_editor import open_page_link, restore_original_message
-from app.services.factory import new_block
+from app.editor.builders import new_block
 from app.services.guest_message_registry import GuestMessageRegistry
 from app.services.page_navigation import PageNavigationRegistry
 from app.services.page_registry import PageRegistry

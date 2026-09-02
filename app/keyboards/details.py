@@ -7,7 +7,7 @@ from aiogram.types import DisabledButton, InlineKeyboardButton, InlineKeyboardMa
 
 from app.i18n import t
 from app.services.blocks import BLOCK_LABELS
-from app.services.factory import MEDIA_CAPTION_TYPES, QUOTE_TYPES, compatible_child_block_types
+from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES, compatible_child_block_types
 
 
 def build_details_inner_blocks_keyboard(details: dict[str, Any]) -> InlineKeyboardMarkup:
