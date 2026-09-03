@@ -12,7 +12,7 @@ from app.i18n import t
 from app.keyboards import build_heading_level_keyboard
 from app.editor.builders import map_data, quote_data, text_data
 from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES
-from app.services.parser import message_to_blocks, messages_to_blocks, replacement_data
+from app.services.parser import message_to_blocks, messages_to_blocks, replacement_block, replacement_data
 from app.services.anchors import set_anchor_display_name
 from app.states import RichEditorStates
 
@@ -71,7 +71,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         "mathematical_expression": math_input_prompt(editing=True),
         "anchor": t("details.send_anchor"),
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر",
-        "table": "أرسل صفوف الجدول؛ افصل الأعمدة بعلامة |",
+        "table": "أرسل الجدول الجاهز الجديد، أو أرسل صفوفه وافصل الأعمدة بعلامة |",
         "blockquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لوضعه داخله",
         "pullquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لإرفاقه به",
         "collage": "أرسل صور/فيديو أو Album جديدًا للكولاج",
@@ -163,6 +163,7 @@ async def receive_replacement(
         return
 
     replacement: dict[str, Any] | None
+    replacement_source = "generated"
     if edit_field:
         if not message.text:
             await message.answer("أرسل نصًا لهذا الحقل.")
@@ -217,6 +218,13 @@ async def receive_replacement(
                     replacement["quote_html"] = caption["data"].get("html", "")
             else:
                 replacement = None
+    elif expected == "table" and message.rich_message:
+        table_block = replacement_block(message, "table")
+        if table_block is None:
+            replacement = None
+        else:
+            replacement = table_block["data"]
+            replacement_source = str(table_block.get("source", "native"))
     elif expected == "anchor":
         replacement = copy.deepcopy(block.get("data", {}))
         if not message.text or not set_anchor_display_name(
@@ -252,15 +260,16 @@ async def receive_replacement(
         await message.answer("نوع المحتوى غير صحيح. أرسل نفس نوع الجزء المطلوب.")
         return
 
-    for key in ("native", "native_data", "native_type"):
-        replacement.pop(key, None)
+    if replacement_source != "native":
+        for key in ("native", "native_data", "native_type"):
+            replacement.pop(key, None)
 
     updated = await replace_payload(
         state,
         blocks,
         str(block["id"]),
         replacement,
-        source="generated",
+        source=replacement_source,
     )
     if updated is None:
         await message.answer("هذا الجزء لم يعد موجودًا.")
