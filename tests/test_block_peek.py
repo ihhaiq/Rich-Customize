@@ -18,7 +18,7 @@ class BlockPeekTests(unittest.IsolatedAsyncioTestCase):
             "data": data or {},
         }
 
-    def test_editor_places_eye_button_beside_each_block(self):
+    def test_editor_places_eye_left_of_each_previewable_block(self):
         keyboard = build_rich_editor_keyboard([
             self._block("paragraph", {"text": "hello"}),
         ])
@@ -26,11 +26,25 @@ class BlockPeekTests(unittest.IsolatedAsyncioTestCase):
         row = next(
             row
             for row in keyboard.inline_keyboard
-            if row[0].callback_data == "r:b:b1"
+            if any(button.callback_data == "r:b:b1" for button in row)
         )
         self.assertEqual(len(row), 2)
-        self.assertEqual(row[1].text, "👁")
-        self.assertEqual(row[1].callback_data, "r:peek:b1")
+        self.assertEqual(row[0].text, "👁")
+        self.assertEqual(row[0].callback_data, "r:peek:b1")
+        self.assertEqual(row[1].callback_data, "r:b:b1")
+
+    def test_divider_has_no_eye_button(self):
+        keyboard = build_rich_editor_keyboard([
+            self._block("divider", {}, "divider-1"),
+        ])
+
+        row = next(
+            row
+            for row in keyboard.inline_keyboard
+            if any(button.callback_data == "r:b:divider-1" for button in row)
+        )
+        self.assertEqual(len(row), 1)
+        self.assertEqual(row[0].callback_data, "r:b:divider-1")
 
     def test_non_visual_media_peek_prefers_audio_title(self):
         block = self._block("audio", {
