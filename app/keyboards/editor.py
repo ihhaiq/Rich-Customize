@@ -71,10 +71,16 @@ def build_rich_editor_keyboard(
         )])
 
     rows.extend([
-        [InlineKeyboardButton(
-            text=get_block_button_text(block, normalized_offset + index),
-            callback_data=f"r:b:{block['id']}",
-        )]
+        [
+            InlineKeyboardButton(
+                text=get_block_button_text(block, normalized_offset + index),
+                callback_data=f"r:b:{block['id']}",
+            ),
+            InlineKeyboardButton(
+                text="👁",
+                callback_data=f"r:peek:{block['id']}",
+            ),
+        ]
         for index, block in enumerate(visible_blocks)
     ])
 
