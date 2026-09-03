@@ -89,6 +89,13 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
         panel_notice = "⚠️ تعذرت المعاينة."
 
     async with user_locks[callback.from_user.id]:
+        if await state.get_state() != RichEditorStates.managing.state:
+            return
+        latest_data = await state.get_data()
+        if latest_data.get("block_scroll_enabled", True) is not True:
+            return
+        if latest_data.get("current_block_id") is not None:
+            return
         latest_draft = await draft_store.load(state)
         latest_data = await state.get_data()
         if isinstance(callback.message, Message):
@@ -130,7 +137,7 @@ async def import_rich_message_into_editor(
     changed = before.as_state() != after.as_state()
     if changed:
         await remember(state)
-    await state.update_data(block_scroll_offset=0)
+    await state.update_data(block_scroll_offset=0, block_scroll_enabled=True)
     if changed:
         await draft_store.save(state, after)
     else:
