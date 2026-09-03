@@ -80,6 +80,7 @@ async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
     draft.current_page_title = title
     await draft_store.save(state, draft)
     await state.set_state(RichEditorStates.managing)
+    await state.update_data(block_scroll_enabled=True)
     await edit_ui(
         callback.message,
         editor_dashboard_text(draft, f"✅ تم تحديث الصفحة المحفوظة «{title}»."),
@@ -119,6 +120,7 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
     after.current_page_title = title
     await persist_page_draft_change(state, before, after)
     await state.set_state(RichEditorStates.managing)
+    await state.update_data(block_scroll_enabled=True)
     prefix = (
         "✅ تم تحديث الصفحة المحفوظة.\n\nالكود: "
         if existing_id == code
@@ -324,6 +326,7 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
         current_button_id=None,
         management_chat_id=callback.message.chat.id,
         management_message_id=callback.message.message_id,
+        block_scroll_enabled=True,
     )
     await edit_ui(
         callback.message,
