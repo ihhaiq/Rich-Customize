@@ -71,6 +71,7 @@ async def open_post_chats(callback: CallbackQuery, state: FSMContext, bot: Bot) 
         post_selected_chat_ids=[],
         post_silent=False,
         post_protected=False,
+        block_scroll_enabled=False,
     )
     await render_post_chat_picker(callback, state, bot, [])
     await callback.answer()
@@ -127,12 +128,3 @@ async def select_post_chat(callback: CallbackQuery, state: FSMContext, bot: Bot)
         notice = "تم تحديد المحادثة للإرسال"
     await render_post_chat_picker(callback, state, bot, selected)
     await callback.answer(notice)
-
-
-__all__ = [
-    "open_post_chats",
-    "remember_publish_chat",
-    "return_to_post_chats",
-    "router",
-    "select_post_chat",
-]
