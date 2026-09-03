@@ -97,6 +97,78 @@ class EditorScrollStateTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(changed)
         self.assertEqual(state.data["block_scroll_offset"], 0)
 
+    async def test_switching_between_identical_saved_pages_resets_scroll(self):
+        blocks = self._blocks(BLOCK_SCROLL_SIZE * 2 + 1)
+        before = EditorDraft(
+            blocks=blocks,
+            message_buttons=[],
+            current_page_id="page-one",
+            current_page_title="One",
+        )
+        after = EditorDraft(
+            blocks=copy.deepcopy(blocks),
+            message_buttons=[],
+            current_page_id="page-two",
+            current_page_title="Two",
+        )
+        state = FakeState({
+            **before.as_state(),
+            "block_scroll_offset": BLOCK_SCROLL_SIZE * 2,
+        })
+
+        changed = await persist_page_draft_change(state, before, after)
+
+        self.assertTrue(changed)
+        self.assertEqual(state.data["block_scroll_offset"], 0)
+
+    async def test_detaching_deleted_current_page_keeps_scroll(self):
+        blocks = self._blocks(BLOCK_SCROLL_SIZE * 2 + 1)
+        before = EditorDraft(
+            blocks=blocks,
+            message_buttons=[],
+            current_page_id="page-one",
+            current_page_title="One",
+        )
+        after = EditorDraft(
+            blocks=copy.deepcopy(blocks),
+            message_buttons=[],
+            current_page_id=None,
+            current_page_title=None,
+        )
+        state = FakeState({
+            **before.as_state(),
+            "block_scroll_offset": BLOCK_SCROLL_SIZE,
+        })
+
+        changed = await persist_page_draft_change(state, before, after)
+
+        self.assertTrue(changed)
+        self.assertEqual(state.data["block_scroll_offset"], BLOCK_SCROLL_SIZE)
+
+    async def test_explicit_page_open_reset_handles_identical_unsaved_content(self):
+        blocks = self._blocks(BLOCK_SCROLL_SIZE * 2 + 1)
+        before = EditorDraft(blocks=blocks, message_buttons=[])
+        after = EditorDraft(
+            blocks=copy.deepcopy(blocks),
+            message_buttons=[],
+            current_page_id="saved-page",
+            current_page_title="Saved",
+        )
+        state = FakeState({
+            **before.as_state(),
+            "block_scroll_offset": BLOCK_SCROLL_SIZE * 2,
+        })
+
+        changed = await persist_page_draft_change(
+            state,
+            before,
+            after,
+            reset_scroll=True,
+        )
+
+        self.assertTrue(changed)
+        self.assertEqual(state.data["block_scroll_offset"], 0)
+
     async def test_saving_current_content_as_page_does_not_jump_to_top(self):
         blocks = self._blocks(BLOCK_SCROLL_SIZE * 2 + 1)
         before = EditorDraft(blocks=blocks, message_buttons=[])
