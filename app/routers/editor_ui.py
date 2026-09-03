@@ -151,16 +151,20 @@ async def repost_saved_ui(
     data = await state.get_data()
     chat_id = data.get("management_chat_id")
     message_id = data.get("management_message_id")
-    if chat_id and message_id:
-        try:
-            await bot.delete_message(chat_id=chat_id, message_id=message_id)
-        except TelegramBadRequest as error:
-            logger.debug("Could not remove the old management panel: %s", error)
+    if not chat_id:
+        raise RuntimeError("Editor management chat is not available")
+
     sent = await bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
     await state.update_data(
         management_chat_id=sent.chat.id,
         management_message_id=sent.message_id,
     )
+
+    if message_id and message_id != sent.message_id:
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except TelegramBadRequest as error:
+            logger.debug("Could not remove the old management panel: %s", error)
     return sent
 
 
