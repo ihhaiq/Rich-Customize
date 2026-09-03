@@ -314,7 +314,12 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     after.current_page_title = str(page.get("title") or page_id)
     await persist_page_draft_change(state, before, after)
     await state.set_state(RichEditorStates.managing)
-    await state.update_data(current_block_id=None, current_button_id=None)
+    await state.update_data(
+        current_block_id=None,
+        current_button_id=None,
+        management_chat_id=callback.message.chat.id,
+        management_message_id=callback.message.message_id,
+    )
     await edit_ui(
         callback.message,
         editor_dashboard_text(after),
