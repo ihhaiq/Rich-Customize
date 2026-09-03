@@ -41,9 +41,14 @@ async def persist_page_draft_change(
     state: FSMContext,
     before: EditorDraft,
     after: EditorDraft,
+    *,
+    reset_scroll: bool = False,
 ) -> bool:
     """Persist a page-related draft mutation and remember one undo snapshot."""
     if before.as_state() == after.as_state():
+        if reset_scroll:
+            await state.update_data(block_scroll_offset=0)
+            await draft_store.load(state)
         return False
     await remember(state)
     page_changed = before.current_page_id != after.current_page_id
@@ -53,7 +58,7 @@ async def persist_page_draft_change(
         or before.buttons_per_row != after.buttons_per_row
         or before.buttons_align != after.buttons_align
     )
-    if page_changed and content_changed:
+    if reset_scroll or (page_changed and content_changed):
         await state.update_data(block_scroll_offset=0)
     await draft_store.save(state, after)
     return True
