@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
-from app.editor.session import load_editor_session
+from app.editor.session import load_editor_session, user_locks
 from app.editor.view_state import normalize_block_scroll_offset
 from app.i18n import t
 from app.keyboards import build_editor_tools_keyboard, build_rich_editor_keyboard
@@ -66,29 +66,44 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
 
 @router.callback_query(F.data.startswith("r:blockscroll:"))
 async def scroll_blocks(callback: CallbackQuery, state: FSMContext) -> None:
-    session = await load_editor_session(callback, state)
-    if not session or not isinstance(callback.message, Message):
+    if not callback.from_user or not isinstance(callback.message, Message):
+        await callback.answer()
         return
-    _, blocks = session
     try:
         requested_offset = int((callback.data or "").rsplit(":", 1)[1])
     except (TypeError, ValueError, IndexError):
         await callback.answer()
         return
 
-    block_scroll_offset = normalize_block_scroll_offset(len(blocks), requested_offset)
-    draft = await draft_store.load(state)
-    await state.update_data(block_scroll_offset=block_scroll_offset)
-    await edit_ui(
-        callback.message,
-        editor_dashboard_text(draft),
-        build_rich_editor_keyboard(
-            blocks,
-            draft.message_buttons,
-            block_offset=block_scroll_offset,
-        ),
-    )
     await callback.answer()
+    async with user_locks[callback.from_user.id]:
+        data = await state.get_data()
+        if not isinstance(data.get("blocks"), list):
+            return
+        management_message_id = data.get("management_message_id")
+        management_chat_id = data.get("management_chat_id")
+        if (
+            management_message_id != callback.message.message_id
+            or management_chat_id != callback.message.chat.id
+        ):
+            return
+
+        draft = await draft_store.load(state)
+        block_scroll_offset = normalize_block_scroll_offset(
+            len(draft.blocks),
+            requested_offset,
+        )
+        await state.update_data(block_scroll_offset=block_scroll_offset)
+        draft = await draft_store.load(state)
+        await edit_ui(
+            callback.message,
+            editor_dashboard_text(draft),
+            build_rich_editor_keyboard(
+                draft.blocks,
+                draft.message_buttons,
+                block_offset=block_scroll_offset,
+            ),
+        )
 
 
 @router.callback_query(F.data == "r:tools")
