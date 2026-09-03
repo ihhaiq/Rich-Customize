@@ -4,8 +4,14 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from aiogram.enums import ButtonStyle
+
 from app.keyboards.editor import build_rich_editor_keyboard
-from app.routers.block_preview import _block_peek_text, _send_visual_peek
+from app.routers.block_preview import (
+    _block_peek_text,
+    _compact_text,
+    _send_visual_peek,
+)
 
 
 class BlockPeekTests(unittest.IsolatedAsyncioTestCase):
@@ -33,7 +39,7 @@ class BlockPeekTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(row[0].callback_data, "r:peek:b1")
         self.assertEqual(row[1].callback_data, "r:b:b1")
 
-    def test_divider_has_no_eye_button(self):
+    def test_divider_has_no_eye_button_and_is_primary(self):
         keyboard = build_rich_editor_keyboard([
             self._block("divider", {}, "divider-1"),
         ])
@@ -45,6 +51,7 @@ class BlockPeekTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(row), 1)
         self.assertEqual(row[0].callback_data, "r:b:divider-1")
+        self.assertEqual(row[0].style, ButtonStyle.PRIMARY)
 
     def test_non_visual_media_peek_prefers_audio_title(self):
         block = self._block("audio", {
@@ -74,6 +81,20 @@ class BlockPeekTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(_block_peek_text(paragraph), "نص يميز هذا البلوك")
         self.assertEqual(_block_peek_text(anchor), "قسم الأغاني")
+
+    def test_plain_text_with_angle_brackets_is_not_treated_as_html(self):
+        self.assertEqual(_compact_text("2 < 3 > 1"), "2 < 3 > 1")
+
+    def test_table_peek_reads_structured_rich_caption(self):
+        block = self._block("table", {
+            "caption_rich_text": {
+                "type": "bold",
+                "text": "جدول الأسعار",
+            },
+            "rows": [["الخطة", "السعر"]],
+        })
+
+        self.assertEqual(_block_peek_text(block), "جدول الأسعار")
 
     async def test_visual_peek_sends_photo_by_file_id(self):
         sent_message = SimpleNamespace(message_id=99)
