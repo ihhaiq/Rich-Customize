@@ -58,7 +58,12 @@ async def persist_page_draft_change(
         or before.buttons_per_row != after.buttons_per_row
         or before.buttons_align != after.buttons_align
     )
-    if reset_scroll or (page_changed and content_changed):
+    switching_saved_page = bool(
+        page_changed
+        and before.current_page_id is not None
+        and after.current_page_id is not None
+    )
+    if reset_scroll or (page_changed and content_changed) or switching_saved_page:
         await state.update_data(block_scroll_offset=0)
     await draft_store.save(state, after)
     return True
