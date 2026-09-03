@@ -6,6 +6,7 @@ from typing import Any, Protocol
 
 from app.editor.models import normalize_blocks
 from app.editor.types import BlockList
+from app.editor.view_state import normalize_block_scroll_offset, set_block_scroll_offset
 
 
 class StateLike(Protocol):
@@ -54,7 +55,16 @@ class FSMDraftStore:
     """
 
     async def load(self, state: StateLike) -> EditorDraft:
-        return EditorDraft.from_state(await state.get_data())
+        data = await state.get_data()
+        draft = EditorDraft.from_state(data)
+        block_scroll_offset = normalize_block_scroll_offset(
+            len(draft.blocks),
+            data.get("block_scroll_offset"),
+        )
+        set_block_scroll_offset(block_scroll_offset)
+        if data.get("block_scroll_offset") != block_scroll_offset:
+            await state.update_data(block_scroll_offset=block_scroll_offset)
+        return draft
 
     async def save(
         self,
@@ -66,7 +76,16 @@ class FSMDraftStore:
         payload = current.as_state()
         payload.update(changes)
         normalized = EditorDraft.from_state(payload)
-        await state.update_data(**normalized.as_state())
+        data = await state.get_data()
+        block_scroll_offset = normalize_block_scroll_offset(
+            len(normalized.blocks),
+            data.get("block_scroll_offset"),
+        )
+        await state.update_data(
+            **normalized.as_state(),
+            block_scroll_offset=block_scroll_offset,
+        )
+        set_block_scroll_offset(block_scroll_offset)
         return normalized
 
 
