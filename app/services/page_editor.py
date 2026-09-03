@@ -46,6 +46,15 @@ async def persist_page_draft_change(
     if before.as_state() == after.as_state():
         return False
     await remember(state)
+    page_changed = before.current_page_id != after.current_page_id
+    content_changed = (
+        before.blocks != after.blocks
+        or before.message_buttons != after.message_buttons
+        or before.buttons_per_row != after.buttons_per_row
+        or before.buttons_align != after.buttons_align
+    )
+    if page_changed and content_changed:
+        await state.update_data(block_scroll_offset=0)
     await draft_store.save(state, after)
     return True
 
