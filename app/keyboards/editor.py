@@ -82,7 +82,7 @@ def build_rich_editor_keyboard(
             continue
         rows.append([
             InlineKeyboardButton(
-                text="👁",
+                text="👁︎",
                 callback_data=f"r:peek:{block['id']}",
             ),
             block_button,
