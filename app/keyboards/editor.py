@@ -71,11 +71,13 @@ def build_rich_editor_keyboard(
         )])
 
     for index, block in enumerate(visible_blocks):
+        is_divider = block.get("type") == "divider"
         block_button = InlineKeyboardButton(
             text=get_block_button_text(block, normalized_offset + index),
             callback_data=f"r:b:{block['id']}",
+            style=ButtonStyle.PRIMARY if is_divider else None,
         )
-        if block.get("type") == "divider":
+        if is_divider:
             rows.append([block_button])
             continue
         rows.append([
