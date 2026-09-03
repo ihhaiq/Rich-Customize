@@ -5,11 +5,13 @@ from typing import Any
 from aiogram.enums import ButtonStyle
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.editor.view_state import (
+    BLOCK_SCROLL_SIZE,
+    current_block_scroll_offset,
+    normalize_block_scroll_offset,
+)
 from app.i18n import t, tr
 from app.services.blocks import get_block_button_text
-
-
-BLOCK_SCROLL_SIZE = 8
 
 
 def build_welcome_keyboard() -> InlineKeyboardMarkup:
@@ -36,7 +38,7 @@ def build_rich_editor_keyboard(
     blocks: list[dict[str, Any]],
     buttons: list[dict[str, Any]] | None = None,
     *,
-    block_offset: int = 0,
+    block_offset: int | None = None,
 ) -> InlineKeyboardMarkup:
     if not blocks:
         return InlineKeyboardMarkup(inline_keyboard=[[
@@ -48,9 +50,15 @@ def build_rich_editor_keyboard(
         ]])
 
     ordered_blocks = sorted(blocks, key=lambda item: item["position"])
-    last_offset = ((len(ordered_blocks) - 1) // BLOCK_SCROLL_SIZE) * BLOCK_SCROLL_SIZE
-    normalized_offset = max(0, min(block_offset, last_offset))
-    normalized_offset = (normalized_offset // BLOCK_SCROLL_SIZE) * BLOCK_SCROLL_SIZE
+    requested_offset = (
+        current_block_scroll_offset()
+        if block_offset is None
+        else block_offset
+    )
+    normalized_offset = normalize_block_scroll_offset(
+        len(ordered_blocks),
+        requested_offset,
+    )
     visible_blocks = ordered_blocks[
         normalized_offset:normalized_offset + BLOCK_SCROLL_SIZE
     ]
