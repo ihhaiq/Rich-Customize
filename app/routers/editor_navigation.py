@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
 from app.editor.session import load_editor_session
+from app.editor.view_state import normalize_block_scroll_offset
 from app.i18n import t
 from app.keyboards import build_editor_tools_keyboard, build_rich_editor_keyboard
 from app.routers.editor_ui import delete_stored_block_prompt, edit_ui, editor_dashboard_text
@@ -31,7 +32,11 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         bot, state, data, protected_message=callback.message,
     )
     draft = await draft_store.load(state)
-    block_scroll_offset = int(data.get("block_scroll_offset") or 0)
+    block_scroll_offset = normalize_block_scroll_offset(
+        len(blocks),
+        data.get("block_scroll_offset"),
+    )
+    await state.update_data(block_scroll_offset=block_scroll_offset)
     await edit_ui(
         callback.message,
         editor_dashboard_text(draft),
@@ -66,11 +71,12 @@ async def scroll_blocks(callback: CallbackQuery, state: FSMContext) -> None:
         return
     _, blocks = session
     try:
-        block_scroll_offset = max(0, int((callback.data or "").rsplit(":", 1)[1]))
+        requested_offset = int((callback.data or "").rsplit(":", 1)[1])
     except (TypeError, ValueError, IndexError):
         await callback.answer()
         return
 
+    block_scroll_offset = normalize_block_scroll_offset(len(blocks), requested_offset)
     draft = await draft_store.load(state)
     await state.update_data(block_scroll_offset=block_scroll_offset)
     await edit_ui(
