@@ -70,19 +70,21 @@ def build_rich_editor_keyboard(
             callback_data=f"r:blockscroll:{max(0, normalized_offset - BLOCK_SCROLL_SIZE)}",
         )])
 
-    rows.extend([
-        [
-            InlineKeyboardButton(
-                text=get_block_button_text(block, normalized_offset + index),
-                callback_data=f"r:b:{block['id']}",
-            ),
+    for index, block in enumerate(visible_blocks):
+        block_button = InlineKeyboardButton(
+            text=get_block_button_text(block, normalized_offset + index),
+            callback_data=f"r:b:{block['id']}",
+        )
+        if block.get("type") == "divider":
+            rows.append([block_button])
+            continue
+        rows.append([
             InlineKeyboardButton(
                 text="👁",
                 callback_data=f"r:peek:{block['id']}",
             ),
-        ]
-        for index, block in enumerate(visible_blocks)
-    ])
+            block_button,
+        ])
 
     if normalized_offset + BLOCK_SCROLL_SIZE < len(ordered_blocks):
         rows.append([InlineKeyboardButton(
