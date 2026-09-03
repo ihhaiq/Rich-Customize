@@ -5,8 +5,11 @@ from typing import Any
 from aiogram.enums import ButtonStyle
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.i18n import t
+from app.i18n import t, tr
 from app.services.blocks import get_block_button_text
+
+
+BLOCK_SCROLL_SIZE = 8
 
 
 def build_welcome_keyboard() -> InlineKeyboardMarkup:
@@ -30,7 +33,10 @@ def build_start_editor_keyboard() -> InlineKeyboardMarkup:
 
 
 def build_rich_editor_keyboard(
-    blocks: list[dict[str, Any]], buttons: list[dict[str, Any]] | None = None,
+    blocks: list[dict[str, Any]],
+    buttons: list[dict[str, Any]] | None = None,
+    *,
+    block_offset: int = 0,
 ) -> InlineKeyboardMarkup:
     if not blocks:
         return InlineKeyboardMarkup(inline_keyboard=[[
@@ -40,10 +46,36 @@ def build_rich_editor_keyboard(
                 style=ButtonStyle.PRIMARY,
             ),
         ]])
-    rows = [
-        [InlineKeyboardButton(text=get_block_button_text(block, index), callback_data=f"r:b:{block['id']}")]
-        for index, block in enumerate(sorted(blocks, key=lambda item: item["position"]))
+
+    ordered_blocks = sorted(blocks, key=lambda item: item["position"])
+    last_offset = ((len(ordered_blocks) - 1) // BLOCK_SCROLL_SIZE) * BLOCK_SCROLL_SIZE
+    normalized_offset = max(0, min(block_offset, last_offset))
+    normalized_offset = (normalized_offset // BLOCK_SCROLL_SIZE) * BLOCK_SCROLL_SIZE
+    visible_blocks = ordered_blocks[
+        normalized_offset:normalized_offset + BLOCK_SCROLL_SIZE
     ]
+
+    rows: list[list[InlineKeyboardButton]] = []
+    if normalized_offset > 0:
+        rows.append([InlineKeyboardButton(
+            text=tr("⬆️ صعود"),
+            callback_data=f"r:blockscroll:{max(0, normalized_offset - BLOCK_SCROLL_SIZE)}",
+        )])
+
+    rows.extend([
+        [InlineKeyboardButton(
+            text=get_block_button_text(block, normalized_offset + index),
+            callback_data=f"r:b:{block['id']}",
+        )]
+        for index, block in enumerate(visible_blocks)
+    ])
+
+    if normalized_offset + BLOCK_SCROLL_SIZE < len(ordered_blocks):
+        rows.append([InlineKeyboardButton(
+            text=tr("⬇️ تمرير"),
+            callback_data=f"r:blockscroll:{normalized_offset + BLOCK_SCROLL_SIZE}",
+        )])
+
     rows.append([
         InlineKeyboardButton(
             text=t("ux.editor.preview"), callback_data="r:result",
@@ -105,6 +137,7 @@ def build_error_recovery_keyboard() -> InlineKeyboardMarkup:
 
 
 __all__ = [
+    "BLOCK_SCROLL_SIZE",
     "build_editor_tools_keyboard",
     "build_error_recovery_keyboard",
     "build_result_keyboard",
