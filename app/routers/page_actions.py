@@ -312,7 +312,12 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     after.buttons_align = str(page.get("buttons_align", "center"))
     after.current_page_id = page_id
     after.current_page_title = str(page.get("title") or page_id)
-    await persist_page_draft_change(state, before, after)
+    await persist_page_draft_change(
+        state,
+        before,
+        after,
+        reset_scroll=before.current_page_id != page_id,
+    )
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
         current_block_id=None,
