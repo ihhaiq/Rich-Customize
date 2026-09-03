@@ -77,6 +77,8 @@ async def scroll_blocks(callback: CallbackQuery, state: FSMContext) -> None:
 
     await callback.answer()
     async with user_locks[callback.from_user.id]:
+        if await state.get_state() != RichEditorStates.managing.state:
+            return
         data = await state.get_data()
         if not isinstance(data.get("blocks"), list):
             return
