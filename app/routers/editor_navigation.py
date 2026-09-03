@@ -59,6 +59,7 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         nested_details_id=None,
         nested_child_id=None,
         nested_action=None,
+        block_scroll_enabled=True,
     )
     await managed_chat_registry.clear_panel(callback.from_user.id)
     await callback.answer()
@@ -81,6 +82,10 @@ async def scroll_blocks(callback: CallbackQuery, state: FSMContext) -> None:
             return
         data = await state.get_data()
         if not isinstance(data.get("blocks"), list):
+            return
+        if data.get("block_scroll_enabled", True) is not True:
+            return
+        if data.get("current_block_id") is not None:
             return
         management_message_id = data.get("management_message_id")
         management_chat_id = data.get("management_chat_id")
@@ -113,6 +118,7 @@ async def open_editor_tools(callback: CallbackQuery, state: FSMContext) -> None:
     session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
+    await state.update_data(block_scroll_enabled=False)
     await edit_ui(
         callback.message,
         t("editor.tools_text"),
