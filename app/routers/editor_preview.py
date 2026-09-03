@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
 from app.editor.history import remember
-from app.editor.session import load_editor_session
+from app.editor.session import load_editor_session, user_locks
 from app.i18n import t
 from app.keyboards import build_error_recovery_keyboard, build_rich_editor_keyboard
 from app.routers.button_support import prepare_message_buttons
@@ -38,7 +38,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     data, blocks = session
     draft = await draft_store.load(state)
     await callback.answer("جاري إنشاء المعاينة…")
-    panel_text = editor_dashboard_text(draft, "✅ المعاينة جاهزة.")
+    panel_notice = "✅ المعاينة جاهزة."
     try:
         prepared_buttons = await prepare_message_buttons(draft.message_buttons)
         sent_messages = await send_rich_message_preview(
@@ -76,7 +76,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             f"السبب: {friendly_rich_error(error)}",
             reply_markup=build_error_recovery_keyboard(),
         )
-        panel_text = editor_dashboard_text(draft, "⚠️ تعذرت المعاينة.")
+        panel_notice = "⚠️ تعذرت المعاينة."
     except Exception:
         logger.exception(
             "Failed to render preview for user_id=%s", callback.from_user.id,
@@ -86,17 +86,27 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             "تعذر إنشاء المعاينة. راجع السجل لمعرفة الخطأ.",
             reply_markup=build_error_recovery_keyboard(),
         )
-        panel_text = editor_dashboard_text(draft, "⚠️ تعذرت المعاينة.")
-    if isinstance(callback.message, Message):
-        management_id = data.get("management_message_id")
-        if callback.message.message_id != management_id:
-            try:
-                await callback.message.delete()
-            except TelegramBadRequest:
-                pass
-    await repost_saved_ui(
-        bot, state, panel_text, build_rich_editor_keyboard(blocks, draft.message_buttons),
-    )
+        panel_notice = "⚠️ تعذرت المعاينة."
+
+    async with user_locks[callback.from_user.id]:
+        latest_draft = await draft_store.load(state)
+        latest_data = await state.get_data()
+        if isinstance(callback.message, Message):
+            management_id = latest_data.get("management_message_id")
+            if callback.message.message_id != management_id:
+                try:
+                    await callback.message.delete()
+                except TelegramBadRequest:
+                    pass
+        await repost_saved_ui(
+            bot,
+            state,
+            editor_dashboard_text(latest_draft, panel_notice),
+            build_rich_editor_keyboard(
+                latest_draft.blocks,
+                latest_draft.message_buttons,
+            ),
+        )
 
 
 @router.message(RichEditorStates.managing, F.rich_message)
@@ -117,16 +127,25 @@ async def import_rich_message_into_editor(
     after.buttons_align = "center"
     after.current_page_id = None
     after.current_page_title = None
-    if before.as_state() != after.as_state():
+    changed = before.as_state() != after.as_state()
+    if changed:
         await remember(state)
+    await state.update_data(block_scroll_offset=0)
+    if changed:
         await draft_store.save(state, after)
+    else:
+        await draft_store.load(state)
     await state.update_data(current_block_id=None)
     await delete_input_message(message)
     await edit_saved_ui(
         bot,
         state,
         editor_dashboard_text(after),
-        build_rich_editor_keyboard(blocks, after.message_buttons),
+        build_rich_editor_keyboard(
+            blocks,
+            after.message_buttons,
+            block_offset=0,
+        ),
     )
 
 
