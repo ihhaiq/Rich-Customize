@@ -31,10 +31,15 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         bot, state, data, protected_message=callback.message,
     )
     draft = await draft_store.load(state)
+    block_scroll_offset = int(data.get("block_scroll_offset") or 0)
     await edit_ui(
         callback.message,
         editor_dashboard_text(draft),
-        build_rich_editor_keyboard(blocks, draft.message_buttons),
+        build_rich_editor_keyboard(
+            blocks,
+            draft.message_buttons,
+            block_offset=block_scroll_offset,
+        ),
     )
     await state.set_state(RichEditorStates.managing)
     await state.update_data(
@@ -54,6 +59,32 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("r:blockscroll:"))
+async def scroll_blocks(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await load_editor_session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    _, blocks = session
+    try:
+        block_scroll_offset = max(0, int((callback.data or "").rsplit(":", 1)[1]))
+    except (TypeError, ValueError, IndexError):
+        await callback.answer()
+        return
+
+    draft = await draft_store.load(state)
+    await state.update_data(block_scroll_offset=block_scroll_offset)
+    await edit_ui(
+        callback.message,
+        editor_dashboard_text(draft),
+        build_rich_editor_keyboard(
+            blocks,
+            draft.message_buttons,
+            block_offset=block_scroll_offset,
+        ),
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data == "r:tools")
 async def open_editor_tools(callback: CallbackQuery, state: FSMContext) -> None:
     session = await load_editor_session(callback, state)
@@ -67,4 +98,10 @@ async def open_editor_tools(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
-__all__ = ["back_to_main", "no_op", "open_editor_tools", "router"]
+__all__ = [
+    "back_to_main",
+    "no_op",
+    "open_editor_tools",
+    "router",
+    "scroll_blocks",
+]
