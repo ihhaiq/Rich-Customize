@@ -35,7 +35,7 @@ class BlockPeekTests(unittest.IsolatedAsyncioTestCase):
             if any(button.callback_data == "r:b:b1" for button in row)
         )
         self.assertEqual(len(row), 2)
-        self.assertEqual(row[0].text, "👁")
+        self.assertEqual(row[0].text, "👁︎")
         self.assertEqual(row[0].callback_data, "r:peek:b1")
         self.assertEqual(row[1].callback_data, "r:b:b1")
 
