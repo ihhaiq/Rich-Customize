@@ -3,6 +3,8 @@ import unittest
 from aiogram.types import MessageEntity
 
 from app.editor.builders import list_data, new_block, table_data
+from app.editor.models import make_block
+from app.services.blocks import set_table_cell_style
 from app.services.renderer import build_input_rich_message
 
 
@@ -107,6 +109,37 @@ class RichListTableFormattingTests(unittest.TestCase):
 
         self.assertEqual(cells[0]["text"], {"type": "bold", "text": "يسار"})
         self.assertEqual(cells[1]["text"], {"type": "bold", "text": "يمين"})
+
+    def test_editing_native_table_cell_keeps_native_rich_text(self):
+        table = make_block(
+            "table",
+            {
+                "native": True,
+                "native_type": "table",
+                "native_data": {
+                    "type": "table",
+                    "cells": [[{
+                        "text": {"type": "bold", "text": "منسق"},
+                        "align": "left",
+                        "valign": "middle",
+                    }]],
+                    "is_bordered": True,
+                },
+            },
+            source="native",
+        )
+
+        self.assertTrue(set_table_cell_style(table, 0, 0, centered=True))
+        cell = table["data"]["rows"][0][0]
+        self.assertEqual(cell["text"], "منسق")
+        self.assertEqual(cell["rich_text"], {"type": "bold", "text": "منسق"})
+
+        rich = build_input_rich_message([table]).model_dump(
+            mode="json", exclude_none=True,
+        )
+        rendered = rich["blocks"][0]["cells"][0][0]
+        self.assertEqual(rendered["text"], {"type": "bold", "text": "منسق"})
+        self.assertEqual(rendered["align"], "center")
 
 
 if __name__ == "__main__":
