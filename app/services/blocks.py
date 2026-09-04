@@ -90,6 +90,36 @@ def update_block(blocks: BlockList, block_id: str, data: BlockData) -> bool:
     return replace_block_data(blocks, block_id, data) is not None
 
 
+def _rich_text_plain(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "".join(_rich_text_plain(item) for item in value)
+    if isinstance(value, dict):
+        if value.get("type") == "custom_emoji":
+            return str(value.get("alternative_text") or "")
+        return _rich_text_plain(value.get("text", value.get("children", "")))
+    return str(value)
+
+
+def _editable_table_rows(rows: list[list[Any]]) -> list[list[Any]]:
+    editable = copy.deepcopy(rows)
+    for row in editable:
+        if not isinstance(row, list):
+            continue
+        for index, raw in enumerate(row):
+            if not isinstance(raw, dict):
+                continue
+            rich_text = raw.get("text")
+            if isinstance(rich_text, (dict, list)):
+                raw["rich_text"] = copy.deepcopy(rich_text)
+                raw["text"] = _rich_text_plain(rich_text)
+            row[index] = raw
+    return editable
+
+
 def table_rows(block: Block) -> list[list[Any]]:
     """Return table cells from either an editor-created or received native table."""
     if block.get("type") != "table":
@@ -109,7 +139,7 @@ def editable_table_data(block: Block) -> BlockData | None:
     if block.get("type") != "table":
         return None
     old = block.setdefault("data", {})
-    rows = copy.deepcopy(table_rows(block))
+    rows = _editable_table_rows(table_rows(block))
     if not rows:
         return None
     native = old.get("native_data") if isinstance(old.get("native_data"), dict) else {}
