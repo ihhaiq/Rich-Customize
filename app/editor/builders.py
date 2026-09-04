@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import html
 import re
+from collections.abc import Iterable
 from typing import Any
 
-from aiogram.types import Message
+from aiogram.types import Message, MessageEntity
+from aiogram.utils.text_decorations import html_decoration
 
 from app.editor.models import make_block
 
@@ -16,17 +18,106 @@ def new_block(block_type: str, data: dict[str, Any] | None = None) -> dict[str, 
     return make_block(block_type, data)
 
 
-def table_data(plain: str) -> dict[str, Any]:
-    rows: list[list[Any]] = [
-        [cell.strip() for cell in line.split("|")]
-        for line in plain.splitlines()
-        if line.strip()
-    ]
+def _utf16_length(value: str) -> int:
+    return len(value.encode("utf-16-le")) // 2
+
+
+def _formatted_slice(
+    plain: str,
+    entities: Iterable[MessageEntity] | None,
+    start: int,
+    end: int,
+) -> str:
+    fragment = plain[start:end]
+    if not fragment:
+        return ""
+    source_entities = list(entities or [])
+    if not source_entities:
+        return html.escape(fragment)
+
+    start_units = _utf16_length(plain[:start])
+    end_units = start_units + _utf16_length(fragment)
+    clipped: list[MessageEntity] = []
+    for entity in source_entities:
+        entity_start = int(entity.offset)
+        entity_end = entity_start + int(entity.length)
+        overlap_start = max(entity_start, start_units)
+        overlap_end = min(entity_end, end_units)
+        if overlap_start >= overlap_end:
+            continue
+        clipped.append(
+            entity.model_copy(
+                update={
+                    "offset": overlap_start - start_units,
+                    "length": overlap_end - overlap_start,
+                },
+            ),
+        )
+    return html_decoration.unparse(fragment, clipped)
+
+
+def _line_bounds(plain: str) -> list[tuple[int, int]]:
+    bounds: list[tuple[int, int]] = []
+    offset = 0
+    for raw_line in plain.splitlines(keepends=True):
+        content_end = offset + len(raw_line)
+        while content_end > offset and plain[content_end - 1] in "\r\n":
+            content_end -= 1
+        bounds.append((offset, content_end))
+        offset += len(raw_line)
+    if plain and not bounds:
+        bounds.append((0, len(plain)))
+    return bounds
+
+
+def _trim_bounds(plain: str, start: int, end: int) -> tuple[int, int]:
+    while start < end and plain[start].isspace():
+        start += 1
+    while end > start and plain[end - 1].isspace():
+        end -= 1
+    return start, end
+
+
+def _formatted_payload(
+    plain: str,
+    entities: Iterable[MessageEntity] | None,
+    start: int,
+    end: int,
+) -> str | dict[str, Any]:
+    text = plain[start:end]
+    formatted = _formatted_slice(plain, entities, start, end)
+    if formatted == html.escape(text):
+        return text
+    return {"text": text, "html": formatted}
+
+
+def table_data(
+    plain: str,
+    entities: Iterable[MessageEntity] | None = None,
+) -> dict[str, Any]:
+    rows: list[list[Any]] = []
+    for line_start, line_end in _line_bounds(plain):
+        if not plain[line_start:line_end].strip():
+            continue
+        row: list[Any] = []
+        cell_start = line_start
+        for position in range(line_start, line_end + 1):
+            if position != line_end and plain[position] != "|":
+                continue
+            start, end = _trim_bounds(plain, cell_start, position)
+            row.append(_formatted_payload(plain, entities, start, end))
+            cell_start = position + 1
+        rows.append(row)
+
     widest_row = max((len(row) for row in rows), default=1)
     normalized_rows: list[list[Any]] = []
     for row in rows:
         if len(row) == 1 and widest_row > 1:
-            normalized_rows.append([{"text": row[0], "colspan": widest_row}])
+            source = row[0]
+            if isinstance(source, dict):
+                normalized_rows.append([{**source, "colspan": widest_row}])
+            else:
+                normalized_rows.append([{"text": source, "colspan": widest_row}])
         else:
             normalized_rows.append(row)
 
@@ -37,7 +128,10 @@ def table_data(plain: str) -> dict[str, Any]:
             cell = raw_cell if isinstance(raw_cell, dict) else {"text": str(raw_cell)}
             colspan = cell.get("colspan")
             attribute = f' colspan="{int(colspan)}"' if colspan else ""
-            cells.append(f"<td{attribute}>{html.escape(str(cell.get('text', '')))}</td>")
+            cell_html = cell.get("html")
+            if not isinstance(cell_html, str):
+                cell_html = html.escape(str(cell.get("text", "")))
+            cells.append(f"<td{attribute}>{cell_html}</td>")
         html_rows.append(f"<tr>{''.join(cells)}</tr>")
     return {
         "rows": normalized_rows,
@@ -73,28 +167,45 @@ def preformatted_data(plain: str) -> dict[str, Any]:
     return {"text": code, "html": rendered, "language": language}
 
 
-def list_data(plain: str, kind: str = "bullet") -> dict[str, Any]:
+def list_data(
+    plain: str,
+    kind: str = "bullet",
+    entities: Iterable[MessageEntity] | None = None,
+) -> dict[str, Any]:
     safe_kind = kind if kind in LIST_KINDS else "bullet"
     items: list[dict[str, Any]] = []
-    for raw_line in plain.splitlines():
-        line = raw_line.strip()
-        if not line:
+    for line_start, line_end in _line_bounds(plain):
+        start, end = _trim_bounds(plain, line_start, line_end)
+        if start >= end:
             continue
+        line = plain[start:end]
         checked = False
+        content_start = start
         if safe_kind == "checklist":
             completed = re.match(r"^(?:\[\s*[xX]\s*\]|✅|☑️?)\s*", line)
             pending = re.match(r"^(?:\[\s*\]|⬜|☐)\s*", line)
             marker = completed or pending
             if marker:
                 checked = completed is not None
-                line = line[marker.end():].strip()
+                content_start += marker.end()
         elif safe_kind == "numbered":
-            line = re.sub(r"^\d+\s*[.)-]\s*", "", line).strip()
+            marker = re.match(r"^\d+\s*[.)-]\s*", line)
+            if marker:
+                content_start += marker.end()
         else:
-            line = line.lstrip("-• ").strip()
-        if not line:
+            relative = 0
+            while relative < len(line) and line[relative] in "-• ":
+                relative += 1
+            content_start += relative
+
+        content_start, content_end = _trim_bounds(plain, content_start, end)
+        if content_start >= content_end:
             continue
-        item: dict[str, Any] = {"text": line}
+        item_text = plain[content_start:content_end]
+        item: dict[str, Any] = {"text": item_text}
+        formatted = _formatted_slice(plain, entities, content_start, content_end)
+        if formatted != html.escape(item_text):
+            item["html"] = formatted
         if safe_kind == "checklist":
             item.update(has_checkbox=True, is_checked=checked)
         elif safe_kind == "numbered":
@@ -102,18 +213,24 @@ def list_data(plain: str, kind: str = "bullet") -> dict[str, Any]:
         items.append(item)
 
     if safe_kind == "numbered":
-        body = "".join(f"<li>{html.escape(item['text'])}</li>" for item in items)
+        body = "".join(
+            f"<li>{item.get('html') or html.escape(item['text'])}</li>"
+            for item in items
+        )
         rendered = f"<ol>{body}</ol>"
     elif safe_kind == "checklist":
         body = "".join(
             "<li><input type=\"checkbox\""
             f"{' checked' if item['is_checked'] else ''}>"
-            f"{html.escape(item['text'])}</li>"
+            f"{item.get('html') or html.escape(item['text'])}</li>"
             for item in items
         )
         rendered = f"<ul>{body}</ul>"
     else:
-        body = "".join(f"<li>{html.escape(item['text'])}</li>" for item in items)
+        body = "".join(
+            f"<li>{item.get('html') or html.escape(item['text'])}</li>"
+            for item in items
+        )
         rendered = f"<ul>{body}</ul>"
     return {"items": items, "kind": safe_kind, "text": plain, "html": rendered}
 
@@ -144,9 +261,9 @@ def text_data(
         )[:64]
         return {"text": name, "html": f'<a name="{html.escape(name, quote=True)}"></a>'}
     if block_type == "list":
-        return list_data(plain, list_kind)
+        return list_data(plain, list_kind, message.entities)
     if block_type == "table":
-        return table_data(plain)
+        return table_data(plain, message.entities)
     return {"text": plain, "html": rich}
 
 
