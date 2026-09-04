@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 from app import i18n_core as _core
 from app.lang import (
@@ -46,6 +47,17 @@ def resolve_language(language_code: str | None) -> str:
     if primary in TRANSLATIONS:
         return primary
     return "en"
+
+
+@contextmanager
+def use_language(language_code: str | None) -> Iterator[str]:
+    """Temporarily bind localization outside the aiogram middleware lifecycle."""
+    language = resolve_language(language_code)
+    token = _core._language.set(language)
+    try:
+        yield language
+    finally:
+        _core._language.reset(token)
 
 
 def tr(text: str) -> str:
@@ -123,4 +135,5 @@ __all__ = [
     "resolve_language",
     "t",
     "tr",
+    "use_language",
 ]
