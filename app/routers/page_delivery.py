@@ -6,6 +6,7 @@ from aiogram import Bot, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import InlineQuery, InlineQueryResultArticle, InputRichMessageContent, Message
 
+from app.i18n import tr
 from app.services.buttons import normalize_page_code
 from app.services.renderer import RichMessageRenderError, build_input_rich_message
 
@@ -34,7 +35,7 @@ async def saved_page_query_result(page_id: str) -> InlineQueryResultArticle | No
     return InlineQueryResultArticle(
         id=f"page-{page_id}",
         title=str(page.get("title") or page_id),
-        description=f"رسالة غنية محفوظة · {page_id}",
+        description=f"{tr('رسالة غنية محفوظة · ')}{page_id}",
         input_message_content=InputRichMessageContent(rich_message=rich_message),
     )
 
