@@ -27,6 +27,26 @@ class EmptyDetailsRecoveryTests(unittest.TestCase):
         self.assertEqual(payload["blocks"][0]["blocks"][0]["type"], "paragraph")
         self.assertEqual(payload["blocks"][0]["blocks"][0]["text"], "…")
 
+    def test_malformed_details_children_are_repaired_after_normalization(self):
+        blocks = [{
+            "id": "details-bad-children",
+            "type": "details",
+            "position": 0,
+            "source": "generated",
+            "data": {
+                "summary_html": "تفاصيل",
+                "children": [None, "bad child"],
+            },
+        }]
+
+        normalize_blocks(blocks)
+
+        children = blocks[0]["data"]["children"]
+        self.assertEqual(len(children), 1)
+        self.assertEqual(children[0]["type"], "paragraph")
+        self.assertEqual(children[0]["data"]["text"], "…")
+        build_input_rich_message(blocks)
+
     def test_empty_native_details_is_detached_before_render(self):
         blocks = [
             make_block(
