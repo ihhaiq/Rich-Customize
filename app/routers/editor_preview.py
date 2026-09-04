@@ -37,8 +37,8 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
         return
     data, blocks = session
     draft = await draft_store.load(state)
-    await callback.answer("جاري إنشاء المعاينة…")
-    panel_notice = "✅ المعاينة جاهزة."
+    await callback.answer(t("preview_generating"))
+    panel_notice = f"✅ {t('preview_ready')}"
     try:
         prepared_buttons = await prepare_message_buttons(draft.message_buttons)
         sent_messages = await send_rich_message_preview(
@@ -72,21 +72,21 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
         )
         await bot.send_message(
             callback.from_user.id,
-            "تعذر إرسال النتيجة كرسالة غنية واحدة؛ لم يتم تقسيمها إلى رسائل منفصلة.\n"
-            f"السبب: {friendly_rich_error(error)}",
+            f"{t('preview_failed')}\n"
+            f"{t('common.reason', reason=friendly_rich_error(error))}",
             reply_markup=build_error_recovery_keyboard(),
         )
-        panel_notice = "⚠️ تعذرت المعاينة."
+        panel_notice = f"⚠️ {t('preview_failed')}"
     except Exception:
         logger.exception(
             "Failed to render preview for user_id=%s", callback.from_user.id,
         )
         await bot.send_message(
             callback.from_user.id,
-            "تعذر إنشاء المعاينة. راجع السجل لمعرفة الخطأ.",
+            t("preview_failed"),
             reply_markup=build_error_recovery_keyboard(),
         )
-        panel_notice = "⚠️ تعذرت المعاينة."
+        panel_notice = f"⚠️ {t('preview_failed')}"
 
     async with user_locks[callback.from_user.id]:
         if await state.get_state() != RichEditorStates.managing.state:
