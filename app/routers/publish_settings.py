@@ -4,12 +4,16 @@ from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.i18n import t
-from app.keyboards import build_post_confirmation_keyboard, build_post_settings_keyboard
+from app.i18n import t, tr
+from app.keyboards import build_post_back_keyboard
 from app.services.chat_registry import managed_chat_registry
+from app.services.publish_ui import (
+    build_post_confirmation_rich_message,
+    build_post_settings_rich_message,
+    edit_publish_ui,
+)
 
 from app.editor.session import load_editor_session
-from app.routers.editor_ui import edit_ui
 from app.routers.publish_support import eligible_post_chats
 
 
@@ -18,8 +22,9 @@ router = Router(name="publish_settings")
 
 def settings_text(selected_count: int) -> str:
     return (
-        f"إعدادات المنشور\n\nالمحادثات المحددة: {selected_count}\n"
-        "اختر الإعدادات ثم اضغط إرسال:"
+        f"{tr('إعدادات المنشور')}\n\n"
+        f"{tr('المحادثات المحددة: ')}{selected_count}\n"
+        f"{tr('اختر الإعدادات ثم اضغط إرسال:')}"
     )
 
 
@@ -35,18 +40,19 @@ async def open_post_settings(callback: CallbackQuery, state: FSMContext, bot: Bo
     selected = [chat_id for chat_id in selected if chat_id in eligible_ids]
     if not selected:
         await state.update_data(post_selected_chat_ids=[])
-        await callback.answer("حدد محادثة واحدة على الأقل.", show_alert=True)
+        await callback.answer(t("select_chat"), show_alert=True)
         return
     await state.update_data(post_selected_chat_ids=selected)
     await managed_chat_registry.clear_panel(callback.from_user.id)
-    await edit_ui(
+    await edit_publish_ui(
         callback.message,
-        settings_text(len(selected)),
-        build_post_settings_keyboard(
+        build_post_settings_rich_message(
+            settings_text(len(selected)),
             silent=bool(data.get("post_silent", False)),
             protected=bool(data.get("post_protected", False)),
             selected_count=len(selected),
         ),
+        build_post_back_keyboard("r:postlist"),
     )
     await callback.answer()
 
@@ -59,7 +65,7 @@ async def toggle_post_option(callback: CallbackQuery, state: FSMContext) -> None
     data, _ = session
     selected = [int(item) for item in data.get("post_selected_chat_ids", [])]
     if not selected:
-        await callback.answer("حدد محادثة واحدة على الأقل.", show_alert=True)
+        await callback.answer(t("select_chat"), show_alert=True)
         return
     option = callback.data.rsplit(":", 1)[-1]
     silent = bool(data.get("post_silent", False))
@@ -69,17 +75,18 @@ async def toggle_post_option(callback: CallbackQuery, state: FSMContext) -> None
     elif option == "protected":
         protected = not protected
     else:
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(tr("اختيار غير صالح."), show_alert=True)
         return
     await state.update_data(post_silent=silent, post_protected=protected)
-    await edit_ui(
+    await edit_publish_ui(
         callback.message,
-        settings_text(len(selected)),
-        build_post_settings_keyboard(
+        build_post_settings_rich_message(
+            settings_text(len(selected)),
             silent=silent,
             protected=protected,
             selected_count=len(selected),
         ),
+        build_post_back_keyboard("r:postlist"),
     )
     await callback.answer()
 
@@ -94,10 +101,12 @@ async def confirm_post(callback: CallbackQuery, state: FSMContext) -> None:
     if not selected:
         await callback.answer(t("select_chat"), show_alert=True)
         return
-    await edit_ui(
+    await edit_publish_ui(
         callback.message,
-        t("ux.publish.confirm", count=len(selected)),
-        build_post_confirmation_keyboard(len(selected)),
+        build_post_confirmation_rich_message(
+            t("ux.publish.confirm", count=len(selected)),
+        ),
+        build_post_back_keyboard("r:postsettings"),
     )
     await callback.answer()
 

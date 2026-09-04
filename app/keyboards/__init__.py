@@ -54,6 +54,7 @@ from app.keyboards.pages import (
 )
 from app.keyboards.publishing import (
     build_chat_reached_keyboard,
+    build_post_back_keyboard,
     build_post_chats_keyboard,
     build_post_confirmation_keyboard,
     build_post_settings_keyboard,

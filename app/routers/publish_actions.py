@@ -8,13 +8,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
-from app.keyboards import build_post_settings_keyboard
+from app.keyboards import build_post_back_keyboard
 from app.services.chat_registry import managed_chat_registry
+from app.services.publish_ui import build_post_settings_rich_message, edit_publish_ui
 from app.services.renderer import RichMessageRenderError, send_rich_message_post
 
 from app.editor.session import load_editor_session, user_locks
 from app.routers.button_support import prepare_message_buttons
-from app.routers.editor_ui import edit_ui, friendly_rich_error
+from app.routers.editor_ui import friendly_rich_error
 from app.routers.publish_support import can_publish_to_chat
 
 
@@ -83,14 +84,15 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
         if len(succeeded) + len(failed) > 20:
             lines.append("… تم اختصار قائمة النتائج")
         lines.append("\nيمكنك تغيير الإعدادات وإرسال المنشور مرة أخرى.")
-        await edit_ui(
+        await edit_publish_ui(
             callback.message,
-            "\n".join(lines),
-            build_post_settings_keyboard(
+            build_post_settings_rich_message(
+                "\n".join(lines),
                 silent=bool(data.get("post_silent", False)),
                 protected=bool(data.get("post_protected", False)),
                 selected_count=len(selected),
             ),
+            build_post_back_keyboard("r:postlist"),
         )
 
 
