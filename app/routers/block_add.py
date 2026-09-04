@@ -8,7 +8,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.i18n import t
+from app.i18n import t, tr
 from app.keyboards import (
     build_add_block_keyboard,
     build_anchor_target_keyboard,
@@ -43,7 +43,7 @@ async def add_block_menu(callback: CallbackQuery, state: FSMContext) -> None:
         return
     await edit_ui(
         callback.message,
-        "اختر نوع الـBlock الجديد:",
+        tr("اختر نوع الـBlock الجديد:"),
         build_add_block_keyboard(),
     )
     await callback.answer()
@@ -101,12 +101,12 @@ async def choose_add_block(
         raise SkipHandler
     if block_type == "thinking":
         await callback.answer(
-            "Thinking متاح في sendRichMessageDraft فقط ولا يمكن إضافته للنتيجة النهائية.",
+            tr("Thinking متاح في sendRichMessageDraft فقط ولا يمكن إضافته للنتيجة النهائية."),
             show_alert=True,
         )
         return
     if block_type not in FINAL_RICH_BLOCK_TYPES:
-        await callback.answer("نوع غير معروف.", show_alert=True)
+        await callback.answer(tr("نوع غير معروف."), show_alert=True)
         return
     if block_type == "anchor" and not anchor_targets(blocks):
         await callback.answer(t("anchor.no_targets"), show_alert=True)
@@ -114,7 +114,7 @@ async def choose_add_block(
     if block_type == "heading":
         if isinstance(callback.message, Message):
             await callback.message.answer(
-                "اختر مستوى العنوان:",
+                tr("اختر مستوى العنوان:"),
                 reply_markup=build_heading_level_keyboard("add"),
             )
         await callback.answer()
@@ -128,31 +128,31 @@ async def choose_add_block(
             bot,
             new_block("divider", {"html": "<hr/>"}),
         )
-        await callback.answer("تمت إضافة الفاصل")
+        await callback.answer(tr("تمت إضافة الفاصل"))
         return
 
     prompts = {
-        "paragraph": "أرسل نص الفقرة",
+        "paragraph": tr("أرسل نص الفقرة"),
         "preformatted": code_input_prompt(),
-        "footer": "أرسل نص التذييل",
+        "footer": tr("أرسل نص التذييل"),
         "mathematical_expression": math_input_prompt(),
         "anchor": t("details.send_anchor"),
-        "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
-        "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
-        "blockquote": "أرسل نص الاقتباس، أو أرسل وسائط/ملفًا لوضعه داخل الاقتباس",
-        "pullquote": "أرسل نص الاقتباس البارز، أو أرسل وسائط/ملفًا لإرفاقه به",
-        "collage": "أرسل صور/فيديو أو Album للكولاج",
-        "slideshow": "أرسل صور/فيديو أو Album لعرض الشرائح",
-        "map": "أرسل موقعًا من مرفقات Telegram",
-        "animation": "أرسل GIF أو Animation",
-        "audio": "أرسل ملف Audio",
-        "document": "أرسل ملفًا",
-        "photo": "أرسل صورة",
-        "video": "أرسل فيديو",
-        "voice": "أرسل بصمة صوتية",
+        "list": t("list.bullet_prompt"),
+        "table": tr("أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |"),
+        "blockquote": tr("أرسل نص الاقتباس، أو أرسل وسائط/ملفًا لوضعه داخل الاقتباس"),
+        "pullquote": tr("أرسل نص الاقتباس البارز، أو أرسل وسائط/ملفًا لإرفاقه به"),
+        "collage": tr("أرسل صور/فيديو أو Album للكولاج"),
+        "slideshow": tr("أرسل صور/فيديو أو Album لعرض الشرائح"),
+        "map": tr("أرسل موقعًا من مرفقات Telegram"),
+        "animation": tr("أرسل GIF أو Animation"),
+        "audio": t("send_audio"),
+        "document": t("send_file"),
+        "photo": t("send_photo"),
+        "video": t("send_video"),
+        "voice": t("send_voice"),
     }
     if block_type not in prompts:
-        await callback.answer("هذا النوع لا يملك مسار إضافة مباشر حاليًا.", show_alert=True)
+        await callback.answer(tr("هذا النوع لا يملك مسار إضافة مباشر حاليًا."), show_alert=True)
         return
     step = "quote_text" if block_type in QUOTE_TYPES else "content"
     await state.set_state(RichEditorStates.adding_block)
@@ -173,7 +173,7 @@ async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> No
         return
     parts = callback.data.split(":")
     if len(parts) not in {4, 5} or parts[2] not in {"add", "edit", "details"}:
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     action = parts[2]
     if action == "details":
@@ -183,7 +183,7 @@ async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> No
     except ValueError:
         heading_size = 0
     if heading_size not in range(1, 7):
-        await callback.answer("مستوى العنوان غير صالح.", show_alert=True)
+        await callback.answer(tr("مستوى العنوان غير صالح."), show_alert=True)
         return
 
     if action == "add":
@@ -196,17 +196,17 @@ async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> No
         await send_add_prompt(
             callback.message,
             state,
-            f"اخترت H{heading_size}. أرسل نص العنوان الآن.",
+            tr(f"اخترت H{heading_size}. أرسل نص العنوان الآن."),
         )
     else:
         if len(parts) != 5:
-            await callback.answer("هذا العنوان لم يعد موجودًا.", show_alert=True)
+            await callback.answer(tr("هذا العنوان لم يعد موجودًا."), show_alert=True)
             return
         block_id = parts[4]
         _, blocks = session
         block = get_block_by_id(blocks, block_id)
         if block is None or block.get("type") != "heading":
-            await callback.answer("هذا العنوان لم يعد موجودًا.", show_alert=True)
+            await callback.answer(tr("هذا العنوان لم يعد موجودًا."), show_alert=True)
             return
         await state.set_state(RichEditorStates.editing_block)
         await state.update_data(
@@ -218,7 +218,7 @@ async def choose_heading_level(callback: CallbackQuery, state: FSMContext) -> No
         await send_add_prompt(
             callback.message,
             state,
-            f"اخترت H{heading_size}. أرسل نص العنوان الجديد الآن.",
+            tr(f"اخترت H{heading_size}. أرسل نص العنوان الجديد الآن."),
         )
     try:
         await callback.message.delete()
@@ -243,7 +243,7 @@ async def receive_added_block(
     step = data.get("add_step")
     payload = data.get("add_payload") or {}
     if block_type not in FINAL_RICH_BLOCK_TYPES:
-        await message.answer("انتهت عملية الإضافة. ارجع إلى المحرّر وحاول مجددًا.")
+        await message.answer(tr("انتهت عملية الإضافة. ارجع إلى المحرّر وحاول مجددًا."))
         await state.set_state(RichEditorStates.managing)
         return
 
@@ -287,7 +287,7 @@ async def receive_added_block(
                 parsed = message_to_blocks(message)
             media_children, caption = quote_media_payload(parsed)
             if not media_children:
-                await message.answer("أرسل نصًا أو صورة/فيديو/صوتًا/ملفًا للاقتباس البارز.")
+                await message.answer(tr("أرسل نصًا أو صورة/فيديو/صوتًا/ملفًا للاقتباس البارز."))
                 return
             await delete_add_step_messages(bot, message, data, state)
             next_payload: dict[str, Any] = {"media_children": media_children}
@@ -297,10 +297,10 @@ async def receive_added_block(
                     quote_html=caption["data"].get("html", ""),
                 )
                 next_step = "quote_credit"
-                prompt = "تم إرفاق الوسائط واعتماد وصفها كنص للاقتباس. أرسل اسم الكاتب، أو /skip."
+                prompt = tr("تم إرفاق الوسائط واعتماد وصفها كنص للاقتباس. أرسل اسم الكاتب، أو /skip.")
             else:
                 next_step = "quote_media_text"
-                prompt = "تم إرفاق الوسائط. أرسل الآن نص الاقتباس البارز."
+                prompt = tr("تم إرفاق الوسائط. أرسل الآن نص الاقتباس البارز.")
             await state.update_data(add_step=next_step, add_payload=next_payload)
             await send_add_prompt(message, state, prompt)
             return
@@ -312,13 +312,13 @@ async def receive_added_block(
         await send_add_prompt(
             message,
             state,
-            "أرسل اسم الكاتب، أو /skip لإضافته بدون كاتب",
+            tr("أرسل اسم الكاتب، أو /skip لإضافته بدون كاتب"),
         )
         return
 
     if block_type in QUOTE_TYPES and step == "quote_media_text":
         if not message.text:
-            await message.answer("أرسل نص الاقتباس البارز بعد الوسائط.")
+            await message.answer(tr("أرسل نص الاقتباس البارز بعد الوسائط."))
             return
         await delete_add_step_messages(bot, message, data, state)
         await state.update_data(
@@ -332,13 +332,13 @@ async def receive_added_block(
         await send_add_prompt(
             message,
             state,
-            "أرسل اسم الكاتب، أو /skip لإضافته بدون كاتب",
+            tr("أرسل اسم الكاتب، أو /skip لإضافته بدون كاتب"),
         )
         return
 
     if block_type in QUOTE_TYPES and step == "quote_credit":
         if not message.text:
-            await message.answer("أرسل اسم الكاتب كنص، أو /skip.")
+            await message.answer(tr("أرسل اسم الكاتب كنص، أو /skip."))
             return
         credit = None if message.text.strip().lower() == "/skip" else message.html_text
         await finish_add(
@@ -359,7 +359,7 @@ async def receive_added_block(
             children = message_to_blocks(message)
         children = [item for item in children if item.get("type") in {"photo", "video"}]
         if not children:
-            await message.answer("أرسل صورًا أو فيديوهات لهذا النوع.")
+            await message.answer(tr("أرسل صورًا أو فيديوهات لهذا النوع."))
             return
         await finish_add(
             message,
@@ -371,7 +371,7 @@ async def receive_added_block(
 
     if block_type == "map":
         if not message.location:
-            await message.answer("أرسل موقعًا باستخدام زر المرفقات في Telegram.")
+            await message.answer(tr("أرسل موقعًا باستخدام زر المرفقات في Telegram."))
             return
         await finish_add(
             message,
@@ -391,7 +391,7 @@ async def receive_added_block(
             None,
         )
         if media_block is None:
-            await message.answer("نوع الوسائط غير صحيح؛ أرسل النوع الذي اخترته.")
+            await message.answer(tr("نوع الوسائط غير صحيح؛ أرسل النوع الذي اخترته."))
             return
         caption_block = next(
             (item for item in parsed if item.get("type") == "caption"),
@@ -404,7 +404,7 @@ async def receive_added_block(
         return
 
     if not message.text:
-        await message.answer("هذا النوع يحتاج إلى نص.")
+        await message.answer(tr("هذا النوع يحتاج إلى نص."))
         return
     prepared = text_data(
         message,
