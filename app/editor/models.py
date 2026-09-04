@@ -50,6 +50,14 @@ def make_block(
     }
 
 
+def _empty_details_child() -> Block:
+    return make_block(
+        "paragraph",
+        {"text": "…", "html": "<p>…</p>"},
+        position=0,
+    )
+
+
 def normalize_block(
     block: Block,
     *,
@@ -77,6 +85,17 @@ def normalize_block(
         data["native"] = True
 
     children = data.get("children")
+    if block["type"] == "details":
+        if not isinstance(children, list):
+            children = []
+            data["children"] = children
+        if not children:
+            children.append(_empty_details_child())
+            if source == SOURCE_NATIVE:
+                block["source"] = SOURCE_GENERATED
+                data.pop("native", None)
+                data.pop("native_data", None)
+                data.pop("native_type", None)
     if isinstance(children, list):
         normalize_blocks(children)
 
