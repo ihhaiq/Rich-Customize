@@ -6,6 +6,7 @@ from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
+from app.i18n import tr
 from app.services.showcase import (
     MEDIA_LABELS,
     MissingShowcaseMedia,
@@ -18,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 def missing_media_text(error: MissingShowcaseMedia) -> str:
-    labels = "، ".join(MEDIA_LABELS[kind] for kind in error.missing)
-    return f"مكتبة وسائط القالب ناقصة. أضف إلى قناة الوسائط: {labels}"
+    labels = ", ".join(tr(MEDIA_LABELS[kind]) for kind in error.missing)
+    return f"{tr('مكتبة وسائط القالب ناقصة. أضف إلى قناة الوسائط: ')}{labels}"
 
 
 @router.message(Command("draft"))
@@ -36,12 +37,12 @@ async def showcase_from_message(message: Message, bot: Bot) -> None:
         logger.exception(
             "Failed to send all-block showcase to user_id=%s", message.from_user.id,
         )
-        await message.answer("تعذر إرسال قالب كل البلوكات. راجع السجل لمعرفة الخطأ.")
+        await message.answer(tr("تعذر إرسال قالب كل البلوكات. راجع السجل لمعرفة الخطأ."))
 
 
 @router.callback_query(F.data == "r:showcase")
 async def showcase_from_button(callback: CallbackQuery, bot: Bot) -> None:
-    await callback.answer("جاري تجهيز قالب كل البلوكات…")
+    await callback.answer(tr("جاري تجهيز قالب كل البلوكات…"))
     try:
         await send_all_blocks_showcase(
             bot, callback.from_user.id, callback.from_user.id,
@@ -54,7 +55,7 @@ async def showcase_from_button(callback: CallbackQuery, bot: Bot) -> None:
         )
         await bot.send_message(
             callback.from_user.id,
-            "تعذر إرسال قالب كل البلوكات. راجع السجل لمعرفة الخطأ.",
+            tr("تعذر إرسال قالب كل البلوكات. راجع السجل لمعرفة الخطأ."),
         )
 
 
