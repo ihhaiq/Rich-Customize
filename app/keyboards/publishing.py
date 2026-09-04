@@ -8,6 +8,12 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from app.i18n import t
 
 
+def build_post_back_keyboard(callback_data: str = "r:back") -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=t("ux.common.back"), callback_data=callback_data),
+    ]])
+
+
 def build_post_chats_keyboard(
     chats: list[dict[str, Any]],
     channel_url: str,
@@ -90,6 +96,7 @@ def build_post_confirmation_keyboard(selected_count: int) -> InlineKeyboardMarku
 
 __all__ = [
     "build_chat_reached_keyboard",
+    "build_post_back_keyboard",
     "build_post_chats_keyboard",
     "build_post_confirmation_keyboard",
     "build_post_settings_keyboard",
