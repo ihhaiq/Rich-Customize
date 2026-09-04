@@ -2,9 +2,18 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.editor.models import make_block
 from app.editor.workflow import editor_workflow
 
 DETAILS_TYPE = "details"
+
+
+def _empty_details_child() -> dict[str, Any]:
+    return make_block(
+        "paragraph",
+        {"text": "…", "html": "<p>…</p>"},
+        position=0,
+    )
 
 
 def details_children(details: dict[str, Any]) -> list[dict[str, Any]]:
@@ -38,6 +47,8 @@ def replace_details_children(
     normalized: list[dict[str, Any]] = []
     for child in children:
         normalized = editor_workflow.add(normalized, child).blocks
+    if not normalized:
+        normalized = [_empty_details_child()]
     detach_native_details(details)
     details.setdefault("data", {})["children"] = normalized
 
@@ -59,7 +70,7 @@ def delete_details_child(details: dict[str, Any], child_id: str) -> bool:
     result = editor_workflow.delete(details_children(details), child_id)
     if result.changed:
         detach_native_details(details)
-        details["data"]["children"] = result.blocks
+        details["data"]["children"] = result.blocks or [_empty_details_child()]
     return result.changed
 
 
