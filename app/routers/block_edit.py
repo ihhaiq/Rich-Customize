@@ -8,7 +8,7 @@ from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.i18n import t
+from app.i18n import t, tr
 from app.keyboards import build_heading_level_keyboard
 from app.editor.builders import map_data, quote_data, text_data
 from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES
@@ -46,7 +46,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
     block_id = callback.data.rsplit(":", 1)[-1]
     block = block_by_id(blocks, block_id)
     if block is None:
-        await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
+        await callback.answer(t("missing_block"), show_alert=True)
         return
     if block.get("type") == "details":
         raise SkipHandler
@@ -55,35 +55,35 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
             await send_add_prompt(
                 callback.message,
                 state,
-                "اختر مستوى العنوان الجديد:",
+                tr("اختر مستوى العنوان الجديد:"),
                 reply_markup=build_heading_level_keyboard("edit", block_id),
             )
         await callback.answer()
         return
 
     prompts = {
-        "text": "أرسل النص الجديد",
-        "caption": "أرسل الوصف الجديد",
-        "photo": "أرسل الصورة الجديدة",
-        "paragraph": "أرسل نص الفقرة الجديد",
+        "text": tr("أرسل النص الجديد"),
+        "caption": tr("أرسل الوصف الجديد"),
+        "photo": tr("أرسل الصورة الجديدة"),
+        "paragraph": tr("أرسل نص الفقرة الجديد"),
         "preformatted": code_input_prompt(editing=True),
-        "footer": "أرسل التذييل الجديد",
+        "footer": tr("أرسل التذييل الجديد"),
         "mathematical_expression": math_input_prompt(editing=True),
         "anchor": t("details.send_anchor"),
-        "list": "أرسل عناصر القائمة؛ كل عنصر في سطر",
-        "table": "أرسل صفوف الجدول؛ افصل الأعمدة بعلامة |",
-        "blockquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لوضعه داخله",
-        "pullquote": "أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لإرفاقه به",
-        "collage": "أرسل صور/فيديو أو Album جديدًا للكولاج",
-        "slideshow": "أرسل صور/فيديو أو Album جديدًا لعرض الشرائح",
-        "map": "أرسل الموقع الجديد من مرفقات Telegram",
-        "video": "أرسل الفيديو الجديد",
-        "animation": "أرسل GIF جديدًا",
-        "audio": "أرسل Audio جديدًا",
-        "voice": "أرسل بصمة صوتية جديدة",
-        "document": "أرسل الملف الجديد",
-        "sticker": "أرسل الملصق الجديد",
-        "video_note": "أرسل فيديو دائريًا جديدًا",
+        "list": t("list.bullet_prompt"),
+        "table": tr("أرسل صفوف الجدول؛ افصل الأعمدة بعلامة |"),
+        "blockquote": tr("أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لوضعه داخله"),
+        "pullquote": tr("أرسل نص الاقتباس الجديد، أو وسائط/ملفًا جديدًا لإرفاقه به"),
+        "collage": tr("أرسل صور/فيديو أو Album جديدًا للكولاج"),
+        "slideshow": tr("أرسل صور/فيديو أو Album جديدًا لعرض الشرائح"),
+        "map": tr("أرسل الموقع الجديد من مرفقات Telegram"),
+        "video": tr("أرسل الفيديو الجديد"),
+        "animation": tr("أرسل GIF جديدًا"),
+        "audio": tr("أرسل Audio جديدًا"),
+        "voice": tr("أرسل بصمة صوتية جديدة"),
+        "document": tr("أرسل الملف الجديد"),
+        "sticker": tr("أرسل الملصق الجديد"),
+        "video_note": tr("أرسل فيديو دائريًا جديدًا"),
     }
     if block.get("type") == "list":
         list_kind = str(block.get("data", {}).get("kind", "bullet"))
@@ -98,7 +98,7 @@ async def edit_block(callback: CallbackQuery, state: FSMContext) -> None:
         await send_add_prompt(
             callback.message,
             state,
-            prompts.get(str(block.get("type")), "أرسل المحتوى الجديد من النوع نفسه"),
+            prompts.get(str(block.get("type")), tr("أرسل المحتوى الجديد من النوع نفسه")),
         )
     await callback.answer()
 
@@ -112,7 +112,7 @@ async def edit_block_field(callback: CallbackQuery, state: FSMContext) -> None:
     try:
         _, _, block_id, field = callback.data.split(":", 3)
     except ValueError:
-        await callback.answer("هذا الحقل لم يعد موجودًا.", show_alert=True)
+        await callback.answer(tr("هذا الحقل لم يعد موجودًا."), show_alert=True)
         return
     block = block_by_id(blocks, block_id)
     if block is not None and block.get("type") == "details":
@@ -122,12 +122,12 @@ async def edit_block_field(callback: CallbackQuery, state: FSMContext) -> None:
         or (field == "credit" and block.get("type") in MEDIA_CAPTION_TYPES | QUOTE_TYPES)
     )
     if not field_allowed:
-        await callback.answer("هذا الحقل لم يعد موجودًا.", show_alert=True)
+        await callback.answer(tr("هذا الحقل لم يعد موجودًا."), show_alert=True)
         return
     assert block is not None
     prompts = {
-        "caption": "أرسل تذييل الوسائط الجديد، أو /remove لحذفه",
-        "credit": "أرسل اسم الكاتب/المصدر الجديد، أو /remove لحذفه",
+        "caption": tr("أرسل تذييل الوسائط الجديد، أو /remove لحذفه"),
+        "credit": tr("أرسل اسم الكاتب/المصدر الجديد، أو /remove لحذفه"),
     }
     await state.update_data(
         current_block_id=block_id,
@@ -158,14 +158,14 @@ async def receive_replacement(
     edit_field = data.get("edit_field")
     block = block_by_id(blocks, str(block_id) if block_id else None)
     if block is None:
-        await message.answer("هذا الجزء لم يعد موجودًا.")
+        await message.answer(t("missing_block"))
         await state.set_state(RichEditorStates.managing)
         return
 
     replacement: dict[str, Any] | None
     if edit_field:
         if not message.text:
-            await message.answer("أرسل نصًا لهذا الحقل.")
+            await message.answer(tr("أرسل نصًا لهذا الحقل."))
             return
         remove = message.text.strip().lower() == "/remove"
         key = {"caption": "caption_html", "credit": "credit_html"}.get(str(edit_field))
@@ -249,7 +249,7 @@ async def receive_replacement(
             replacement["credit_html"] = block.get("data", {}).get("credit_html")
 
     if replacement is None:
-        await message.answer("نوع المحتوى غير صحيح. أرسل نفس نوع الجزء المطلوب.")
+        await message.answer(tr("نوع المحتوى غير صحيح. أرسل نفس نوع الجزء المطلوب."))
         return
 
     for key in ("native", "native_data", "native_type"):
@@ -263,7 +263,7 @@ async def receive_replacement(
         source="generated",
     )
     if updated is None:
-        await message.answer("هذا الجزء لم يعد موجودًا.")
+        await message.answer(t("missing_block"))
         await state.set_state(RichEditorStates.managing)
         return
 
