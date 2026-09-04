@@ -60,12 +60,12 @@ def resolve_button_style(value: str | None) -> ButtonStyle | None:
 def build_message_buttons_keyboard(
     buttons: list[dict[str, Any]], *, buttons_per_row: int = 1,
     include_back: bool = False,
-    back_text: str = "🔙 رجوع",
+    back_text: str | None = None,
 ) -> InlineKeyboardMarkup:
     rendered: list[InlineKeyboardButton] = []
     for button in normalize_button_positions(buttons):
         common = {
-            "text": str(button.get("text") or "زر"),
+            "text": str(button.get("text") or "Button"),
             "style": resolve_button_style(str(button.get("style", "default"))),
         }
         button_type = get_button_type(button)
@@ -96,7 +96,9 @@ def build_message_buttons_keyboard(
     width = max(1, min(8, int(buttons_per_row)))
     rows = [rendered[index:index + width] for index in range(0, len(rendered), width)]
     if include_back:
-        rows.append([InlineKeyboardButton(text=back_text, callback_data="r:bpback")])
+        rows.append([InlineKeyboardButton(
+            text=back_text or t("ux.common.back"), callback_data="r:bpback",
+        )])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -135,7 +137,7 @@ def build_page_target_keyboard(
         text=f"📄 {page.get('title') or page['page_id']}",
         callback_data=f"{prefix}:{page['page_id']}",
     )] for page in pages]
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:buttons")])
+    rows.append([InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:buttons")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -205,12 +207,12 @@ def build_button_picker_keyboard(
 ) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(
-            text=f"{index + 1}. {button.get('text') or 'زر'}",
+            text=f"{index + 1}. {button.get('text') or 'Button'}",
             callback_data=f"r:bt:{action}:{button['id']}",
         )]
         for index, button in enumerate(normalize_button_positions(buttons))
     ]
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:buttons")])
+    rows.append([InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:buttons")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -242,7 +244,7 @@ def build_button_position_keyboard(
     for index, button in enumerate(normalize_button_positions(buttons)):
         selected = button is current
         rows.append([InlineKeyboardButton(
-            text=f"{'✅ ' if selected else ''}{index + 1} — {button.get('text') or 'زر'}",
+            text=f"{'✅ ' if selected else ''}{index + 1} — {button.get('text') or 'Button'}",
             callback_data=None if selected else f"r:bmv:{button_id}:{index}",
             disabled=DisabledButton() if selected else None,
         )])
