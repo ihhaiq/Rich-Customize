@@ -171,6 +171,18 @@ class MiniAppLocalizationGuardTests(unittest.TestCase):
             + ", ".join(frozen),
         )
 
+    def test_lazy_main_text_is_not_retranslated(self):
+        offenders = []
+        for path in (APP_ROOT / "routers").rglob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            if re.search(r"\btr\(\s*MAIN_TEXT\s*\)", source):
+                offenders.append(str(path.relative_to(ROOT)))
+        self.assertFalse(
+            offenders,
+            "MAIN_TEXT already resolves through semantic t(...) and must be converted with str(), "
+            "not passed back through tr(): " + ", ".join(offenders),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
