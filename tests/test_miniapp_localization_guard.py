@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import re
 import unittest
 from pathlib import Path
@@ -45,6 +46,24 @@ def _feature_translation_keys() -> dict[str, list[str]]:
     return result
 
 
+def _semantic_term_rows() -> tuple[list[str], dict[str, list[str]]]:
+    source = (STATIC_ROOT / "miniapp_i18n_coverage.js").read_text(encoding="utf-8")
+    key_match = re.search(r"const TERM_KEYS = \[(?P<body>.*?)\n\s*\];", source, re.S)
+    row_match = re.search(r"const TERM_ROWS = \{(?P<body>.*?)\n\s*\};", source, re.S)
+    if not key_match or not row_match:
+        raise AssertionError("TERM_KEYS/TERM_ROWS were not found in miniapp_i18n_coverage.js")
+    keys = re.findall(r'"([A-Za-z][A-Za-z0-9_-]*)"', key_match.group("body"))
+    rows: dict[str, list[str]] = {}
+    for match in re.finditer(
+        r'^\s*(?:"([^"]+)"|([a-z][a-z0-9-]*))\s*:\s*(\[[^\n]*\]),?$',
+        row_match.group("body"),
+        re.M,
+    ):
+        language = match.group(1) or match.group(2)
+        rows[language] = json.loads(match.group(3))
+    return keys, rows
+
+
 def _contains_localization_call(node: ast.AST) -> bool:
     for child in ast.walk(node):
         if not isinstance(child, ast.Call):
@@ -69,25 +88,28 @@ class MiniAppLocalizationGuardTests(unittest.TestCase):
         )
 
     def test_native_coverage_terms_include_every_additional_locale(self):
-        source = (STATIC_ROOT / "miniapp_i18n_coverage.js").read_text(encoding="utf-8")
-        match = re.search(r"const TERM_ROWS = \{(?P<body>.*?)\n\s*\};", source, re.S)
-        self.assertIsNotNone(match, "TERM_ROWS was not found in miniapp_i18n_coverage.js")
-        body = match.group("body") if match else ""
-        covered = {
-            quoted or bare
-            for quoted, bare in re.findall(
-                r"^\s*(?:\"([^\"]+)\"|([a-z][a-z0-9-]*))\s*:\s*\[",
-                body,
-                re.M,
-            )
-        }
+        _, rows = _semantic_term_rows()
         expected = set(SUPPORTED_LANGUAGES) - {"en", "ar", "ru"}
+        covered = set(rows)
         self.assertEqual(
             expected,
             covered,
             f"Mini App native fallback coverage differs: missing={sorted(expected - covered)}, "
             f"extra={sorted(covered - expected)}",
         )
+
+    def test_native_coverage_rows_match_term_schema(self):
+        keys, rows = _semantic_term_rows()
+        invalid = {
+            language: {
+                "expected": len(keys),
+                "actual": len(values),
+                "empty": [index for index, value in enumerate(values) if not str(value).strip()],
+            }
+            for language, values in rows.items()
+            if len(values) != len(keys) or any(not str(value).strip() for value in values)
+        }
+        self.assertFalse(invalid, f"Malformed Mini App semantic locale rows: {invalid}")
 
     def test_coverage_layer_loads_before_feature_scripts(self):
         html = (STATIC_ROOT / "index.html").read_text(encoding="utf-8")
