@@ -46,7 +46,7 @@ async def open_block(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer(t("missing_block"), show_alert=True)
         await edit_ui(
             callback.message,
-            tr(MAIN_TEXT),
+            str(MAIN_TEXT),
             build_rich_editor_keyboard(blocks),
         )
         return
