@@ -11,6 +11,7 @@ from app.editor.draft_store import draft_store
 from app.editor.history import remember
 from app.editor.models import make_block
 from app.editor.workflow import editor_workflow
+from app.i18n import tr
 from app.keyboards import build_rich_editor_keyboard
 from app.states import RichEditorStates
 
@@ -56,7 +57,7 @@ async def finish_add(
     await repost_saved_ui(
         bot,
         state,
-        editor_dashboard_text(draft, "✅ تمت إضافة البلوك بنجاح."),
+        editor_dashboard_text(draft, tr("✅ تمت إضافة البلوك بنجاح.")),
         build_rich_editor_keyboard(result.blocks, draft.message_buttons),
     )
     assert result.block is not None

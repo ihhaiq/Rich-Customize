@@ -85,7 +85,7 @@
 
   function openDialog(type = "url", title = "") {
     if (!window.RichButtonDialog?.open) {
-      toast?.(tr("button.editor_not_ready", "محرر الأزرار غير جاهز بعد"));
+      toast?.(tr("button.editor_not_ready", "The button editor is not ready yet"));
       return;
     }
     window.RichButtonDialog.open({presetType:type, title});
@@ -105,7 +105,7 @@
     if (field) return field;
     field = document.createElement("div");
     field.className = "button-dialog-field button-page-field hidden";
-    field.innerHTML = `<span>${tr("button.linked_page", "الصفحة المرتبطة")}</span><div class="button-page-list button-type-list"></div><small class="details-meta button-pages-status"></small>`;
+    field.innerHTML = `<span>${tr("button.linked_page", "Linked page")}</span><div class="button-page-list button-type-list"></div><small class="details-meta button-pages-status"></small>`;
     card.querySelector(".button-dialog-actions")?.before(field);
     return field;
   }
@@ -117,15 +117,15 @@
     const list = field.querySelector(".button-page-list");
     const status = field.querySelector(".button-pages-status");
     list.innerHTML = "";
-    status.textContent = tr("button.loading_pages", "جاري تحميل صفحاتك المحفوظة…");
+    status.textContent = tr("button.loading_pages", "Loading your saved pages…");
     try {
       const data = await api("/miniapp/api/pages");
       if (!card.isConnected) return;
       const pages = Array.isArray(data?.pages) ? data.pages : [];
       card.dataset.pagesLoaded = "1";
       status.textContent = pages.length
-        ? tr("button.choose_page", "اختر الصفحة التي يفتحها الزر")
-        : tr("button.no_pages", "ما عندك صفحات محفوظة بعد");
+        ? tr("button.choose_page", "Choose the page opened by the button")
+        : tr("button.no_pages", "You do not have any saved pages yet");
       pages.forEach(page => {
         const pageId = String(page.page_id || "");
         if (!pageId) return;
@@ -147,13 +147,14 @@
         copy.append(title, meta);
         label.append(input, radio, copy);
         input.addEventListener("change", () => {
-          status.textContent = tr("button.selected_page", `تم اختيار «${page.title || pageId}»`, {title:page.title || pageId});
+          status.textContent = tr("button.selected_page", `Selected “${page.title || pageId}”`, {title:page.title || pageId});
           try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.(); } catch (_) {}
         });
         list.appendChild(label);
       });
     } catch (error) {
-      status.textContent = tr("button.pages_failed", `تعذر تحميل الصفحات: ${error?.message || "خطأ غير معروف"}`, {error:error?.message || tr("common.unknown_error", "خطأ غير معروف")});
+      const reason = error?.message || tr("common.unknown_error", "Unknown error");
+      status.textContent = tr("button.pages_failed", `Could not load pages: ${reason}`, {error:reason});
     } finally {
       delete card.dataset.pagesLoading;
     }
@@ -189,7 +190,7 @@
       if (!pageId) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        toast?.(tr("button.choose_saved_page", "اختر صفحة محفوظة للزر"));
+        toast?.(tr("button.choose_saved_page", "Choose a saved page for the button"));
         return;
       }
       const valueInput = card.querySelector(".button-value-input");
@@ -210,7 +211,7 @@
   });
   dialogObserver.observe(document.body, {childList:true, subtree:true});
 
-  // Aa > "زر غني" now opens the single Telegram-style Add Button panel directly.
+  // Aa > Rich Button opens the single Telegram-style Add Button panel directly.
   document.addEventListener("click", event => {
     const row = event.target.closest?.(".text-menu-row");
     if (!row) return;

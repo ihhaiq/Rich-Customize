@@ -14,15 +14,6 @@ MAX_MEDIA_BYTES = 50 * 1024 * 1024
 SUPPORTED_KINDS = {"photo", "video", "animation", "audio", "voice", "document"}
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
-_KIND_LABELS = {
-    "photo": "الصورة",
-    "video": "الفيديو",
-    "animation": "GIF",
-    "audio": "الملف الصوتي",
-    "voice": "الرسالة الصوتية",
-    "document": "الملف",
-}
-
 
 def _safe_filename(value: str | None, fallback: str) -> str:
     filename = (value or fallback).rsplit("/", 1)[-1].rsplit("\\", 1)[-1].strip()
@@ -33,18 +24,18 @@ async def _multipart_file(request: web.Request) -> tuple[bytes, str, str]:
     try:
         reader = await request.multipart()
     except (ValueError, AssertionError) as exc:
-        raise web.HTTPBadRequest(text="Expected multipart file upload") from exc
+        raise web.HTTPBadRequest(text="invalid_request") from exc
 
     part = await reader.next()
     while part is not None and part.name != "file":
         part = await reader.next()
     if part is None:
-        raise web.HTTPBadRequest(text="Missing upload file")
+        raise web.HTTPBadRequest(text="no_file")
 
     content_type = (part.headers.get("Content-Type") or "application/octet-stream").split(";", 1)[0].lower()
     payload = await part.read(decode=False)
     if not payload:
-        raise web.HTTPBadRequest(text="Empty upload file")
+        raise web.HTTPBadRequest(text="no_file")
     filename = _safe_filename(part.filename, "upload.bin")
     return payload, filename, content_type
 
@@ -74,29 +65,28 @@ async def _send_to_telegram(
     filename: str,
 ):
     upload = BufferedInputFile(payload, filename=filename)
-    caption = f"📎 تم رفع {_KIND_LABELS[kind]} من Mini App"
 
     if kind == "photo":
-        message = await bot.send_photo(chat_id=user_id, photo=upload, caption=caption)
+        message = await bot.send_photo(chat_id=user_id, photo=upload)
         media = message.photo[-1] if message.photo else None
     elif kind == "video":
-        message = await bot.send_video(chat_id=user_id, video=upload, caption=caption)
+        message = await bot.send_video(chat_id=user_id, video=upload)
         media = message.video
     elif kind == "animation":
-        message = await bot.send_animation(chat_id=user_id, animation=upload, caption=caption)
+        message = await bot.send_animation(chat_id=user_id, animation=upload)
         media = message.animation
     elif kind == "audio":
-        message = await bot.send_audio(chat_id=user_id, audio=upload, caption=caption)
+        message = await bot.send_audio(chat_id=user_id, audio=upload)
         media = message.audio
     elif kind == "voice":
-        message = await bot.send_voice(chat_id=user_id, voice=upload, caption=caption)
+        message = await bot.send_voice(chat_id=user_id, voice=upload)
         media = message.voice
     else:
-        message = await bot.send_document(chat_id=user_id, document=upload, caption=caption)
+        message = await bot.send_document(chat_id=user_id, document=upload)
         media = message.document
 
     if media is None or not getattr(media, "file_id", None):
-        raise web.HTTPBadRequest(text="Telegram did not return a reusable file_id")
+        raise web.HTTPBadRequest(text="telegram_upload_failed")
     return message, media
 
 
@@ -105,21 +95,25 @@ async def _upload_kind(request: web.Request, kind: str) -> web.Response:
     user = developer_user(request)
     user_id = int(user["id"])
     if kind not in SUPPORTED_KINDS:
-        raise web.HTTPBadRequest(text="Unsupported upload type")
+        raise web.HTTPBadRequest(text="unsupported")
 
     payload, filename, content_type = await _multipart_file(request)
     limit = MAX_PHOTO_BYTES if kind == "photo" else MAX_MEDIA_BYTES
     if len(payload) > limit:
-        raise web.HTTPRequestEntityTooLarge(max_size=limit, actual_size=len(payload))
+        raise web.HTTPRequestEntityTooLarge(
+            max_size=limit,
+            actual_size=len(payload),
+            text="too_large",
+        )
 
     if kind == "photo" and content_type not in ALLOWED_IMAGE_TYPES:
-        raise web.HTTPBadRequest(text="Only JPEG, PNG, or WebP images are supported as photos")
+        raise web.HTTPBadRequest(text="unsupported")
     if kind == "video" and not content_type.startswith("video/"):
-        raise web.HTTPBadRequest(text="Choose a video file")
+        raise web.HTTPBadRequest(text="unsupported")
     if kind == "animation" and content_type not in {"image/gif", "video/mp4"}:
-        raise web.HTTPBadRequest(text="Choose a GIF or MP4 animation")
+        raise web.HTTPBadRequest(text="unsupported")
     if kind in {"audio", "voice"} and not content_type.startswith("audio/"):
-        raise web.HTTPBadRequest(text="Choose an audio file")
+        raise web.HTTPBadRequest(text="unsupported")
 
     bot: Bot = request.app["bot"]
     try:
@@ -131,11 +125,9 @@ async def _upload_kind(request: web.Request, kind: str) -> web.Response:
             filename=filename,
         )
     except TelegramForbiddenError as exc:
-        raise web.HTTPForbidden(
-            text="افتح محادثة البوت الخاصة واضغط Start أولًا حتى يقدر يرسل الملف إلك."
-        ) from exc
+        raise web.HTTPForbidden(text="open_in_telegram") from exc
     except TelegramBadRequest as exc:
-        raise web.HTTPBadRequest(text=f"Telegram rejected the {kind}: {exc}") from exc
+        raise web.HTTPBadRequest(text="telegram_upload_failed") from exc
 
     return web.json_response({
         "ok": True,
@@ -164,9 +156,9 @@ async def discard_editor_session(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
     except (ValueError, TypeError) as exc:
-        raise web.HTTPBadRequest(text="Invalid discard payload") from exc
+        raise web.HTTPBadRequest(text="invalid_request") from exc
     if not isinstance(payload, dict):
-        raise web.HTTPBadRequest(text="Discard payload must be an object")
+        raise web.HTTPBadRequest(text="invalid_request")
 
     page_id = str(payload.get("page_id") or "").strip()
     existed_before = bool(payload.get("existed_before"))
@@ -174,16 +166,16 @@ async def discard_editor_session(request: web.Request) -> web.Response:
     if existed_before:
         original = payload.get("original")
         if not page_id or not isinstance(original, dict):
-            raise web.HTTPBadRequest(text="Missing original page snapshot")
+            raise web.HTTPBadRequest(text="invalid_request")
 
         current_page = await page_registry.get(page_id)
         if not current_page or int(current_page.get("owner_id", 0)) != owner_id:
-            raise web.HTTPNotFound(text="Page not found")
+            raise web.HTTPNotFound(text="page_not_found")
 
         blocks = original.get("blocks")
         buttons = original.get("buttons", [])
         if not isinstance(blocks, list) or not isinstance(buttons, list):
-            raise web.HTTPBadRequest(text="Invalid original page snapshot")
+            raise web.HTTPBadRequest(text="invalid_request")
 
         await page_registry.save(
             owner_id,
@@ -196,8 +188,6 @@ async def discard_editor_session(request: web.Request) -> web.Response:
         )
         return web.json_response({"ok": True, "action": "restored", "page_id": page_id})
 
-    # The session started as a new local draft. Auto-save may have created a
-    # persistent page while the user was editing; remove only that new page.
     deleted = False
     if page_id:
         deleted = await page_registry.delete(page_id, owner_id)

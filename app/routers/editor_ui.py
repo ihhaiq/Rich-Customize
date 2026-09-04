@@ -18,7 +18,19 @@ from app.states import RichEditorStates
 
 
 logger = logging.getLogger(__name__)
-MAIN_TEXT = "تخصيص الرسالة\n\nاختر الجزء الذي تريد تعديله:"
+
+
+class _LocalizedMainText:
+    def __str__(self) -> str:
+        return f"{t('customize')}\n\n{t('choose_block')}"
+
+    def __format__(self, format_spec: str) -> str:
+        return format(str(self), format_spec)
+
+
+# Backwards-compatible lazy value. Some editor routers import MAIN_TEXT directly;
+# resolving it only when rendered keeps it bound to the active user's locale.
+MAIN_TEXT = _LocalizedMainText()
 
 
 def editor_dashboard_text(draft: EditorDraft, notice: str | None = None) -> str:
@@ -59,6 +71,7 @@ async def edit_ui(
     reply_markup,
     parse_mode: str | None = None,
 ) -> None:
+    text = str(text)
     try:
         await message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
     except TelegramBadRequest as error:
@@ -67,6 +80,7 @@ async def edit_ui(
 
 
 async def edit_button_ui(message: Message, text: str, reply_markup) -> None:
+    text = str(text)
     try:
         await message.bot.edit_message_text(
             chat_id=message.chat.id,
@@ -87,6 +101,7 @@ async def edit_saved_ui(
     reply_markup,
     parse_mode: str | None = None,
 ) -> None:
+    text = str(text)
     data = await state.get_data()
     try:
         await bot.edit_message_text(
@@ -115,6 +130,7 @@ async def edit_saved_button_ui(
     text: str,
     reply_markup,
 ) -> None:
+    text = str(text)
     data = await state.get_data()
     try:
         await bot.edit_message_text(
@@ -148,6 +164,7 @@ async def repost_saved_ui(
     text: str,
     reply_markup,
 ) -> Message:
+    text = str(text)
     data = await state.get_data()
     chat_id = data.get("management_chat_id")
     message_id = data.get("management_message_id")
@@ -221,7 +238,7 @@ async def send_add_prompt(
     text: str,
     reply_markup=None,
 ) -> Message:
-    sent = await message.answer(text, reply_markup=reply_markup)
+    sent = await message.answer(str(text), reply_markup=reply_markup)
     await state.update_data(
         add_prompt_chat_id=sent.chat.id,
         add_prompt_message_id=sent.message_id,

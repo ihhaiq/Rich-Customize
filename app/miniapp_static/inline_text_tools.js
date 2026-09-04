@@ -510,8 +510,8 @@
     const selectionRect = savedRange.getBoundingClientRect();
     const existingLink = sharedFormatElement(savedRange, "a[href]");
     const {menu} = simpleMenu(existingLink
-      ? tr("inline.edit_link", "تعديل الرابط")
-      : tr("inline.add_link", "إضافة رابط داخل النص"));
+      ? tr("inline.edit_link", "Edit link")
+      : tr("inline.add_link", "Add link"));
     menu.classList.add("inline-value-editor");
     const input = document.createElement("input");
     input.className = "rich-button-editor-input";
@@ -550,13 +550,13 @@
     actions.className = "rich-button-editor-actions";
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = tr("common.cancel", "إلغاء");
+    cancel.textContent = tr("common.cancel", "Cancel");
     let remove = null;
     if (existingLink) {
       remove = document.createElement("button");
       remove.type = "button";
       remove.className = "danger";
-      remove.textContent = tr("inline.remove_link", "إزالة الرابط");
+      remove.textContent = tr("inline.remove_link", "Remove link");
       remove.onclick = () => {
         closeFloatingMenu();
         replaceSelectedInline({tag:"a",selectors:"a[href]"}, "remove");
@@ -566,13 +566,13 @@
     save.type = "button";
     save.className = "primary-soft";
     save.textContent = existingLink
-      ? tr("common.save", "حفظ")
-      : tr("inline.add_link", "إضافة الرابط");
+      ? tr("common.save", "Save")
+      : tr("inline.add_link", "Add link");
     cancel.onclick = () => closeFloatingMenu();
     save.onclick = () => {
       const href = targetPicker?.value || normalizeLink(input.value);
       if (!href) {
-        toast(tr("inline.invalid_link", "أدخل رابطًا صحيحًا يبدأ بـ https:// أو tg://"));
+        toast(tr("inline.invalid_link", "Enter a valid link beginning with https:// or tg://"));
         input.focus();
         return;
       }
@@ -800,7 +800,7 @@
       return;
     }
     const rect = savedRange.getBoundingClientRect();
-    const {menu,list} = simpleMenu(tr("button.convert_selection", "حوّل النص إلى زر"));
+    const {menu,list} = simpleMenu(tr("button.convert_selection", "Turn text into a button"));
     BUTTON_ORDER.forEach(type => {
       const meta = BUTTON_TYPES[type];
       list.appendChild(menuButton(meta.icon, meta.label, "", () => {
@@ -847,11 +847,11 @@
     actions.className = "rich-button-editor-actions";
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = tr("common.cancel", "إلغاء");
+    cancel.textContent = tr("common.cancel", "Cancel");
     const save = document.createElement("button");
     save.type = "button";
     save.className = "primary-soft";
-    save.textContent = tr("common.save", "حفظ");
+    save.textContent = tr("common.save", "Save");
     cancel.onclick = () => closeFloatingMenu();
     save.onclick = () => {updateToken(token,{value:String(input.value || "").trim()});closeFloatingMenu();};
     actions.append(cancel,save);
@@ -864,7 +864,7 @@
     const info = parseMarker(token.dataset.marker);
     if (!info) return;
     const rect = token.getBoundingClientRect();
-    const {menu} = simpleMenu(tr("button.name", "اسم الزر"));
+    const {menu} = simpleMenu(tr("button.name", "Button name"));
     menu.classList.add("inline-value-editor");
     const input = document.createElement("input");
     input.className = "rich-button-editor-input";
@@ -874,7 +874,7 @@
     const save = document.createElement("button");
     save.type = "button";
     save.className = "primary-soft";
-    save.textContent = tr("common.save", "حفظ");
+    save.textContent = tr("common.save", "Save");
     save.onclick = () => {updateToken(token,{title:cleanTitle(input.value)});closeFloatingMenu();};
     actions.append(save);
     menu.append(input,actions);
@@ -887,11 +887,11 @@
     if (!info) return;
     let data;
     try { data = await api("/miniapp/api/pages"); }
-    catch (error) { toast(tr("button.pages_failed", `تعذر تحميل الصفحات: ${error.message}`, {error:error.message})); return; }
+    catch (error) { toast(tr("button.pages_failed", `Could not load pages: ${error.message}`, {error:error.message})); return; }
     const pages = Array.isArray(data.pages) ? data.pages : [];
-    if (!pages.length) { toast(tr("button.no_pages", "ما عندك صفحات محفوظة للربط")); return; }
+    if (!pages.length) { toast(tr("button.no_pages", "You have no saved pages yet")); return; }
     const rect = token.getBoundingClientRect();
-    const {menu,list} = simpleMenu(tr("button.choose_page", "اختر الصفحة المرتبطة"));
+    const {menu,list} = simpleMenu(tr("button.choose_page", "Choose the page this button opens"));
     pages.forEach(page => {
       list.appendChild(menuButton("page", page.title || page.page_id, page.page_id, () => {
         const value = info.type === "callback_data" ? `r:cbd:${page.page_id}` : page.page_id;
@@ -929,7 +929,7 @@
     const info = parseMarker(token.dataset.marker);
     if (!info) return;
     const rect = token.getBoundingClientRect();
-    const {menu,list} = simpleMenu(tr("button.color", "لون الزر"));
+    const {menu,list} = simpleMenu(tr("button.color", "Button color"));
     [[tr("button.default", "Default"),null],[tr("button.blue", "Blue"),"b"],[tr("button.green", "Green"),"g"],[tr("button.red", "Red"),"r"]].forEach(([label,color]) => {
       list.appendChild(menuButton("color",label,"",() => {updateToken(token,{color});closeFloatingMenu();}));
     });

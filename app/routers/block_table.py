@@ -6,6 +6,7 @@ from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+from app.i18n import t, tr
 from app.keyboards import (
     build_table_cell_keyboard,
     build_table_display_keyboard,
@@ -45,15 +46,24 @@ TABLE_ALL_ACTIONS = {
     "uea": (None, False, "تم إلغاء توسيط نص جميع الخلايا"),
 }
 
-TABLE_DISPLAY_HELP_TEXT = (
-    "🧱 إعدادات مظهر الجدول\n\n"
-    "اختر الخاصية التي تريد تغييرها:\n\n"
-    "• الحدود — إظهار أو إخفاء الخطوط المحيطة بالجدول وبين الخلايا.\n"
-    "• صفوف مخططة — تمييز الصفوف بالتناوب لتسهيل قراءة الجدول.\n"
-    "• وضع مضغوط — تقليل المسافات داخل الخلايا ليظهر الجدول بحجم أصغر وأكثر كثافة.\n"
-    "• عنوان الجدول — إضافة نص وصفي يظهر كعنوان للجدول أو تعديل العنوان الحالي.\n\n"
-    "✅ = مفعّل   |   ❌ = غير مفعّل"
-)
+
+def table_display_help_text() -> str:
+    return "\n".join([
+        tr("🧱 إعدادات مظهر الجدول"),
+        "",
+        tr("اختر الخاصية التي تريد تغييرها:"),
+        "",
+        tr("• الحدود — إظهار أو إخفاء الخطوط المحيطة بالجدول وبين الخلايا."),
+        tr("• صفوف مخططة — تمييز الصفوف بالتناوب لتسهيل قراءة الجدول."),
+        tr("• وضع مضغوط — تقليل المسافات داخل الخلايا ليظهر الجدول بحجم أصغر وأكثر كثافة."),
+        tr("• عنوان الجدول — إضافة نص وصفي يظهر كعنوان للجدول أو تعديل العنوان الحالي."),
+        "",
+        tr("✅ = مفعّل   |   ❌ = غير مفعّل"),
+    ])
+
+
+def _table_options_text() -> str:
+    return f"{tr('إعدادات خلايا الجدول')}\n\n{tr('اختر العملية التي تريد تطبيقها:')}"
 
 
 @router.callback_query(F.data.startswith("r:tm:"))
@@ -65,11 +75,11 @@ async def table_options(callback: CallbackQuery, state: FSMContext) -> None:
     block_id = callback.data.rsplit(":", 1)[-1]
     block = block_by_id(blocks, block_id)
     if block is None or block.get("type") != "table" or not table_rows(block):
-        await callback.answer("هذا الجدول لم يعد موجودًا أو لا يحتوي خلايا.", show_alert=True)
+        await callback.answer(tr("هذا الجدول لم يعد موجودًا أو لا يحتوي خلايا."), show_alert=True)
         return
     await edit_ui(
         callback.message,
-        "إعدادات خلايا الجدول\n\nاختر العملية التي تريد تطبيقها:",
+        _table_options_text(),
         build_table_options_keyboard(block_id),
     )
     await callback.answer()
@@ -84,18 +94,18 @@ async def choose_table_action(callback: CallbackQuery, state: FSMContext) -> Non
     try:
         _, _, block_id, action = callback.data.split(":", 3)
     except ValueError:
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     block = block_by_id(blocks, block_id)
     if block is None or block.get("type") != "table":
-        await callback.answer("هذا الجدول لم يعد موجودًا.", show_alert=True)
+        await callback.answer(tr("هذا الجدول لم يعد موجودًا."), show_alert=True)
         return
 
     if action in TABLE_ALL_ACTIONS:
         shaded, centered, notice = TABLE_ALL_ACTIONS[action]
         editable = copy.deepcopy(block)
         if not set_all_table_cells_style(editable, shaded=shaded, centered=centered):
-            await callback.answer("تعذر تعديل خلايا الجدول.", show_alert=True)
+            await callback.answer(tr("تعذر تعديل خلايا الجدول."), show_alert=True)
             return
         updated = await replace_payload(
             state,
@@ -104,22 +114,22 @@ async def choose_table_action(callback: CallbackQuery, state: FSMContext) -> Non
             editable.get("data", {}),
         )
         if updated is None:
-            await callback.answer("هذا الجدول لم يعد موجودًا.", show_alert=True)
+            await callback.answer(tr("هذا الجدول لم يعد موجودًا."), show_alert=True)
             return
         await edit_ui(
             callback.message,
-            "إعدادات خلايا الجدول\n\nاختر العملية التي تريد تطبيقها:",
+            _table_options_text(),
             build_table_options_keyboard(block_id),
         )
-        await callback.answer(notice)
+        await callback.answer(tr(notice))
         return
 
     if action not in TABLE_CELL_ACTIONS or not table_rows(block):
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     await edit_ui(
         callback.message,
-        "اختر الخلية المطلوبة\n\nالرقم الأول للصف، والثاني للعمود:",
+        f"{tr('اختر الخلية المطلوبة')}\n\n{tr('الرقم الأول للصف، والثاني للعمود:')}",
         build_table_cell_keyboard(block, action),
     )
     await callback.answer()
@@ -138,12 +148,12 @@ async def apply_table_cell_action(callback: CallbackQuery, state: FSMContext) ->
             _, _, block_id, action, raw_row, raw_column = callback.data.split(":", 5)
             row_index, column_index = int(raw_row), int(raw_column)
         except (ValueError, TypeError):
-            await callback.answer("اختيار خلية غير صالح.", show_alert=True)
+            await callback.answer(tr("اختيار خلية غير صالح."), show_alert=True)
             return
         block = block_by_id(blocks, block_id)
         settings = TABLE_CELL_ACTIONS.get(action)
         if block is None or block.get("type") != "table" or settings is None:
-            await callback.answer("هذا الجدول أو الإجراء لم يعد موجودًا.", show_alert=True)
+            await callback.answer(tr("هذا الجدول أو الإجراء لم يعد موجودًا."), show_alert=True)
             return
         shaded, centered, notice = settings
         editable = copy.deepcopy(block)
@@ -154,7 +164,7 @@ async def apply_table_cell_action(callback: CallbackQuery, state: FSMContext) ->
             shaded=shaded,
             centered=centered,
         ):
-            await callback.answer("هذه الخلية لم تعد موجودة.", show_alert=True)
+            await callback.answer(tr("هذه الخلية لم تعد موجودة."), show_alert=True)
             return
         updated = await replace_payload(
             state,
@@ -163,14 +173,14 @@ async def apply_table_cell_action(callback: CallbackQuery, state: FSMContext) ->
             editable.get("data", {}),
         )
         if updated is None:
-            await callback.answer("هذا الجدول لم يعد موجودًا.", show_alert=True)
+            await callback.answer(tr("هذا الجدول لم يعد موجودًا."), show_alert=True)
             return
         await edit_ui(
             callback.message,
-            "إعدادات خلايا الجدول\n\nاختر العملية التي تريد تطبيقها:",
+            _table_options_text(),
             build_table_options_keyboard(block_id),
         )
-        await callback.answer(notice)
+        await callback.answer(tr(notice))
 
 
 @router.callback_query(F.data.startswith("r:tdisplay:"))
@@ -182,11 +192,11 @@ async def open_table_display(callback: CallbackQuery, state: FSMContext) -> None
     block_id = callback.data.rsplit(":", 1)[-1]
     block = block_by_id(blocks, block_id)
     if block is None or block.get("type") != "table":
-        await callback.answer("هذا الجدول لم يعد موجودًا.", show_alert=True)
+        await callback.answer(tr("هذا الجدول لم يعد موجودًا."), show_alert=True)
         return
     await edit_ui(
         callback.message,
-        TABLE_DISPLAY_HELP_TEXT,
+        table_display_help_text(),
         build_table_display_keyboard(block),
     )
     await callback.answer()
@@ -201,37 +211,38 @@ async def toggle_table_display(callback: CallbackQuery, state: FSMContext) -> No
     try:
         _, _, block_id, field = callback.data.split(":", 3)
     except ValueError:
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     if field not in {"is_bordered", "is_striped", "is_compact"}:
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     block = block_by_id(blocks, block_id)
     if block is None or block.get("type") != "table":
-        await callback.answer("هذا الجدول لم يعد موجودًا.", show_alert=True)
+        await callback.answer(tr("هذا الجدول لم يعد موجودًا."), show_alert=True)
         return
     current = table_flag(block, field)
     editable = copy.deepcopy(block)
     table_data = editable_table_data(editable)
     if table_data is None:
-        await callback.answer("تعذر تعديل الجدول.", show_alert=True)
+        await callback.answer(tr("تعذر تعديل الجدول."), show_alert=True)
         return
     table_data[field] = not current
     updated = await replace_payload(state, blocks, block_id, table_data)
     if updated is None:
-        await callback.answer("تعذر تعديل الجدول.", show_alert=True)
+        await callback.answer(tr("تعذر تعديل الجدول."), show_alert=True)
         return
     await edit_ui(
         callback.message,
-        TABLE_DISPLAY_HELP_TEXT,
+        table_display_help_text(),
         build_table_display_keyboard(updated),
     )
     labels = {
-        "is_bordered": "الحدود",
-        "is_striped": "الصفوف المخططة",
-        "is_compact": "الوضع المضغوط",
+        "is_bordered": tr("الحدود"),
+        "is_striped": tr("الصفوف المخططة"),
+        "is_compact": tr("الوضع المضغوط"),
     }
-    await callback.answer(f"تم {'تفعيل' if not current else 'إلغاء'} {labels[field]}")
+    action = tr("تفعيل") if not current else tr("إلغاء")
+    await callback.answer(f"{tr('تم')} {action} {labels[field]}")
 
 
 @router.callback_query(F.data.startswith("r:tcaption:"))
@@ -243,14 +254,14 @@ async def request_table_caption(callback: CallbackQuery, state: FSMContext) -> N
     block_id = callback.data.rsplit(":", 1)[-1]
     block = block_by_id(blocks, block_id)
     if block is None or block.get("type") != "table":
-        await callback.answer("هذا الجدول لم يعد موجودًا.", show_alert=True)
+        await callback.answer(tr("هذا الجدول لم يعد موجودًا."), show_alert=True)
         return
     await state.set_state(RichEditorStates.editing_table_caption)
     await state.update_data(table_caption_block_id=block_id)
     await send_add_prompt(
         callback.message,
         state,
-        "أرسل عنوان الجدول. لإزالة العنوان أرسل /empty",
+        tr("أرسل عنوان الجدول. لإزالة العنوان أرسل /empty"),
     )
     await callback.answer()
 
@@ -263,13 +274,13 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
     block = block_by_id(blocks, block_id)
     if block is None or block.get("type") != "table":
         await state.set_state(RichEditorStates.managing)
-        await message.answer("هذا الجدول لم يعد موجودًا.")
+        await message.answer(tr("هذا الجدول لم يعد موجودًا."))
         return
     editable = copy.deepcopy(block)
     table_data = editable_table_data(editable)
     if table_data is None:
         await state.set_state(RichEditorStates.managing)
-        await message.answer("تعذر تعديل الجدول.")
+        await message.answer(tr("تعذر تعديل الجدول."))
         return
     text = (message.text or "").strip()
     if text.casefold() == "/empty":
@@ -277,7 +288,7 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
         table_data["caption_html"] = None
         table_data["caption_text"] = None
     elif not text:
-        await message.answer("أرسل عنوانًا صحيحًا أو /empty لإزالته.")
+        await message.answer(tr("أرسل عنوانًا صحيحًا أو /empty لإزالته."))
         return
     else:
         table_data["caption_rich_text"] = None
@@ -286,7 +297,7 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
     updated = await replace_payload(state, blocks, block_id, table_data)
     if updated is None:
         await state.set_state(RichEditorStates.managing)
-        await message.answer("تعذر تعديل الجدول.")
+        await message.answer(tr("تعذر تعديل الجدول."))
         return
     await state.update_data(table_caption_block_id=None)
     await delete_add_step_messages(bot, message, state_data, state)
@@ -294,7 +305,7 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
     await edit_saved_ui(
         bot,
         state,
-        TABLE_DISPLAY_HELP_TEXT,
+        table_display_help_text(),
         build_table_display_keyboard(updated),
     )
 
@@ -302,13 +313,13 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
 __all__ = [
     "TABLE_ALL_ACTIONS",
     "TABLE_CELL_ACTIONS",
-    "TABLE_DISPLAY_HELP_TEXT",
     "apply_table_cell_action",
     "choose_table_action",
     "open_table_display",
     "receive_table_caption",
     "request_table_caption",
     "router",
+    "table_display_help_text",
     "table_options",
     "toggle_table_display",
 ]

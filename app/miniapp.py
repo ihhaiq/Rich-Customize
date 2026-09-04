@@ -93,8 +93,12 @@ async def _can_publish_to_chat(bot: Bot, chat_id: int, user_id: int) -> bool:
     return True
 
 
-async def _eligible_destinations(bot: Bot, user_id: int) -> list[dict]:
-    result = [{"kind": "private", "chat_id": user_id, "title": "المحادثة الخاصة", "type": "private"}]
+async def _eligible_destinations(
+    bot: Bot,
+    user_id: int,
+    private_title: str,
+) -> list[dict]:
+    result = [{"kind": "private", "chat_id": user_id, "title": private_title, "type": "private"}]
     for item in await managed_chat_registry.list_for_user(user_id):
         try:
             chat_id = int(item.get("chat_id", 0))
@@ -238,7 +242,13 @@ async def api_save_page(request: web.Request) -> web.Response:
 
 async def api_destinations(request: web.Request) -> web.Response:
     user = _miniapp_user(request)
-    destinations = await _eligible_destinations(request.app["bot"], int(user["id"]))
+    user_id = int(user["id"])
+    private_title = str(user.get("first_name") or user.get("username") or user_id)
+    destinations = await _eligible_destinations(
+        request.app["bot"],
+        user_id,
+        private_title,
+    )
     return web.json_response({"ok": True, "destinations": destinations})
 
 

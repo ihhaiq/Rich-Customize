@@ -17,7 +17,7 @@ from app.keyboards import (
     build_button_type_keyboard,
     build_buttons_manager_keyboard,
 )
-from app.i18n import t
+from app.i18n import t, tr
 from app.routers.button_support import answer_with_button_guide, edit_button_ui, save_changed_draft
 from app.services.buttons import delete_message_button, get_button_type, get_message_button
 from app.states import RichEditorStates
@@ -193,7 +193,7 @@ async def change_buttons_per_row(callback: CallbackQuery, state: FSMContext) -> 
         manager_text(len(after.message_buttons)),
         build_buttons_manager_keyboard(after.message_buttons, after.buttons_per_row),
     )
-    await callback.answer(f"عدد الأزرار في الصف: {after.buttons_per_row}")
+    await callback.answer(t("ux.buttons.layout", count=after.buttons_per_row))
 
 
 @router.callback_query(F.data.startswith("r:bs:"))
@@ -204,19 +204,19 @@ async def choose_button_action(callback: CallbackQuery, state: FSMContext) -> No
     draft = await draft_store.load(state)
     action = callback.data.rsplit(":", 1)[-1]
     if action not in {"delete", "style", "move", "value", "url", "title", "type"}:
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     if not draft.message_buttons:
-        await callback.answer("لا توجد أزرار بعد. أضف زرًا أولًا.", show_alert=True)
+        await callback.answer(t("ux.buttons.empty"), show_alert=True)
         return
     labels = {
-        "delete": "اختر الزر الذي تريد إزالته:",
-        "style": "اختر الزر الذي تريد تغيير لونه:",
-        "move": "اختر الزر الذي تريد تغيير ترتيبه:",
-        "value": "اختر الزر الذي تريد تغيير محتواه:",
-        "url": "اختر الزر الذي تريد تغيير محتواه:",
-        "title": "اختر الزر الذي تريد تغيير عنوانه:",
-        "type": "اختر الزر الذي تريد تغيير نوعه:",
+        "delete": tr("اختر الزر الذي تريد إزالته:"),
+        "style": tr("اختر الزر الذي تريد تغيير لونه:"),
+        "move": tr("اختر الزر الذي تريد تغيير ترتيبه:"),
+        "value": tr("اختر الزر الذي تريد تغيير محتواه:"),
+        "url": tr("اختر الزر الذي تريد تغيير محتواه:"),
+        "title": tr("اختر الزر الذي تريد تغيير عنوانه:"),
+        "type": tr("اختر الزر الذي تريد تغيير نوعه:"),
     }
     await edit_button_ui(
         callback.message,
@@ -234,12 +234,12 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
     try:
         _, _, action, button_id = callback.data.split(":", 3)
     except ValueError:
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     before = await draft_store.load(state)
     button = get_message_button(before.message_buttons, button_id)
     if button is None:
-        await callback.answer("هذا الزر لم يعد موجودًا.", show_alert=True)
+        await callback.answer(t("ux.buttons.missing"), show_alert=True)
         return
     if action == "delete":
         await edit_button_ui(
@@ -252,7 +252,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
     if action == "style":
         await edit_button_ui(
             callback.message,
-            f"تغيير لون الزر: {button['text']}\n\nاختر اللون:",
+            f"{tr('تغيير لون الزر: ')}{button['text']}\n\n{tr('اختر اللون:')}",
             build_button_style_keyboard(
                 button_id,
                 str(button.get("style", "default")),
@@ -264,7 +264,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
     if action == "move":
         await edit_button_ui(
             callback.message,
-            f"تغيير ترتيب الزر: {button['text']}\n\nاختر الموقع الجديد:",
+            f"{tr('تغيير ترتيب الزر: ')}{button['text']}\n\n{tr('اختر الموقع الجديد:')}",
             build_button_position_keyboard(before.message_buttons, button_id),
         )
         await callback.answer()
@@ -273,21 +273,21 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         await state.update_data(current_button_id=button_id)
         await edit_button_ui(
             callback.message,
-            f"تغيير نوع الزر: {button['text']}\n\nاختر النوع الجديد:",
+            f"{tr('تغيير نوع الزر: ')}{button['text']}\n\n{tr('اختر النوع الجديد:')}",
             build_button_type_keyboard(f"r:bct:{button_id}"),
         )
         await callback.answer()
         return
     if action not in {"value", "url", "title"}:
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     await state.set_state(RichEditorStates.editing_button)
     pending_action = "value" if action in {"value", "url"} else "title"
     await state.update_data(pending_button_action=pending_action, current_button_id=button_id)
     prompt = (
-        "أرسل العنوان الجديد للزر."
+        t("ux.buttons.send_new_title")
         if pending_action == "title"
-        else "أرسل المحتوى الجديد. يكتشف البوت النوع تلقائيًا من الصيغة؛ مثلاً LINK: الرابط أو callback_data: الكود أو copy: النص. إذا أرسلت قيمة بلا نوع فسيبقى نوع الزر الحالي."
+        else t("ux.buttons.send_new_value")
     )
     await answer_with_button_guide(callback.message, prompt)
     await callback.answer()

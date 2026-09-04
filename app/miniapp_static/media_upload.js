@@ -58,6 +58,18 @@ function mediaConfig(kind) {
   return config ? {...config, label: mt(config.labelKey), pick: mt(config.pickKey)} : null;
 }
 
+function uploadErrorText(code, status) {
+  const normalized = String(code || "").trim();
+  if (normalized === "no_file") return mt("media.no_file");
+  if (normalized === "unsupported") return mt("media.unsupported");
+  if (normalized === "too_large") return mt("media.too_large", {size: 50});
+  if (normalized === "open_in_telegram") return mt("save.open_in_telegram");
+  if (normalized === "page_not_found") return mt("button.no_pages");
+  if (normalized === "telegram_upload_failed") return "Telegram";
+  if (normalized === "invalid_request") return mt("common.unknown_error");
+  return normalized || `HTTP ${status}`;
+}
+
 function rememberPreview(key, file) {
   const previous = mediaPreviewUrls.get(key);
   if (previous) URL.revokeObjectURL(previous);
@@ -100,7 +112,10 @@ async function uploadOneMedia(file, kind, previewKey) {
     headers: {"X-Telegram-Init-Data": tg?.initData || ""},
     body: form,
   });
-  if (!response.ok) throw new Error((await response.text()) || `HTTP ${response.status}`);
+  if (!response.ok) {
+    const code = await response.text();
+    throw new Error(uploadErrorText(code, response.status));
+  }
   return response.json();
 }
 

@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
+from app.i18n import tr
 from app.keyboards import build_post_back_keyboard
 from app.services.chat_registry import managed_chat_registry
 from app.services.publish_ui import build_post_settings_rich_message, edit_publish_ui
@@ -35,9 +36,9 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
         draft = await draft_store.load(state)
         selected = [int(item) for item in data.get("post_selected_chat_ids", [])]
         if not selected:
-            await callback.answer("حدد محادثة واحدة على الأقل.", show_alert=True)
+            await callback.answer(tr("حدد محادثة واحدة على الأقل."), show_alert=True)
             return
-        await callback.answer("جاري إرسال المنشور…")
+        await callback.answer(tr("جاري إرسال المنشور…"))
         registered = {
             int(chat["chat_id"]): chat
             for chat in await managed_chat_registry.list_for_user(callback.from_user.id)
@@ -76,14 +77,18 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
             else:
                 succeeded.append(title)
 
-        lines = ["نتيجة الإرسال:", f"✅ نجح: {len(succeeded)}", f"❌ فشل: {len(failed)}"]
+        lines = [
+            tr("نتيجة الإرسال:"),
+            f"✅ {tr('نجح: ')}{len(succeeded)}",
+            f"❌ {tr('فشل: ')}{len(failed)}",
+        ]
         lines.extend(f"✅ {title}" for title in succeeded[:10])
         lines.extend(f"❌ {title}" for title in failed[:10])
         if failed_reasons:
-            lines.append(f"\nسبب الفشل: {failed_reasons[0]}")
+            lines.append(f"\n{tr('سبب الفشل: ')}{failed_reasons[0]}")
         if len(succeeded) + len(failed) > 20:
-            lines.append("… تم اختصار قائمة النتائج")
-        lines.append("\nيمكنك تغيير الإعدادات وإرسال المنشور مرة أخرى.")
+            lines.append(tr("… تم اختصار قائمة النتائج"))
+        lines.append(f"\n{tr('يمكنك تغيير الإعدادات وإرسال المنشور مرة أخرى.')}")
         await edit_publish_ui(
             callback.message,
             build_post_settings_rich_message(

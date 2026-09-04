@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery, Message
 from app.editor.history import remember
 from app.editor.draft_store import draft_store
 from app.editor.workflow import editor_workflow
-from app.i18n import t
+from app.i18n import t, tr
 from app.keyboards import (
     build_anchor_target_keyboard,
     build_block_position_keyboard,
@@ -43,10 +43,10 @@ async def open_block(callback: CallbackQuery, state: FSMContext) -> None:
     block_id = callback.data.rsplit(":", 1)[-1]
     block = block_by_id(blocks, block_id)
     if block is None:
-        await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
+        await callback.answer(t("missing_block"), show_alert=True)
         await edit_ui(
             callback.message,
-            MAIN_TEXT,
+            str(MAIN_TEXT),
             build_rich_editor_keyboard(blocks),
         )
         return
@@ -67,11 +67,11 @@ async def duplicate_block_action(callback: CallbackQuery, state: FSMContext) -> 
     _, blocks = session
     block_id = callback.data.rsplit(":", 1)[-1]
     if block_by_id(blocks, block_id) is None:
-        await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
+        await callback.answer(t("missing_block"), show_alert=True)
         return
     result = editor_workflow.duplicate(blocks, block_id, after=True)
     if not result.changed or result.block is None:
-        await callback.answer("تعذر نسخ هذا الجزء.", show_alert=True)
+        await callback.answer(tr("تعذر نسخ هذا الجزء."), show_alert=True)
         return
     await remember(state)
     await save_blocks(state, result.blocks)
@@ -92,7 +92,7 @@ async def ask_delete(callback: CallbackQuery, state: FSMContext) -> None:
     _, blocks = session
     block_id = callback.data.rsplit(":", 1)[-1]
     if block_by_id(blocks, block_id) is None:
-        await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
+        await callback.answer(t("missing_block"), show_alert=True)
         return
     anchors = linked_anchors(blocks, block_id)
     if anchors:
@@ -105,7 +105,7 @@ async def ask_delete(callback: CallbackQuery, state: FSMContext) -> None:
         return
     await edit_ui(
         callback.message,
-        "هل تريد حذف هذا الجزء؟",
+        tr("هل تريد حذف هذا الجزء؟"),
         build_delete_confirmation_keyboard(block_id),
     )
     await callback.answer()
@@ -135,7 +135,7 @@ async def confirm_delete(callback: CallbackQuery, state: FSMContext) -> None:
             return
         result = editor_workflow.delete(blocks, block_id)
         if not result.changed:
-            await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
+            await callback.answer(t("missing_block"), show_alert=True)
             return
         await remember(state)
         await save_blocks(state, result.blocks)
@@ -151,7 +151,7 @@ async def confirm_delete(callback: CallbackQuery, state: FSMContext) -> None:
                 result.blocks, (await draft_store.load(state)).message_buttons,
             ),
         )
-        await callback.answer("تم الحذف")
+        await callback.answer(tr("تم الحذف"))
 
 
 @router.callback_query(F.data.startswith("r:adc:"))
@@ -290,11 +290,11 @@ async def move_menu(callback: CallbackQuery, state: FSMContext) -> None:
     _, blocks = session
     block_id = callback.data.rsplit(":", 1)[-1]
     if block_by_id(blocks, block_id) is None:
-        await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
+        await callback.answer(t("missing_block"), show_alert=True)
         return
     await edit_ui(
         callback.message,
-        "اختر الموقع الجديد:",
+        tr("اختر الموقع الجديد:"),
         build_block_position_keyboard(blocks, block_id),
     )
     await callback.answer()
@@ -314,7 +314,7 @@ async def move_one_step(callback: CallbackQuery, state: FSMContext) -> None:
         ordered = sorted(blocks, key=lambda item: int(item.get("position", 0)))
         block = block_by_id(ordered, block_id)
         if block is None:
-            await callback.answer("هذا الجزء لم يعد موجودًا.", show_alert=True)
+            await callback.answer(t("missing_block"), show_alert=True)
             return
         current_index = ordered.index(block)
         target_index = (
@@ -323,11 +323,11 @@ async def move_one_step(callback: CallbackQuery, state: FSMContext) -> None:
             else current_index + 1
         )
         if not 0 <= target_index < len(ordered):
-            await callback.answer("هذا الجزء وصل إلى نهاية الترتيب.")
+            await callback.answer(tr("هذا الجزء وصل إلى نهاية الترتيب."))
             return
         result = editor_workflow.move(blocks, block_id, target_index)
         if not result.changed or result.block is None:
-            await callback.answer("تعذر نقل الجزء.", show_alert=True)
+            await callback.answer(tr("تعذر نقل الجزء."), show_alert=True)
             return
         await remember(state)
         await save_blocks(state, result.blocks)
@@ -336,7 +336,7 @@ async def move_one_step(callback: CallbackQuery, state: FSMContext) -> None:
             block_page(result.block, result.blocks),
             build_managed_block_keyboard(result.block, result.blocks),
         )
-        await callback.answer("تم تغيير الموقع")
+        await callback.answer(tr("تم تغيير الموقع"))
 
 
 @router.callback_query(F.data.startswith("r:mt:"))
@@ -352,11 +352,11 @@ async def move_to(callback: CallbackQuery, state: FSMContext) -> None:
             _, _, block_id, raw_index = callback.data.split(":", 3)
             target_index = int(raw_index)
         except (TypeError, ValueError):
-            await callback.answer("الموقع الجديد غير صالح.", show_alert=True)
+            await callback.answer(tr("الموقع الجديد غير صالح."), show_alert=True)
             return
         result = editor_workflow.move(blocks, block_id, target_index)
         if not result.changed:
-            await callback.answer("تعذر نقل الجزء؛ ربما تغيرت الجلسة.", show_alert=True)
+            await callback.answer(tr("تعذر نقل الجزء؛ ربما تغيرت الجلسة."), show_alert=True)
             return
         await remember(state)
         await save_blocks(state, result.blocks)
@@ -368,7 +368,7 @@ async def move_to(callback: CallbackQuery, state: FSMContext) -> None:
                 result.blocks, (await draft_store.load(state)).message_buttons,
             ),
         )
-        await callback.answer("تم تغيير الموقع")
+        await callback.answer(tr("تم تغيير الموقع"))
 
 
 __all__ = [

@@ -70,31 +70,31 @@ def normalize_button_value(button_type: str, value: str) -> tuple[str | None, st
     if button_type == "url":
         normalized = normalize_button_url(value)
         if normalized is None or len(normalized) > 256:
-            return None, "الرابط غير صالح. أرسل @username أو رابطًا يبدأ بـ http:// أو https:// أو tg://"
+            return None, tr("الرابط غير صالح. أرسل @username أو رابطًا يبدأ بـ http:// أو https:// أو tg://")
         return normalized, None
     if button_type in {"web_app", "login_url"}:
         normalized = normalize_https_url(value)
         if normalized is None or len(normalized) > 256:
-            return None, "هذا النوع يحتاج إلى رابط HTTPS صالح."
+            return None, tr("هذا النوع يحتاج إلى رابط HTTPS صالح.")
         return normalized, None
     if button_type == "page":
         code = normalize_page_code(value)
         if code is None:
-            return None, "كود الصفحة غير صالح."
+            return None, tr("كود الصفحة غير صالح.")
         return code, None
     if button_type == "copy" and len(value) > 256:
-        return None, "نص النسخ طويل جدًا؛ الحد الأقصى 256 حرفًا."
+        return None, tr("نص النسخ طويل جدًا؛ الحد الأقصى 256 حرفًا.")
     if button_type == "callback_data" and not 1 <= len(value.encode("utf-8")) <= 64:
-        return None, "قيمة callback_data يجب أن تكون بين 1 و64 بايت."
+        return None, tr("قيمة callback_data يجب أن تكون بين 1 و64 بايت.")
     if button_type == "popup" and len(value) > 200:
-        return None, "نص التنبيه طويل جدًا؛ الحد الأقصى 200 حرف."
+        return None, tr("نص التنبيه طويل جدًا؛ الحد الأقصى 200 حرف.")
     if button_type in {"switch_inline", "switch_inline_current"}:
         normalized = "" if value.strip().lower() == "/empty" else value
         if len(normalized) > 256:
-            return None, "استعلام Inline طويل جدًا؛ الحد الأقصى 256 حرفًا."
+            return None, tr("استعلام Inline طويل جدًا؛ الحد الأقصى 256 حرفًا.")
         return normalized, None
     if button_type not in BUTTON_TYPES:
-        return None, "نوع الزر غير صالح لهذه العملية."
+        return None, tr("نوع الزر غير صالح لهذه العملية.")
     return value, None
 
 
@@ -135,7 +135,7 @@ async def preview_buttons(
                 buttons,
                 buttons_per_row=width,
                 include_back=True,
-                back_text=tr("🔙 رجوع"),
+                back_text=t("ux.common.back"),
             ),
         )
 

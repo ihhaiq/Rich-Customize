@@ -7,6 +7,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
 
+from app.i18n import tr
 from app.keyboards import build_chat_reached_keyboard
 from app.services.chat_registry import managed_chat_registry
 
@@ -37,7 +38,7 @@ async def remember_publish_chat(update: ChatMemberUpdated, bot: Bot) -> None:
         try:
             await bot.send_message(
                 update.from_user.id,
-                "تمت إضافة البوت، لكن بدون صلاحية نشر الرسائل في القناة.",
+                tr("تمت إضافة البوت، لكن بدون صلاحية نشر الرسائل في القناة."),
             )
         except (TelegramBadRequest, TelegramForbiddenError):
             pass
@@ -51,7 +52,7 @@ async def remember_publish_chat(update: ChatMemberUpdated, bot: Bot) -> None:
     try:
         await bot.send_message(
             actor.id,
-            f"✅ تم الوصول إلى «{title}».",
+            f"{tr('✅ تم الوصول إلى «')}{title}».",
             reply_markup=build_chat_reached_keyboard(chat_id),
         )
     except (TelegramBadRequest, TelegramForbiddenError):
@@ -101,7 +102,7 @@ async def select_post_chat(callback: CallbackQuery, state: FSMContext, bot: Bot)
     try:
         chat_id = int(callback.data.rsplit(":", 1)[-1])
     except (TypeError, ValueError):
-        await callback.answer("اختيار محادثة غير صالح.", show_alert=True)
+        await callback.answer(tr("اختيار محادثة غير صالح."), show_alert=True)
         return
     registered = next(
         (
@@ -115,17 +116,17 @@ async def select_post_chat(callback: CallbackQuery, state: FSMContext, bot: Bot)
     ):
         await managed_chat_registry.remove(callback.from_user.id, chat_id)
         await callback.answer(
-            "المحادثة لم تعد متاحة، أو أن صلاحيات أحد المشرفين تغيرت.",
+            tr("المحادثة لم تعد متاحة، أو أن صلاحيات أحد المشرفين تغيرت."),
             show_alert=True,
         )
         return
     selected = [int(item) for item in data.get("post_selected_chat_ids", [])]
     if chat_id in selected:
         selected.remove(chat_id)
-        notice = "تم إلغاء تحديد المحادثة"
+        notice = tr("تم إلغاء تحديد المحادثة")
     else:
         selected.append(chat_id)
-        notice = "تم تحديد المحادثة للإرسال"
+        notice = tr("تم تحديد المحادثة للإرسال")
     await render_post_chat_picker(callback, state, bot, selected)
     await callback.answer(notice)
 

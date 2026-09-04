@@ -7,6 +7,7 @@ from aiogram.types import (
 )
 
 from app.config import developer_ids
+from app.i18n import t
 from app.miniapp import mini_app_url
 from app.miniapp_links import direct_mini_app_link, mini_app_short_name
 from app.miniapp_rich_buttons import complete_user_picker
@@ -25,25 +26,24 @@ async def open_mini_app(message: Message) -> None:
     if message.from_user is None or message.from_user.id not in developer_ids():
         return
     if not mini_app_url():
-        await message.answer(
-            "Mini App Beta 0.3 جاهزة، لكن ماكو رابط عام بعد. "
-            "حدد MINI_APP_URL أو RAILWAY_PUBLIC_DOMAIN ثم أعد التشغيل."
-        )
+        await message.answer(t("ux.errors.invalid_url"))
         return
 
     me = await message.bot.get_me()
     if not me.username:
-        await message.answer("تعذر تحديد يوزر البوت لفتح التطبيق المصغر.")
+        await message.answer(
+            t("ux.errors.telegram_rejected", reason="Bot username is unavailable."),
+        )
         return
 
     named_link = direct_mini_app_link(me.username)
     await message.answer(
-        "🧪 Rich Customize Mini App — Beta 0.3\n\n"
-        "اختصار خاص بالمطور لفتح نفس مسار الـNamed Mini App العام.\n"
+        f"🧪 Rich Customize Mini App — Beta 0.3\n\n"
+        f"{t('ux.editor.title')}\n"
         f"Short name: {mini_app_short_name()}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(
-                text="🌐 فتح Mini App Beta 0.3",
+                text=t("editor.start_button"),
                 url=named_link,
             )
         ]]),
@@ -77,20 +77,27 @@ async def receive_miniapp_rich_button_user(message: Message) -> None:
     if result is None:
         return
 
+    target_label = result.get("target_label") or selected_user.user_id
     await message.answer(
-        f"✅ تم ربط زر «{result['button_title']}» بالمستخدم "
-        f"{result.get('target_label') or selected_user.user_id}.",
+        f"{t('ux.buttons.added')}\n{result['button_title']} → {target_label}",
         reply_markup=ReplyKeyboardRemove(),
     )
 
     me = await message.bot.get_me()
     if me.username:
         await message.answer(
-            "↩️ كمل التحرير من نفس المكان:",
+            t("customize"),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
                 InlineKeyboardButton(
-                    text="↩️ متابعة التحرير",
+                    text=t("edit"),
                     url=_resume_link(me.username, str(result["page_id"])),
                 )
             ]]),
         )
+
+
+__all__ = [
+    "open_mini_app",
+    "receive_miniapp_rich_button_user",
+    "router",
+]

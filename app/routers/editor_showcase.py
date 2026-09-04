@@ -6,20 +6,28 @@ from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from app.services.showcase import (
-    MEDIA_LABELS,
-    MissingShowcaseMedia,
-    send_all_blocks_showcase,
-)
+from app.i18n import t
+from app.services.showcase import MissingShowcaseMedia, send_all_blocks_showcase
 
 
 router = Router(name="editor_showcase")
 logger = logging.getLogger(__name__)
 
+_SHOWCASE_MEDIA_KEYS = {
+    "photo": "block.photo",
+    "video": "block.video",
+    "animation": "block.animation",
+    "audio": "block.audio",
+    "voice": "block.voice",
+}
+
 
 def missing_media_text(error: MissingShowcaseMedia) -> str:
-    labels = "، ".join(MEDIA_LABELS[kind] for kind in error.missing)
-    return f"مكتبة وسائط القالب ناقصة. أضف إلى قناة الوسائط: {labels}"
+    labels = ", ".join(
+        t(_SHOWCASE_MEDIA_KEYS.get(kind, "block.content"))
+        for kind in error.missing
+    )
+    return f"{t('preview_failed')}\n{labels}"
 
 
 @router.message(Command("draft"))
@@ -36,12 +44,12 @@ async def showcase_from_message(message: Message, bot: Bot) -> None:
         logger.exception(
             "Failed to send all-block showcase to user_id=%s", message.from_user.id,
         )
-        await message.answer("تعذر إرسال قالب كل البلوكات. راجع السجل لمعرفة الخطأ.")
+        await message.answer(t("preview_failed"))
 
 
 @router.callback_query(F.data == "r:showcase")
 async def showcase_from_button(callback: CallbackQuery, bot: Bot) -> None:
-    await callback.answer("جاري تجهيز قالب كل البلوكات…")
+    await callback.answer(t("preview_generating"))
     try:
         await send_all_blocks_showcase(
             bot, callback.from_user.id, callback.from_user.id,
@@ -52,10 +60,7 @@ async def showcase_from_button(callback: CallbackQuery, bot: Bot) -> None:
         logger.exception(
             "Failed to send all-block showcase to user_id=%s", callback.from_user.id,
         )
-        await bot.send_message(
-            callback.from_user.id,
-            "تعذر إرسال قالب كل البلوكات. راجع السجل لمعرفة الخطأ.",
-        )
+        await bot.send_message(callback.from_user.id, t("preview_failed"))
 
 
 __all__ = [

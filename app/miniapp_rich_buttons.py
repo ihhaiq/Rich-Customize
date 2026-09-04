@@ -9,6 +9,7 @@ from typing import Any
 from aiohttp import web
 from aiogram.types import KeyboardButton, KeyboardButtonRequestUsers, ReplyKeyboardMarkup
 
+from app.i18n import t, use_language
 from app.services.inline_buttons import find_user_button_markers
 from app.services.page_registry import page_registry
 
@@ -87,8 +88,8 @@ def _find_block(blocks: list[dict[str, Any]], block_id: str) -> dict[str, Any] |
 
 
 def _clean_title(value: Any) -> str:
-    title = str(value or "زر").replace("{", "").replace("}", "").replace("\n", " ").strip()
-    return title[:64] or "زر"
+    title = str(value or "Button").replace("{", "").replace("}", "").replace("\n", " ").strip()
+    return title[:64] or "Button"
 
 
 def _button_marker(data: dict[str, Any]) -> str:
@@ -144,38 +145,38 @@ async def request_user_picker(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
     except Exception as exc:
-        raise web.HTTPBadRequest(text="Invalid JSON") from exc
+        raise web.HTTPBadRequest(text="invalid_request") from exc
     if not isinstance(payload, dict):
-        raise web.HTTPBadRequest(text="JSON object required")
+        raise web.HTTPBadRequest(text="invalid_request")
 
     page_id = str(payload.get("page_id") or "")
     block_id = str(payload.get("block_id") or "")
     marker = str(payload.get("marker") or "").strip() or None
     if not page_id or not block_id:
-        raise web.HTTPBadRequest(text="page_id and block_id are required")
+        raise web.HTTPBadRequest(text="invalid_request")
 
     owner_id = int(user["id"])
     page = await page_registry.get(page_id)
     if not page or int(page.get("owner_id", 0)) != owner_id:
-        raise web.HTTPNotFound(text="Page not found")
+        raise web.HTTPNotFound(text="page_not_found")
     block = _find_block(page.get("blocks") or [], block_id)
     if block is None:
-        raise web.HTTPNotFound(text="Block not found")
+        raise web.HTTPNotFound(text="block_not_found")
 
     title: str
     color: str | None = None
     if marker:
         matches = find_user_button_markers(marker)
         if not matches or matches[0].get("marker") != marker:
-            raise web.HTTPBadRequest(text="Invalid inline user button marker")
+            raise web.HTTPBadRequest(text="invalid_request")
         if not _contains_marker(block.get("data", {}), marker):
-            raise web.HTTPBadRequest(text="Inline button is no longer present in this block")
+            raise web.HTTPBadRequest(text="button_not_found")
         title = _clean_title(matches[0].get("title"))
         color = str(matches[0].get("color") or "") or None
     else:
         rich = block.get("data", {}).get("_rich_button")
         if not isinstance(rich, dict) or str(rich.get("button_type")) != "user":
-            raise web.HTTPBadRequest(text="This block is not a user rich button")
+            raise web.HTTPBadRequest(text="button_not_found")
         title = _clean_title(rich.get("title"))
         color = str(rich.get("color") or "") or None
 
@@ -187,28 +188,29 @@ async def request_user_picker(request: web.Request) -> web.Response:
         title=title,
         color=color,
     )
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[[
-            KeyboardButton(
-                text=f"👤 تحديد مستخدم لزر «{title}»",
-                request_users=KeyboardButtonRequestUsers(
-                    request_id=request_id,
-                    max_quantity=1,
-                    request_name=True,
-                    request_username=True,
-                    request_photo=True,
-                ),
-            )
-        ]],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-        selective=True,
-    )
-    await request.app["bot"].send_message(
-        chat_id=owner_id,
-        text=f"اختر المستخدم الذي تريد ربطه بالزر «{title}»: ",
-        reply_markup=keyboard,
-    )
+    with use_language(str(user.get("language_code") or "")):
+        keyboard = ReplyKeyboardMarkup(
+            keyboard=[[
+                KeyboardButton(
+                    text=f"👤 {t('common.choose_action')} · {title}",
+                    request_users=KeyboardButtonRequestUsers(
+                        request_id=request_id,
+                        max_quantity=1,
+                        request_name=True,
+                        request_username=True,
+                        request_photo=True,
+                    ),
+                )
+            ]],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+            selective=True,
+        )
+        await request.app["bot"].send_message(
+            chat_id=owner_id,
+            text=f"{t('common.choose_action')}\n{title}",
+            reply_markup=keyboard,
+        )
     return web.json_response({"ok": True, "request_id": request_id, "page_id": page_id})
 
 

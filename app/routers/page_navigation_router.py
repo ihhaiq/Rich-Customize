@@ -7,7 +7,7 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.types import CallbackQuery, EphemeralMessageParameters, Message
 
-from app.i18n import t
+from app.i18n import t, tr
 from app.services.page_navigation import PageNavigation
 from app.services.renderer import RichMessageRenderError, build_input_rich_message
 
@@ -68,7 +68,7 @@ async def _open_page_link(
         else None
     )
     if callback_message is None and guest_context is None:
-        await callback.answer("تعذر تحديد محادثة رسالة Guest.", show_alert=True)
+        await callback.answer(tr("تعذر تحديد محادثة رسالة Guest."), show_alert=True)
         return
     if callback_message is not None:
         chat_id = callback_message.chat.id
@@ -80,7 +80,7 @@ async def _open_page_link(
     if require_subscription and not await is_chat_subscriber(
         bot, chat_id, callback.from_user.id,
     ):
-        await callback.answer("انت مو من المقربين ابتعد عني .... ", show_alert=True)
+        await callback.answer(tr("انت مو من المقربين ابتعد عني .... "), show_alert=True)
         return
     parts = callback.data.split(":")
     target_id = parts[2] if len(parts) > 2 else ""
@@ -88,7 +88,7 @@ async def _open_page_link(
     navigation_token = parts[4] if len(parts) > 4 and parts[4] else None
     page = await page_registry.get(target_id)
     if page is None:
-        await callback.answer("هذه الصفحة لم تعد موجودة أو انتهت صلاحيتها.", show_alert=True)
+        await callback.answer(tr("هذه الصفحة لم تعد موجودة أو انتهت صلاحيتها."), show_alert=True)
         return
     ephemeral_message_id = (
         callback_message.ephemeral_message_id if callback_message is not None else None
@@ -139,7 +139,7 @@ async def _open_page_link(
             callback.from_user.id,
         )
         await callback.answer(
-            f"تعذر فتح الصفحة: {friendly_rich_error(error)[:160]}",
+            f"{tr('تعذر فتح الصفحة: ')}{friendly_rich_error(error)[:160]}",
             show_alert=True,
         )
         return
@@ -158,7 +158,7 @@ async def render_navigation_page(
     page = await page_registry.get(page_id)
     if page is None:
         await callback.answer(
-            "هذه الصفحة لم تعد موجودة أو انتهت صلاحيتها.", show_alert=True,
+            tr("هذه الصفحة لم تعد موجودة أو انتهت صلاحيتها."), show_alert=True,
         )
         return False
     callback_message = callback.message if isinstance(callback.message, Message) else None
@@ -195,7 +195,7 @@ async def render_navigation_page(
             callback.from_user.id,
         )
         await callback.answer(
-            f"تعذر فتح الصفحة: {friendly_rich_error(error)[:160]}",
+            f"{tr('تعذر فتح الصفحة: ')}{friendly_rich_error(error)[:160]}",
             show_alert=True,
         )
         return False
@@ -305,7 +305,7 @@ async def restore_original_message(callback: CallbackQuery, bot: Bot) -> None:
     chat = getattr(callback_message, "chat", None)
     ephemeral_message_id = getattr(callback_message, "ephemeral_message_id", None)
     if chat is None or not ephemeral_message_id:
-        await callback.answer("الرسالة الأصلية غير متاحة.", show_alert=True)
+        await callback.answer(tr("الرسالة الأصلية غير متاحة."), show_alert=True)
         return
     try:
         await bot.delete_ephemeral_message(
@@ -319,7 +319,7 @@ async def restore_original_message(callback: CallbackQuery, bot: Bot) -> None:
             callback.from_user.id,
         )
         await callback.answer(
-            f"تعذر الرجوع إلى الرسالة الأصلية: {friendly_rich_error(error)[:140]}",
+            f"{tr('تعذر الرجوع إلى الرسالة الأصلية: ')}{friendly_rich_error(error)[:140]}",
             show_alert=True,
         )
         return
