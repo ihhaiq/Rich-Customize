@@ -19,17 +19,26 @@ from app.lang import (
     SUPPORTED_LANGUAGES,
     TRANSLATIONS,
 )
-from app.lang.catalogs.details_semantic import DETAILS_PHRASES
 
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = ROOT / "app"
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
-
-# details_semantic.py explicitly documents English fallback for non-Arabic
-# locales until dedicated translations are added. Keep that existing debt
-# visible and isolated so every other user-facing t(...) call is protected.
-INTENTIONAL_ENGLISH_FALLBACK_KEYS = frozenset(DETAILS_PHRASES)
+INTENTIONAL_ENGLISH_FALLBACK_KEYS = frozenset()
+PUBLIC_UI_DIRS = (APP_ROOT / "routers", APP_ROOT / "keyboards")
+PUBLIC_UI_EXCLUDED_FILES = {APP_ROOT / "routers" / "developer.py"}
+INPUT_ONLY_ARABIC = {"دريفت"}
+OUTPUT_METHODS = {
+    "answer",
+    "answer_document",
+    "answer_photo",
+    "edit_text",
+    "send_message",
+    "send_photo",
+    "send_document",
+    "edit_message_text",
+}
+BUTTON_BUILDERS = {"InlineKeyboardButton", "KeyboardButton"}
 
 
 def _fields(value: str) -> set[str]:
@@ -55,6 +64,22 @@ def _static_text(node: ast.AST) -> str | None:
         else:
             return None
     return "".join(parts)
+
+
+def _call_name(node: ast.Call) -> str:
+    if isinstance(node.func, ast.Name):
+        return node.func.id
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr
+    return ""
+
+
+def _contains_unlocalized_arabic(node: ast.AST) -> bool:
+    if isinstance(node, ast.Call) and _call_name(node) in {"t", "tr"}:
+        return False
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return bool(ARABIC_RE.search(node.value) and node.value not in INPUT_ONLY_ARABIC)
+    return any(_contains_unlocalized_arabic(child) for child in ast.iter_child_nodes(node))
 
 
 def _collect_calls(function_name: str, *, allow_fstrings: bool) -> dict[str, list[str]]:
@@ -153,10 +178,7 @@ class LocalizationCoverageTests(unittest.TestCase):
             if key not in PHRASES and key not in CATALOG_EN:
                 continue
             for language in sorted(SUPPORTED_LANGUAGES - {"en"}):
-                if (
-                    language != "ar"
-                    and key in INTENTIONAL_ENGLISH_FALLBACK_KEYS
-                ):
+                if key in INTENTIONAL_ENGLISH_FALLBACK_KEYS:
                     continue
                 if not _has_translation_path(language, key):
                     missing[language].append(f"{key} ({', '.join(locations)})")
@@ -189,11 +211,6 @@ class LocalizationCoverageTests(unittest.TestCase):
         )
 
     def test_arabic_source_tr_calls_translate_for_every_other_locale(self):
-        # The legacy tr() compatibility path is intentionally source-language
-        # based. Arabic source strings must therefore normalize to English and
-        # continue into every other supported locale. English-source tr() calls
-        # are not checked here because some are intentionally gated to specific
-        # locales by their caller.
         used = {
             source: locations
             for source, locations in _collect_calls("tr", allow_fstrings=True).items()
@@ -224,12 +241,66 @@ class LocalizationCoverageTests(unittest.TestCase):
             f"selected locale: {dict(missing)}",
         )
 
-    def test_intentional_fallback_allowlist_stays_scoped_to_details(self):
-        self.assertEqual(
-            INTENTIONAL_ENGLISH_FALLBACK_KEYS,
-            set(DETAILS_PHRASES),
+    def test_no_public_output_contains_unlocalized_arabic_literals(self):
+        leaks: list[str] = []
+        for directory in PUBLIC_UI_DIRS:
+            for path in directory.rglob("*.py"):
+                if path in PUBLIC_UI_EXCLUDED_FILES:
+                    continue
+                tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    name = _call_name(node)
+                    expressions: list[ast.AST] = []
+                    if name in OUTPUT_METHODS and node.args:
+                        expressions.append(node.args[0])
+                    if name in BUTTON_BUILDERS:
+                        expressions.extend(
+                            keyword.value for keyword in node.keywords
+                            if keyword.arg == "text"
+                        )
+                        if node.args:
+                            expressions.append(node.args[0])
+                    if not expressions:
+                        continue
+                    if any(_contains_unlocalized_arabic(expr) for expr in expressions):
+                        leaks.append(
+                            f"{path.relative_to(ROOT)}:{getattr(node, 'lineno', 0)}"
+                        )
+        self.assertFalse(
+            leaks,
+            "Public UI contains Arabic literals outside t()/tr(): " + ", ".join(leaks),
         )
-        self.assertTrue(INTENTIONAL_ENGLISH_FALLBACK_KEYS)
+
+    def test_miniapp_html_bootstrap_is_locale_neutral(self):
+        html_source = (APP_ROOT / "miniapp_static" / "index.html").read_text(encoding="utf-8")
+        self.assertFalse(
+            ARABIC_RE.search(html_source),
+            "Mini App HTML must use neutral English bootstrap text; localization applies after load.",
+        )
+
+    def test_miniapp_translation_fallbacks_are_not_arabic(self):
+        fallback_pattern = re.compile(
+            r"\btr\(\s*['\"][^'\"]+['\"]\s*,\s*['\"]([^'\"]*)['\"]"
+        )
+        leaks: list[str] = []
+        static_root = APP_ROOT / "miniapp_static"
+        for path in static_root.glob("*.js"):
+            if path.name in {"miniapp_i18n.js", "miniapp_i18n_locales.js"}:
+                continue
+            source = path.read_text(encoding="utf-8")
+            for match in fallback_pattern.finditer(source):
+                if ARABIC_RE.search(match.group(1)):
+                    line = source.count("\n", 0, match.start()) + 1
+                    leaks.append(f"{path.relative_to(ROOT)}:{line}")
+        self.assertFalse(
+            leaks,
+            "Mini App tr(...) fallbacks must be English/neutral: " + ", ".join(leaks),
+        )
+
+    def test_no_intentional_english_fallback_debt_remains(self):
+        self.assertFalse(INTENTIONAL_ENGLISH_FALLBACK_KEYS)
 
 
 if __name__ == "__main__":
