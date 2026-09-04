@@ -62,9 +62,6 @@ def table_display_help_text() -> str:
     ])
 
 
-TABLE_DISPLAY_HELP_TEXT = table_display_help_text()
-
-
 def _table_options_text() -> str:
     return f"{tr('إعدادات خلايا الجدول')}\n\n{tr('اختر العملية التي تريد تطبيقها:')}"
 
@@ -316,7 +313,6 @@ async def receive_table_caption(message: Message, state: FSMContext, bot: Bot) -
 __all__ = [
     "TABLE_ALL_ACTIONS",
     "TABLE_CELL_ACTIONS",
-    "TABLE_DISPLAY_HELP_TEXT",
     "apply_table_cell_action",
     "choose_table_action",
     "open_table_display",
