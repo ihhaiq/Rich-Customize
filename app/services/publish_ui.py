@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from aiogram.types import InputRichMessage
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import InlineKeyboardMarkup, InputRichMessage, Message
 
 from app.i18n import t, tr
 
@@ -51,6 +52,23 @@ def _panel(text: str, rows: list[list[dict[str, Any]]]) -> InputRichMessage:
             },
         ],
     )
+
+
+async def edit_publish_ui(
+    message: Message,
+    rich_message: InputRichMessage,
+    reply_markup: InlineKeyboardMarkup,
+) -> None:
+    try:
+        await message.bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            rich_message=rich_message,
+            reply_markup=reply_markup,
+        )
+    except TelegramBadRequest as error:
+        if "message is not modified" not in str(error).lower():
+            raise
 
 
 def build_post_picker_rich_message(
@@ -175,4 +193,5 @@ __all__ = [
     "build_post_confirmation_rich_message",
     "build_post_picker_rich_message",
     "build_post_settings_rich_message",
+    "edit_publish_ui",
 ]
