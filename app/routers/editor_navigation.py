@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 from app.editor.draft_store import draft_store
 from app.editor.session import load_editor_session, user_locks
 from app.editor.view_state import normalize_block_scroll_offset
-from app.i18n import t, tr
+from app.i18n import t
 from app.keyboards import build_editor_tools_keyboard, build_rich_editor_keyboard
 from app.routers.editor_ui import (
     delete_stored_block_prompt,
@@ -25,7 +25,7 @@ router = Router(name="editor_navigation")
 
 @router.callback_query(F.data == "r:no")
 async def no_op(callback: CallbackQuery) -> None:
-    await callback.answer(tr("هذا هو الموقع الحالي"))
+    await callback.answer(t("editor.current_position"))
 
 
 @router.callback_query(F.data == "r:back")
