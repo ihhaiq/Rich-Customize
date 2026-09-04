@@ -9,6 +9,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
+from app.i18n import tr
 from app.keyboards import build_post_back_keyboard
 from app.services.chat_registry import managed_chat_registry
 from app.services.publish_ui import build_post_picker_rich_message, edit_publish_ui
@@ -87,14 +88,14 @@ async def bot_add_links(bot: Bot) -> tuple[str, str]:
 def post_chats_text(chats: list[dict[str, Any]], selected_count: int) -> str:
     if not chats:
         return (
-            "إنشاء منشور\n\n"
-            "لا توجد قناة أو مجموعة مشتركة يكون فيها المستخدم والبوت مشرفين.\n"
-            "أضف البوت من أحد الزرين، وبعد نجاح الإضافة سيصلك إشعار هنا."
+            f"{tr('إنشاء منشور')}\n\n"
+            f"{tr('لا توجد قناة أو مجموعة مشتركة يكون فيها المستخدم والبوت مشرفين.')}\n"
+            f"{tr('أضف البوت من أحد الزرين، وبعد نجاح الإضافة سيصلك إشعار هنا.')}"
         )
     return (
-        "إنشاء منشور\n\n"
-        "اضغط على كل قناة أو مجموعة لتحديدها للإرسال المتعدد.\n"
-        f"المحدد حالياً: {selected_count}"
+        f"{tr('إنشاء منشور')}\n\n"
+        f"{tr('اضغط على كل قناة أو مجموعة لتحديدها للإرسال المتعدد.')}\n"
+        f"{tr('المحدد حالياً: ')}{selected_count}"
     )
 
 
