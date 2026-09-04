@@ -19,11 +19,11 @@ def build_block_editor_keyboard(
     ordered = sorted(blocks, key=lambda item: item["position"])
     position = ordered.index(block)
     rows: list[list[InlineKeyboardButton]] = [[InlineKeyboardButton(
-        text="👁 معاينة هذا الـBlock", callback_data=f"r:pv:{block_id}",
+        text=t("preview_block"), callback_data=f"r:pv:{block_id}",
         style=ButtonStyle.PRIMARY,
     )]]
     if block["type"] != "divider":
-        label = "✏️ تعديل المحتوى" if block["type"] == "details" else "✏️ تعديل"
+        label = t("edit_content") if block["type"] == "details" else t("edit")
         rows.append([InlineKeyboardButton(text=label, callback_data=f"r:e:{block_id}")])
     if block["type"] == "anchor":
         rows.append([InlineKeyboardButton(
@@ -64,7 +64,7 @@ def build_block_editor_keyboard(
             text="✍️ تعديل الكاتب", callback_data=f"r:f:{block_id}:credit",
         )])
     rows.append([InlineKeyboardButton(
-        text="🗑 حذف", callback_data=f"r:d:{block_id}", style=ButtonStyle.DANGER,
+        text=t("delete"), callback_data=f"r:d:{block_id}", style=ButtonStyle.DANGER,
     )])
     if not linked_anchor:
         rows.append([
@@ -79,7 +79,7 @@ def build_block_editor_keyboard(
                 disabled=DisabledButton() if position >= len(ordered) - 1 else None,
             ),
         ])
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
+    rows.append([InlineKeyboardButton(text=t("back"), callback_data="r:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -99,7 +99,7 @@ def build_table_options_keyboard(block_id: str) -> InlineKeyboardMarkup:
         callback_data=f"r:tdisplay:{block_id}",
         style=ButtonStyle.PRIMARY,
     )])
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data=f"r:b:{block_id}")])
+    rows.append([InlineKeyboardButton(text=t("back"), callback_data=f"r:b:{block_id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -130,7 +130,7 @@ def build_table_display_keyboard(block: dict[str, Any]) -> InlineKeyboardMarkup:
             text=f"✏️ {'تعديل عنوان الجدول' if has_caption else 'إضافة عنوان للجدول'}",
             callback_data=f"r:tcaption:{block_id}",
         )],
-        [InlineKeyboardButton(text="🔙 رجوع", callback_data=f"r:tm:{block_id}")],
+        [InlineKeyboardButton(text=t("back"), callback_data=f"r:tm:{block_id}")],
     ])
 
 
@@ -150,7 +150,7 @@ def build_table_cell_keyboard(block: dict[str, Any], action: str) -> InlineKeybo
                 callback_data=f"r:tc:{block_id}:{action}:{row_index}:{column_index}",
             ))
     rows = [buttons[index:index + 4] for index in range(0, len(buttons), 4)]
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data=f"r:tm:{block_id}")])
+    rows.append([InlineKeyboardButton(text=t("back"), callback_data=f"r:tm:{block_id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -209,16 +209,16 @@ def build_heading_level_keyboard(action: str, block_id: str | None = None) -> In
         back_data = "r:details:add"
     else:
         back_data = f"r:b:{block_id}"
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data=back_data)])
+    rows.append([InlineKeyboardButton(text=t("back"), callback_data=back_data)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def build_delete_confirmation_keyboard(block_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
-            text="🗑 نعم، حذف", callback_data=f"r:dc:{block_id}", style=ButtonStyle.DANGER,
+            text=t("ux.common.yes_delete"), callback_data=f"r:dc:{block_id}", style=ButtonStyle.DANGER,
         ),
-        InlineKeyboardButton(text="إلغاء", callback_data=f"r:b:{block_id}"),
+        InlineKeyboardButton(text=t("common.cancel"), callback_data=f"r:b:{block_id}"),
     ]])
 
 
@@ -230,7 +230,7 @@ def build_anchor_target_keyboard(
     back_data: str = "r:addmenu",
 ) -> InlineKeyboardMarkup:
     excluded = exclude_ids or set()
-    ordered = sorted(blocks, key=lambda item: int(item.get("position", 0)))
+    ordered = sorted(blocks, key=lambda item: int(item["position"]))
     candidates = anchor_targets(ordered, exclude_ids=excluded)
     rows = [[InlineKeyboardButton(
         text=get_block_button_text(block, ordered.index(block)),
@@ -273,7 +273,7 @@ def build_block_position_keyboard(blocks: list[dict[str, Any]], block_id: str) -
             callback_data=None if current else f"r:mt:{block_id}:{index}",
             disabled=DisabledButton() if current else None,
         )])
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data=f"r:b:{block_id}")])
+    rows.append([InlineKeyboardButton(text=t("back"), callback_data=f"r:b:{block_id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

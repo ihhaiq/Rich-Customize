@@ -110,7 +110,12 @@ async def complete_button_target(
     pending_message = data.get("pending_user_message")
     resolutions = list(data.get("pending_user_resolutions") or [])
     index = int(data.get("pending_user_marker_index", 0))
-    if not isinstance(blocks, list) or not isinstance(markers, list) or not markers:
+    if (
+        not isinstance(markers, list)
+        or not markers
+        or (resume == "open_editor" and not isinstance(blocks, list))
+        or (resume != "open_editor" and not isinstance(pending_message, dict))
+    ):
         await state.clear()
         await message.answer("انتهت بيانات ربط الزر. أعد إضافة الزر من المحرر.")
         return
@@ -119,9 +124,11 @@ async def complete_button_target(
         await message.answer("تعذر متابعة ربط الزر بسبب بيانات غير صالحة.")
         return
     marker = markers[index]
-    resolve_user_button_marker(
-        blocks, str(marker.get("marker", "")), target_id, username,
-    )
+    if resume == "open_editor":
+        assert isinstance(blocks, list)
+        resolve_user_button_marker(
+            blocks, str(marker.get("marker", "")), target_id, username,
+        )
     resolutions.append({
         "marker": str(marker.get("marker", "")),
         "user_id": target_id,
@@ -134,16 +141,19 @@ async def complete_button_target(
             await state.clear()
             await message.answer("تعذر متابعة ربط الزر بسبب بيانات غير صالحة.")
             return
-        await state.update_data(
-            pending_user_blocks=blocks,
-            pending_user_marker_index=next_index,
-            pending_user_resolutions=resolutions,
-        )
+        updates: dict[str, Any] = {
+            "pending_user_marker_index": next_index,
+            "pending_user_resolutions": resolutions,
+        }
+        if resume == "open_editor":
+            updates["pending_user_blocks"] = blocks
+        await state.update_data(**updates)
         await ask_for_button_user(message, state, next_marker)
         return
 
     await message.answer("✅ تم ربط الوجهة بالزر.", reply_markup=ReplyKeyboardRemove())
     if resume == "open_editor":
+        assert isinstance(blocks, list)
         await state.clear()
         await open_editor(message, state, blocks)
         return
@@ -155,15 +165,21 @@ async def complete_button_target(
     }
     clean_data["resuming_user_buttons"] = True
     await state.set_data(clean_data)
-    await state.set_state(
-        RichEditorStates.adding_block
-        if resume == "adding_block"
-        else RichEditorStates.editing_block
-    )
-    original = Message.model_validate(pending_message, context={"bot": message.bot})
     if resume == "adding_block":
+        await state.set_state(RichEditorStates.adding_block)
+    else:
+        await state.set_state(RichEditorStates.editing_block)
+
+    original = Message.model_validate(pending_message, context={"bot": message.bot})
+    if resume == "adding_block" and clean_data.get("pending_add_type") == "details":
+        from app.routers.details_builder import receive_details_add
+        await receive_details_add(original, state, message.bot)
+    elif resume == "adding_block":
         from app.routers.block_add import receive_added_block
         await receive_added_block(original, state, message.bot)
+    elif clean_data.get("nested_details_id") or clean_data.get("expected_type") == "details":
+        from app.routers.details_edit import receive_details_edit
+        await receive_details_edit(original, state, message.bot)
     else:
         from app.routers.block_edit import receive_replacement
         await receive_replacement(original, state, message.bot)

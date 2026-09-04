@@ -22,7 +22,7 @@ router = Router(name="editor_entry")
 @router.message(CommandStart())
 async def start(message: Message) -> None:
     await message.answer(
-        "أهلًا بك في محرّر الرسائل الغنية.\nأرسل /editor لبدء رسالة جديدة.",
+        f"{t('welcome')}\n{t('start_editor')}",
         reply_markup=build_welcome_keyboard(),
     )
 
@@ -57,9 +57,7 @@ async def receive_source(message: Message, state: FSMContext) -> None:
     else:
         blocks = message_to_blocks(message)
     if not blocks:
-        await message.answer(
-            "هذا النوع غير مدعوم حاليًا. أرسل نصًا أو وسائط أو Rich Message."
-        )
+        await message.answer(t("unsupported"))
         return
     user_markers = find_user_button_markers(message.text)
     if user_markers:

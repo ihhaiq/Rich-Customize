@@ -47,14 +47,14 @@ def build_post_chats_keyboard(
             style=ButtonStyle.PRIMARY,
         ),
     ])
-    rows.append([InlineKeyboardButton(text="🔙 رجوع", callback_data="r:back")])
+    rows.append([InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:back")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def build_chat_reached_keyboard(chat_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
-            text="📝 إرسال المنشور", callback_data=f"r:postchat:{chat_id}",
+            text=t("ux.editor.publish"), callback_data=f"r:postchat:{chat_id}",
             style=ButtonStyle.SUCCESS,
         ),
     ]])

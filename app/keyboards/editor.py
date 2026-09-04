@@ -16,7 +16,7 @@ from app.services.blocks import get_block_button_text
 
 def build_welcome_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🧩 قالب كل البلوكات", callback_data="r:showcase"),
+        InlineKeyboardButton(text=t("editor.showcase_button"), callback_data="r:showcase"),
         InlineKeyboardButton(
             text=t("editor.new_button"), callback_data="r:starteditor",
             style=ButtonStyle.PRIMARY,
@@ -139,7 +139,7 @@ def build_editor_tools_keyboard() -> InlineKeyboardMarkup:
 def build_result_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
-            text="✅ النتيجة", callback_data="r:result", style=ButtonStyle.SUCCESS,
+            text=t("result"), callback_data="r:result", style=ButtonStyle.SUCCESS,
         ),
     ]])
 

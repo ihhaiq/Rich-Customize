@@ -9,7 +9,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
 from app.editor.session import load_editor_session
-from app.i18n import t
+from app.i18n import t, tr
 from app.keyboards import (
     build_page_delete_confirmation_keyboard,
     build_page_restore_keyboard,
@@ -332,9 +332,8 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
         callback.message,
         editor_dashboard_text(after),
         build_rich_editor_keyboard(after.blocks, after.message_buttons),
-        parse_mode="HTML",
     )
-    await callback.answer("تم فتح الصفحة")
+    await callback.answer(tr("تم فتح الصفحة"))
 
 
 __all__ = [

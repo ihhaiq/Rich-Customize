@@ -9,6 +9,7 @@ from aiogram.types import CallbackQuery
 
 from app.editor.draft_store import draft_store
 from app.editor.types import BlockList
+from app.i18n import t
 from app.services.albums import AlbumCollector
 
 
@@ -23,7 +24,7 @@ async def load_editor_session(
     data = await state.get_data()
     if not isinstance(data.get("blocks"), list):
         await callback.answer(
-            "انتهت الجلسة. أرسل /editor للبدء من جديد.",
+            t("expired"),
             show_alert=True,
         )
         return None

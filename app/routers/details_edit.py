@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 from aiogram import Bot, F, Router
@@ -33,8 +34,9 @@ from app.services.details_editor import (
     replace_details_child,
     replace_details_children,
 )
-from app.editor.builders import new_block, text_data
-from app.editor.specs import MEDIA_CAPTION_TYPES
+from app.editor.builders import map_data, new_block, quote_data, text_data
+from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES
+from app.services.anchors import set_anchor_display_name
 from app.services.parser import (
     message_to_blocks,
     messages_to_blocks,
@@ -105,6 +107,7 @@ async def receive_nested_replacement(
             or child.get("type")
             or ""
         )
+        candidate: dict[str, Any] | None = None
 
         if expected in {"collage", "slideshow"}:
             if message.media_group_id:
@@ -119,29 +122,87 @@ async def receive_nested_replacement(
                 for item in parsed
                 if item.get("type") in {"photo", "video"}
             ]
-            if not media_children:
-                await message.answer(t("details.inner_wrong_content"))
-                return True
-            candidate = new_block(
-                expected,
-                {
-                    **child.get("data", {}),
-                    "children": media_children,
-                },
-            )
+            if media_children:
+                candidate = new_block(
+                    expected,
+                    {
+                        **child.get("data", {}),
+                        "children": media_children,
+                    },
+                )
+        elif expected == "map":
+            if message.location:
+                replacement = map_data(
+                    message.location.latitude,
+                    message.location.longitude,
+                )
+                replacement["caption_html"] = child.get("data", {}).get("caption_html")
+                replacement["credit_html"] = child.get("data", {}).get("credit_html")
+                candidate = new_block(expected, replacement)
+        elif expected in QUOTE_TYPES:
+            if message.text:
+                replacement = quote_data(
+                    message,
+                    child.get("data", {}).get("credit_html"),
+                )
+                replacement["media_children"] = child.get("data", {}).get(
+                    "media_children", []
+                )
+                candidate = new_block(expected, replacement)
+            else:
+                if message.media_group_id:
+                    collected = await albums.collect(message)
+                    if collected is None:
+                        return True
+                    parsed = messages_to_blocks(collected)
+                else:
+                    parsed = message_to_blocks(message)
+                media_children = [
+                    item
+                    for item in parsed
+                    if item.get("type") in {
+                        "photo", "video", "animation", "audio", "voice", "document"
+                    }
+                ]
+                if media_children:
+                    replacement = {
+                        **child.get("data", {}),
+                        "media_children": media_children,
+                    }
+                    candidate = new_block(expected, replacement)
+        elif expected == "anchor":
+            replacement = copy.deepcopy(child.get("data", {}))
+            if message.text and set_anchor_display_name(
+                {"type": "anchor", "data": replacement},
+                message.text,
+            ):
+                candidate = new_block(expected, replacement)
+        elif expected in {
+            "paragraph", "heading", "preformatted", "footer",
+            "mathematical_expression", "list", "table",
+        }:
+            if message.text:
+                replacement = text_data(
+                    message,
+                    expected,
+                    child.get("data", {}).get("size", 2),
+                    str(child.get("data", {}).get("kind", "bullet")),
+                )
+                if expected == "list" and not replacement.get("items"):
+                    await message.answer(t("list.empty"))
+                    return True
+                candidate = new_block(expected, replacement)
         else:
             replacement = replacement_data(message, expected)
-            if replacement is None:
-                await message.answer(t("details.inner_wrong_content"))
-                return True
-            if expected in MEDIA_CAPTION_TYPES:
-                replacement["caption_html"] = (
-                    child.get("data", {}).get("caption_html")
-                )
-                replacement["credit_html"] = (
-                    child.get("data", {}).get("credit_html")
-                )
-            candidate = new_block(expected, replacement)
+            if replacement is not None:
+                if expected in MEDIA_CAPTION_TYPES:
+                    replacement["caption_html"] = child.get("data", {}).get("caption_html")
+                    replacement["credit_html"] = child.get("data", {}).get("credit_html")
+                candidate = new_block(expected, replacement)
+
+        if candidate is None:
+            await message.answer(t("details.inner_wrong_content"))
+            return True
 
         selected = (
             replace_details_child(

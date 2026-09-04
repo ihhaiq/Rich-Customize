@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
@@ -9,7 +10,12 @@ from app.editor.session import load_editor_session, user_locks
 from app.editor.view_state import normalize_block_scroll_offset
 from app.i18n import t
 from app.keyboards import build_editor_tools_keyboard, build_rich_editor_keyboard
-from app.routers.editor_ui import delete_stored_block_prompt, edit_ui, editor_dashboard_text
+from app.routers.editor_ui import (
+    delete_stored_block_prompt,
+    edit_saved_ui,
+    edit_ui,
+    editor_dashboard_text,
+)
 from app.services.chat_registry import managed_chat_registry
 from app.states import RichEditorStates
 
@@ -19,7 +25,7 @@ router = Router(name="editor_navigation")
 
 @router.callback_query(F.data == "r:no")
 async def no_op(callback: CallbackQuery) -> None:
-    await callback.answer("هذا هو الموقع الحالي")
+    await callback.answer(t("editor.current_position"))
 
 
 @router.callback_query(F.data == "r:back")
@@ -28,8 +34,17 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
     if not session or not isinstance(callback.message, Message):
         return
     data, blocks = session
+    management_message_id = data.get("management_message_id")
+    management_chat_id = data.get("management_chat_id")
+    is_management_callback = bool(
+        management_message_id == callback.message.message_id
+        and management_chat_id == callback.message.chat.id
+    )
     await delete_stored_block_prompt(
-        bot, state, data, protected_message=callback.message,
+        bot,
+        state,
+        data,
+        protected_message=callback.message if is_management_callback else None,
     )
     draft = await draft_store.load(state)
     block_scroll_offset = normalize_block_scroll_offset(
@@ -37,8 +52,14 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext, bot: Bot) -> 
         data.get("block_scroll_offset"),
     )
     await state.update_data(block_scroll_offset=block_scroll_offset)
-    await edit_ui(
-        callback.message,
+    if not is_management_callback:
+        try:
+            await callback.message.delete()
+        except TelegramBadRequest:
+            pass
+    await edit_saved_ui(
+        bot,
+        state,
         editor_dashboard_text(draft),
         build_rich_editor_keyboard(
             blocks,
