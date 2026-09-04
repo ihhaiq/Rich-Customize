@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.editor.draft_store import draft_store
-from app.i18n import t
+from app.i18n import t, tr
 from app.keyboards import (
     build_button_style_keyboard,
     build_button_type_keyboard,
@@ -40,10 +40,10 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
     action = data.get("pending_button_action")
     value = (message.text or "").strip()
     if not value:
-        await message.answer("أرسل قيمة نصية صحيحة.")
+        await message.answer(tr("أرسل قيمة نصية صحيحة."))
         return
     if action in {"add_title", "title"} and len(value) > 64:
-        await message.answer("عنوان الزر طويل جدًا؛ الحد الأقصى 64 حرفًا.")
+        await message.answer(tr("عنوان الزر طويل جدًا؛ الحد الأقصى 64 حرفًا."))
         return
     if action == "add_title":
         await state.update_data(
@@ -68,16 +68,16 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
         button_type = str(data.get("pending_button_type") or action.removeprefix("add_"))
         normalized_value, error = normalize_button_value(button_type, value)
         if error or normalized_value is None:
-            await message.answer(error or "قيمة الزر غير صالحة.")
+            await message.answer(error or tr("قيمة الزر غير صالحة."))
             return
         button = add_message_button(
             buttons,
-            str(data.get("pending_button_text", "زر")),
+            str(data.get("pending_button_text", "Button")),
             normalized_value,
             button_type,
         )
         if button is None:
-            await message.answer("تعذر إضافة الزر؛ وصلت إلى الحد الأقصى.")
+            await message.answer(tr("تعذر إضافة الزر؛ وصلت إلى الحد الأقصى."))
             await state.set_state(RichEditorStates.managing)
             return
         notice = t("ux.buttons.added")
@@ -85,41 +85,41 @@ async def receive_button_value(message: Message, state: FSMContext, bot: Bot) ->
     else:
         button = get_message_button(buttons, str(data.get("current_button_id", "")))
         if button is None:
-            await message.answer("هذا الزر لم يعد موجودًا.")
+            await message.answer(t("ux.buttons.missing"))
             await state.set_state(RichEditorStates.managing)
             return
         if action == "change_type_value":
             button_type = str(data.get("pending_button_type") or "")
             normalized_value, error = normalize_button_value(button_type, value)
             if error or normalized_value is None:
-                await message.answer(error or "قيمة الزر غير صالحة.")
+                await message.answer(error or tr("قيمة الزر غير صالحة."))
                 return
             change_message_button_type(button, button_type, normalized_value)
-            notice = "✅ تم تغيير نوع الزر."
+            notice = tr("✅ تم تغيير نوع الزر.")
         elif action == "title":
             button["text"] = value
-            notice = "✅ تم تغيير عنوان الزر."
+            notice = tr("✅ تم تغيير عنوان الزر.")
         elif action == "value":
             old_type = get_button_type(button)
             button_type, inferred_value = infer_button_type_and_value(value, old_type)
             normalized_value, error = normalize_button_value(button_type, inferred_value)
             if error or normalized_value is None:
-                await message.answer(error or "قيمة الزر غير صالحة.")
+                await message.answer(error or tr("قيمة الزر غير صالحة."))
                 return
             if button_type == "page":
                 page = await page_registry.get(normalized_value)
                 user_id = message.from_user.id if message.from_user else 0
                 if page is None or int(page.get("owner_id", 0)) != int(user_id):
-                    await message.answer("كود الصفحة غير موجود أو لا يخصك.")
+                    await message.answer(tr("كود الصفحة غير موجود أو لا يخصك."))
                     return
             change_message_button_type(button, button_type, normalized_value)
             notice = (
-                "✅ تم تغيير محتوى الزر ونوعه تلقائيًا."
+                tr("✅ تم تغيير محتوى الزر ونوعه تلقائيًا.")
                 if button_type != old_type
-                else "✅ تم تغيير محتوى الزر."
+                else tr("✅ تم تغيير محتوى الزر.")
             )
         else:
-            await message.answer("انتهت عملية تعديل الزر. ارجع إلى لوحة الإدارة وحاول مجددًا.")
+            await message.answer(tr("انتهت عملية تعديل الزر. ارجع إلى لوحة الإدارة وحاول مجددًا."))
             await state.set_state(RichEditorStates.managing)
             return
 
