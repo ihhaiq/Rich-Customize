@@ -306,20 +306,20 @@
     card.className = "rich-button-dialog glass-panel";
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-modal", "true");
-    card.setAttribute("aria-label", tr("button.add", "إضافة زر"));
+    card.setAttribute("aria-label", tr("button.add", "Add button"));
 
     const preset = BUTTON_TYPES.some(item => item.value === options.presetType) ? options.presetType : "url";
     let chosenType = preset;
     let chosenColor = null;
 
     card.innerHTML = `
-      <h3>${escapeHtml(tr("button.add", "إضافة زر"))}</h3>
-      <label class="button-dialog-field"><span>${escapeHtml(tr("button.title", "نص الزر"))}</span><input class="button-title-input" maxlength="64" value="${escapeHtml(options.title || "")}" placeholder="${escapeHtml(tr("button.title_placeholder", "اكتب عنوان الزر"))}"></label>
-      <label class="button-separate-option"><input type="checkbox" class="button-separate-input"><span class="button-check"></span><span>${escapeHtml(tr("button.separate", "زر في سطر منفصل"))}</span></label>
-      <div class="button-style-row" aria-label="${escapeHtml(tr("button.style", "نمط الزر"))}"></div>
+      <h3>${escapeHtml(tr("button.add", "Add button"))}</h3>
+      <label class="button-dialog-field"><span>${escapeHtml(tr("button.title", "Button text"))}</span><input class="button-title-input" maxlength="64" value="${escapeHtml(options.title || "")}" placeholder="${escapeHtml(tr("button.title_placeholder", "Enter button title"))}"></label>
+      <label class="button-separate-option"><input type="checkbox" class="button-separate-input"><span class="button-check"></span><span>${escapeHtml(tr("button.separate", "Button on a separate line"))}</span></label>
+      <div class="button-style-row" aria-label="${escapeHtml(tr("button.style", "Button style"))}"></div>
       <div class="button-type-list" role="radiogroup"></div>
-      <label class="button-dialog-field button-value-field"><span class="button-value-label">${escapeHtml(tr("button.url", "الرابط"))}</span><input class="button-value-input" dir="ltr" placeholder="https://example.com"></label>
-      <div class="button-dialog-actions"><button type="button" data-button-dialog="cancel">${escapeHtml(tr("common.cancel", "إلغاء"))}</button><button type="button" class="save" data-button-dialog="save">${escapeHtml(tr("common.save", "حفظ"))}</button></div>`;
+      <label class="button-dialog-field button-value-field"><span class="button-value-label">${escapeHtml(tr("button.url", "Link"))}</span><input class="button-value-input" dir="ltr" placeholder="https://example.com"></label>
+      <div class="button-dialog-actions"><button type="button" data-button-dialog="cancel">${escapeHtml(tr("common.cancel", "Cancel"))}</button><button type="button" class="save" data-button-dialog="save">${escapeHtml(tr("common.save", "Save"))}</button></div>`;
 
     const styleRow = card.querySelector(".button-style-row");
     BUTTON_STYLES.forEach((style, index) => {
@@ -364,9 +364,9 @@
       const title = String(card.querySelector(".button-title-input")?.value || "").trim();
       let value = String(valueInput.value || "").trim();
       const separateLine = Boolean(card.querySelector(".button-separate-input")?.checked);
-      if (!title) { toast(tr("button.title_required", "اكتب نص الزر")); return; }
-      if (chosenType === "url" && value && !/^(https?:\/\/|tg:\/\/)/i.test(value)) { toast(tr("inline.invalid_link", "الرابط لازم يبدأ بـ https:// أو tg://")); return; }
-      if (["copy","popup"].includes(chosenType) && !value) { toast(tr("button.value_required", "اكتب قيمة الزر")); return; }
+      if (!title) { toast(tr("button.title_required", "Enter the button text")); return; }
+      if (chosenType === "url" && value && !/^(https?:\/\/|tg:\/\/)/i.test(value)) { toast(tr("inline.invalid_link", "The link must start with https:// or tg://")); return; }
+      if (["copy","popup"].includes(chosenType) && !value) { toast(tr("button.value_required", "Enter a button value")); return; }
       let type = chosenType;
       if (type === "user" && /^@[A-Za-z0-9_]{4,}$/.test(value)) {
         type = "url";
@@ -377,7 +377,7 @@
         color:chosenColor,
         separateLine,
       });
-      if (created === null || created === false) { toast(tr("button.create_failed", "تعذر إنشاء الزر")); return; }
+      if (created === null || created === false) { toast(tr("button.create_failed", "Could not create the button")); return; }
       closeButtonDialog();
       haptic("medium");
     });
