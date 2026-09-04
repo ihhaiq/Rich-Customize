@@ -18,10 +18,12 @@ def build_post_chats_keyboard(
     rows: list[list[InlineKeyboardButton]] = []
     for chat in chats:
         chat_id = int(chat["chat_id"])
+        is_selected = chat_id in selected
         icon = "📢" if chat.get("type") == "channel" else "👥"
         rows.append([InlineKeyboardButton(
-            text=f"{'✅' if chat_id in selected else '⬜'} {icon} {chat.get('title') or chat_id}",
+            text=f"{'✅' if is_selected else '⬜'} {icon} {chat.get('title') or chat_id}",
             callback_data=f"r:postchat:{chat_id}",
+            style=ButtonStyle.SUCCESS if is_selected else ButtonStyle.PRIMARY,
         )])
     if chats:
         rows.append([InlineKeyboardButton(
