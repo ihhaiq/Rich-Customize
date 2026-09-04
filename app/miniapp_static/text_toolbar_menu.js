@@ -109,7 +109,7 @@
   function insertRichButton(type) {
     closeTextMenus();
     if (!window.RichButtonEditor?.create) {
-      toast(tr("button.editor_not_ready", "محرر الأزرار الغنية غير جاهز"));
+      toast(tr("button.editor_not_ready", "The rich-button editor is not ready"));
       return;
     }
     window.RichButtonEditor.create(type);
@@ -168,7 +168,7 @@
     row.classList.add("active", "submenu-open");
     headingMenu = document.createElement("aside");
     headingMenu.className = "popup-menu text-heading-submenu";
-    headingMenu.setAttribute("aria-label", tr("heading.level_picker", "مستوى العنوان"));
+    headingMenu.setAttribute("aria-label", tr("heading.level_picker", "Heading level"));
     for (let level = 1; level <= 6; level++) {
       headingMenu.appendChild(makeRow({icon:"heading", label:tr("heading.level", `Heading ${level}`, {level}), level}, () => insertHeading(level)));
     }
@@ -183,7 +183,7 @@
     row.classList.add("active", "submenu-open");
     buttonMenu = document.createElement("aside");
     buttonMenu.className = "popup-menu text-button-submenu";
-    buttonMenu.setAttribute("aria-label", tr("button.type", "نوع الزر الغني"));
+    buttonMenu.setAttribute("aria-label", tr("button.type", "Rich button type"));
     const types = window.RichButtonEditor?.types || {};
     [
       "user", "url", "callback_data", "page_callback", "copy", "popup",
@@ -203,7 +203,7 @@
     textButton.classList.add("active");
     rootMenu = document.createElement("aside");
     rootMenu.className = "popup-menu text-toolbar-menu";
-    rootMenu.setAttribute("aria-label", tr("editor.text_tools", "أدوات النص"));
+    rootMenu.setAttribute("aria-label", tr("editor.text_tools", "Text tools"));
     ROOT_ITEMS.forEach(item => {
       const row = makeRow(item, button => {
         if (item.kind === "heading") openHeadingMenu(button);
