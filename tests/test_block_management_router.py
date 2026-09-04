@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, patch
+
+from aiogram.types import Chat, Message, User
 
 from app.editor.models import make_block
 from app.editor.workflow import editor_workflow
@@ -102,6 +106,49 @@ class BlockManagementDomainTests(unittest.TestCase):
             if button.callback_data
         }
         self.assertIn(f"r:dup:{block['id']}", callbacks)
+
+
+class NativeTableInputTests(unittest.IsolatedAsyncioTestCase):
+    async def test_add_table_accepts_a_ready_native_table(self):
+        message = Message.model_validate({
+            "message_id": 1,
+            "date": datetime.now(timezone.utc),
+            "chat": Chat(id=1, type="private"),
+            "from_user": User(id=1, is_bot=False, first_name="Test"),
+            "rich_message": {
+                "blocks": [{
+                    "type": "table",
+                    "cells": [[
+                        {"text": "Name", "align": "left", "valign": "middle"},
+                        {"text": "Age", "align": "center", "valign": "middle"},
+                    ]],
+                    "is_bordered": True,
+                    "is_striped": True,
+                }],
+            },
+        })
+        state = AsyncMock()
+        state.get_data.return_value = {
+            "pending_add_type": "table",
+            "add_step": "content",
+            "add_payload": {},
+        }
+        bot = AsyncMock()
+
+        with (
+            patch(
+                "app.routers.block_add.defer_text_for_user_buttons",
+                new=AsyncMock(return_value=False),
+            ),
+            patch("app.routers.block_add.finish_add", new=AsyncMock()) as finish_add,
+        ):
+            await receive_added_block(message, state, bot)
+
+        added = finish_add.await_args.args[3]
+        self.assertEqual(added["type"], "table")
+        self.assertEqual(added["source"], "native")
+        self.assertEqual(added["data"]["native_data"]["cells"][0][1]["text"], "Age")
+        self.assertTrue(added["data"]["native_data"]["is_striped"])
 
 
 class BlockManagementRouterTests(unittest.TestCase):

@@ -17,7 +17,7 @@ from app.keyboards import (
 )
 from app.editor.builders import container_data, map_data, new_block, text_data
 from app.editor.specs import FINAL_RICH_BLOCK_TYPES, QUOTE_TYPES
-from app.services.parser import message_to_blocks, messages_to_blocks
+from app.services.parser import message_to_blocks, messages_to_blocks, replacement_block
 from app.services.anchors import anchor_name, anchor_targets, new_anchor_data
 from app.states import RichEditorStates
 
@@ -138,7 +138,7 @@ async def choose_add_block(
         "mathematical_expression": math_input_prompt(),
         "anchor": t("details.send_anchor"),
         "list": "أرسل عناصر القائمة؛ كل عنصر في سطر منفصل",
-        "table": "أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
+        "table": "أرسل جدولًا جاهزًا، أو أرسل صفوف الجدول؛ كل صف بسطر وافصل الأعمدة بعلامة |",
         "blockquote": "أرسل نص الاقتباس، أو أرسل وسائط/ملفًا لوضعه داخل الاقتباس",
         "pullquote": "أرسل نص الاقتباس البارز، أو أرسل وسائط/ملفًا لإرفاقه به",
         "collage": "أرسل صور/فيديو أو Album للكولاج",
@@ -347,6 +347,14 @@ async def receive_added_block(
             bot,
             new_block(block_type, {**payload, "credit_html": credit}),
         )
+        return
+
+    if block_type == "table" and message.rich_message:
+        table_block = replacement_block(message, "table")
+        if table_block is None:
+            await message.answer("الرسالة الغنية لا تحتوي على جدول. أرسل جدولًا جاهزًا أو صفوفًا نصية.")
+            return
+        await finish_add(message, state, bot, table_block)
         return
 
     if block_type in {"collage", "slideshow"}:
