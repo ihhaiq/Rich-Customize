@@ -88,7 +88,10 @@ def _details_native_fallbacks(code: str) -> dict[str, str]:
     silently dropping back to English, while dedicated wording can still
     override any key through DETAILS_KEY_TRANSLATIONS.
     """
-    common = lambda key: _localized_common(code, key)
+
+    def common(key: str) -> str:
+        return _localized_common(code, key)
+
     details = common("details")
     choose = common("common.choose_action")
     invalid = common("invalid")
