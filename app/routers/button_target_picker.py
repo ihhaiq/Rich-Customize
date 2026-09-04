@@ -15,7 +15,7 @@ from aiogram.types import (
     ReplyKeyboardRemove,
 )
 
-from app.i18n import tr
+from app.i18n import t
 from app.services.inline_buttons import find_user_button_markers, resolve_user_button_marker
 from app.states import RichEditorStates
 
@@ -39,11 +39,11 @@ async def ask_for_button_user(
         pending_user_request_id=request_id,
         pending_chat_request_id=chat_request_id,
     )
-    title = str(marker.get("title") or tr("مستخدم"))
+    title = str(marker.get("title") or "Button")
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(
-                text=f"{tr('👤 اختيار مستخدم لزر «')}{title}»",
+                text=f"👤 {t('ux.buttons.type.url')} · {title}",
                 request_users=KeyboardButtonRequestUsers(
                     request_id=request_id,
                     max_quantity=1,
@@ -53,7 +53,7 @@ async def ask_for_button_user(
                 ),
             )],
             [KeyboardButton(
-                text=f"{tr('📢 اختيار قناة لزر «')}{title}»",
+                text=f"📢 {t('select_chat')} · {title}",
                 request_chat=KeyboardButtonRequestChat(
                     request_id=chat_request_id,
                     chat_is_channel=True,
@@ -69,7 +69,7 @@ async def ask_for_button_user(
         selective=True,
     )
     await message.answer(
-        f"{tr('اختر المستخدم أو القناة التي سيفتحها زر «')}{title}»:",
+        f"{t('common.choose_action')}\n{title}",
         reply_markup=keyboard,
     )
 
@@ -119,11 +119,11 @@ async def complete_button_target(
         or (resume != "open_editor" and not isinstance(pending_message, dict))
     ):
         await state.clear()
-        await message.answer(tr("انتهت بيانات ربط الزر. أعد إضافة الزر من المحرر."))
+        await message.answer(t("expired"))
         return
     if not 0 <= index < len(markers) or not isinstance(markers[index], dict):
         await state.clear()
-        await message.answer(tr("تعذر متابعة ربط الزر بسبب بيانات غير صالحة."))
+        await message.answer(t("invalid"))
         return
     marker = markers[index]
     if resume == "open_editor":
@@ -141,7 +141,7 @@ async def complete_button_target(
         next_marker = markers[next_index]
         if not isinstance(next_marker, dict):
             await state.clear()
-            await message.answer(tr("تعذر متابعة ربط الزر بسبب بيانات غير صالحة."))
+            await message.answer(t("invalid"))
             return
         updates: dict[str, Any] = {
             "pending_user_marker_index": next_index,
@@ -153,7 +153,7 @@ async def complete_button_target(
         await ask_for_button_user(message, state, next_marker)
         return
 
-    await message.answer(tr("✅ تم ربط الوجهة بالزر."), reply_markup=ReplyKeyboardRemove())
+    await message.answer(t("ux.buttons.added"), reply_markup=ReplyKeyboardRemove())
     if resume == "open_editor":
         assert isinstance(blocks, list)
         await state.clear()
@@ -215,7 +215,7 @@ async def receive_button_user(message: Message, state: FSMContext) -> None:
         or (resume == "open_editor" and not isinstance(data.get("pending_user_blocks"), list))
         or (resume != "open_editor" and not isinstance(data.get("pending_user_message"), dict))
     ):
-        await message.answer(tr("اختيار المستخدم لا يخص الزر الحالي. استخدم زر الاختيار الظاهر."))
+        await message.answer(t("invalid"))
         return
 
     marker = markers[index]
@@ -226,12 +226,7 @@ async def receive_button_user(message: Message, state: FSMContext) -> None:
         try:
             known_user = await message.bot.get_chat(user_id)
         except (TelegramBadRequest, TelegramForbiddenError):
-            await message.answer(
-                tr(
-                    "تعذر إنشاء زر لهذا الحساب: الحساب بلا username وغير معروف للبوت. "
-                    "خليه يرسل /start للبوت أولًا، أو اختر حسابًا عنده username."
-                ),
-            )
+            await message.answer(t("ux.buttons.missing"))
             await ask_for_button_user(message, state, marker)
             return
         username = getattr(known_user, "username", None)
@@ -254,7 +249,7 @@ async def receive_button_channel(message: Message, state: FSMContext) -> None:
         or (resume == "open_editor" and not isinstance(data.get("pending_user_blocks"), list))
         or (resume != "open_editor" and not isinstance(data.get("pending_user_message"), dict))
     ):
-        await message.answer(tr("اختيار القناة لا يخص الزر الحالي. استخدم زر الاختيار الظاهر."))
+        await message.answer(t("invalid"))
         return
     await complete_button_target(message, state, data, shared.chat_id, shared.username)
 
@@ -270,7 +265,7 @@ async def wait_for_button_user(message: Message, state: FSMContext) -> None:
         await state.set_state(RichEditorStates.waiting_input)
         await answer_with_button_guide(
             message,
-            tr("انتهى طلب اختيار المستخدم. أرسل الرسالة مرة أخرى."),
+            t("expired"),
             reply_markup=ReplyKeyboardRemove(),
         )
 
