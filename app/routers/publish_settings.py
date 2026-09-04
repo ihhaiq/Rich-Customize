@@ -5,11 +5,15 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.i18n import t
-from app.keyboards import build_post_confirmation_keyboard, build_post_settings_keyboard
+from app.keyboards import build_post_back_keyboard
 from app.services.chat_registry import managed_chat_registry
+from app.services.publish_ui import (
+    build_post_confirmation_rich_message,
+    build_post_settings_rich_message,
+    edit_publish_ui,
+)
 
 from app.editor.session import load_editor_session
-from app.routers.editor_ui import edit_ui
 from app.routers.publish_support import eligible_post_chats
 
 
@@ -39,14 +43,15 @@ async def open_post_settings(callback: CallbackQuery, state: FSMContext, bot: Bo
         return
     await state.update_data(post_selected_chat_ids=selected)
     await managed_chat_registry.clear_panel(callback.from_user.id)
-    await edit_ui(
+    await edit_publish_ui(
         callback.message,
-        settings_text(len(selected)),
-        build_post_settings_keyboard(
+        build_post_settings_rich_message(
+            settings_text(len(selected)),
             silent=bool(data.get("post_silent", False)),
             protected=bool(data.get("post_protected", False)),
             selected_count=len(selected),
         ),
+        build_post_back_keyboard("r:postlist"),
     )
     await callback.answer()
 
@@ -72,14 +77,15 @@ async def toggle_post_option(callback: CallbackQuery, state: FSMContext) -> None
         await callback.answer("اختيار غير صالح.", show_alert=True)
         return
     await state.update_data(post_silent=silent, post_protected=protected)
-    await edit_ui(
+    await edit_publish_ui(
         callback.message,
-        settings_text(len(selected)),
-        build_post_settings_keyboard(
+        build_post_settings_rich_message(
+            settings_text(len(selected)),
             silent=silent,
             protected=protected,
             selected_count=len(selected),
         ),
+        build_post_back_keyboard("r:postlist"),
     )
     await callback.answer()
 
@@ -94,10 +100,12 @@ async def confirm_post(callback: CallbackQuery, state: FSMContext) -> None:
     if not selected:
         await callback.answer(t("select_chat"), show_alert=True)
         return
-    await edit_ui(
+    await edit_publish_ui(
         callback.message,
-        t("ux.publish.confirm", count=len(selected)),
-        build_post_confirmation_keyboard(len(selected)),
+        build_post_confirmation_rich_message(
+            t("ux.publish.confirm", count=len(selected)),
+        ),
+        build_post_back_keyboard("r:postsettings"),
     )
     await callback.answer()
 
