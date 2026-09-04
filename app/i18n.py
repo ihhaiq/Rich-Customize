@@ -16,6 +16,7 @@ from app.i18n_runtime import (
     resolve_language,
     t,
     tr,
+    use_language,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "resolve_language",
     "t",
     "tr",
+    "use_language",
 ]
