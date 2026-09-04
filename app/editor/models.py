@@ -85,19 +85,18 @@ def normalize_block(
         data["native"] = True
 
     children = data.get("children")
-    if block["type"] == "details":
-        if not isinstance(children, list):
-            children = []
-            data["children"] = children
-        if not children:
-            children.append(_empty_details_child())
-            if source == SOURCE_NATIVE:
-                block["source"] = SOURCE_GENERATED
-                data.pop("native", None)
-                data.pop("native_data", None)
-                data.pop("native_type", None)
+    if block["type"] == "details" and not isinstance(children, list):
+        children = []
+        data["children"] = children
     if isinstance(children, list):
         normalize_blocks(children)
+    if block["type"] == "details" and isinstance(children, list) and not children:
+        children.append(_empty_details_child())
+        if source == SOURCE_NATIVE:
+            block["source"] = SOURCE_GENERATED
+            data.pop("native", None)
+            data.pop("native_data", None)
+            data.pop("native_type", None)
 
     items = data.get("items")
     if isinstance(items, list):
