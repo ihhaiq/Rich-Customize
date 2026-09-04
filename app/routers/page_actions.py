@@ -38,7 +38,7 @@ async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
         return
     _, blocks = session
     if not blocks:
-        await callback.answer("لا توجد أجزاء لحفظها.", show_alert=True)
+        await callback.answer(tr("لا توجد أجزاء لحفظها."), show_alert=True)
         return
     draft = await draft_store.load(state)
     existing_id = draft.current_page_id
@@ -47,7 +47,7 @@ async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
         await send_add_prompt(
             callback.message,
             state,
-            "أرسل اسم الصفحة لحفظها؛ الحد الأقصى 64 حرفًا.",
+            tr("أرسل اسم الصفحة لحفظها؛ الحد الأقصى 64 حرفًا."),
         )
         await callback.answer()
         return
@@ -61,9 +61,9 @@ async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
         await send_add_prompt(
             callback.message,
             state,
-            "الصفحة الأصلية لم تعد موجودة. أرسل اسمًا لحفظها كصفحة جديدة.",
+            tr("الصفحة الأصلية لم تعد موجودة. أرسل اسمًا لحفظها كصفحة جديدة."),
         )
-        await callback.answer("الصفحة الأصلية لم تعد موجودة.", show_alert=True)
+        await callback.answer(tr("الصفحة الأصلية لم تعد موجودة."), show_alert=True)
         return
 
     title = str(draft.current_page_title or existing.get("title") or existing_id)[:64]
@@ -83,26 +83,29 @@ async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(block_scroll_enabled=True)
     await edit_ui(
         callback.message,
-        editor_dashboard_text(draft, f"✅ تم تحديث الصفحة المحفوظة «{title}»."),
+        editor_dashboard_text(
+            draft,
+            f"{tr('✅ تم تحديث الصفحة المحفوظة «')}{title}».",
+        ),
         build_rich_editor_keyboard(draft.blocks, draft.message_buttons),
     )
-    await callback.answer("✅ تم حفظ التعديلات بنفس الكود")
+    await callback.answer(tr("✅ تم حفظ التعديلات بنفس الكود"))
 
 
 @router.message(RichEditorStates.saving_page_name)
 async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> None:
     title = (message.text or "").strip()
     if not title:
-        await message.answer("اسم الصفحة يجب أن يكون نصًا.")
+        await message.answer(tr("اسم الصفحة يجب أن يكون نصًا."))
         return
     if len(title) > 64:
-        await message.answer("اسم الصفحة طويل جدًا؛ الحد الأقصى 64 حرفًا.")
+        await message.answer(tr("اسم الصفحة طويل جدًا؛ الحد الأقصى 64 حرفًا."))
         return
     data = await state.get_data()
     before = await draft_store.load(state)
     if not before.blocks:
         await state.clear()
-        await message.answer("انتهت جلسة المحرّر. أرسل /editor وابدأ من جديد.")
+        await message.answer(t("expired"))
         return
     existing_id = before.current_page_id
     code = await page_registry.save(
@@ -122,18 +125,22 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
     await state.set_state(RichEditorStates.managing)
     await state.update_data(block_scroll_enabled=True)
     prefix = (
-        "✅ تم تحديث الصفحة المحفوظة.\n\nالكود: "
+        tr("✅ تم تحديث الصفحة المحفوظة.\n\nالكود: ")
         if existing_id == code
-        else "✅ تم حفظ الصفحة.\n\nالكود: "
+        else tr("✅ تم حفظ الصفحة.\n\nالكود: ")
     )
     await message.answer(
-        f"{prefix}{code}\n\nتقدر تستعمله داخل النص هكذا:\n"
-        f"{{التالي:cbd {code}#b}}\n\nأو اختَر «CBD — فتح صفحة» من قائمة الأزرار."
+        f"{prefix}{code}\n\n{tr('تقدر تستعمله داخل النص هكذا:')}\n"
+        f"{{{tr('التالي:cbd ')}{code}#b}}\n\n"
+        f"{tr('أو اختَر «CBD — فتح صفحة» من قائمة الأزرار.')}"
     )
     await edit_saved_ui(
         bot,
         state,
-        editor_dashboard_text(after, f"✅ تم حفظ الصفحة «{title}»."),
+        editor_dashboard_text(
+            after,
+            f"{tr('✅ تم حفظ الصفحة «')}{title}».",
+        ),
         build_rich_editor_keyboard(after.blocks, after.message_buttons),
     )
 
@@ -146,11 +153,11 @@ async def request_page_rename(callback: CallbackQuery, state: FSMContext) -> Non
         _, _, page_id, raw_index = callback.data.split(":", 3)
         page_index = max(0, int(raw_index))
     except (ValueError, TypeError):
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     page = await page_registry.get(page_id)
     if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
-        await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
+        await callback.answer(tr("الصفحة محذوفة أو لا تخصك."), show_alert=True)
         return
     await state.set_state(RichEditorStates.renaming_page)
     await state.update_data(rename_page_id=page_id, pages_page_index=page_index)
@@ -166,16 +173,16 @@ async def request_page_rename(callback: CallbackQuery, state: FSMContext) -> Non
 async def receive_page_rename(message: Message, state: FSMContext, bot: Bot) -> None:
     title = (message.text or "").strip()
     if not title:
-        await message.answer("اسم الصفحة يجب أن يكون نصًا.")
+        await message.answer(tr("اسم الصفحة يجب أن يكون نصًا."))
         return
     if len(title) > 64:
-        await message.answer("اسم الصفحة طويل جدًا؛ الحد الأقصى 64 حرفًا.")
+        await message.answer(tr("اسم الصفحة طويل جدًا؛ الحد الأقصى 64 حرفًا."))
         return
     data = await state.get_data()
     page_id = str(data.get("rename_page_id") or "")
     if not await page_registry.rename(page_id, message.from_user.id, title):
         await state.set_state(RichEditorStates.managing)
-        await message.answer("الصفحة محذوفة أو لا تخصك.")
+        await message.answer(tr("الصفحة محذوفة أو لا تخصك."))
         return
     await delete_add_step_messages(bot, message, data, state)
     before = await draft_store.load(state)
@@ -202,11 +209,11 @@ async def confirm_page_delete(callback: CallbackQuery, state: FSMContext) -> Non
         _, _, page_id, raw_index = callback.data.split(":", 3)
         page_index = max(0, int(raw_index))
     except (ValueError, TypeError):
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     page = await page_registry.get(page_id)
     if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
-        await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
+        await callback.answer(tr("الصفحة محذوفة أو لا تخصك."), show_alert=True)
         return
     title = html.escape(str(page.get("title") or page_id))
     await edit_ui(
@@ -226,16 +233,16 @@ async def delete_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
         _, _, page_id, raw_index = callback.data.split(":", 3)
         requested_index = max(0, int(raw_index))
     except (ValueError, TypeError):
-        await callback.answer("اختيار غير صالح.", show_alert=True)
+        await callback.answer(t("invalid"), show_alert=True)
         return
     page = await page_registry.get(page_id)
     if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
-        await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
+        await callback.answer(tr("الصفحة محذوفة أو لا تخصك."), show_alert=True)
         return
     before = await draft_store.load(state)
     was_current = before.current_page_id == page_id
     if not await page_registry.delete(page_id, callback.from_user.id):
-        await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
+        await callback.answer(tr("الصفحة محذوفة أو لا تخصك."), show_alert=True)
         return
     await state.update_data(
         deleted_page_id=page_id,
@@ -304,7 +311,7 @@ async def open_saved_page(callback: CallbackQuery, state: FSMContext) -> None:
     page_id = callback.data.rsplit(":", 1)[-1]
     page = await page_registry.get(page_id)
     if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
-        await callback.answer("الصفحة محذوفة أو لا تخصك.", show_alert=True)
+        await callback.answer(tr("الصفحة محذوفة أو لا تخصك."), show_alert=True)
         return
     before = await draft_store.load(state)
     after = copy.deepcopy(before)
