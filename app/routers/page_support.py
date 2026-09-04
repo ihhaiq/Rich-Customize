@@ -22,7 +22,7 @@ def saved_pages_text(page_index: int = 0, total_pages: int = 1) -> str:
 
 
 def opened_page_text() -> str:
-    return tr(MAIN_TEXT)
+    return MAIN_TEXT
 
 
 async def render_pages_screen(
