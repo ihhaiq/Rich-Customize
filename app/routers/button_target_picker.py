@@ -165,19 +165,19 @@ async def complete_button_target(
     }
     clean_data["resuming_user_buttons"] = True
     await state.set_data(clean_data)
-    if resume in {"adding_block", "adding_details"}:
+    if resume == "adding_block":
         await state.set_state(RichEditorStates.adding_block)
     else:
         await state.set_state(RichEditorStates.editing_block)
 
     original = Message.model_validate(pending_message, context={"bot": message.bot})
-    if resume == "adding_block":
-        from app.routers.block_add import receive_added_block
-        await receive_added_block(original, state, message.bot)
-    elif resume == "adding_details":
+    if resume == "adding_block" and clean_data.get("pending_add_type") == "details":
         from app.routers.details_builder import receive_details_add
         await receive_details_add(original, state, message.bot)
-    elif resume == "editing_details":
+    elif resume == "adding_block":
+        from app.routers.block_add import receive_added_block
+        await receive_added_block(original, state, message.bot)
+    elif clean_data.get("nested_details_id") or clean_data.get("expected_type") == "details":
         from app.routers.details_edit import receive_details_edit
         await receive_details_edit(original, state, message.bot)
     else:
