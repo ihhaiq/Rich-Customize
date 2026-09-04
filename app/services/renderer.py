@@ -347,7 +347,7 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
                 payload_items.append({
                     "blocks": [{
                         "type": "paragraph",
-                        "text": inline_button_rich_text(str(item.get("text", ""))),
+                        "text": _data_rich_text(item, "rich_text", "html", "text") or "",
                     }],
                     "has_checkbox": True if item.get("has_checkbox") else None,
                     "is_checked": True if item.get("is_checked") else None,
@@ -372,7 +372,7 @@ def _editor_input_block(block: dict[str, Any], path: str) -> dict[str, Any]:
             for cell in row:
                 source = cell if isinstance(cell, dict) else {"text": str(cell)}
                 payload_row.append({
-                    "text": inline_button_rich_text(source.get("text", "")),
+                    "text": _data_rich_text(source, "rich_text", "html", "text"),
                     "align": source.get("align") or "left",
                     "valign": source.get("valign") or "middle", "is_header": source.get("is_header"),
                     "colspan": source.get("colspan"), "rowspan": source.get("rowspan"),
