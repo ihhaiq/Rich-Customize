@@ -12,16 +12,23 @@ from app.editor.view_state import (
 )
 from app.i18n import t, tr
 from app.services.blocks import get_block_button_text
+from app.services.welcome import ADD_GROUP_URL
 
 
 def build_welcome_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text=t("editor.showcase_button"), callback_data="r:showcase"),
-        InlineKeyboardButton(
-            text=t("editor.new_button"), callback_data="r:starteditor",
-            style=ButtonStyle.PRIMARY,
-        ),
-    ]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=t("welcome.add_group_button"),
+            url=ADD_GROUP_URL,
+        )],
+        [
+            InlineKeyboardButton(text=t("editor.showcase_button"), callback_data="r:showcase"),
+            InlineKeyboardButton(
+                text=t("editor.new_button"), callback_data="r:starteditor",
+                style=ButtonStyle.PRIMARY,
+            ),
+        ],
+    ])
 
 
 def build_start_editor_keyboard() -> InlineKeyboardMarkup:
