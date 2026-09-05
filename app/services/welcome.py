@@ -21,38 +21,34 @@ def _url_button(text: str, url: str) -> dict[str, object]:
     }
 
 
-def _callback_button(text: str, callback_data: str) -> dict[str, object]:
-    return {
-        "type": "button",
-        "button": {
-            "text": text,
-            "callback_data": callback_data,
-        },
-    }
-
-
 def build_welcome_rich_message(user: User) -> InputRichMessage:
     """Build the localized /start message with native RichText actions."""
     mention_text = user.full_name.strip() or str(user.id)
-    text: list[object] = [
+    greeting: list[object] = [
         f"{t('welcome.greeting')} ",
         {
             "type": "text_mention",
             "text": mention_text,
             "user": user,
         },
-        f"!\n{BOT_USERNAME}\n",
+        "!",
+    ]
+    intro: list[object] = [
+        f"{BOT_USERNAME}\n",
         t("welcome.description_before_view"),
         _url_button(t("welcome.view_button"), SHOWCASE_URL),
-        t("welcome.description_after_view"),
-        "\n\n",
+    ]
+    actions: list[object] = [
         {
             "type": "bold",
             "text": t("welcome.add_prompt"),
         },
         "\n",
         f"{t('welcome.start_prompt')} ",
-        _callback_button(t("editor.new_button"), "r:starteditor"),
+        {
+            "type": "bold",
+            "text": t("editor.new_button"),
+        },
         "\n\n",
         t("welcome.help_title"),
         "\n",
@@ -61,7 +57,25 @@ def build_welcome_rich_message(user: User) -> InputRichMessage:
         f" {t('welcome.and')} ",
         _url_button(t("welcome.support_button"), SUPPORT_URL),
     ]
-    return InputRichMessage(blocks=[{"type": "paragraph", "text": text}])
+    return InputRichMessage(blocks=[
+        {
+            "type": "heading",
+            "text": greeting,
+            "size": 3,
+        },
+        {
+            "type": "paragraph",
+            "text": intro,
+        },
+        {
+            "type": "footer",
+            "text": t("welcome.description_after_view").lstrip(),
+        },
+        {
+            "type": "paragraph",
+            "text": actions,
+        },
+    ])
 
 
 __all__ = [
