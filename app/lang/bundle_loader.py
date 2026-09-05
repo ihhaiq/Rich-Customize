@@ -15,6 +15,11 @@ from app.lang.catalogs.guide import GUIDE_TRANSLATIONS
 from app.lang.catalogs.pages import PAGE_AR_TO_EN, PAGE_TRANSLATIONS
 from app.lang.catalogs.recent_ui import RECENT_AR_TO_EN, RECENT_TRANSLATIONS
 from app.lang.catalogs.regional import PROFILES as REGIONAL_PROFILES, TRANSLATIONS as REGIONAL_TRANSLATIONS
+from app.lang.catalogs.welcome_semantic import (
+    WELCOME_AR_PHRASES,
+    WELCOME_KEY_TRANSLATIONS,
+    WELCOME_PHRASES,
+)
 from app.lang.catalogs.western import PROFILES as WESTERN_PROFILES, TRANSLATIONS as WESTERN_TRANSLATIONS
 
 
@@ -52,11 +57,13 @@ def _semantic_phrases(code: str) -> dict[str, str]:
         result = dict(EDITOR_PHRASES)
         result.update(DETAILS_PHRASES)
         result.update(COMMON_PHRASES)
+        result.update(WELCOME_PHRASES)
         return result
     if code == "ar":
         result = dict(EDITOR_AR_PHRASES)
         result.update(DETAILS_AR_PHRASES)
         result.update(COMMON_AR_PHRASES)
+        result.update(WELCOME_AR_PHRASES)
         return result
     return {}
 
@@ -156,6 +163,7 @@ def _details_native_fallbacks(code: str) -> dict[str, str]:
 def _keyed(code: str) -> dict[str, str]:
     result = dict(EDITOR_KEY_TRANSLATIONS.get(code, {}))
     result.update(COMMON_KEY_TRANSLATIONS.get(code, {}))
+    result.update(WELCOME_KEY_TRANSLATIONS.get(code, {}))
     details = _details_native_fallbacks(code)
     details.update(DETAILS_KEY_TRANSLATIONS.get(code, {}))
     result.update(details)
