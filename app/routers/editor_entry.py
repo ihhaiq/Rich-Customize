@@ -13,6 +13,7 @@ from app.routers.button_target_picker import ask_for_button_user
 from app.routers.editor_ui import open_editor
 from app.services.inline_buttons import find_user_button_markers
 from app.services.parser import message_to_blocks, messages_to_blocks
+from app.services.welcome import build_welcome_rich_message
 from app.states import RichEditorStates
 
 
@@ -21,8 +22,15 @@ router = Router(name="editor_entry")
 
 @router.message(CommandStart())
 async def start(message: Message) -> None:
-    await message.answer(
-        f"{t('welcome')}\n{t('start_editor')}",
+    if message.from_user is None:
+        await message.answer(
+            f"{t('welcome')}\n{t('start_editor')}",
+            reply_markup=build_welcome_keyboard(),
+        )
+        return
+    await message.bot.send_rich_message(
+        chat_id=message.chat.id,
+        rich_message=build_welcome_rich_message(message.from_user),
         reply_markup=build_welcome_keyboard(),
     )
 
