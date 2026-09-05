@@ -3,14 +3,14 @@ from __future__ import annotations
 
 CORE_PHRASES: dict[str, str] = {
     "customize": "تخصيص الرسالة",
-    "choose_block": "اختر الجزء الذي تريد تعديله:",
-    "block_added": "تمت إضافة الـBlock بنجاح.",
+    "choose_block": "اختر البلوك الذي تريد تعديله:",
+    "block_added": "تمت إضافة البلوك بنجاح.",
     "welcome": "أهلًا بك في محرّر الرسائل الغنية.",
     "start_editor": "أرسل /editor لبدء رسالة جديدة.",
     "send_message": "أرسل الرسالة التي تريد تخصيصها.",
     "unsupported": "هذا النوع غير مدعوم حاليًا. أرسل نصًا أو وسائط أو رسالة غنية.",
     "expired": "انتهت الجلسة. أرسل /editor للبدء من جديد.",
-    "add_block": "➕ إضافة Block",
+    "add_block": "➕ إضافة بلوك",
     "result": "✅ النتيجة",
     "create_post": "📝 إنشاء منشور",
     "edit": "✏️ تعديل",
