@@ -22,7 +22,7 @@ def _url_button(text: str, url: str) -> dict[str, object]:
 
 
 def build_welcome_rich_message(user: User) -> InputRichMessage:
-    """Build the localized /start message with native RichText actions."""
+    """Build the localized /start message with a compact visual hierarchy."""
     mention_text = user.full_name.strip() or str(user.id)
     greeting: list[object] = [
         f"{t('welcome.greeting')} ",
@@ -34,22 +34,23 @@ def build_welcome_rich_message(user: User) -> InputRichMessage:
         "!",
     ]
     intro: list[object] = [
-        f"{BOT_USERNAME}\n",
-        t("welcome.description_before_view"),
+        t("welcome.product_description"),
+        " ",
         _url_button(t("welcome.view_button"), SHOWCASE_URL),
     ]
     actions: list[object] = [
         {
             "type": "bold",
-            "text": t("welcome.add_prompt"),
+            "text": t("welcome.add_cta"),
         },
         "\n",
-        f"{t('welcome.start_prompt')} ",
+        f"{t('welcome.start_cta')} ",
         {
             "type": "bold",
             "text": t("editor.new_button"),
         },
-        "\n\n",
+    ]
+    help_text: list[object] = [
         t("welcome.help_title"),
         "\n",
         f"{t('welcome.help_check')} ",
@@ -69,11 +70,15 @@ def build_welcome_rich_message(user: User) -> InputRichMessage:
         },
         {
             "type": "footer",
-            "text": t("welcome.description_after_view").lstrip(),
+            "text": BOT_USERNAME,
         },
         {
             "type": "paragraph",
             "text": actions,
+        },
+        {
+            "type": "footer",
+            "text": help_text,
         },
     ])
 
