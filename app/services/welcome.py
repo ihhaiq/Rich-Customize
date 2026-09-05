@@ -38,18 +38,6 @@ def build_welcome_rich_message(user: User) -> InputRichMessage:
         " ",
         _url_button(t("welcome.view_button"), SHOWCASE_URL),
     ]
-    actions: list[object] = [
-        {
-            "type": "bold",
-            "text": t("welcome.add_cta"),
-        },
-        "\n",
-        f"{t('welcome.start_cta')} ",
-        {
-            "type": "bold",
-            "text": t("editor.new_button"),
-        },
-    ]
     help_text: list[object] = [
         t("welcome.help_title"),
         "\n",
@@ -71,10 +59,6 @@ def build_welcome_rich_message(user: User) -> InputRichMessage:
         {
             "type": "footer",
             "text": BOT_USERNAME,
-        },
-        {
-            "type": "paragraph",
-            "text": actions,
         },
         {
             "type": "footer",
