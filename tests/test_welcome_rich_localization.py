@@ -92,7 +92,7 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
         blocks = payload["blocks"]
 
         self.assertEqual([block["type"] for block in blocks], [
-            "heading", "paragraph", "footer", "footer",
+            "heading", "footer", "paragraph", "footer",
         ])
 
         heading = blocks[0]
@@ -104,10 +104,10 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
         self.assertEqual(mention["text"], "حسين")
         self.assertEqual(mention["user"]["id"], user.id)
 
-        intro = blocks[1]["text"]
-        self.assertEqual(intro[0], "محرّر متكامل لإنشاء وتخصيص رسائل تليكرام الغنية.")
+        self.assertEqual(blocks[1]["text"], f"- {BOT_USERNAME}")
 
-        self.assertEqual(blocks[2]["text"], BOT_USERNAME)
+        intro = blocks[2]["text"]
+        self.assertEqual(intro[0], "محرّر متكامل لإنشاء وتخصيص رسائل تليكرام الغنية.")
 
         help_text = blocks[3]["text"]
         self.assertEqual(help_text[0], "📌 بعض المساعدة؟")
