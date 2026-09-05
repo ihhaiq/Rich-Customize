@@ -53,12 +53,12 @@ def build_welcome_rich_message(user: User) -> InputRichMessage:
             "size": 3,
         },
         {
-            "type": "paragraph",
-            "text": intro,
+            "type": "footer",
+            "text": f"- {BOT_USERNAME}",
         },
         {
-            "type": "footer",
-            "text": BOT_USERNAME,
+            "type": "paragraph",
+            "text": intro,
         },
         {
             "type": "footer",
