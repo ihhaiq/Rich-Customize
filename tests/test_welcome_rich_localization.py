@@ -79,11 +79,6 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
                 "محرّر متكامل لإنشاء وتخصيص رسائل تليكرام الغنية.",
             )
             self.assertEqual(t("welcome.view_button"), "👁 انظر")
-            self.assertEqual(
-                t("welcome.add_cta"),
-                "👈🏻 أضف البوت إلى مجموعتك أو قناتك",
-            )
-            self.assertEqual(t("welcome.start_cta"), "أو ابدأ الآن من")
             self.assertEqual(t("welcome.and"), "و")
             self.assertEqual(t("welcome.add_group_button"), "➕ أضفني إلى مجموعة ➕")
             self.assertEqual(t("welcome.updates_button"), "قناة التحديثات")
@@ -97,7 +92,7 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
         blocks = payload["blocks"]
 
         self.assertEqual([block["type"] for block in blocks], [
-            "heading", "paragraph", "footer", "paragraph", "footer",
+            "heading", "paragraph", "footer", "footer",
         ])
 
         heading = blocks[0]
@@ -114,17 +109,7 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
 
         self.assertEqual(blocks[2]["text"], BOT_USERNAME)
 
-        action_text = blocks[3]["text"]
-        bold_items = [
-            item for item in action_text
-            if isinstance(item, dict) and item.get("type") == "bold"
-        ]
-        self.assertEqual(
-            [item["text"] for item in bold_items],
-            ["👈🏻 أضف البوت إلى مجموعتك أو قناتك", "➕ بدء المحرّر"],
-        )
-
-        help_text = blocks[4]["text"]
+        help_text = blocks[3]["text"]
         self.assertEqual(help_text[0], "📌 بعض المساعدة؟")
 
         all_rich_text = []
