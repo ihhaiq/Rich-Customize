@@ -23,6 +23,7 @@ from app.lang.catalogs.welcome_semantic import (
 )
 from app.services.welcome import (
     BOT_USERNAME,
+    LTR_MARK,
     SHOWCASE_URL,
     SUPPORT_URL,
     UPDATES_URL,
@@ -104,7 +105,7 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
         self.assertEqual(mention["text"], "حسين")
         self.assertEqual(mention["user"]["id"], user.id)
 
-        self.assertEqual(blocks[1]["text"], f"- {BOT_USERNAME}")
+        self.assertEqual(blocks[1]["text"], f"{LTR_MARK}- {BOT_USERNAME}")
 
         intro = blocks[2]["text"]
         self.assertEqual(intro[0], "محرّر متكامل لإنشاء وتخصيص رسائل تليكرام الغنية.")
