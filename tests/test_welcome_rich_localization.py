@@ -66,40 +66,58 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
             self.assertEqual(t("welcome.updates_button"), "قناة التحديثات")
             self.assertEqual(t("welcome.support_button"), "مجموعة الدعم")
 
-    def test_rich_welcome_contains_mention_bold_prompt_and_rich_actions(self):
+    def test_rich_welcome_uses_heading_footer_bold_text_and_three_link_buttons(self):
         user = User(id=123456789, is_bot=False, first_name="حسين")
         with use_language("ar-IQ"):
             rich_message = build_welcome_rich_message(user)
         payload = rich_message.model_dump(mode="json", exclude_none=True)
-        rich_text = payload["blocks"][0]["text"]
+        blocks = payload["blocks"]
 
+        self.assertEqual([block["type"] for block in blocks], [
+            "heading", "paragraph", "footer", "paragraph",
+        ])
+
+        heading = blocks[0]
+        self.assertEqual(heading["size"], 3)
         mention = next(
-            item for item in rich_text
+            item for item in heading["text"]
             if isinstance(item, dict) and item.get("type") == "text_mention"
         )
         self.assertEqual(mention["text"], "حسين")
         self.assertEqual(mention["user"]["id"], user.id)
 
-        bold = next(
-            item for item in rich_text
-            if isinstance(item, dict) and item.get("type") == "bold"
+        footer = blocks[2]
+        self.assertEqual(
+            footer["text"],
+            "باستخدام مجموعة واسعة من البلوكات والأزرار الغنية، مع المعاينة والحفظ والنشر لمجموعتك أو قناتك بكل سهولة وأمان!",
         )
-        self.assertEqual(bold["text"], "👈🏻 أضفني في مجموعتك/قناتك")
 
+        action_text = blocks[3]["text"]
+        bold_items = [
+            item for item in action_text
+            if isinstance(item, dict) and item.get("type") == "bold"
+        ]
+        self.assertEqual(
+            [item["text"] for item in bold_items],
+            ["👈🏻 أضفني في مجموعتك/قناتك", "➕ بدء المحرّر"],
+        )
+
+        all_rich_text = []
+        for block in blocks:
+            text = block.get("text")
+            if isinstance(text, list):
+                all_rich_text.extend(text)
         buttons = [
             item["button"]
-            for item in rich_text
+            for item in all_rich_text
             if isinstance(item, dict) and item.get("type") == "button"
         ]
-        self.assertEqual(len(buttons), 4)
-        url_buttons = {button["text"]: button["url"] for button in buttons if "url" in button}
+        self.assertEqual(len(buttons), 3)
+        self.assertFalse(any(button.get("callback_data") for button in buttons))
+        url_buttons = {button["text"]: button["url"] for button in buttons}
         self.assertEqual(url_buttons["👁 انظر"], SHOWCASE_URL)
         self.assertEqual(url_buttons["قناة التحديثات"], UPDATES_URL)
         self.assertEqual(url_buttons["مجموعة الدعم"], SUPPORT_URL)
-
-        start_button = next(button for button in buttons if button.get("callback_data"))
-        self.assertEqual(start_button["text"], "➕ بدء المحرّر")
-        self.assertEqual(start_button["callback_data"], "r:starteditor")
         self.assertEqual(SHOWCASE_URL, "https://t.me/durov/531")
 
 
