@@ -20,6 +20,7 @@ from app.keyboards import (
 )
 from app.services.buttons import add_message_button
 from app.routers.editor_ui import editor_dashboard_text
+from app.services.welcome import ADD_GROUP_URL
 
 
 class ButtonKeyboardTests(unittest.TestCase):
@@ -114,10 +115,21 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertTrue(button.text)
         self.assertEqual(button.style, ButtonStyle.PRIMARY)
 
-    def test_welcome_places_start_editor_next_to_showcase(self):
-        keyboard = build_welcome_keyboard()
-        callbacks = [button.callback_data for button in keyboard.inline_keyboard[0]]
-        self.assertEqual(callbacks, ["r:showcase", "r:starteditor"])
+    def test_welcome_group_shortcut_sits_above_start_and_showcase(self):
+        token = i18n_core._language.set("ar")
+        try:
+            keyboard = build_welcome_keyboard()
+        finally:
+            i18n_core._language.reset(token)
+
+        group_button = keyboard.inline_keyboard[0][0]
+        self.assertEqual(group_button.text, "➕ أضفني إلى مجموعة ➕")
+        self.assertEqual(group_button.url, ADD_GROUP_URL)
+        self.assertIsNone(group_button.style)
+        self.assertEqual(
+            [button.callback_data for button in keyboard.inline_keyboard[1]],
+            ["r:showcase", "r:starteditor"],
+        )
 
     def test_button_manager_opens_a_focused_editor_for_each_button(self):
         buttons = []
