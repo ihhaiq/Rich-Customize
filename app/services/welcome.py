@@ -5,7 +5,7 @@ from aiogram.types import InputRichMessage, User
 from app.i18n import t
 
 SHOWCASE_URL = "https://t.me/durov/531"
-UPDATES_URL = "https://t.me/RichCustomizet"
+UPDATES_URL = "https://t.me/RichCustomize"
 SUPPORT_URL = "https://t.me/+D4cEzE0V7IIwYTcx"
 ADD_GROUP_URL = "https://t.me/RichCustomizebot?startgroup=true"
 BOT_USERNAME = "@RichCustomizebot"
