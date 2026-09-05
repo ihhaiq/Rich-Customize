@@ -9,7 +9,6 @@ UPDATES_URL = "https://t.me/RichCustomizet"
 SUPPORT_URL = "https://t.me/+D4cEzE0V7IIwYTcx"
 ADD_GROUP_URL = "https://t.me/RichCustomizebot?startgroup=true"
 BOT_USERNAME = "@RichCustomizebot"
-LTR_MARK = "\u200e"
 
 
 def _url_button(text: str, url: str) -> dict[str, object]:
@@ -54,8 +53,13 @@ def build_welcome_rich_message(user: User) -> InputRichMessage:
             "size": 3,
         },
         {
-            "type": "footer",
-            "text": f"{LTR_MARK}- {BOT_USERNAME}",
+            "type": "table",
+            "cells": [[{
+                "text": f"- {BOT_USERNAME}",
+                "align": "left",
+                "valign": "middle",
+            }]],
+            "is_compact": True,
         },
         {
             "type": "paragraph",
@@ -71,7 +75,6 @@ def build_welcome_rich_message(user: User) -> InputRichMessage:
 __all__ = [
     "ADD_GROUP_URL",
     "BOT_USERNAME",
-    "LTR_MARK",
     "SHOWCASE_URL",
     "SUPPORT_URL",
     "UPDATES_URL",
