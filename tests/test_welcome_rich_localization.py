@@ -6,6 +6,11 @@ from aiogram.types import User
 
 from app.i18n import t, use_language
 from app.lang import KEY_TRANSLATIONS, SUPPORTED_LANGUAGES
+from app.lang.catalogs.welcome_compact import (
+    WELCOME_COMPACT_AR_PHRASES,
+    WELCOME_COMPACT_KEY_TRANSLATIONS,
+    WELCOME_COMPACT_PHRASES,
+)
 from app.lang.catalogs.welcome_revision import (
     WELCOME_REVISION_AR_PHRASES,
     WELCOME_REVISION_KEY_TRANSLATIONS,
@@ -17,6 +22,7 @@ from app.lang.catalogs.welcome_semantic import (
     WELCOME_PHRASES,
 )
 from app.services.welcome import (
+    BOT_USERNAME,
     SHOWCASE_URL,
     SUPPORT_URL,
     UPDATES_URL,
@@ -25,6 +31,7 @@ from app.services.welcome import (
 
 WELCOME_KEYS = set(WELCOME_PHRASES)
 REVISION_KEYS = set(WELCOME_REVISION_PHRASES)
+COMPACT_KEYS = set(WELCOME_COMPACT_PHRASES)
 
 
 class WelcomeRichLocalizationTests(unittest.TestCase):
@@ -52,21 +59,37 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
             )
             self.assertTrue(REVISION_KEYS <= set(KEY_TRANSLATIONS[language]), language)
 
+    def test_every_supported_locale_has_compact_welcome_copy(self):
+        self.assertEqual(set(WELCOME_COMPACT_AR_PHRASES), COMPACT_KEYS)
+        expected = set(SUPPORTED_LANGUAGES) - {"ar", "en"}
+        self.assertEqual(set(WELCOME_COMPACT_KEY_TRANSLATIONS), expected)
+        for language in sorted(expected):
+            self.assertEqual(
+                set(WELCOME_COMPACT_KEY_TRANSLATIONS[language]),
+                COMPACT_KEYS,
+                language,
+            )
+            self.assertTrue(COMPACT_KEYS <= set(KEY_TRANSLATIONS[language]), language)
+
     def test_arabic_copy_matches_requested_start_message(self):
         with use_language("ar-IQ"):
             self.assertEqual(t("welcome.greeting"), "مرحبا")
-            self.assertEqual(t("welcome.view_button"), "👁 انظر")
-            self.assertEqual(t("welcome.add_prompt"), "👈🏻 أضفني في مجموعتك/قناتك")
             self.assertEqual(
-                t("welcome.start_prompt"),
-                "وابدأ في استعمال البوت عن طريق الضغط على زر",
+                t("welcome.product_description"),
+                "محرّر متكامل لإنشاء وتخصيص رسائل تليكرام الغنية.",
             )
+            self.assertEqual(t("welcome.view_button"), "👁 انظر")
+            self.assertEqual(
+                t("welcome.add_cta"),
+                "👈🏻 أضف البوت إلى مجموعتك أو قناتك",
+            )
+            self.assertEqual(t("welcome.start_cta"), "أو ابدأ الآن من")
             self.assertEqual(t("welcome.and"), "و")
             self.assertEqual(t("welcome.add_group_button"), "➕ أضفني إلى مجموعة ➕")
             self.assertEqual(t("welcome.updates_button"), "قناة التحديثات")
             self.assertEqual(t("welcome.support_button"), "مجموعة الدعم")
 
-    def test_rich_welcome_uses_heading_footer_bold_text_and_three_link_buttons(self):
+    def test_rich_welcome_uses_compact_visual_hierarchy(self):
         user = User(id=123456789, is_bot=False, first_name="حسين")
         with use_language("ar-IQ"):
             rich_message = build_welcome_rich_message(user)
@@ -74,7 +97,7 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
         blocks = payload["blocks"]
 
         self.assertEqual([block["type"] for block in blocks], [
-            "heading", "paragraph", "footer", "paragraph",
+            "heading", "paragraph", "footer", "paragraph", "footer",
         ])
 
         heading = blocks[0]
@@ -86,11 +109,10 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
         self.assertEqual(mention["text"], "حسين")
         self.assertEqual(mention["user"]["id"], user.id)
 
-        footer = blocks[2]
-        self.assertEqual(
-            footer["text"],
-            "باستخدام مجموعة واسعة من البلوكات والأزرار الغنية، مع المعاينة والحفظ والنشر لمجموعتك أو قناتك بكل سهولة وأمان!",
-        )
+        intro = blocks[1]["text"]
+        self.assertEqual(intro[0], "محرّر متكامل لإنشاء وتخصيص رسائل تليكرام الغنية.")
+
+        self.assertEqual(blocks[2]["text"], BOT_USERNAME)
 
         action_text = blocks[3]["text"]
         bold_items = [
@@ -99,8 +121,11 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
         ]
         self.assertEqual(
             [item["text"] for item in bold_items],
-            ["👈🏻 أضفني في مجموعتك/قناتك", "➕ بدء المحرّر"],
+            ["👈🏻 أضف البوت إلى مجموعتك أو قناتك", "➕ بدء المحرّر"],
         )
+
+        help_text = blocks[4]["text"]
+        self.assertEqual(help_text[0], "📌 بعض المساعدة؟")
 
         all_rich_text = []
         for block in blocks:
