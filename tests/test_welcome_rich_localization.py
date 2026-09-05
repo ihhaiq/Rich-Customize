@@ -23,7 +23,6 @@ from app.lang.catalogs.welcome_semantic import (
 )
 from app.services.welcome import (
     BOT_USERNAME,
-    LTR_MARK,
     SHOWCASE_URL,
     SUPPORT_URL,
     UPDATES_URL,
@@ -93,7 +92,7 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
         blocks = payload["blocks"]
 
         self.assertEqual([block["type"] for block in blocks], [
-            "heading", "footer", "paragraph", "footer",
+            "heading", "footer", "paragraph", "divider", "footer",
         ])
 
         heading = blocks[0]
@@ -105,12 +104,14 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
         self.assertEqual(mention["text"], "حسين")
         self.assertEqual(mention["user"]["id"], user.id)
 
-        self.assertEqual(blocks[1]["text"], f"{LTR_MARK}- {BOT_USERNAME}")
+        self.assertEqual(blocks[1]["text"], f"- {BOT_USERNAME}")
 
         intro = blocks[2]["text"]
         self.assertEqual(intro[0], "محرّر متكامل لإنشاء وتخصيص رسائل تليكرام الغنية.")
 
-        help_text = blocks[3]["text"]
+        self.assertEqual(blocks[3]["type"], "divider")
+
+        help_text = blocks[4]["text"]
         self.assertEqual(help_text[0], "📌 بعض المساعدة؟")
 
         all_rich_text = []
@@ -130,6 +131,7 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
         self.assertEqual(url_buttons["قناة التحديثات"], UPDATES_URL)
         self.assertEqual(url_buttons["مجموعة الدعم"], SUPPORT_URL)
         self.assertEqual(SHOWCASE_URL, "https://t.me/durov/531")
+        self.assertEqual(UPDATES_URL, "https://t.me/RichCustomize")
 
 
 if __name__ == "__main__":
