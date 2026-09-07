@@ -8,7 +8,7 @@ from aiogram.types import InlineKeyboardMarkup, InputRichMessage, Message
 from app.i18n import t, tr
 
 
-def _button(
+def _rich_button(
     text: str,
     *,
     callback_data: str | None = None,
@@ -22,37 +22,11 @@ def _button(
         button["url"] = url
     if style in {"primary", "success", "danger"}:
         button["style"] = style
-    return button
-
-
-def _rich_button(
-    text: str,
-    *,
-    callback_data: str | None = None,
-    url: str | None = None,
-    style: str | None = None,
-) -> dict[str, Any]:
-    return {
-        "type": "button",
-        "button": _button(
-            text,
-            callback_data=callback_data,
-            url=url,
-            style=style,
-        ),
-    }
-
-
-def _button_row(buttons: list[dict[str, Any]]) -> dict[str, Any]:
-    return {
-        "type": "buttons",
-        "buttons": buttons,
-        "align": "center",
-    }
+    return {"type": "button", "button": button}
 
 
 def _cell(
-    text: dict[str, Any],
+    text: Any,
     *,
     colspan: int | None = None,
 ) -> dict[str, Any]:
@@ -66,16 +40,10 @@ def _cell(
     return cell
 
 
-def _panel(
-    text: str,
-    rows: list[list[dict[str, Any]]],
-    *,
-    blocks_before_table: list[dict[str, Any]] | None = None,
-) -> InputRichMessage:
+def _panel(text: str, rows: list[list[dict[str, Any]]]) -> InputRichMessage:
     return InputRichMessage(
         blocks=[
             {"type": "paragraph", "text": text},
-            *(blocks_before_table or []),
             {
                 "type": "table",
                 "cells": rows,
@@ -84,6 +52,21 @@ def _panel(
             },
         ],
     )
+
+
+def _chat_link(chat: dict[str, Any], chat_id: int) -> str:
+    explicit_link = str(chat.get("url") or chat.get("invite_link") or "").strip()
+    if explicit_link.startswith(("http://", "https://", "tg://")):
+        return explicit_link
+
+    username = str(chat.get("username") or "").strip().lstrip("@")
+    if username:
+        return f"https://t.me/{username}"
+
+    numeric_id = str(abs(chat_id))
+    if chat.get("type") in {"channel", "supergroup"} and numeric_id.startswith("100"):
+        return f"https://t.me/c/{numeric_id[3:]}/1"
+    return f"tg://openmessage?chat_id={numeric_id}"
 
 
 async def edit_publish_ui(
@@ -111,7 +94,6 @@ def build_post_picker_rich_message(
     selected_chat_ids: list[int] | None = None,
 ) -> InputRichMessage:
     selected = set(selected_chat_ids or [])
-    chat_buttons: list[dict[str, Any]] = []
     rows: list[list[dict[str, Any]]] = []
 
     for chat in chats:
@@ -120,15 +102,21 @@ def build_post_picker_rich_message(
         state_icon = "✅" if is_selected else "⬜"
         chat_icon = "📢" if chat.get("type") == "channel" else "👥"
         title = str(chat.get("title") or chat_id)
-        chat_buttons.append(
-            _button_row([
-                _button(
-                    f"{state_icon} {chat_icon} {title}",
+        rows.append([
+            _cell(
+                _rich_button(
+                    f"{chat_icon} {title}",
+                    url=_chat_link(chat, chat_id),
+                ),
+            ),
+            _cell(
+                _rich_button(
+                    f"{state_icon} {t('ux.publish.select')}",
                     callback_data=f"r:postchat:{chat_id}",
                     style="success" if is_selected else "primary",
                 ),
-            ]),
-        )
+            ),
+        ])
 
     if chats:
         rows.append([
@@ -158,7 +146,7 @@ def build_post_picker_rich_message(
             ),
         ),
     ])
-    return _panel(text, rows, blocks_before_table=chat_buttons)
+    return _panel(text, rows)
 
 
 def build_post_settings_rich_message(
