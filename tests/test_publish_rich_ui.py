@@ -13,9 +13,9 @@ def _type_value(value):
 
 
 class PublishRichUiTests(unittest.TestCase):
-    def test_picker_buttons_live_inside_rich_table(self):
+    def test_picker_chat_names_use_full_width_button_rows(self):
         chats = [
-            {"chat_id": -1001, "title": "القناة", "type": "channel"},
+            {"chat_id": -1001, "title": "GH | العراقيون العرب AR", "type": "channel"},
             {"chat_id": -1002, "title": "المجموعة", "type": "supergroup"},
         ]
         rich = build_post_picker_rich_message(
@@ -26,25 +26,32 @@ class PublishRichUiTests(unittest.TestCase):
             [-1002],
         )
 
-        self.assertEqual(len(rich.blocks), 2)
-        table = rich.blocks[1]
+        self.assertEqual(len(rich.blocks), 4)
+        unselected_row = rich.blocks[1]
+        selected_row = rich.blocks[2]
+        table = rich.blocks[3]
+
+        self.assertEqual(_type_value(unselected_row.type), "buttons")
+        self.assertEqual(_type_value(selected_row.type), "buttons")
+        self.assertEqual(unselected_row.align, "center")
+        self.assertEqual(selected_row.align, "center")
+
+        unselected = unselected_row.buttons[0]
+        selected = selected_row.buttons[0]
+        self.assertEqual(str(unselected.text), "⬜ 📢 GH | العراقيون العرب AR")
+        self.assertEqual(unselected.callback_data, "r:postchat:-1001")
+        self.assertEqual(unselected.style, "primary")
+
+        self.assertTrue(str(selected.text).startswith("✅"))
+        self.assertEqual(selected.callback_data, "r:postchat:-1002")
+        self.assertEqual(selected.style, "success")
+
         self.assertEqual(_type_value(table.type), "table")
         self.assertTrue(table.is_bordered)
 
-        unselected = table.cells[0][0].text
-        selected = table.cells[1][0].text
-        settings = table.cells[2][0].text
-        add_channel = table.cells[3][0].text
-        add_group = table.cells[3][1].text
-
-        self.assertEqual(_type_value(unselected.type), "button")
-        self.assertTrue(str(unselected.button.text).startswith("⬜"))
-        self.assertEqual(unselected.button.callback_data, "r:postchat:-1001")
-        self.assertEqual(unselected.button.style, "primary")
-
-        self.assertTrue(str(selected.button.text).startswith("✅"))
-        self.assertEqual(selected.button.callback_data, "r:postchat:-1002")
-        self.assertEqual(selected.button.style, "success")
+        settings = table.cells[0][0].text
+        add_channel = table.cells[1][0].text
+        add_group = table.cells[1][1].text
 
         self.assertEqual(settings.button.callback_data, "r:postsettings")
         self.assertEqual(settings.button.style, "success")

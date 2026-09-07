@@ -8,7 +8,7 @@ from aiogram.types import InlineKeyboardMarkup, InputRichMessage, Message
 from app.i18n import t, tr
 
 
-def _rich_button(
+def _button(
     text: str,
     *,
     callback_data: str | None = None,
@@ -22,7 +22,33 @@ def _rich_button(
         button["url"] = url
     if style in {"primary", "success", "danger"}:
         button["style"] = style
-    return {"type": "button", "button": button}
+    return button
+
+
+def _rich_button(
+    text: str,
+    *,
+    callback_data: str | None = None,
+    url: str | None = None,
+    style: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "type": "button",
+        "button": _button(
+            text,
+            callback_data=callback_data,
+            url=url,
+            style=style,
+        ),
+    }
+
+
+def _button_row(buttons: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "type": "buttons",
+        "buttons": buttons,
+        "align": "center",
+    }
 
 
 def _cell(
@@ -40,10 +66,16 @@ def _cell(
     return cell
 
 
-def _panel(text: str, rows: list[list[dict[str, Any]]]) -> InputRichMessage:
+def _panel(
+    text: str,
+    rows: list[list[dict[str, Any]]],
+    *,
+    blocks_before_table: list[dict[str, Any]] | None = None,
+) -> InputRichMessage:
     return InputRichMessage(
         blocks=[
             {"type": "paragraph", "text": text},
+            *(blocks_before_table or []),
             {
                 "type": "table",
                 "cells": rows,
@@ -79,6 +111,7 @@ def build_post_picker_rich_message(
     selected_chat_ids: list[int] | None = None,
 ) -> InputRichMessage:
     selected = set(selected_chat_ids or [])
+    chat_buttons: list[dict[str, Any]] = []
     rows: list[list[dict[str, Any]]] = []
 
     for chat in chats:
@@ -87,16 +120,15 @@ def build_post_picker_rich_message(
         state_icon = "✅" if is_selected else "⬜"
         chat_icon = "📢" if chat.get("type") == "channel" else "👥"
         title = str(chat.get("title") or chat_id)
-        rows.append([
-            _cell(
-                _rich_button(
+        chat_buttons.append(
+            _button_row([
+                _button(
                     f"{state_icon} {chat_icon} {title}",
                     callback_data=f"r:postchat:{chat_id}",
                     style="success" if is_selected else "primary",
                 ),
-                colspan=2,
-            ),
-        ])
+            ]),
+        )
 
     if chats:
         rows.append([
@@ -126,7 +158,7 @@ def build_post_picker_rich_message(
             ),
         ),
     ])
-    return _panel(text, rows)
+    return _panel(text, rows, blocks_before_table=chat_buttons)
 
 
 def build_post_settings_rich_message(
