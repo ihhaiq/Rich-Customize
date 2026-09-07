@@ -9,6 +9,7 @@ from __future__ import annotations
 CATALOG_EN: dict[str, str] = {
     "common.back": "🔙 Back",
     "common.reason": "Reason: {reason}",
+    "ux.publish.select": "Select",
     "editor.block_missing": "This block no longer exists.",
     "editor.preview_block": "👁 Preview this Block",
     "editor.preview_generating": "Generating block preview…",
@@ -23,6 +24,7 @@ CATALOG_EN: dict[str, str] = {
 CATALOG_AR: dict[str, str] = {
     "common.back": "🔙 رجوع",
     "common.reason": "السبب: {reason}",
+    "ux.publish.select": "تحديد",
     "editor.block_missing": "هذا الجزء لم يعد موجودًا.",
     "editor.preview_block": "👁 معاينة هذا الـBlock",
     "editor.preview_generating": "جاري إنشاء معاينة الجزء…",
@@ -249,3 +251,31 @@ CATALOG_TRANSLATIONS: dict[str, dict[str, str]] = {
         "editor.preview_single_notice": "👁 僅預覽 {label}。\n完整預覽維持不變，仍可透過「✅ 結果」查看。",
     },
 }
+
+
+_PUBLISH_SELECT_TRANSLATIONS: dict[str, str] = {
+    "es": "Seleccionar",
+    "fr": "Sélectionner",
+    "de": "Auswählen",
+    "it": "Seleziona",
+    "pt": "Selecionar",
+    "nl": "Selecteren",
+    "pl": "Wybierz",
+    "uk": "Вибрати",
+    "ru": "Выбрать",
+    "tr": "Seç",
+    "fa": "انتخاب",
+    "ku": "Hilbijêre",
+    "ur": "منتخب کریں",
+    "hi": "चुनें",
+    "id": "Pilih",
+    "ja": "選択",
+    "ko": "선택",
+    "vi": "Chọn",
+    "th": "เลือก",
+    "zh-hans": "选择",
+    "zh-hant": "選擇",
+}
+
+for language, label in _PUBLISH_SELECT_TRANSLATIONS.items():
+    CATALOG_TRANSLATIONS[language]["ux.publish.select"] = label
