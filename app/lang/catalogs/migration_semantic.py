@@ -44,6 +44,8 @@ SEMANTIC_PHRASES: dict[str, str] = {
     "editor.choose_block": "Choose the block you want to edit:",
     "editor.scroll_up": "⬆️ Up",
     "editor.scroll_down": "⬇️ Scroll",
+    "pages.empty": "You don't have any saved pages yet.",
+    "pages.search_invalid": "Send a valid search term.",
 }
 
 SEMANTIC_AR_PHRASES: dict[str, str] = {
@@ -85,6 +87,8 @@ SEMANTIC_AR_PHRASES: dict[str, str] = {
     "editor.choose_block": "اختر الجزء الذي تريد تعديله:",
     "editor.scroll_up": "⬆️ صعود",
     "editor.scroll_down": "⬇️ تمرير",
+    "pages.empty": "ما عندك صفحات محفوظة بعد.",
+    "pages.search_invalid": "أرسل كلمة بحث صحيحة.",
 }
 
 
