@@ -5,7 +5,7 @@ from typing import Any
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup, InputRichMessage, Message
 
-from app.i18n import t, tr
+from app.i18n import t
 
 
 def _rich_button(
@@ -122,7 +122,7 @@ def build_post_picker_rich_message(
         rows.append([
             _cell(
                 _rich_button(
-                    tr("⚙️ إعدادات وإرسال") + f" ({len(selected)})",
+                    f"{t('publish.settings_send')} ({len(selected)})",
                     callback_data="r:postsettings",
                     style="success",
                 ),
@@ -133,14 +133,14 @@ def build_post_picker_rich_message(
     rows.append([
         _cell(
             _rich_button(
-                tr("➕ إضافة البوت إلى قناة"),
+                t("publish.add_bot_channel"),
                 url=channel_url,
                 style="primary",
             ),
         ),
         _cell(
             _rich_button(
-                tr("➕ إضافة البوت إلى مجموعة"),
+                t("publish.add_bot_group"),
                 url=group_url,
                 style="primary",
             ),
