@@ -146,11 +146,33 @@ DEVELOPER_ID=123456789
 
 ## قاعدة البيانات
 
-لا توجد Migration. جلسة التحرير الحالية مؤقتة في `MemoryStorage` وتُفقد عند إعادة التشغيل،
-لكن الصفحات المحفوظة تبقى افتراضيًا في `data/rich_pages.json`. يمكن تغيير مسارها بمتغير
-البيئة `RICH_PAGES_STATE`. للإنتاج متعدد النسخ استبدل `MemoryStorage` وملف JSON بمخزن مشترك.
-يُحفظ ربط رسائل Guest افتراضيًا في `data/guest_messages.json`، ويمكن تغيير مساره بمتغير
-البيئة `GUEST_MESSAGES_STATE`.
+يدعم البوت PostgreSQL كمخزن أساسي مع fallback تلقائي إلى ملفات JSON. في Railway أضف
+خدمة PostgreSQL إلى المشروع، ثم أضف إلى متغيرات خدمة البوت مرجع الاتصال:
+
+```env
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+```
+
+إذا كان اسم خدمة القاعدة مختلفًا عن `Postgres` استبدله بالاسم الظاهر في Railway. ينشئ
+البوت جدولي `rich_state` و`rich_fsm` تلقائيًا عند أول اتصال، ويستورد ملفات JSON القديمة
+إلى قاعدة فارغة من دون حذفها. تشمل المزامنة الصفحات، المحادثات، رسائل Guest، نصوص Popup،
+تنقّل الصفحات، بيانات الوسائط، مكتبة Showcase وجلسات المحرّر FSM.
+
+تبقى متغيرات `*_STATE` مطلوبة كمسارات fallback ولا ينبغي حذفها. عند نجاح الكتابة إلى
+PostgreSQL يحتفظ البوت أيضًا بنسخة JSON حديثة. وإذا انقطع الاتصال يكمل العمل على JSON،
+ثم يرفع التغييرات المحلية قبل العودة إلى PostgreSQL عند إعادة الاتصال. يفحص الاتصال
+تلقائيًا كل 30 ثانية، ويمكن للمطوّر فحصه فورًا من `/dev` عبر زر `فحص قاعدة البيانات`.
+
+لتبقى ملفات fallback بعد إعادة نشر Railway، اربط Volume دائمًا واجعل المسارات تحته؛
+بدون Volume يستمر fallback خلال عمر الـDeployment الحالي فقط. أهم إعدادات الاتصال:
+
+```env
+DATABASE_POOL_MAX_SIZE=5
+DATABASE_CONNECT_TIMEOUT=5
+DATABASE_COMMAND_TIMEOUT=5
+DATABASE_RECONNECT_INTERVAL=30
+DATABASE_FALLBACK_STATE=data/database_fallback.json
+```
 
 ### خطأ `BOT_DOMAIN_INVALID`
 

@@ -14,7 +14,6 @@ from aiogram.exceptions import (
     TelegramServerError,
     TelegramUnauthorizedError,
 )
-from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.utils.token import TokenValidationError
 
 from app.config import Settings
@@ -22,7 +21,9 @@ from app.i18n import LocaleMiddleware, LocalizedBot, configure_bot_profile
 from app.miniapp import BETA_VERSION, start_mini_app_server
 from app.routers import router
 from app.services.media import cleanup_interval_seconds, media_store
+from app.services.media_library import showcase_media_library
 from app.services.page_registry import page_registry
+from app.storage import HybridFSMStorage, state_database
 
 
 logger = logging.getLogger(__name__)
@@ -170,7 +171,7 @@ async def _media_cleanup_loop() -> None:
     interval = cleanup_interval_seconds()
     while True:
         try:
-            media_store.cleanup()
+            await asyncio.to_thread(media_store.cleanup)
         except Exception:
             logger.exception("Rich-media cleanup failed")
         await asyncio.sleep(interval)
@@ -191,7 +192,19 @@ async def main() -> None:
         )
         return
 
-    dispatcher = Dispatcher(storage=MemoryStorage())
+    database_status = await state_database.startup()
+    if database_status.connected:
+        logger.info(
+            "Persistent storage mode: PostgreSQL (%sms)",
+            database_status.latency_ms,
+        )
+    else:
+        logger.warning(
+            "Persistent storage mode: JSON fallback (%s)",
+            database_status.last_error or "DATABASE_URL is not configured",
+        )
+
+    dispatcher = Dispatcher(storage=HybridFSMStorage())
     dispatcher.message.outer_middleware(LocaleMiddleware())
     dispatcher.guest_message.outer_middleware(LocaleMiddleware())
     dispatcher.callback_query.outer_middleware(LocaleMiddleware())
@@ -199,8 +212,15 @@ async def main() -> None:
     dispatcher.include_router(router)
 
     cleanup_task: asyncio.Task[None] | None = None
+    database_task: asyncio.Task[None] | None = None
     miniapp_runner = None
     try:
+        await showcase_media_library.reload()
+        if state_database.configured:
+            database_task = asyncio.create_task(
+                state_database.maintain_connection(),
+                name="postgres-connection-monitor",
+            )
         try:
             miniapp_runner = await start_mini_app_server(bot, settings.bot_token)
             logger.info("Mini App Beta %s server started", BETA_VERSION)
@@ -212,7 +232,7 @@ async def main() -> None:
         if not await prepare_telegram(bot):
             return
         await page_registry.rebuild_media_pins()
-        media_store.cleanup()
+        await asyncio.to_thread(media_store.cleanup)
         cleanup_task = asyncio.create_task(_media_cleanup_loop(), name="rich-media-cleanup")
         await configure_bot_profile(bot)
         logger.info("Starting Telegram polling")
@@ -221,6 +241,12 @@ async def main() -> None:
             allowed_updates=dispatcher.resolve_used_update_types(),
         )
     finally:
+        if database_task is not None:
+            database_task.cancel()
+            try:
+                await database_task
+            except asyncio.CancelledError:
+                pass
         if cleanup_task is not None:
             cleanup_task.cancel()
             try:
@@ -229,6 +255,7 @@ async def main() -> None:
                 pass
         if miniapp_runner is not None:
             await miniapp_runner.cleanup()
+        await state_database.close()
         await bot.session.close()
         logger.info("Telegram HTTP session closed")
 

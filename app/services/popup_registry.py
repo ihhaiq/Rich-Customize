@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 from pathlib import Path
+
+from app.storage import HybridJSONRepository
 
 
 def _registry_path() -> Path:
@@ -17,14 +18,10 @@ class PopupRegistry:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or _registry_path()
         self._lock = asyncio.Lock()
+        self._repository = HybridJSONRepository("button_popups", self.path)
 
-    def _read(self) -> dict[str, str]:
-        if not self.path.exists():
-            return {}
-        try:
-            value = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {}
+    async def _read(self) -> dict[str, str]:
+        value = await self._repository.read()
         popups = value.get("popups", {}) if isinstance(value, dict) else {}
         return {
             str(key): str(text)
@@ -32,30 +29,24 @@ class PopupRegistry:
             if isinstance(key, str) and isinstance(text, str)
         } if isinstance(popups, dict) else {}
 
-    def _write(self, popups: dict[str, str]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(f"{self.path.suffix}.tmp")
-        temporary.write_text(
-            json.dumps({"popups": popups}, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        temporary.replace(self.path)
+    async def _write(self, popups: dict[str, str]) -> None:
+        await self._repository.write({"popups": popups})
 
     async def remember(self, button_id: str, text: str) -> None:
         async with self._lock:
-            popups = self._read()
+            popups = await self._read()
             popups[button_id] = text
-            self._write(popups)
+            await self._write(popups)
 
     async def get(self, button_id: str) -> str | None:
         async with self._lock:
-            return self._read().get(button_id)
+            return (await self._read()).get(button_id)
 
     async def remove(self, button_id: str) -> None:
         async with self._lock:
-            popups = self._read()
+            popups = await self._read()
             if popups.pop(button_id, None) is not None:
-                self._write(popups)
+                await self._write(popups)
 
 
 popup_registry = PopupRegistry()

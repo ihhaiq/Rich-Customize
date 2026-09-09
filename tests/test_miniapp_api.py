@@ -13,11 +13,12 @@ class MiniAppApiTests(unittest.IsolatedAsyncioTestCase):
         response = await miniapp.health(SimpleNamespace())
 
         self.assertEqual(response.status, 200)
-        self.assertEqual(json.loads(response.body), {
-            "ok": True,
-            "service": "rich-customize",
-            "beta": miniapp.BETA_VERSION,
-        })
+        payload = json.loads(response.body)
+        self.assertEqual(payload["ok"], True)
+        self.assertEqual(payload["service"], "rich-customize")
+        self.assertEqual(payload["beta"], miniapp.BETA_VERSION)
+        self.assertEqual(payload["database"]["mode"], "json")
+        self.assertFalse(payload["database"]["connected"])
 
     async def test_page_update_persists_buttons_and_layout_from_payload(self):
         request = SimpleNamespace(
