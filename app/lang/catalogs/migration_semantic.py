@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 # Semantic replacements for high-traffic controls that previously depended on
-# tr("Arabic source text").  English values intentionally match the established
+# tr("Arabic source text"). English values intentionally match the established
 # source-translation catalog so existing locale packs can be reused while the
 # remaining legacy UI is migrated incrementally.
 SEMANTIC_PHRASES: dict[str, str] = {
@@ -42,6 +42,8 @@ SEMANTIC_PHRASES: dict[str, str] = {
     "editor.choose_new_heading_level": "Choose the new heading level:",
     "editor.customize_title": "Customize message",
     "editor.choose_block": "Choose the block you want to edit:",
+    "editor.scroll_up": "⬆️ Up",
+    "editor.scroll_down": "⬇️ Scroll",
 }
 
 SEMANTIC_AR_PHRASES: dict[str, str] = {
@@ -81,6 +83,8 @@ SEMANTIC_AR_PHRASES: dict[str, str] = {
     "editor.choose_new_heading_level": "اختر مستوى العنوان الجديد:",
     "editor.customize_title": "تخصيص الرسالة",
     "editor.choose_block": "اختر الجزء الذي تريد تعديله:",
+    "editor.scroll_up": "⬆️ صعود",
+    "editor.scroll_down": "⬇️ تمرير",
 }
 
 
