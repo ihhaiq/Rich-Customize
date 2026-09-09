@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import random
 from pathlib import Path
 
 from aiogram.types import Message
+
+from app.storage import HybridJSONRepository
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +21,13 @@ class ShowcaseMediaLibrary:
     def __init__(self, path: Path = MEDIA_LIBRARY_PATH) -> None:
         self.path = path
         self._lock = asyncio.Lock()
+        self._repository = HybridJSONRepository("showcase_media", self.path)
         self._items = self._load()
 
     def _load(self) -> dict[str, list[str]]:
         empty: dict[str, list[str]] = {kind: [] for kind in SUPPORTED_MEDIA}
-        if not self.path.exists():
-            return empty
-        try:
-            raw = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as error:
-            logger.warning("Could not load showcase media library: %s", error)
+        raw = self._repository.read_local_sync()
+        if not isinstance(raw, dict):
             return empty
         for kind in SUPPORTED_MEDIA:
             values = raw.get(kind, [])
@@ -57,13 +55,7 @@ class ShowcaseMediaLibrary:
                 values.append(file_id)
                 # Keep the cache bounded while retaining plenty of random choices.
                 self._items[kind] = values[-200:]
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                temporary = self.path.with_suffix(self.path.suffix + ".tmp")
-                temporary.write_text(
-                    json.dumps(self._items, ensure_ascii=False, indent=2),
-                    encoding="utf-8",
-                )
-                temporary.replace(self.path)
+                await self._repository.write(self._items)
         return kind
 
     def random_id(self, kind: str) -> str | None:
@@ -75,7 +67,14 @@ class ShowcaseMediaLibrary:
 
     async def reload(self) -> None:
         async with self._lock:
-            self._items = self._load()
+            raw = await self._repository.read()
+            empty: dict[str, list[str]] = {kind: [] for kind in SUPPORTED_MEDIA}
+            if isinstance(raw, dict):
+                for kind in SUPPORTED_MEDIA:
+                    values = raw.get(kind, [])
+                    if isinstance(values, list):
+                        empty[kind] = [value for value in values if isinstance(value, str)]
+            self._items = empty
 
 
 showcase_media_library = ShowcaseMediaLibrary()

@@ -21,6 +21,7 @@ from app.services.data_import import (
 )
 from app.services.media_library import showcase_media_library
 from app.services.page_registry import page_registry
+from app.storage import state_database
 
 
 router = Router(name="developer")
@@ -47,7 +48,8 @@ async def open_developer_panel(message: Message, state: FSMContext) -> None:
     await message.answer(
         "🛠 لوحة المطوّر\n\n"
         "تقدر تصدّر بيانات البوت الحالية كملف ZIP، أو ترفع ملف ZIP/JSON "
-        "لاستيرادها. الاستيراد يُفحص ويطلب تأكيدًا قبل استبدال أي بيانات.\n\n"
+        "لاستيرادها، وتفحص اتصال PostgreSQL أو تعيد ربطه من الزر المخصص. "
+        "الاستيراد يُفحص ويطلب تأكيدًا قبل استبدال أي بيانات.\n\n"
         "ملف التصدير لا يحتوي التوكن أو متغيرات البيئة.",
         reply_markup=build_developer_keyboard(),
     )
@@ -176,6 +178,7 @@ async def confirm_data_import(callback: CallbackQuery, state: FSMContext) -> Non
     async with _import_lock:
         try:
             imported = await asyncio.to_thread(apply_data_import, prepared)
+            await state_database.sync_local_paths(list(prepared))
             await showcase_media_library.reload()
             await page_registry.rebuild_media_pins()
         except (DataImportError, OSError):
@@ -206,3 +209,34 @@ async def cancel_data_import(callback: CallbackQuery, state: FSMContext) -> None
             "تم إلغاء الاستيراد.", reply_markup=build_developer_keyboard(),
         )
     await callback.answer()
+
+
+@router.callback_query(F.data == "dev:database:check")
+async def check_database_connection(callback: CallbackQuery) -> None:
+    if not _is_developer(callback.from_user.id):
+        await callback.answer("هذا الخيار للمطوّر فقط.", show_alert=True)
+        return
+    await callback.answer("جاري فحص قاعدة البيانات…")
+    status = await state_database.check_and_reconnect(force=True)
+    if not isinstance(callback.message, Message):
+        return
+    if status.connected:
+        await callback.message.answer(
+            "✅ قاعدة البيانات متصلة.\n\n"
+            f"الوضع الحالي: PostgreSQL\n"
+            f"زمن الاستجابة: {status.latency_ms or 1}ms\n"
+            f"المخازن المتزامنة: {status.synced_namespaces}\n"
+            f"عمليات JSON المنتظرة: {status.pending_sync}",
+            reply_markup=build_developer_keyboard(),
+        )
+        return
+    if not status.configured:
+        detail = "متغير DATABASE_URL غير مضاف إلى خدمة البوت في Railway."
+    else:
+        detail = status.last_error or "فشل الاتصال لسبب غير معروف."
+    await callback.message.answer(
+        "⚠️ قاعدة البيانات غير متصلة.\n\n"
+        f"{detail}\n\n"
+        "البوت مستمر بالعمل تلقائيًا باستخدام ملفات JSON الاحتياطية.",
+        reply_markup=build_developer_keyboard(),
+    )

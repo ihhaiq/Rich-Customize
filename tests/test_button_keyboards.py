@@ -48,6 +48,10 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertEqual(button.style, ButtonStyle.SUCCESS)
         self.assertEqual(buttons[1].callback_data, "dev:export")
         self.assertEqual(buttons[1].style, ButtonStyle.PRIMARY)
+        database_button = build_developer_keyboard().inline_keyboard[1][0]
+        self.assertEqual(database_button.text, "فحص قاعدة البيانات")
+        self.assertEqual(database_button.callback_data, "dev:database:check")
+        self.assertEqual(database_button.style, ButtonStyle.PRIMARY)
 
         confirmation = build_developer_import_confirmation_keyboard()
         self.assertEqual(

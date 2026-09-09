@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import secrets
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from app.storage import HybridJSONRepository
 
 
 NAVIGATION_TTL_SECONDS = 24 * 60 * 60
@@ -49,23 +50,14 @@ class PageNavigationRegistry:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or _registry_path()
         self._lock = asyncio.Lock()
+        self._repository = HybridJSONRepository("page_navigation", self.path)
 
-    def _read(self) -> dict[str, dict[str, Any]]:
-        if not self.path.exists():
-            return {}
-        try:
-            value = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {}
+    async def _read(self) -> dict[str, dict[str, Any]]:
+        value = await self._repository.read()
         return value if isinstance(value, dict) else {}
 
-    def _write(self, sessions: dict[str, dict[str, Any]]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(f"{self.path.suffix}.tmp")
-        temporary.write_text(
-            json.dumps(sessions, ensure_ascii=False, indent=2), encoding="utf-8",
-        )
-        temporary.replace(self.path)
+    async def _write(self, sessions: dict[str, dict[str, Any]]) -> None:
+        await self._repository.write(sessions)
 
     @staticmethod
     def _cleanup(sessions: dict[str, dict[str, Any]], now: int) -> None:
@@ -104,7 +96,7 @@ class PageNavigationRegistry:
         token: str | None = None,
     ) -> PageNavigation:
         async with self._lock:
-            sessions = self._read()
+            sessions = await self._read()
             now = int(time.time())
             self._cleanup(sessions, now)
             current = self._state(token, sessions.get(token, {})) if token else None
@@ -132,17 +124,17 @@ class PageNavigationRegistry:
                 "external_root": external_root,
                 "updated_at": now,
             }
-            self._write(sessions)
+            await self._write(sessions)
             return PageNavigation(token, int(user_id), tuple(stack), external_root)
 
     async def back(self, token: str, user_id: int) -> PageNavigation | None:
         async with self._lock:
-            sessions = self._read()
+            sessions = await self._read()
             now = int(time.time())
             self._cleanup(sessions, now)
             current = self._state(token, sessions.get(token, {}))
             if current is None or current.user_id != user_id or not current.can_go_back:
-                self._write(sessions)
+                await self._write(sessions)
                 return None
             stack = list(current.stack)
             previous_stack = list(stack)
@@ -155,37 +147,37 @@ class PageNavigationRegistry:
                 "external_root": current.external_root,
                 "updated_at": now,
             }
-            self._write(sessions)
+            await self._write(sessions)
             return PageNavigation(
                 token, current.user_id, tuple(stack), current.external_root,
             )
 
     async def home(self, token: str, user_id: int) -> PageNavigation | None:
         async with self._lock:
-            sessions = self._read()
+            sessions = await self._read()
             now = int(time.time())
             self._cleanup(sessions, now)
             current = self._state(token, sessions.get(token, {}))
             if current is None or current.user_id != user_id:
-                self._write(sessions)
+                await self._write(sessions)
                 return None
-            self._write(sessions)
+            await self._write(sessions)
             return current
 
     async def commit_back(self, token: str, user_id: int) -> None:
         async with self._lock:
-            sessions = self._read()
+            sessions = await self._read()
             value = sessions.get(token)
             current = self._state(token, value if isinstance(value, dict) else {})
             if current is None or current.user_id != user_id or not isinstance(value, dict):
                 return
             value.pop("previous_stack", None)
             value["updated_at"] = int(time.time())
-            self._write(sessions)
+            await self._write(sessions)
 
     async def rollback_back(self, token: str, user_id: int) -> None:
         async with self._lock:
-            sessions = self._read()
+            sessions = await self._read()
             value = sessions.get(token)
             current = self._state(token, value if isinstance(value, dict) else {})
             if current is None or current.user_id != user_id or not isinstance(value, dict):
@@ -194,13 +186,13 @@ class PageNavigationRegistry:
             if isinstance(previous, list) and all(isinstance(item, str) for item in previous):
                 value["stack"] = previous
                 value["updated_at"] = int(time.time())
-                self._write(sessions)
+                await self._write(sessions)
 
     async def finish(self, token: str) -> None:
         async with self._lock:
-            sessions = self._read()
+            sessions = await self._read()
             if sessions.pop(token, None) is not None:
-                self._write(sessions)
+                await self._write(sessions)
 
 
 page_navigation_registry = PageNavigationRegistry()

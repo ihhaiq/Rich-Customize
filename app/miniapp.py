@@ -19,6 +19,7 @@ from app.services.chat_registry import managed_chat_registry
 from app.services.page_registry import page_registry
 from app.services.popup_registry import popup_registry
 from app.services.renderer import RichMessageRenderError, send_rich_message_post
+from app.storage import state_database
 
 STATIC_DIR = Path(__file__).with_name("miniapp_static")
 _ADMIN_STATUSES = {"administrator", "creator"}
@@ -124,7 +125,18 @@ async def index(_: web.Request) -> web.FileResponse:
 
 async def health(_: web.Request) -> web.Response:
     """Lightweight unauthenticated probe for Railway/container health checks."""
-    return web.json_response({"ok": True, "service": "rich-customize", "beta": BETA_VERSION})
+    database = state_database.status()
+    return web.json_response({
+        "ok": True,
+        "service": "rich-customize",
+        "beta": BETA_VERSION,
+        "database": {
+            "configured": database.configured,
+            "connected": database.connected,
+            "mode": database.mode,
+            "pending_sync": database.pending_sync,
+        },
+    })
 
 
 async def api_me(request: web.Request) -> web.Response:

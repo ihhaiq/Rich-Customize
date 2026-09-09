@@ -4,8 +4,12 @@ __pycache__/
 .pytest_cache/
 .venv/
 data/managed_chats.json
+data/button_popups.json
+data/database_fallback.json
 data/bot_profile_state_*.json
+data/bot_profile.json
 data/showcase_media.json
 data/rich_pages.json
+data/rich_media.json
 data/guest_messages.json
 data/page_navigation.json

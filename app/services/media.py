@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
+import threading
 import time
 from pathlib import Path
 from typing import Any, Iterable
+
+from app.storage import HybridJSONRepository
 
 logger = logging.getLogger(__name__)
 
@@ -95,23 +97,21 @@ class MediaStore:
     def __init__(self, path: Path | None = None, ttl: int | None = None) -> None:
         self.path = path or _state_path()
         self.ttl = ttl or _ttl_seconds()
+        self._lock = threading.RLock()
+        self._repository = HybridJSONRepository("rich_media", self.path)
 
     def _read(self) -> dict[str, dict[str, Any]]:
-        if not self.path.exists():
-            return {}
-        try:
-            raw = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {}
+        raw = self._repository.read_local_sync()
         return raw if isinstance(raw, dict) else {}
 
     def _write(self, items: dict[str, dict[str, Any]]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
-        temporary.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
-        temporary.replace(self.path)
+        self._repository.write_local_and_mirror(items)
 
     def remember_blocks(self, blocks: Iterable[dict[str, Any]]) -> None:
+        with self._lock:
+            self._remember_blocks(blocks)
+
+    def _remember_blocks(self, blocks: Iterable[dict[str, Any]]) -> None:
         now = int(time.time())
         items = self._read()
         changed = False
@@ -135,6 +135,10 @@ class MediaStore:
             self._write(items)
 
     def pin_page(self, page_id: str, blocks: Iterable[dict[str, Any]]) -> None:
+        with self._lock:
+            self._pin_page(page_id, blocks)
+
+    def _pin_page(self, page_id: str, blocks: Iterable[dict[str, Any]]) -> None:
         page_id = str(page_id)
         now = int(time.time())
         items = self._read()
@@ -169,6 +173,10 @@ class MediaStore:
             self._write(items)
 
     def unpin_page(self, page_id: str) -> None:
+        with self._lock:
+            self._unpin_page(page_id)
+
+    def _unpin_page(self, page_id: str) -> None:
         page_id = str(page_id)
         now = int(time.time())
         items = self._read()
@@ -185,6 +193,10 @@ class MediaStore:
             self._write(items)
 
     def cleanup(self) -> int:
+        with self._lock:
+            return self._cleanup()
+
+    def _cleanup(self) -> int:
         now = int(time.time())
         items = self._read()
         before = len(items)

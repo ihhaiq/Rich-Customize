@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import copy
-import json
 import os
 import secrets
 import time
@@ -10,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.services.media import media_store
+from app.storage import HybridJSONRepository
 
 
 def _registry_path() -> Path:
@@ -23,23 +23,14 @@ class PageRegistry:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or _registry_path()
         self._lock = asyncio.Lock()
+        self._repository = HybridJSONRepository("rich_pages", self.path)
 
-    def _read(self) -> dict[str, dict[str, Any]]:
-        if not self.path.exists():
-            return {}
-        try:
-            value = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {}
+    async def _read(self) -> dict[str, dict[str, Any]]:
+        value = await self._repository.read()
         return value if isinstance(value, dict) else {}
 
-    def _write(self, pages: dict[str, dict[str, Any]]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(f"{self.path.suffix}.tmp")
-        temporary.write_text(
-            json.dumps(pages, ensure_ascii=False, indent=2), encoding="utf-8",
-        )
-        temporary.replace(self.path)
+    async def _write(self, pages: dict[str, dict[str, Any]]) -> None:
+        await self._repository.write(pages)
 
     async def save(
         self,
@@ -53,7 +44,7 @@ class PageRegistry:
     ) -> str:
         """Create a new page or overwrite an existing one owned by the same user."""
         async with self._lock:
-            pages = self._read()
+            pages = await self._read()
             existing = pages.get(page_id or "")
             reuse = (
                 bool(page_id)
@@ -76,19 +67,19 @@ class PageRegistry:
                 else now,
                 "updated_at": now,
             }
-            self._write(pages)
+            await self._write(pages)
             media_store.remember_blocks(blocks)
             media_store.pin_page(code, blocks)
             return code
 
     async def get(self, page_id: str) -> dict[str, Any] | None:
         async with self._lock:
-            page = self._read().get(page_id)
+            page = (await self._read()).get(page_id)
             return copy.deepcopy(page) if isinstance(page, dict) else None
 
     async def list_for_user(self, owner_id: int) -> list[dict[str, Any]]:
         async with self._lock:
-            pages = self._read()
+            pages = await self._read()
             result = [
                 {"page_id": code, **copy.deepcopy(page)}
                 for code, page in pages.items()
@@ -129,12 +120,12 @@ class PageRegistry:
 
     async def delete(self, page_id: str, owner_id: int) -> bool:
         async with self._lock:
-            pages = self._read()
+            pages = await self._read()
             page = pages.get(page_id)
             if not isinstance(page, dict) or int(page.get("owner_id", 0)) != owner_id:
                 return False
             pages.pop(page_id, None)
-            self._write(pages)
+            await self._write(pages)
             media_store.unpin_page(page_id)
             return True
 
@@ -148,7 +139,7 @@ class PageRegistry:
         if int(snapshot.get("owner_id", 0)) != owner_id:
             return False
         async with self._lock:
-            pages = self._read()
+            pages = await self._read()
             if page_id in pages:
                 return False
             page = copy.deepcopy(snapshot)
@@ -159,26 +150,26 @@ class PageRegistry:
             page["buttons_per_row"] = int(page.get("buttons_per_row", 1))
             page["buttons_align"] = str(page.get("buttons_align", "center"))
             pages[page_id] = page
-            self._write(pages)
+            await self._write(pages)
             media_store.remember_blocks(page["blocks"])
             media_store.pin_page(page_id, page["blocks"])
             return True
 
     async def rename(self, page_id: str, owner_id: int, title: str) -> bool:
         async with self._lock:
-            pages = self._read()
+            pages = await self._read()
             page = pages.get(page_id)
             if not isinstance(page, dict) or int(page.get("owner_id", 0)) != owner_id:
                 return False
             page["title"] = title.strip()[:64] or "صفحة بلا اسم"
             page["updated_at"] = int(time.time())
-            self._write(pages)
+            await self._write(pages)
             return True
 
     async def rebuild_media_pins(self) -> None:
         """Rebuild pins at startup so existing page codes survive cache cleanup."""
         async with self._lock:
-            pages = self._read()
+            pages = await self._read()
             for page_id, page in pages.items():
                 if isinstance(page, dict):
                     media_store.remember_blocks(page.get("blocks") or [])
