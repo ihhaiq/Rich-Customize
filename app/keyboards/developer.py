@@ -16,11 +16,6 @@ def build_developer_keyboard() -> InlineKeyboardMarkup:
                 style=ButtonStyle.PRIMARY,
             ),
         ],
-        [InlineKeyboardButton(
-            text="فحص قاعدة البيانات",
-            callback_data="dev:database:check",
-            style=ButtonStyle.PRIMARY,
-        )],
     ])
 
 

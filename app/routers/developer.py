@@ -21,6 +21,7 @@ from app.services.data_import import (
 )
 from app.services.media_library import showcase_media_library
 from app.services.page_registry import page_registry
+from app.services.developer_ui import build_developer_rich_message
 from app.storage import state_database
 
 
@@ -35,6 +36,14 @@ class DeveloperStates(StatesGroup):
     confirming_import = State()
 
 
+async def _send_developer_panel(message: Message, text: str) -> None:
+    await message.bot.send_rich_message(
+        chat_id=message.chat.id,
+        rich_message=build_developer_rich_message(text),
+        reply_markup=build_developer_keyboard(),
+    )
+
+
 def _is_developer(user_id: int | None) -> bool:
     return user_id is not None and user_id in developer_ids()
 
@@ -45,13 +54,13 @@ async def open_developer_panel(message: Message, state: FSMContext) -> None:
     if not _is_developer(user_id):
         return
     await state.clear()
-    await message.answer(
+    await _send_developer_panel(
+        message,
         "🛠 لوحة المطوّر\n\n"
         "تقدر تصدّر بيانات البوت الحالية كملف ZIP، أو ترفع ملف ZIP/JSON "
         "لاستيرادها، وتفحص اتصال PostgreSQL أو تعيد ربطه من الزر المخصص. "
         "الاستيراد يُفحص ويطلب تأكيدًا قبل استبدال أي بيانات.\n\n"
         "ملف التصدير لا يحتوي التوكن أو متغيرات البيئة.",
-        reply_markup=build_developer_keyboard(),
     )
 
 
@@ -191,10 +200,10 @@ async def confirm_data_import(callback: CallbackQuery, state: FSMContext) -> Non
 
     await state.clear()
     if isinstance(callback.message, Message):
-        await callback.message.answer(
+        await _send_developer_panel(
+            callback.message,
             "✅ تم استيراد البيانات بنجاح.\n"
             f"عدد الملفات المستبدلة: {len(imported)}",
-            reply_markup=build_developer_keyboard(),
         )
 
 
@@ -205,9 +214,7 @@ async def cancel_data_import(callback: CallbackQuery, state: FSMContext) -> None
         return
     await state.clear()
     if isinstance(callback.message, Message):
-        await callback.message.answer(
-            "تم إلغاء الاستيراد.", reply_markup=build_developer_keyboard(),
-        )
+        await _send_developer_panel(callback.message, "تم إلغاء الاستيراد.")
     await callback.answer()
 
 
@@ -221,22 +228,22 @@ async def check_database_connection(callback: CallbackQuery) -> None:
     if not isinstance(callback.message, Message):
         return
     if status.connected:
-        await callback.message.answer(
+        await _send_developer_panel(
+            callback.message,
             "✅ قاعدة البيانات متصلة.\n\n"
             f"الوضع الحالي: PostgreSQL\n"
             f"زمن الاستجابة: {status.latency_ms or 1}ms\n"
             f"المخازن المتزامنة: {status.synced_namespaces}\n"
             f"عمليات JSON المنتظرة: {status.pending_sync}",
-            reply_markup=build_developer_keyboard(),
         )
         return
     if not status.configured:
         detail = "متغير DATABASE_URL غير مضاف إلى خدمة البوت في Railway."
     else:
         detail = status.last_error or "فشل الاتصال لسبب غير معروف."
-    await callback.message.answer(
+    await _send_developer_panel(
+        callback.message,
         "⚠️ قاعدة البيانات غير متصلة.\n\n"
         f"{detail}\n\n"
         "البوت مستمر بالعمل تلقائيًا باستخدام ملفات JSON الاحتياطية.",
-        reply_markup=build_developer_keyboard(),
     )

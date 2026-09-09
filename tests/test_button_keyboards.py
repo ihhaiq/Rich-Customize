@@ -1,6 +1,7 @@
 import unittest
 
 from aiogram.enums import ButtonStyle
+from aiogram.types import RichTextButton
 
 from app import i18n_core
 from app.editor.draft_store import EditorDraft
@@ -19,6 +20,7 @@ from app.keyboards import (
     build_welcome_keyboard,
 )
 from app.services.buttons import add_message_button
+from app.services.developer_ui import build_developer_rich_message
 from app.routers.editor_ui import editor_dashboard_text
 from app.services.welcome import ADD_GROUP_URL
 
@@ -40,7 +42,7 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertIn("الأزرار: 1", text)
         self.assertIn("صفحتي", text)
 
-    def test_developer_panel_has_import_and_export_buttons(self):
+    def test_developer_panel_has_import_export_and_rich_database_button(self):
         buttons = build_developer_keyboard().inline_keyboard[0]
         button = buttons[0]
 
@@ -48,10 +50,14 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertEqual(button.style, ButtonStyle.SUCCESS)
         self.assertEqual(buttons[1].callback_data, "dev:export")
         self.assertEqual(buttons[1].style, ButtonStyle.PRIMARY)
-        database_button = build_developer_keyboard().inline_keyboard[1][0]
-        self.assertEqual(database_button.text, "فحص قاعدة البيانات")
-        self.assertEqual(database_button.callback_data, "dev:database:check")
-        self.assertEqual(database_button.style, ButtonStyle.PRIMARY)
+        self.assertEqual(len(build_developer_keyboard().inline_keyboard), 1)
+
+        rich_message = build_developer_rich_message("لوحة المطور")
+        database_button = rich_message.blocks[0].text[-1]
+        self.assertIsInstance(database_button, RichTextButton)
+        self.assertEqual(database_button.button.text, "فحص قاعدة البيانات")
+        self.assertEqual(database_button.button.callback_data, "dev:database:check")
+        self.assertEqual(database_button.button.style, "primary")
 
         confirmation = build_developer_import_confirmation_keyboard()
         self.assertEqual(
