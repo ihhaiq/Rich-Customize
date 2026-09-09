@@ -5,7 +5,7 @@ import html
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from app.i18n import t, tr
+from app.i18n import t
 from app.keyboards import build_pages_keyboard
 from app.routers.editor_ui import MAIN_TEXT, edit_saved_ui, edit_ui
 from app.routers.button_support import save_changed_draft
@@ -14,10 +14,10 @@ from app.services.page_editor import query_user_pages
 
 def saved_pages_text(page_index: int = 0, total_pages: int = 1) -> str:
     return "\n".join([
-        tr("📚 صفحاتك المحفوظة"),
+        t("pages.saved_title"),
         f"{page_index + 1}/{total_pages}",
         "",
-        tr("اختر صفحة لفتحها وتعديلها:"),
+        t("pages.open_prompt"),
     ])
 
 
