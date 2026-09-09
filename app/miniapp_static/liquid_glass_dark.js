@@ -1,50 +1,8 @@
-// Beta 0.3.4 — block long-press menu contains only quick actions.
-function openBlockMenu(block){
-  if(!block||!current?.blocks)return;
-  slashMenu.classList.add("hidden");
-  blockActions.innerHTML="";
-  blockMenuTitle.textContent=info(block.type).label;
-  blockMenu.classList.add("block-quick-menu");
-
-  const index=current.blocks.findIndex(item=>item.id===block.id);
-
-  const up=menuButton("up",mt("action.move_up"),"",()=>{
-    moveBlock(block.id,-1);
-    hideMenus();
-  });
-  up.disabled=index<=0;
-  blockActions.appendChild(up);
-
-  const down=menuButton("down",mt("action.move_down"),"",()=>{
-    moveBlock(block.id,1);
-    hideMenus();
-  });
-  down.disabled=index<0||index>=current.blocks.length-1;
-  blockActions.appendChild(down);
-
-  blockActions.appendChild(menuButton("delete",mt("action.delete_block"),"",()=>{
-    deleteBlock(block.id);
-    hideMenus();
-  },"danger"));
-
-  blockMenu.classList.remove("hidden");
-}
-
-// Optional ⚡ deep-black Liquid Glass mode.
+// Optional deep-black Liquid Glass theme controlled by the ⚡ top-bar toggle.
 (()=>{
   const ROOT_CLASS="liquid-glass-dark";
   const STORAGE_KEY="richCustomizeLiquidGlassDark";
-  const STYLE_ID="liquidGlassDarkCss";
   const BUTTON_ID="liquidGlassToggle";
-
-  function ensureThemeStyles(){
-    if(document.getElementById(STYLE_ID))return;
-    const link=document.createElement("link");
-    link.id=STYLE_ID;
-    link.rel="stylesheet";
-    link.href="/miniapp/static/liquid_glass_dark.css?v=0.3.40";
-    document.head.appendChild(link);
-  }
 
   function readPreference(){
     try{return localStorage.getItem(STORAGE_KEY)==="1";}catch(_){return false;}
@@ -103,8 +61,7 @@ function openBlockMenu(block){
     return button;
   }
 
-  function initLiquidGlassToggle(){
-    ensureThemeStyles();
+  function init(){
     const button=ensureToggle();
     const enabled=readPreference();
     document.documentElement.classList.toggle(ROOT_CLASS,enabled);
@@ -112,8 +69,8 @@ function openBlockMenu(block){
   }
 
   if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",initLiquidGlassToggle,{once:true});
+    document.addEventListener("DOMContentLoaded",init,{once:true});
   }else{
-    initLiquidGlassToggle();
+    init();
   }
 })();

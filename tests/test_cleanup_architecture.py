@@ -143,6 +143,22 @@ class CleanupArchitectureTests(unittest.TestCase):
         self.assertNotIn("def tr(", source)
         self.assertNotIn("def t(", source)
 
+    def test_miniapp_has_no_patch_or_dead_table_assets(self):
+        static = APP / "miniapp_static"
+        patch_files = sorted(path.name for path in static.iterdir() if "_patch" in path.name)
+        self.assertEqual(patch_files, [])
+        self.assertFalse((static / "table_cell_tools.js").exists())
+        self.assertFalse((static / "table_cell_tools.css").exists())
+        index = (static / "index.html").read_text(encoding="utf-8")
+        for asset in (
+            "block_quick_menu.js",
+            "liquid_glass_dark.js",
+            "details_list_editor.js",
+            "details_list_state.js",
+            "page_menu.js",
+        ):
+            self.assertIn(asset, index)
+
 
 if __name__ == "__main__":
     unittest.main()

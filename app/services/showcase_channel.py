@@ -29,10 +29,6 @@ _STALE_MESSAGE_MARKERS = (
 )
 
 
-class ShowcaseChannelEmpty(RuntimeError):
-    pass
-
-
 @dataclass(frozen=True, slots=True)
 class ShowcaseRefreshResult:
     total: int
@@ -42,12 +38,12 @@ class ShowcaseRefreshResult:
 
 
 class ShowcaseChannelStore:
-    """Persist the ordered contents of the showcase channel.
+    """Persist source-channel snapshots used by the showcase content library.
 
-    The source message IDs are used for delivery through copyMessages so Telegram
-    keeps the original rich-message rendering and media intact. A compact snapshot
-    is persisted as well for diagnostics/backups. PostgreSQL is used through
-    HybridJSONRepository with the normal JSON fallback when it is unavailable.
+    The store keeps ordered source message IDs plus compact text/rich-message
+    snapshots for PostgreSQL-backed persistence, JSON fallback, diagnostics and
+    backups. Message IDs are retained only so the developer refresh action can
+    validate known channel posts and prune entries that were deleted later.
     """
 
     def __init__(
@@ -142,42 +138,8 @@ class ShowcaseChannelStore:
         text = str(error).upper()
         return any(marker in text for marker in _STALE_MESSAGE_MARKERS)
 
-    async def send_preview(self, bot: Bot, chat_id: int) -> int:
-        message_ids = self.message_ids
-        if not message_ids:
-            raise ShowcaseChannelEmpty("showcase channel cache is empty")
-
-        sent = 0
-        for offset in range(0, len(message_ids), _COPY_BATCH_SIZE):
-            batch = message_ids[offset:offset + _COPY_BATCH_SIZE]
-            try:
-                copied = await bot.copy_messages(
-                    chat_id=chat_id,
-                    from_chat_id=self.channel_id,
-                    message_ids=batch,
-                    disable_notification=True,
-                )
-            except TelegramAPIError:
-                if sent == 0:
-                    raise
-                logger.exception(
-                    "Could not copy a later showcase batch to chat_id=%s", chat_id
-                )
-                continue
-            sent += len(copied)
-
-        if sent == 0:
-            raise ShowcaseChannelEmpty("no showcase channel messages could be copied")
-        return sent
-
     async def refresh(self, bot: Bot, validation_chat_id: int) -> ShowcaseRefreshResult:
-        """Reload persisted state and prune source messages that no longer exist.
-
-        Telegram's Bot API does not emit a channel-message deletion update. The
-        developer refresh action therefore validates the known source IDs by
-        silently copying each message to the developer chat and immediately
-        deleting the temporary copies.
-        """
+        """Reload persisted state and prune known source messages that no longer exist."""
         await self.reload()
         source_ids = self.message_ids
         stale: set[int] = set()
@@ -233,7 +195,6 @@ showcase_channel_store = ShowcaseChannelStore()
 
 __all__ = [
     "SHOWCASE_CHANNEL_STATE",
-    "ShowcaseChannelEmpty",
     "ShowcaseChannelStore",
     "ShowcaseRefreshResult",
     "showcase_channel_store",
