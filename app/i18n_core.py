@@ -9,7 +9,7 @@ from aiogram import BaseMiddleware, Bot
 from aiogram.methods import TelegramMethod
 from aiogram.types import InlineKeyboardMarkup, TelegramObject
 
-from app.translations_zh import ZH_HANS, ZH_HANT
+from app.lang.catalogs.chinese import ZH_HANS, ZH_HANT
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")

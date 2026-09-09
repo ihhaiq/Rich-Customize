@@ -4,7 +4,7 @@ from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.i18n import t, tr
+from app.i18n import t
 from app.keyboards import build_page_sort_keyboard
 from app.states import RichEditorStates
 
@@ -40,7 +40,7 @@ async def list_pages(callback: CallbackQuery, state: FSMContext) -> None:
         requested_index,
     )
     if not rendered:
-        await callback.answer(tr("ما عندك صفحات محفوظة بعد."), show_alert=True)
+        await callback.answer(t("pages.empty"), show_alert=True)
         return
     await callback.answer()
 
@@ -58,7 +58,7 @@ async def request_page_search(callback: CallbackQuery, state: FSMContext) -> Non
 async def receive_page_search(message: Message, state: FSMContext, bot: Bot) -> None:
     query = (message.text or "").strip()
     if not query:
-        await message.answer(tr("أرسل كلمة بحث صحيحة."))
+        await message.answer(t("pages.search_invalid"))
         return
     data = await state.get_data()
     query = "" if query.casefold() == "/all" else query[:64]

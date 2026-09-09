@@ -9,12 +9,7 @@ _SHORT_NAME_RE = re.compile(r"^[A-Za-z0-9_]{1,64}$")
 
 
 def mini_app_short_name() -> str:
-    """Return the Telegram Direct/Named Mini App short name.
-
-    The default is ``editor`` so the public link is stable. Configure a Direct
-    Mini App with the same short name in BotFather, or override it with
-    MINI_APP_SHORT_NAME.
-    """
+    """Return the Telegram Direct/Named Mini App short name."""
     value = os.getenv("MINI_APP_SHORT_NAME", _DEFAULT_SHORT_NAME).strip()
     if not _SHORT_NAME_RE.fullmatch(value):
         return _DEFAULT_SHORT_NAME
@@ -30,3 +25,6 @@ def direct_mini_app_link(bot_username: str, start_param: str | None = None) -> s
     if not start_param:
         return base
     return f"{base}?startapp={quote(str(start_param), safe='_-')}"
+
+
+__all__ = ["direct_mini_app_link", "mini_app_short_name"]

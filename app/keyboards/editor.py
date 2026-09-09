@@ -10,7 +10,7 @@ from app.editor.view_state import (
     current_block_scroll_offset,
     normalize_block_scroll_offset,
 )
-from app.i18n import t, tr
+from app.i18n import t
 from app.services.blocks import get_block_button_text
 from app.services.welcome import ADD_GROUP_URL
 
@@ -73,7 +73,7 @@ def build_rich_editor_keyboard(
     rows: list[list[InlineKeyboardButton]] = []
     if normalized_offset > 0:
         rows.append([InlineKeyboardButton(
-            text=tr("⬆️ صعود"),
+            text=t("editor.scroll_up"),
             callback_data=f"r:blockscroll:{max(0, normalized_offset - BLOCK_SCROLL_SIZE)}",
         )])
 
@@ -97,7 +97,7 @@ def build_rich_editor_keyboard(
 
     if normalized_offset + BLOCK_SCROLL_SIZE < len(ordered_blocks):
         rows.append([InlineKeyboardButton(
-            text=tr("⬇️ تمرير"),
+            text=t("editor.scroll_down"),
             callback_data=f"r:blockscroll:{normalized_offset + BLOCK_SCROLL_SIZE}",
         )])
 

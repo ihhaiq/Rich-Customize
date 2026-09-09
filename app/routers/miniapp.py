@@ -8,9 +8,9 @@ from aiogram.types import (
 
 from app.config import developer_ids
 from app.i18n import t
-from app.miniapp import mini_app_url
-from app.miniapp_links import direct_mini_app_link, mini_app_short_name
-from app.miniapp_rich_buttons import complete_user_picker
+from app.webapp.buttons import complete_user_picker
+from app.webapp.links import direct_mini_app_link, mini_app_short_name
+from app.webapp.server import mini_app_url
 
 router = Router(name="miniapp_beta")
 
@@ -53,7 +53,7 @@ async def open_mini_app(message: Message) -> None:
 @router.message(StateFilter(None), F.chat.type == "private", F.users_shared)
 async def receive_miniapp_rich_button_user(message: Message) -> None:
     # This flow belongs to the public Mini App. The pending request registry
-    # already verifies that request_id belongs to message.from_user.id.
+    # verifies that request_id belongs to message.from_user.id.
     if message.from_user is None:
         return
     shared = message.users_shared

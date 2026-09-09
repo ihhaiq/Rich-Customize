@@ -12,6 +12,7 @@ from aiogram.types import KeyboardButton, KeyboardButtonRequestUsers, ReplyKeybo
 from app.i18n import t, use_language
 from app.services.inline_buttons import find_user_button_markers
 from app.services.page_registry import page_registry
+from app.webapp.auth import miniapp_user
 
 
 class MiniAppUserPickerRegistry:
@@ -141,7 +142,7 @@ def _replace_marker_all(value: Any, marker: str, replacement: str) -> Any:
 
 
 async def request_user_picker(request: web.Request) -> web.Response:
-    user = request.app["developer_user"](request)
+    user = miniapp_user(request)
     try:
         payload = await request.json()
     except Exception as exc:
@@ -276,3 +277,12 @@ async def complete_user_picker(
 
 def register_rich_button_routes(app: web.Application) -> None:
     app.router.add_post("/miniapp/api/rich-buttons/user-picker", request_user_picker)
+
+
+__all__ = [
+    "complete_user_picker",
+    "miniapp_user_picker_registry",
+    "register_rich_button_routes",
+    "request_user_picker",
+    "sync_rich_button_block",
+]

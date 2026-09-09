@@ -8,6 +8,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import BufferedInputFile
 
 from app.services.page_registry import page_registry
+from app.webapp.auth import miniapp_user
 
 MAX_PHOTO_BYTES = 10 * 1024 * 1024
 MAX_MEDIA_BYTES = 50 * 1024 * 1024
@@ -91,8 +92,7 @@ async def _send_to_telegram(
 
 
 async def _upload_kind(request: web.Request, kind: str) -> web.Response:
-    developer_user = request.app["developer_user"]
-    user = developer_user(request)
+    user = miniapp_user(request)
     user_id = int(user["id"])
     if kind not in SUPPORTED_KINDS:
         raise web.HTTPBadRequest(text="unsupported")
@@ -142,15 +142,9 @@ async def upload_media(request: web.Request) -> web.Response:
     return await _upload_kind(request, str(request.match_info.get("kind") or "").lower())
 
 
-async def upload_photo(request: web.Request) -> web.Response:
-    # Compatibility route used by older cached Mini App builds.
-    return await _upload_kind(request, "photo")
-
-
 async def discard_editor_session(request: web.Request) -> web.Response:
     """Restore the page loaded at session start, or remove a new auto-saved draft."""
-    developer_user = request.app["developer_user"]
-    user = developer_user(request)
+    user = miniapp_user(request)
     owner_id = int(user["id"])
 
     try:
@@ -195,6 +189,8 @@ async def discard_editor_session(request: web.Request) -> web.Response:
 
 
 def register_upload_routes(app: web.Application) -> None:
-    app.router.add_post("/miniapp/api/upload/photo", upload_photo)
     app.router.add_post("/miniapp/api/upload/{kind}", upload_media)
     app.router.add_post("/miniapp/api/discard-session", discard_editor_session)
+
+
+__all__ = ["discard_editor_session", "register_upload_routes", "upload_media"]

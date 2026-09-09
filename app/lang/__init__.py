@@ -4,6 +4,7 @@ from importlib import import_module
 from typing import Any
 
 from app.lang.bundle_loader import LocaleBundle
+from app.lang.catalogs.migration_semantic import SEMANTIC_AR_PHRASES, SEMANTIC_PHRASES
 
 
 LANGUAGE_MODULES: dict[str, str] = {
@@ -58,6 +59,20 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     for code, bundle in BUNDLES.items()
     if code != "en" and bundle.translations
 }
+
+# New UI is registered by semantic key. Reuse the established English-source
+# translations when a locale already has them, otherwise fall back to English
+# instead of reintroducing Arabic source-string normalization.
+PHRASES.update(SEMANTIC_PHRASES)
+AR_PHRASES.update(SEMANTIC_AR_PHRASES)
+for code in LANGUAGE_MODULES:
+    if code in {"ar", "en"}:
+        continue
+    keyed = KEY_TRANSLATIONS.setdefault(code, {})
+    source_map = TRANSLATIONS.get(code, {})
+    for key, english in SEMANTIC_PHRASES.items():
+        keyed.setdefault(key, source_map.get(english, english))
+
 CATALOG_EN = dict(BUNDLES["en"].catalog)
 CATALOG_AR = dict(BUNDLES["ar"].catalog)
 CATALOG_TRANSLATIONS: dict[str, dict[str, str]] = {
