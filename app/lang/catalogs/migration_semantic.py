@@ -46,6 +46,8 @@ SEMANTIC_PHRASES: dict[str, str] = {
     "editor.scroll_down": "⬇️ Scroll",
     "pages.empty": "You don't have any saved pages yet.",
     "pages.search_invalid": "Send a valid search term.",
+    "pages.saved_title": "📚 Your saved pages",
+    "pages.open_prompt": "Choose a page to open and edit:",
 }
 
 SEMANTIC_AR_PHRASES: dict[str, str] = {
@@ -89,6 +91,8 @@ SEMANTIC_AR_PHRASES: dict[str, str] = {
     "editor.scroll_down": "⬇️ تمرير",
     "pages.empty": "ما عندك صفحات محفوظة بعد.",
     "pages.search_invalid": "أرسل كلمة بحث صحيحة.",
+    "pages.saved_title": "📚 صفحاتك المحفوظة",
+    "pages.open_prompt": "اختر صفحة لفتحها وتعديلها:",
 }
 
 
