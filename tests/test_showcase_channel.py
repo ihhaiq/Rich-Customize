@@ -2,9 +2,10 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from app.routers.developer import _developer_panel_rich_message
+from app.routers.editor_showcase import _send_showcase
 from app.services.data_import import configured_state_destinations
 from app.services.showcase_channel import ShowcaseChannelStore
 
@@ -50,6 +51,18 @@ class ShowcaseChannelTests(unittest.TestCase):
             destinations["showcase_channel.json"],
             Path(directory) / "preview.json",
         )
+
+
+class ShowcaseRouteTests(unittest.IsolatedAsyncioTestCase):
+    async def test_showcase_route_builds_one_generated_rich_message(self):
+        bot = object()
+        with patch(
+            "app.routers.editor_showcase.send_all_blocks_showcase",
+            new_callable=AsyncMock,
+        ) as build_showcase:
+            await _send_showcase(bot, 100, 200)
+
+        build_showcase.assert_awaited_once_with(bot, 100, 200)
 
 
 if __name__ == "__main__":
