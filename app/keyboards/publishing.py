@@ -5,7 +5,7 @@ from typing import Any
 from aiogram.enums import ButtonStyle
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.i18n import t, tr
+from app.i18n import t
 
 
 def build_post_back_keyboard(callback_data: str = "r:back") -> InlineKeyboardMarkup:
@@ -33,17 +33,17 @@ def build_post_chats_keyboard(
         )])
     if chats:
         rows.append([InlineKeyboardButton(
-            text=f"{tr('⚙️ إعدادات وإرسال')} ({len(selected)})",
+            text=f"{t('publish.settings_send')} ({len(selected)})",
             callback_data="r:postsettings",
             style=ButtonStyle.SUCCESS,
         )])
     rows.append([
         InlineKeyboardButton(
-            text=tr("➕ إضافة البوت إلى قناة"), url=channel_url,
+            text=t("publish.add_bot_channel"), url=channel_url,
             style=ButtonStyle.PRIMARY,
         ),
         InlineKeyboardButton(
-            text=tr("➕ إضافة البوت إلى مجموعة"), url=group_url,
+            text=t("publish.add_bot_group"), url=group_url,
             style=ButtonStyle.PRIMARY,
         ),
     ])
