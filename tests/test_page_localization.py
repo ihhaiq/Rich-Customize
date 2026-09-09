@@ -211,9 +211,13 @@ class SavedPagesLocalizationTests(unittest.TestCase):
         self.assertNotIn("<code>", rendered)
 
     def test_opened_page_editor_shows_only_editor_text(self):
-        rendered = _opened_page_text()
+        token = i18n_core._language.set("ar")
+        try:
+            rendered = _opened_page_text()
+        finally:
+            i18n_core._language.reset(token)
 
-        self.assertEqual(rendered, "تخصيص الرسالة\n\nاختر الجزء الذي تريد تعديله:")
+        self.assertEqual(rendered, "تخصيص الرسالة\n\nاختر البلوك الذي تريد تعديله:")
 
     def test_saved_pages_are_paginated_and_out_of_range_is_clamped(self):
         pages = [{"page_id": str(index)} for index in range(10)]
@@ -424,6 +428,7 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
         state = SimpleNamespace(
             clear=AsyncMock(),
             set_state=AsyncMock(),
+            get_data=AsyncMock(return_value={}),
             update_data=AsyncMock(),
         )
 

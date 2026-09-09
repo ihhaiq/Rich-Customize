@@ -143,7 +143,7 @@ class DetailsEditingTests(unittest.IsolatedAsyncioTestCase):
         updated = details["data"]["children"][0]
         self.assertEqual(updated["type"], "paragraph")
         self.assertEqual(updated["data"]["text"], "new text")
-        self.assertEqual(updated["data"]["html"], "<i>new text</i>")
+        self.assertEqual(updated["data"]["html"], "<p><i>new text</i></p>")
 
 
 class SavedPageSafetyTests(unittest.IsolatedAsyncioTestCase):
@@ -236,12 +236,15 @@ class CoreLocalizationRegressionTests(unittest.TestCase):
             result = build_result_keyboard()
             pages = saved_pages_text()
             values = [
-                welcome.inline_keyboard[0][0].text,
-                welcome.inline_keyboard[0][1].text,
+                button.text
+                for row in welcome.inline_keyboard
+                for button in row
+            ]
+            values.extend([
                 result.inline_keyboard[0][0].text,
                 pages,
                 t("editor.current_position"),
-            ]
+            ])
         finally:
             i18n_core._language.reset(token)
 

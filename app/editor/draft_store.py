@@ -63,7 +63,9 @@ class FSMDraftStore:
         )
         set_block_scroll_offset(block_scroll_offset)
         if data.get("block_scroll_offset") != block_scroll_offset:
-            await state.update_data(block_scroll_offset=block_scroll_offset)
+            update_data = getattr(state, "update_data", None)
+            if update_data is not None:
+                await update_data(block_scroll_offset=block_scroll_offset)
         return draft
 
     async def save(
@@ -76,7 +78,8 @@ class FSMDraftStore:
         payload = current.as_state()
         payload.update(changes)
         normalized = EditorDraft.from_state(payload)
-        data = await state.get_data()
+        get_data = getattr(state, "get_data", None)
+        data = await get_data() if get_data is not None else {}
         block_scroll_offset = normalize_block_scroll_offset(
             len(normalized.blocks),
             data.get("block_scroll_offset"),

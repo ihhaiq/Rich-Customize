@@ -193,12 +193,12 @@ async def receive_nested_replacement(
                     return True
                 candidate = new_block(expected, replacement)
         else:
-            replacement = replacement_data(message, expected)
-            if replacement is not None:
+            parsed_replacement = replacement_data(message, expected)
+            if parsed_replacement is not None:
                 if expected in MEDIA_CAPTION_TYPES:
-                    replacement["caption_html"] = child.get("data", {}).get("caption_html")
-                    replacement["credit_html"] = child.get("data", {}).get("credit_html")
-                candidate = new_block(expected, replacement)
+                    parsed_replacement["caption_html"] = child.get("data", {}).get("caption_html")
+                    parsed_replacement["credit_html"] = child.get("data", {}).get("credit_html")
+                candidate = new_block(expected, parsed_replacement)
 
         if candidate is None:
             await message.answer(t("details.inner_wrong_content"))

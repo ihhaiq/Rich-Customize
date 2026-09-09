@@ -91,7 +91,10 @@ class EditorActionVisibilityTests(unittest.TestCase):
         )
         block_rows = [
             row for row in keyboard.inline_keyboard
-            if row[0].callback_data and row[0].callback_data.startswith("r:b:")
+            if any(
+                button.callback_data and button.callback_data.startswith("r:b:")
+                for button in row
+            )
         ]
         self.assertEqual(len(block_rows), BLOCK_SCROLL_SIZE)
         last_block_index = keyboard.inline_keyboard.index(block_rows[-1])

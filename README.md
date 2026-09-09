@@ -162,5 +162,8 @@ DEVELOPER_ID=123456789
 ## الاختبارات
 
 ```bash
-python -m unittest discover -s tests -v
+python -m pytest -q
+python -m ruff check .
+python -m mypy app main.py
+python -m compileall -q app main.py
 ```
