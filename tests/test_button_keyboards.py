@@ -19,6 +19,7 @@ from app.keyboards import (
     build_welcome_keyboard,
 )
 from app.services.buttons import add_message_button
+from app.routers.developer import _developer_panel_rich_message
 from app.routers.editor_ui import editor_dashboard_text
 from app.services.welcome import ADD_GROUP_URL
 
@@ -40,18 +41,33 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertIn("الأزرار: 1", text)
         self.assertIn("صفحتي", text)
 
-    def test_developer_panel_has_import_and_export_buttons(self):
-        buttons = build_developer_keyboard().inline_keyboard[0]
+    def test_developer_panel_has_import_export_and_rich_database_button(self):
+        keyboard = build_developer_keyboard()
+        self.assertEqual(len(keyboard.inline_keyboard), 1)
+        buttons = keyboard.inline_keyboard[0]
         button = buttons[0]
 
         self.assertEqual(button.callback_data, "dev:import")
         self.assertEqual(button.style, ButtonStyle.SUCCESS)
         self.assertEqual(buttons[1].callback_data, "dev:export")
         self.assertEqual(buttons[1].style, ButtonStyle.PRIMARY)
-        database_button = build_developer_keyboard().inline_keyboard[1][0]
-        self.assertEqual(database_button.text, "فحص قاعدة البيانات")
-        self.assertEqual(database_button.callback_data, "dev:database:check")
-        self.assertEqual(database_button.style, ButtonStyle.PRIMARY)
+        self.assertNotIn(
+            "dev:database:check",
+            [
+                item.callback_data
+                for row in keyboard.inline_keyboard
+                for item in row
+                if item.callback_data
+            ],
+        )
+
+        rich_payload = _developer_panel_rich_message("لوحة المطوّر").model_dump(
+            exclude_none=True,
+        )
+        database_button = rich_payload["blocks"][1]["buttons"][0]
+        self.assertEqual(database_button["text"], "فحص قاعدة البيانات")
+        self.assertEqual(database_button["callback_data"], "dev:database:check")
+        self.assertEqual(database_button["style"], "primary")
 
         confirmation = build_developer_import_confirmation_keyboard()
         self.assertEqual(
