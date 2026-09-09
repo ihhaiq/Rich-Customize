@@ -19,6 +19,7 @@ _CONFIGURED_STATES = (
     ("GUEST_MESSAGES_STATE", "data/guest_messages.json"),
     ("BUTTON_POPUPS_STATE", "data/button_popups.json"),
     ("SHOWCASE_MEDIA_LIBRARY", "data/showcase_media.json"),
+    ("SHOWCASE_CHANNEL_STATE", "data/showcase_channel.json"),
 )
 
 
