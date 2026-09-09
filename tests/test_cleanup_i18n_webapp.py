@@ -39,9 +39,15 @@ def test_keyboards_are_semantic_i18n_only() -> None:
         assert "tr(" not in path.read_text("utf-8"), path
 
 
-def test_migrated_editor_dashboard_is_semantic_i18n_only() -> None:
-    path = APP / "routers" / "editor_ui.py"
-    assert "tr(" not in path.read_text("utf-8")
+def test_migrated_editor_surfaces_are_semantic_i18n_only() -> None:
+    paths = [
+        APP / "routers" / "editor_ui.py",
+        APP / "routers" / "page_search.py",
+        APP / "routers" / "page_support.py",
+        APP / "services" / "publish_ui.py",
+    ]
+    for path in paths:
+        assert "tr(" not in path.read_text("utf-8"), path
 
 
 def test_miniapp_backend_is_feature_scoped() -> None:
