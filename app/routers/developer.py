@@ -4,7 +4,7 @@ import asyncio
 import io
 import logging
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -21,6 +21,7 @@ from app.services.data_import import (
 )
 from app.services.media_library import showcase_media_library
 from app.services.page_registry import page_registry
+from app.services.showcase_channel import showcase_channel_store
 from app.storage import state_database
 
 
@@ -44,11 +45,18 @@ def _developer_panel_rich_message(text: str) -> InputRichMessage:
         {"type": "paragraph", "text": text},
         {
             "type": "buttons",
-            "buttons": [{
-                "text": "فحص قاعدة البيانات",
-                "callback_data": "dev:database:check",
-                "style": "primary",
-            }],
+            "buttons": [
+                {
+                    "text": "فحص قاعدة البيانات",
+                    "callback_data": "dev:database:check",
+                    "style": "primary",
+                },
+                {
+                    "text": "تحديث قناة المعاينة",
+                    "callback_data": "dev:showcase:refresh",
+                    "style": "primary",
+                },
+            ],
             "align": "center",
         },
     ])
@@ -72,7 +80,8 @@ async def open_developer_panel(message: Message, state: FSMContext) -> None:
         message,
         "🛠 لوحة المطوّر\n\n"
         "تقدر تصدّر بيانات البوت الحالية كملف ZIP، أو ترفع ملف ZIP/JSON "
-        "لاستيرادها، وتفحص اتصال PostgreSQL أو تعيد ربطه من الزر المخصص. "
+        "لاستيرادها، وتفحص اتصال PostgreSQL أو تعيد ربطه من الزر المخصص، "
+        "وتحدّث كاش قناة المعاينة بعد إضافة أو حذف محتوى منها. "
         "الاستيراد يُفحص ويطلب تأكيدًا قبل استبدال أي بيانات.\n\n"
         "ملف التصدير لا يحتوي التوكن أو متغيرات البيئة.",
     )
@@ -203,6 +212,7 @@ async def confirm_data_import(callback: CallbackQuery, state: FSMContext) -> Non
             imported = await asyncio.to_thread(apply_data_import, prepared)
             await state_database.sync_local_paths(list(prepared))
             await showcase_media_library.reload()
+            await showcase_channel_store.reload()
             await page_registry.rebuild_media_pins()
         except (DataImportError, OSError):
             logger.exception("Could not apply developer data import")
@@ -261,3 +271,37 @@ async def check_database_connection(callback: CallbackQuery) -> None:
         f"{detail}\n\n"
         "البوت مستمر بالعمل تلقائيًا باستخدام ملفات JSON الاحتياطية.",
     )
+
+
+@router.callback_query(F.data == "dev:showcase:refresh")
+async def refresh_showcase_channel(callback: CallbackQuery, bot: Bot) -> None:
+    if not _is_developer(callback.from_user.id):
+        await callback.answer("هذا الخيار للمطوّر فقط.", show_alert=True)
+        return
+
+    await callback.answer("جاري تحديث قناة المعاينة…")
+    try:
+        result = await showcase_channel_store.refresh(bot, callback.from_user.id)
+    except TelegramAPIError:
+        logger.exception("Could not refresh showcase channel cache")
+        if isinstance(callback.message, Message):
+            await _send_developer_panel(
+                callback.message,
+                "❌ تعذر تحديث قناة المعاينة. تأكد أن البوت ما زال مشرفًا في القناة.",
+            )
+        return
+
+    if not isinstance(callback.message, Message):
+        return
+
+    text = (
+        "✅ تم تحديث قناة المعاينة.\n\n"
+        f"العناصر المحفوظة قبل الفحص: {result.total}\n"
+        f"المحتوى الحالي: {result.retained}\n"
+        f"المحذوف من الكاش: {result.removed}"
+    )
+    if result.failed_checks:
+        text += f"\nتعذر التحقق مؤقتًا من: {result.failed_checks}"
+    if result.total == 0:
+        text += "\n\nلا يوجد محتوى محفوظ بعد؛ أي منشور جديد في قناة المعاينة سيُحفظ تلقائيًا."
+    await _send_developer_panel(callback.message, text)
