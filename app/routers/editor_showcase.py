@@ -4,24 +4,14 @@ import logging
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message, User
+from aiogram.types import CallbackQuery, Message
 
 from app.i18n import t
-from app.keyboards import build_welcome_keyboard
 from app.services.showcase_channel import showcase_channel_store
-from app.services.welcome import build_welcome_rich_message
 
 
 router = Router(name="editor_showcase")
 logger = logging.getLogger(__name__)
-
-
-async def _send_welcome(bot: Bot, chat_id: int, user: User) -> None:
-    await bot.send_rich_message(
-        chat_id=chat_id,
-        rich_message=build_welcome_rich_message(user),
-        reply_markup=build_welcome_keyboard(),
-    )
 
 
 @router.message(Command("draft"))
@@ -37,7 +27,7 @@ async def showcase_from_message(message: Message, bot: Bot) -> None:
             "Failed to send cached showcase channel to user_id=%s",
             message.from_user.id,
         )
-        await _send_welcome(bot, message.chat.id, message.from_user)
+        await message.answer(t("preview_failed"))
 
 
 @router.callback_query(F.data == "r:showcase")
@@ -50,7 +40,7 @@ async def showcase_from_button(callback: CallbackQuery, bot: Bot) -> None:
             "Failed to send cached showcase channel to user_id=%s",
             callback.from_user.id,
         )
-        await _send_welcome(bot, callback.from_user.id, callback.from_user)
+        await bot.send_message(callback.from_user.id, t("preview_failed"))
 
 
 __all__ = [
