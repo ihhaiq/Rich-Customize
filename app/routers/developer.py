@@ -9,7 +9,7 @@ from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import BufferedInputFile, CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, InputRichMessage, Message
 
 from app.config import developer_ids
 from app.keyboards import (
@@ -39,19 +39,42 @@ def _is_developer(user_id: int | None) -> bool:
     return user_id is not None and user_id in developer_ids()
 
 
+def _developer_panel_rich_message(text: str) -> InputRichMessage:
+    return InputRichMessage(blocks=[
+        {"type": "paragraph", "text": text},
+        {
+            "type": "buttons",
+            "buttons": [{
+                "text": "فحص قاعدة البيانات",
+                "callback_data": "dev:database:check",
+                "style": "primary",
+            }],
+            "align": "center",
+        },
+    ])
+
+
+async def _send_developer_panel(message: Message, text: str) -> None:
+    await message.bot.send_rich_message(
+        chat_id=message.chat.id,
+        rich_message=_developer_panel_rich_message(text),
+        reply_markup=build_developer_keyboard(),
+    )
+
+
 @router.message(Command("dev"))
 async def open_developer_panel(message: Message, state: FSMContext) -> None:
     user_id = message.from_user.id if message.from_user else None
     if not _is_developer(user_id):
         return
     await state.clear()
-    await message.answer(
+    await _send_developer_panel(
+        message,
         "🛠 لوحة المطوّر\n\n"
         "تقدر تصدّر بيانات البوت الحالية كملف ZIP، أو ترفع ملف ZIP/JSON "
         "لاستيرادها، وتفحص اتصال PostgreSQL أو تعيد ربطه من الزر المخصص. "
         "الاستيراد يُفحص ويطلب تأكيدًا قبل استبدال أي بيانات.\n\n"
         "ملف التصدير لا يحتوي التوكن أو متغيرات البيئة.",
-        reply_markup=build_developer_keyboard(),
     )
 
 
@@ -191,10 +214,10 @@ async def confirm_data_import(callback: CallbackQuery, state: FSMContext) -> Non
 
     await state.clear()
     if isinstance(callback.message, Message):
-        await callback.message.answer(
+        await _send_developer_panel(
+            callback.message,
             "✅ تم استيراد البيانات بنجاح.\n"
             f"عدد الملفات المستبدلة: {len(imported)}",
-            reply_markup=build_developer_keyboard(),
         )
 
 
@@ -205,9 +228,7 @@ async def cancel_data_import(callback: CallbackQuery, state: FSMContext) -> None
         return
     await state.clear()
     if isinstance(callback.message, Message):
-        await callback.message.answer(
-            "تم إلغاء الاستيراد.", reply_markup=build_developer_keyboard(),
-        )
+        await _send_developer_panel(callback.message, "تم إلغاء الاستيراد.")
     await callback.answer()
 
 
@@ -221,22 +242,22 @@ async def check_database_connection(callback: CallbackQuery) -> None:
     if not isinstance(callback.message, Message):
         return
     if status.connected:
-        await callback.message.answer(
+        await _send_developer_panel(
+            callback.message,
             "✅ قاعدة البيانات متصلة.\n\n"
             f"الوضع الحالي: PostgreSQL\n"
             f"زمن الاستجابة: {status.latency_ms or 1}ms\n"
             f"المخازن المتزامنة: {status.synced_namespaces}\n"
             f"عمليات JSON المنتظرة: {status.pending_sync}",
-            reply_markup=build_developer_keyboard(),
         )
         return
     if not status.configured:
         detail = "متغير DATABASE_URL غير مضاف إلى خدمة البوت في Railway."
     else:
         detail = status.last_error or "فشل الاتصال لسبب غير معروف."
-    await callback.message.answer(
+    await _send_developer_panel(
+        callback.message,
         "⚠️ قاعدة البيانات غير متصلة.\n\n"
         f"{detail}\n\n"
         "البوت مستمر بالعمل تلقائيًا باستخدام ملفات JSON الاحتياطية.",
-        reply_markup=build_developer_keyboard(),
     )
