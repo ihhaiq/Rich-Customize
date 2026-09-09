@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.editor.draft_store import EditorDraft, draft_store
-from app.i18n import t, tr
+from app.i18n import t
 from app.keyboards import build_rich_editor_keyboard
 from app.routers.button_guide import answer_with_button_guide, button_guide_blocks
 from app.services.blocks import BLOCK_LABELS
@@ -38,13 +38,13 @@ def editor_dashboard_text(draft: EditorDraft, notice: str | None = None) -> str:
     if notice:
         lines.extend([notice, ""])
     lines.extend([
-        tr("تخصيص الرسالة"),
+        t("customize"),
         t("editor.block_count", count=len(draft.blocks)),
         t("ux.editor.buttons", count=len(draft.message_buttons)),
         (
-            f"{tr('💾 حفظ الصفحة')}: {draft.current_page_title or draft.current_page_id}"
+            f"{t('save_page')}: {draft.current_page_title or draft.current_page_id}"
             if draft.current_page_id
-            else f"{tr('💾 حفظ الصفحة')}: —"
+            else f"{t('save_page')}: —"
         ),
         "",
         t("common.choose_action"),
