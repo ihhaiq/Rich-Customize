@@ -5,7 +5,7 @@ from typing import Any
 from aiogram.enums import ButtonStyle
 from aiogram.types import DisabledButton, InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.i18n import t, tr
+from app.i18n import t
 from app.services.blocks import BLOCK_LABELS
 from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES, compatible_child_block_types
 
@@ -89,11 +89,11 @@ def build_details_inner_delete_keyboard(details_id: str, child_id: str) -> Inlin
 
 def build_details_content_keyboard(child_count: int = 0) -> InlineKeyboardMarkup:
     rows = [[InlineKeyboardButton(
-        text=tr("➕ بلوك داخلي"), callback_data="r:details:add", style=ButtonStyle.PRIMARY,
+        text=t("details.inner_add_button"), callback_data="r:details:add", style=ButtonStyle.PRIMARY,
     )]]
     if child_count:
         rows.append([InlineKeyboardButton(
-            text=tr(f"✅ إنهاء التفاصيل ({child_count})"),
+            text=t("details.finish_button", count=child_count),
             callback_data="r:details:finish", style=ButtonStyle.SUCCESS,
         )])
     rows.append([InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:details:cancel")])
@@ -118,7 +118,7 @@ def build_inner_block_keyboard(container_type: str) -> InlineKeyboardMarkup:
 
 def build_inner_block_input_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text=tr("🔙 أنواع البلوكات الداخلية"), callback_data="r:details:add"),
+        InlineKeyboardButton(text=t("details.inner_types_button"), callback_data="r:details:add"),
     ]])
 
 
