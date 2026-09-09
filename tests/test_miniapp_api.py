@@ -5,6 +5,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+from aiohttp import web
+
 from app import miniapp
 from app.webapp import pages
 
@@ -65,15 +67,15 @@ class MiniAppApiTests(unittest.IsolatedAsyncioTestCase):
             patch.object(pages, "miniapp_user", return_value={"id": 42}),
             patch.object(pages.page_registry, "get", AsyncMock(return_value=current)),
         ):
-            with self.assertRaises(miniapp.web.HTTPBadRequest):
+            with self.assertRaises(web.HTTPBadRequest):
                 await pages.api_save_page(request)
 
     def test_page_content_rejects_invalid_layout_and_block_shapes(self):
-        with self.assertRaises(miniapp.web.HTTPBadRequest):
+        with self.assertRaises(web.HTTPBadRequest):
             pages.page_content({"blocks": ["not-a-block"]})
-        with self.assertRaises(miniapp.web.HTTPBadRequest):
+        with self.assertRaises(web.HTTPBadRequest):
             pages.page_content({"blocks": [], "buttons_per_row": 9})
-        with self.assertRaises(miniapp.web.HTTPBadRequest):
+        with self.assertRaises(web.HTTPBadRequest):
             pages.page_content({"blocks": [], "buttons_align": "diagonal"})
 
 
