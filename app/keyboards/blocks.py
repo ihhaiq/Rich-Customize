@@ -5,7 +5,7 @@ from typing import Any
 from aiogram.enums import ButtonStyle
 from aiogram.types import DisabledButton, InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.i18n import t, tr
+from app.i18n import t
 from app.services.anchors import anchor_target_id, anchor_targets
 from app.services.blocks import get_block_button_text, table_flag, table_rows
 from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES
@@ -31,7 +31,7 @@ def build_block_editor_keyboard(
         )])
     if block["type"] == "details":
         rows.append([InlineKeyboardButton(
-            text=tr("📝 تعديل عنوان التفاصيل"), callback_data=f"r:f:{block_id}:summary",
+            text=t("details.edit_title_button"), callback_data=f"r:f:{block_id}:summary",
         )])
         rows.append([InlineKeyboardButton(
             text=t("details.inner_manage_button"),
@@ -39,7 +39,7 @@ def build_block_editor_keyboard(
         )])
     if block["type"] == "table":
         rows.append([InlineKeyboardButton(
-            text=tr("🎛 إعدادات خلايا الجدول"), callback_data=f"r:tm:{block_id}",
+            text=t("table.cell_settings_button"), callback_data=f"r:tm:{block_id}",
         )])
     if block["type"] == "list" and block.get("data", {}).get("kind") == "checklist":
         for item_index, item in enumerate(block.get("data", {}).get("items", [])):
@@ -56,12 +56,16 @@ def build_block_editor_keyboard(
             )])
     if block["type"] in MEDIA_CAPTION_TYPES:
         rows.append([
-            InlineKeyboardButton(text=tr("💬 تعديل التذييل"), callback_data=f"r:f:{block_id}:caption"),
-            InlineKeyboardButton(text=tr("✍️ تعديل المصدر"), callback_data=f"r:f:{block_id}:credit"),
+            InlineKeyboardButton(
+                text=t("media.edit_caption_button"), callback_data=f"r:f:{block_id}:caption",
+            ),
+            InlineKeyboardButton(
+                text=t("media.edit_source_button"), callback_data=f"r:f:{block_id}:credit",
+            ),
         ])
     if block["type"] in QUOTE_TYPES:
         rows.append([InlineKeyboardButton(
-            text=tr("✍️ تعديل الكاتب"), callback_data=f"r:f:{block_id}:credit",
+            text=t("quote.edit_author_button"), callback_data=f"r:f:{block_id}:credit",
         )])
     rows.append([InlineKeyboardButton(
         text=t("delete"), callback_data=f"r:d:{block_id}", style=ButtonStyle.DANGER,
@@ -85,17 +89,17 @@ def build_block_editor_keyboard(
 
 def build_table_options_keyboard(block_id: str) -> InlineKeyboardMarkup:
     choices = [
-        (tr("🟨 تظليل خلية"), "sh"), (tr("⬜ إلغاء تظليل خلية"), "uh"),
-        (tr("↔️ توسيط خلية"), "ce"), (tr("↩️ إلغاء توسيط خلية"), "ue"),
-        (tr("🟨 تظليل الجميع"), "sha"), (tr("⬜ إلغاء تظليل الجميع"), "uha"),
-        (tr("↔️ توسيط الجميع"), "cea"), (tr("↩️ إلغاء توسيط الجميع"), "uea"),
+        (t("table.shade_cell"), "sh"), (t("table.unshade_cell"), "uh"),
+        (t("table.center_cell"), "ce"), (t("table.uncenter_cell"), "ue"),
+        (t("table.shade_all"), "sha"), (t("table.unshade_all"), "uha"),
+        (t("table.center_all"), "cea"), (t("table.uncenter_all"), "uea"),
     ]
     rows = [
         [InlineKeyboardButton(text=text, callback_data=f"r:ta:{block_id}:{action}") for text, action in choices[index:index + 2]]
         for index in range(0, len(choices), 2)
     ]
     rows.append([InlineKeyboardButton(
-        text=tr("🧱 إعدادات مظهر الجدول"),
+        text=t("table.appearance_settings_button"),
         callback_data=f"r:tdisplay:{block_id}",
         style=ButtonStyle.PRIMARY,
     )])
@@ -115,19 +119,19 @@ def build_table_display_keyboard(block: dict[str, Any]) -> InlineKeyboardMarkup:
     )
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text=f"{'✅' if table_flag(block, 'is_bordered') else '❌'} {tr('الحدود')}",
+            text=f"{'✅' if table_flag(block, 'is_bordered') else '❌'} {t('table.borders')}",
             callback_data=f"r:ttoggle:{block_id}:is_bordered",
         )],
         [InlineKeyboardButton(
-            text=f"{'✅' if table_flag(block, 'is_striped') else '❌'} {tr('صفوف مخططة')}",
+            text=f"{'✅' if table_flag(block, 'is_striped') else '❌'} {t('table.striped_rows')}",
             callback_data=f"r:ttoggle:{block_id}:is_striped",
         )],
         [InlineKeyboardButton(
-            text=f"{'✅' if table_flag(block, 'is_compact') else '❌'} {tr('وضع مضغوط')}",
+            text=f"{'✅' if table_flag(block, 'is_compact') else '❌'} {t('table.compact_mode')}",
             callback_data=f"r:ttoggle:{block_id}:is_compact",
         )],
         [InlineKeyboardButton(
-            text=f"✏️ {tr('تعديل عنوان الجدول') if has_caption else tr('إضافة عنوان للجدول')}",
+            text=t("table.edit_caption" if has_caption else "table.add_caption"),
             callback_data=f"r:tcaption:{block_id}",
         )],
         [InlineKeyboardButton(text=t("ux.common.back"), callback_data=f"r:tm:{block_id}")],
@@ -189,10 +193,7 @@ def build_list_type_keyboard(
 
 def build_heading_level_keyboard(action: str, block_id: str | None = None) -> InlineKeyboardMarkup:
     suffix = f":{block_id}" if block_id else ""
-    labels = tuple(tr(label) for label in (
-        "H1 — الأكبر", "H2 — كبير", "H3 — متوسط كبير",
-        "H4 — متوسط", "H5 — صغير", "H6 — الأصغر",
-    ))
+    labels = tuple(t(f"heading.level_{index}") for index in range(1, 7))
     rows = [
         [
             InlineKeyboardButton(
