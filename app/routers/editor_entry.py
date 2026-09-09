@@ -82,7 +82,6 @@ async def receive_source(message: Message, state: FSMContext) -> None:
 
 
 @router.message(StateFilter(RichEditorStates.managing))
-@router.message(StateFilter(None), F.chat.type == "private")
 async def managing_extra_message(message: Message) -> None:
     await message.answer(
         t("editor.closed_hint"),
@@ -90,7 +89,23 @@ async def managing_extra_message(message: Message) -> None:
     )
 
 
+@router.message(StateFilter(None), F.chat.type == "private")
+async def idle_extra_message(message: Message) -> None:
+    if message.from_user is None:
+        await message.answer(
+            f"{t('welcome')}\n{t('start_editor')}",
+            reply_markup=build_welcome_keyboard(),
+        )
+        return
+    await message.bot.send_rich_message(
+        chat_id=message.chat.id,
+        rich_message=build_welcome_rich_message(message.from_user),
+        reply_markup=build_welcome_keyboard(),
+    )
+
+
 __all__ = [
+    "idle_extra_message",
     "managing_extra_message",
     "new_editor",
     "receive_source",
