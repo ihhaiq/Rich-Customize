@@ -26,7 +26,10 @@ APP_ROOT = ROOT / "app"
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 INTENTIONAL_ENGLISH_FALLBACK_KEYS = frozenset()
 PUBLIC_UI_DIRS = (APP_ROOT / "routers", APP_ROOT / "keyboards")
-PUBLIC_UI_EXCLUDED_FILES = {APP_ROOT / "routers" / "developer.py"}
+PUBLIC_UI_EXCLUDED_FILES = {
+    APP_ROOT / "routers" / "developer.py",
+    APP_ROOT / "keyboards" / "developer.py",
+}
 INPUT_ONLY_ARABIC = {"دريفت"}
 OUTPUT_METHODS = {
     "answer",
@@ -240,6 +243,19 @@ class LocalizationCoverageTests(unittest.TestCase):
             "Arabic-source tr(...) UI would stop at English instead of the "
             f"selected locale: {dict(missing)}",
         )
+
+    def test_legacy_native_fallback_keeps_dynamic_context(self):
+        token = i18n_core._language.set("de")
+        try:
+            details = tr("✅ إنهاء التفاصيل (7)")
+            failure = tr("فشل: Network timeout")
+            callback_data = tr("أرسل callback_data؛ الحد الأقصى 64 بايت.")
+        finally:
+            i18n_core._language.reset(token)
+
+        self.assertIn("7", details)
+        self.assertIn("Network timeout", failure)
+        self.assertIn("64", callback_data)
 
     def test_no_public_output_contains_unlocalized_arabic_literals(self):
         leaks: list[str] = []

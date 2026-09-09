@@ -56,7 +56,7 @@ t("common.reason", reason=error)
 توجد في:
 
 ```text
-app/locales/common.py
+app/lang/catalogs/common.py
 ```
 
 وتشمل حاليًا أسماء الـBlocks وبعض المفاتيح القديمة.
@@ -66,7 +66,7 @@ app/locales/common.py
 توجد في:
 
 ```text
-app/locales/catalog.py
+app/lang/catalogs/catalog.py
 ```
 
 ويحتوي الملف على:
@@ -82,6 +82,12 @@ CATALOG_TRANSLATIONS
 `CATALOG_AR` يحتوي النسخة العربية.
 
 `CATALOG_TRANSLATIONS` يحتوي نفس المفتاح لكل لغة مدعومة.
+
+طبقة التجميع في `app/lang/bundle_loader.py` تعيد استخدام الترجمات القديمة
+للمفاتيح الدلالية المطابقة، وتبني تسميات محلية مختصرة للخصائص الحديثة من
+`app/lang/catalogs/ui_terms.py`. أما النصوص العربية القديمة التي لم تُرحّل بعد
+فتُطبّع في `app/lang/catalogs/legacy_normalization.py` كي لا تتسرّب العربية أو
+تتوقف الواجهة عند الإنجليزية في لغة أخرى.
 
 مثال:
 
@@ -216,7 +222,7 @@ app/routers/block_preview.py
 
 يُحذف فقط بعد أن تصبح:
 
-- `app/keyboards.py`
+- `app/keyboards/`
 - جميع ملفات `app/routers/`
 - رسائل الأخطاء والتنبيهات
 - دليل الأزرار

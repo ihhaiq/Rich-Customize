@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from contextlib import contextmanager
 from typing import Any, Iterator
 
@@ -14,6 +15,7 @@ from app.lang import (
     TRANSLATIONS,
 )
 from app.lang.bundle_loader import SOURCE_NORMALIZATION
+from app.lang.catalogs.ui_terms import ui_terms
 
 EN = _core.EN
 EN.update(SOURCE_NORMALIZATION)
@@ -76,8 +78,14 @@ def tr(text: str) -> str:
         return translated
 
     translated = text
+    normalized_from_arabic = False
+    normalized_targets: list[str] = []
     for source, target in sorted(EN.items(), key=lambda item: len(item[0]), reverse=True):
+        if source in translated:
+            normalized_from_arabic = True
+            normalized_targets.append(target)
         translated = translated.replace(source, target)
+    english = translated
     locale = TRANSLATIONS.get(language)
     if locale:
         for source, target in sorted(
@@ -86,7 +94,88 @@ def tr(text: str) -> str:
             reverse=True,
         ):
             translated = translated.replace(source, target)
+    if language != "en" and normalized_from_arabic and translated == english:
+        return _legacy_native_fallback(language, english, normalized_targets)
     return translated
+
+
+def _legacy_native_fallback(
+    language: str,
+    english: str,
+    normalized_targets: list[str],
+) -> str:
+    """Keep old Arabic-source flows usable until each call moves to t().
+
+    Exact locale translations still win.  For a newly discovered legacy
+    sentence, return a concise native intent instead of exposing Arabic or a
+    silent English-only fallback.  Technical markers and format placeholders
+    are retained so diagnostics and in-progress values remain actionable.
+    """
+
+    terms = ui_terms(language)
+    lowered = english.casefold()
+
+    def common(key: str) -> str:
+        source = PHRASES[key]
+        keyed = KEY_TRANSLATIONS.get(language, {})
+        if key in keyed:
+            return keyed[key]
+        return TRANSLATIONS.get(language, {}).get(source, source)
+
+    feature = terms["button"] if "button" in lowered else ""
+    if "page" in lowered:
+        feature = common("pages")
+    elif "block" in lowered:
+        feature = common("add_block")
+    elif "table" in lowered or "cell" in lowered or "row" in lowered:
+        feature = common("table")
+
+    if any(word in lowered for word in ("invalid", "failed", "couldn't", "unavailable", "no longer", "doesn't exist")):
+        summary = common("invalid")
+    elif any(word in lowered for word in ("choose", "select")):
+        summary = common("common.choose_action")
+    elif any(word in lowered for word in ("send", "write")):
+        summary = terms["write"]
+    elif any(word in lowered for word in ("delete", "remove")):
+        summary = common("delete")
+    elif any(word in lowered for word in ("edit", "change", "update")):
+        summary = common("edit")
+    elif any(word in lowered for word in ("add", "created")):
+        summary = terms["add"]
+    elif any(word in lowered for word in ("save", "saved")):
+        summary = common("save_page")
+    elif "preview" in lowered:
+        summary = terms["preview"]
+    else:
+        summary = terms["settings"]
+
+    if feature and feature not in summary:
+        summary = f"{summary} · {feature}"
+
+    markers = re.findall(
+        r"@[A-Za-z0-9_]+|/[A-Za-z0-9_]+|https?://|tg://|"
+        r"callback_data|sendRichMessageDraft|Web App|Inline|Telegram|CBD|"
+        r"Album|GIF|Audio|Ephemeral|Thinking|__VALUE__|"
+        r"\d+(?:[.,]\d+)*(?:\s*(?:MB|bytes?|characters?))?",
+        english,
+        flags=re.IGNORECASE,
+    )
+    markers = list(dict.fromkeys(markers))
+    markers = [marker for marker in markers if marker not in summary]
+    if markers:
+        summary = f"{summary} · {' · '.join(markers)}"
+
+    # A tr() call can wrap a dynamic value (count, title, or Telegram error)
+    # around a fixed Arabic fragment.  Strip only the fixed normalized fragment
+    # and retain the remainder instead of losing useful runtime context in the
+    # compact fallback.
+    remainder = english
+    for target in sorted(set(normalized_targets), key=len, reverse=True):
+        remainder = remainder.replace(target, " ")
+    remainder = remainder.strip(" \t\r\n.:;!?()[]{}«»“”")
+    if remainder and remainder not in summary and remainder != "__VALUE__":
+        summary = f"{summary} · {remainder}"
+    return summary
 
 
 def t(key: str, **values: Any) -> str:

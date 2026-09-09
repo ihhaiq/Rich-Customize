@@ -13,7 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = ROOT / "app"
 STATIC_ROOT = APP_ROOT / "miniapp_static"
 PUBLIC_UI_DIRS = (APP_ROOT / "routers", APP_ROOT / "keyboards")
-PUBLIC_UI_EXCLUDED_FILES = {APP_ROOT / "routers" / "developer.py"}
+PUBLIC_UI_EXCLUDED_FILES = {
+    APP_ROOT / "routers" / "developer.py",
+    APP_ROOT / "keyboards" / "developer.py",
+}
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 JS_KEY_CALL_RE = re.compile(r"\b(?:mt|tr)\(\s*(['\"`])([A-Za-z][A-Za-z0-9_.-]*)\1")
 JS_FALLBACK_RE = re.compile(
@@ -113,10 +116,10 @@ class MiniAppLocalizationGuardTests(unittest.TestCase):
 
     def test_coverage_layer_loads_before_feature_scripts(self):
         html = (STATIC_ROOT / "index.html").read_text(encoding="utf-8")
-        locales = html.find("miniapp_i18n_locales.js")
-        core = html.find("miniapp_i18n.js")
-        coverage = html.find("miniapp_i18n_coverage.js")
-        app = html.find("app.js")
+        locales = html.find("/miniapp/static/miniapp_i18n_locales.js")
+        core = html.find("/miniapp/static/miniapp_i18n.js")
+        coverage = html.find("/miniapp/static/miniapp_i18n_coverage.js")
+        app = html.find("/miniapp/static/app.js")
         self.assertTrue(
             -1 not in {locales, core, coverage, app},
             "Mini App localization scripts or app.js are missing from index.html",

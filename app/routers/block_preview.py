@@ -26,6 +26,11 @@ _MEDIA_PEEK_TYPES = _VISUAL_PEEK_TYPES | {"audio", "voice", "document"}
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
+def _block_data(block: dict[str, Any]) -> dict[str, Any]:
+    data = block.get("data")
+    return data if isinstance(data, dict) else {}
+
+
 def _is_empty_rich_message_error(error: BaseException) -> bool:
     message = str(error)
     return (
@@ -64,7 +69,7 @@ def _compact_html(value: Any, limit: int = 180) -> str:
 
 
 def _media_peek_title(block: dict[str, Any]) -> str:
-    data = block.get("data") if isinstance(block.get("data"), dict) else {}
+    data = _block_data(block)
     metadata = file_data(block) or {}
     title = _compact_text(metadata.get("title"), 100)
     performer = _compact_text(metadata.get("performer"), 70)
@@ -83,7 +88,7 @@ def _media_peek_title(block: dict[str, Any]) -> str:
 
 
 def _table_peek_text(block: dict[str, Any]) -> str:
-    data = block.get("data") if isinstance(block.get("data"), dict) else {}
+    data = _block_data(block)
     caption = (
         _compact_text(data.get("caption_text"))
         or _compact_html(data.get("caption_html"))
@@ -106,7 +111,7 @@ def _table_peek_text(block: dict[str, Any]) -> str:
 
 def _block_peek_text(block: dict[str, Any]) -> str:
     block_type = str(block.get("type", ""))
-    data = block.get("data") if isinstance(block.get("data"), dict) else {}
+    data = _block_data(block)
 
     if block_type in _MEDIA_PEEK_TYPES:
         return _media_peek_title(block)
@@ -120,7 +125,8 @@ def _block_peek_text(block: dict[str, Any]) -> str:
             or get_block_label(block_type)
         )
     if block_type == "list":
-        items = data.get("items") if isinstance(data.get("items"), list) else []
+        raw_items = data.get("items")
+        items: list[Any] = raw_items if isinstance(raw_items, list) else []
         preview_items: list[str] = []
         for raw in items[:3]:
             value = raw.get("text") if isinstance(raw, dict) else raw

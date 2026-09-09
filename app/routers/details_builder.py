@@ -206,7 +206,7 @@ async def cancel_details_builder(
     await edit_saved_ui(
         bot,
         state,
-        MAIN_TEXT,
+        str(MAIN_TEXT),
         build_rich_editor_keyboard(draft.blocks),
     )
     await callback.answer(t("details.cancelled"))
