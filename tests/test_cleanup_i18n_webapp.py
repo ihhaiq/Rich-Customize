@@ -34,15 +34,14 @@ def test_semantic_migration_keys_cover_every_locale() -> None:
         assert required <= set(KEY_TRANSLATIONS[language]), language
 
 
-def test_migrated_editor_ui_has_no_source_string_translation_calls() -> None:
-    paths = [
-        APP / "keyboards" / "blocks.py",
-        APP / "keyboards" / "details.py",
-        APP / "keyboards" / "publishing.py",
-        APP / "routers" / "editor_ui.py",
-    ]
-    for path in paths:
+def test_keyboards_are_semantic_i18n_only() -> None:
+    for path in (APP / "keyboards").glob("*.py"):
         assert "tr(" not in path.read_text("utf-8"), path
+
+
+def test_migrated_editor_dashboard_is_semantic_i18n_only() -> None:
+    path = APP / "routers" / "editor_ui.py"
+    assert "tr(" not in path.read_text("utf-8")
 
 
 def test_miniapp_backend_is_feature_scoped() -> None:
