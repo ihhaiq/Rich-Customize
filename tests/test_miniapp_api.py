@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from app import miniapp
+from app.webapp import pages
 
 
 class MiniAppApiTests(unittest.IsolatedAsyncioTestCase):
@@ -40,11 +41,11 @@ class MiniAppApiTests(unittest.IsolatedAsyncioTestCase):
         }
 
         with (
-            patch.object(miniapp, "_miniapp_user", return_value={"id": 42}),
-            patch.object(miniapp.page_registry, "get", AsyncMock(return_value=current)),
-            patch.object(miniapp.page_registry, "save", AsyncMock(return_value="page123")) as save,
+            patch.object(pages, "miniapp_user", return_value={"id": 42}),
+            patch.object(pages.page_registry, "get", AsyncMock(return_value=current)),
+            patch.object(pages.page_registry, "save", AsyncMock(return_value="page123")) as save,
         ):
-            response = await miniapp.api_save_page(request)
+            response = await pages.api_save_page(request)
 
         self.assertEqual(response.status, 200)
         args = save.await_args.args
@@ -61,19 +62,19 @@ class MiniAppApiTests(unittest.IsolatedAsyncioTestCase):
         current = {"owner_id": 42}
 
         with (
-            patch.object(miniapp, "_miniapp_user", return_value={"id": 42}),
-            patch.object(miniapp.page_registry, "get", AsyncMock(return_value=current)),
+            patch.object(pages, "miniapp_user", return_value={"id": 42}),
+            patch.object(pages.page_registry, "get", AsyncMock(return_value=current)),
         ):
             with self.assertRaises(miniapp.web.HTTPBadRequest):
-                await miniapp.api_save_page(request)
+                await pages.api_save_page(request)
 
     def test_page_content_rejects_invalid_layout_and_block_shapes(self):
         with self.assertRaises(miniapp.web.HTTPBadRequest):
-            miniapp._page_content({"blocks": ["not-a-block"]})
+            pages.page_content({"blocks": ["not-a-block"]})
         with self.assertRaises(miniapp.web.HTTPBadRequest):
-            miniapp._page_content({"blocks": [], "buttons_per_row": 9})
+            pages.page_content({"blocks": [], "buttons_per_row": 9})
         with self.assertRaises(miniapp.web.HTTPBadRequest):
-            miniapp._page_content({"blocks": [], "buttons_align": "diagonal"})
+            pages.page_content({"blocks": [], "buttons_align": "diagonal"})
 
 
 if __name__ == "__main__":
