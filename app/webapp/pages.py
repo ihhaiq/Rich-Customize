@@ -12,9 +12,9 @@ from app.services.page_registry import page_registry
 from app.services.popup_registry import popup_registry
 from app.services.renderer import RichMessageRenderError, send_rich_message_post
 from app.webapp.auth import miniapp_user
+from app.webapp.constants import BETA_VERSION, MAX_PAGE_BLOCKS
 
 _ADMIN_STATUSES = {"administrator", "creator"}
-MAX_PAGE_BLOCKS = 100
 
 
 def _status_value(member) -> str:
@@ -110,7 +110,7 @@ def page_content(
 
 async def api_me(request: web.Request) -> web.Response:
     user = miniapp_user(request)
-    return web.json_response({"ok": True, "user": user})
+    return web.json_response({"ok": True, "user": user, "beta": BETA_VERSION})
 
 
 async def api_pages(request: web.Request) -> web.Response:
@@ -118,6 +118,7 @@ async def api_pages(request: web.Request) -> web.Response:
     pages = await page_registry.list_for_user(int(user["id"]))
     return web.json_response({
         "ok": True,
+        "beta": BETA_VERSION,
         "pages": [{
             "page_id": page["page_id"],
             "title": page.get("title") or page["page_id"],
@@ -149,7 +150,12 @@ async def api_create_page(request: web.Request) -> web.Response:
         buttons_per_row,
         buttons_align,
     )
-    return web.json_response({"ok": True, "page_id": code, "title": title})
+    return web.json_response({
+        "ok": True,
+        "beta": BETA_VERSION,
+        "page_id": code,
+        "title": title,
+    })
 
 
 async def api_save_page(request: web.Request) -> web.Response:
@@ -170,7 +176,12 @@ async def api_save_page(request: web.Request) -> web.Response:
         buttons_align,
         page_id=page_id,
     )
-    return web.json_response({"ok": True, "page_id": code, "title": title})
+    return web.json_response({
+        "ok": True,
+        "beta": BETA_VERSION,
+        "page_id": code,
+        "title": title,
+    })
 
 
 async def api_destinations(request: web.Request) -> web.Response:
