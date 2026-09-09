@@ -4,30 +4,24 @@ import logging
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, User
 
 from app.i18n import t
-from app.services.showcase import MissingShowcaseMedia, send_all_blocks_showcase
+from app.keyboards import build_welcome_keyboard
+from app.services.showcase_channel import showcase_channel_store
+from app.services.welcome import build_welcome_rich_message
 
 
 router = Router(name="editor_showcase")
 logger = logging.getLogger(__name__)
 
-_SHOWCASE_MEDIA_KEYS = {
-    "photo": "block.photo",
-    "video": "block.video",
-    "animation": "block.animation",
-    "audio": "block.audio",
-    "voice": "block.voice",
-}
 
-
-def missing_media_text(error: MissingShowcaseMedia) -> str:
-    labels = ", ".join(
-        t(_SHOWCASE_MEDIA_KEYS.get(kind, "block.content"))
-        for kind in error.missing
+async def _send_welcome(bot: Bot, chat_id: int, user: User) -> None:
+    await bot.send_rich_message(
+        chat_id=chat_id,
+        rich_message=build_welcome_rich_message(user),
+        reply_markup=build_welcome_keyboard(),
     )
-    return f"{t('preview_failed')}\n{labels}"
 
 
 @router.message(Command("draft"))
@@ -37,34 +31,29 @@ async def showcase_from_message(message: Message, bot: Bot) -> None:
         return
     await bot.send_chat_action(chat_id=message.chat.id, action="typing")
     try:
-        await send_all_blocks_showcase(bot, message.chat.id, message.from_user.id)
-    except MissingShowcaseMedia as error:
-        await message.answer(missing_media_text(error))
+        await showcase_channel_store.send_preview(bot, message.chat.id)
     except Exception:
         logger.exception(
-            "Failed to send all-block showcase to user_id=%s", message.from_user.id,
+            "Failed to send cached showcase channel to user_id=%s",
+            message.from_user.id,
         )
-        await message.answer(t("preview_failed"))
+        await _send_welcome(bot, message.chat.id, message.from_user)
 
 
 @router.callback_query(F.data == "r:showcase")
 async def showcase_from_button(callback: CallbackQuery, bot: Bot) -> None:
     await callback.answer(t("preview_generating"))
     try:
-        await send_all_blocks_showcase(
-            bot, callback.from_user.id, callback.from_user.id,
-        )
-    except MissingShowcaseMedia as error:
-        await bot.send_message(callback.from_user.id, missing_media_text(error))
+        await showcase_channel_store.send_preview(bot, callback.from_user.id)
     except Exception:
         logger.exception(
-            "Failed to send all-block showcase to user_id=%s", callback.from_user.id,
+            "Failed to send cached showcase channel to user_id=%s",
+            callback.from_user.id,
         )
-        await bot.send_message(callback.from_user.id, t("preview_failed"))
+        await _send_welcome(bot, callback.from_user.id, callback.from_user)
 
 
 __all__ = [
-    "missing_media_text",
     "router",
     "showcase_from_button",
     "showcase_from_message",
