@@ -22,10 +22,7 @@ def build_welcome_keyboard() -> InlineKeyboardMarkup:
             url=ADD_GROUP_URL,
         )],
         [
-            InlineKeyboardButton(
-                text=t("welcome.full_preview_button"),
-                callback_data="r:showcase",
-            ),
+            InlineKeyboardButton(text=t("editor.showcase_button"), callback_data="r:showcase"),
             InlineKeyboardButton(
                 text=t("editor.new_button"), callback_data="r:starteditor",
                 style=ButtonStyle.PRIMARY,
