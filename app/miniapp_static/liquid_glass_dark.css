@@ -1,4 +1,29 @@
-/* Optional deep-black Liquid Glass mode, enabled by the ⚡ top-bar toggle. */
+/* Shared Liquid Glass lenses for the Telegram palette and optional black mode.
+   Keep this asset name and the existing toggle preference for compatibility. */
+html:not(.liquid-glass-dark){
+  --glass-bg:color-mix(in srgb,var(--panel) 38%,transparent);
+  --glass-bg-strong:color-mix(in srgb,var(--panel) 68%,transparent);
+  --glass-line:color-mix(in srgb,var(--text) 14%,transparent);
+  --glass-highlight:color-mix(in srgb,var(--panel) 72%,transparent);
+  --glass-shadow:0 18px 46px rgba(20,30,48,.16);
+  --glass-border:var(--glass-line);
+  --glass-inner:var(--glass-highlight);
+  --glass-elevation:var(--glass-shadow);
+  --normal-glass-bg:var(--bg);
+  --normal-glass-surface:var(--glass-bg);
+  --normal-glass-control:color-mix(in srgb,var(--panel) 23%,transparent);
+  --normal-glass-pressed:color-mix(in srgb,var(--panel2) 28%,transparent);
+  --normal-glass-border:var(--glass-line);
+  --normal-glass-surface-shadow:var(--glass-shadow),inset 0 1px 0 var(--glass-highlight),inset 0 -1px 0 color-mix(in srgb,var(--text) 5%,transparent);
+  --normal-glass-control-shadow:0 8px 24px rgba(20,30,48,.12),inset 0 1px 0 var(--glass-highlight),inset 0 -1px 0 color-mix(in srgb,var(--text) 4%,transparent);
+  --normal-glass-title:var(--text);
+  --normal-glass-muted:var(--muted);
+  --normal-glass-input:color-mix(in srgb,var(--text) 3.5%,transparent);
+  --normal-glass-backdrop:rgba(20,30,48,.20);
+  --normal-glass-toggle:color-mix(in srgb,var(--panel) 32%,transparent);
+  --normal-glass-send-shadow:0 14px 36px rgba(20,30,48,.20),inset 0 1px 0 var(--glass-highlight);
+}
+
 html.liquid-glass-dark{
   color-scheme:dark;
   --bg:#030304!important;
@@ -14,81 +39,81 @@ html.liquid-glass-dark{
   --glass-shadow:0 18px 46px rgba(0,0,0,.48)!important;
 }
 
-html.liquid-glass-dark body{
+html:root body{
   background:
     radial-gradient(760px 420px at 16% -10%,rgba(255,255,255,.075),transparent 62%),
     radial-gradient(620px 360px at 94% 8%,color-mix(in srgb,var(--accent) 8%,transparent),transparent 68%),
-    linear-gradient(165deg,#060608 0%,#030304 48%,#000 100%)!important;
+    linear-gradient(165deg,var(--normal-glass-bg,#060608) 0%,var(--normal-glass-bg,#030304) 48%,var(--normal-glass-bg,#000) 100%)!important;
   background-attachment:fixed!important;
 }
 
-html.liquid-glass-dark .editor-head{
-  background:linear-gradient(180deg,rgba(3,3,4,.74),rgba(3,3,4,.16),transparent)!important;
+html:root .editor-head{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 74%,transparent),color-mix(in srgb,var(--bg) 16%,transparent),transparent)!important;
   backdrop-filter:blur(18px) saturate(135%)!important;
   -webkit-backdrop-filter:blur(18px) saturate(135%)!important;
 }
 
-html.liquid-glass-dark .editor-topbar,
-html.liquid-glass-dark .toolbar-bubble,
-html.liquid-glass-dark .popup-menu,
-html.liquid-glass-dark .sheet,
-html.liquid-glass-dark .starter-card,
-html.liquid-glass-dark .sheet-item,
-html.liquid-glass-dark .soft-btn,
-html.liquid-glass-dark .primary-soft,
-html.liquid-glass-dark .fab,
-html.liquid-glass-dark .media-picker-card,
-html.liquid-glass-dark .details-box,
-html.liquid-glass-dark .media-placeholder,
-html.liquid-glass-dark .table-preview{
-  border-color:rgba(255,255,255,.13)!important;
+html:root .editor-topbar,
+html:root .toolbar-bubble,
+html:root .popup-menu,
+html:root .sheet,
+html:root .starter-card,
+html:root .sheet-item,
+html:root .soft-btn,
+html:root .primary-soft,
+html:root .fab,
+html:root .media-picker-card,
+html:root .details-box,
+html:root .media-placeholder,
+html:root .table-preview{
+  border-color:var(--normal-glass-border,rgba(255,255,255,.13))!important;
   background:
     linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.018) 46%,rgba(255,255,255,.035)),
-    rgba(13,13,17,.38)!important;
-  box-shadow:
+    var(--normal-glass-surface,rgba(13,13,17,.38))!important;
+  box-shadow:var(--normal-glass-surface-shadow,
     0 18px 48px rgba(0,0,0,.40),
     inset 0 1px 0 rgba(255,255,255,.17),
-    inset 0 -1px 0 rgba(255,255,255,.035)!important;
+    inset 0 -1px 0 rgba(255,255,255,.035))!important;
   backdrop-filter:blur(30px) saturate(155%) contrast(106%)!important;
   -webkit-backdrop-filter:blur(30px) saturate(155%) contrast(106%)!important;
 }
 
 /* Individual controls are real frosted lenses: content behind them gets blurred. */
-html.liquid-glass-dark .icon-btn,
-html.liquid-glass-dark .composer-toolbar.floating-toolbar .toolbar-bubble button,
-html.liquid-glass-dark .mini-btn,
-html.liquid-glass-dark .destination-icon,
-html.liquid-glass-dark .media-picker-icon,
-html.liquid-glass-dark .fab-ghost{
-  border:1px solid rgba(255,255,255,.14)!important;
+html:root .icon-btn,
+html:root .composer-toolbar.floating-toolbar .toolbar-bubble button,
+html:root .mini-btn,
+html:root .destination-icon,
+html:root .media-picker-icon,
+html:root .fab-ghost{
+  border:1px solid var(--normal-glass-border,rgba(255,255,255,.14))!important;
   background:
     linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 54%,rgba(255,255,255,.055)),
-    rgba(18,18,22,.23)!important;
-  box-shadow:
+    var(--normal-glass-control,rgba(18,18,22,.23))!important;
+  box-shadow:var(--normal-glass-control-shadow,
     0 8px 24px rgba(0,0,0,.34),
     inset 0 1px 0 rgba(255,255,255,.20),
-    inset 0 -1px 0 rgba(255,255,255,.025)!important;
+    inset 0 -1px 0 rgba(255,255,255,.025))!important;
   backdrop-filter:blur(22px) saturate(160%)!important;
   -webkit-backdrop-filter:blur(22px) saturate(160%)!important;
 }
 
-html.liquid-glass-dark .icon-btn:active,
-html.liquid-glass-dark .composer-toolbar.floating-toolbar .toolbar-bubble button:active,
-html.liquid-glass-dark .mini-btn:active{
+html:root .icon-btn:active,
+html:root .composer-toolbar.floating-toolbar .toolbar-bubble button:active,
+html:root .mini-btn:active{
   background:
     linear-gradient(145deg,rgba(255,255,255,.16),rgba(255,255,255,.045)),
-    rgba(26,26,31,.28)!important;
+    var(--normal-glass-pressed,rgba(26,26,31,.28))!important;
   transform:scale(.94);
 }
 
-html.liquid-glass-dark .toolbar-bubble:before{
+html:root .toolbar-bubble:before{
   background:rgba(255,255,255,.12)!important;
   filter:blur(16px)!important;
   opacity:.88;
 }
 
-html.liquid-glass-dark .toolbar-bubble:after,
-html.liquid-glass-dark .editor-topbar:after{
+html:root .toolbar-bubble:after,
+html:root .editor-topbar:after{
   content:"";
   position:absolute;
   inset:0;
@@ -97,48 +122,50 @@ html.liquid-glass-dark .editor-topbar:after{
   background:linear-gradient(118deg,rgba(255,255,255,.08),transparent 34%,rgba(255,255,255,.025) 68%,transparent);
 }
 
-html.liquid-glass-dark .editor-topbar{
+html:root .editor-topbar{
   position:relative;
   isolation:isolate;
   overflow:hidden!important;
 }
 
-html.liquid-glass-dark .page-identity,
-html.liquid-glass-dark .top-actions{
+html:root .page-identity,
+html:root .top-actions{
   position:relative;
   z-index:1;
 }
 
-html.liquid-glass-dark .page-identity input{
-  color:#fafafd!important;
+html:root .page-identity input{
+  color:var(--normal-glass-title,#fafafd)!important;
   text-shadow:0 1px 16px rgba(255,255,255,.06);
 }
 
-html.liquid-glass-dark .page-identity small,
-html.liquid-glass-dark .menu-copy small,
-html.liquid-glass-dark .sheet-header small,
-html.liquid-glass-dark .slash-wrap textarea::placeholder{
-  color:rgba(235,235,245,.52)!important;
+html:root .page-identity small,
+html:root .menu-copy small,
+html:root .sheet-header small,
+html:root .slash-wrap textarea::placeholder{
+  color:var(--normal-glass-muted,rgba(235,235,245,.52))!important;
 }
 
-html.liquid-glass-dark .block.selected:after{
+html:root .block.selected:after{
   box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,.15),
+    inset 0 0 0 1px var(--normal-glass-border,rgba(255,255,255,.15)),
     0 0 0 1px color-mix(in srgb,var(--accent) 18%,transparent)!important;
 }
 
-html.liquid-glass-dark .pre-editor,
-html.liquid-glass-dark .table-preview input,
-html.liquid-glass-dark .media-placeholder input{
-  background:rgba(255,255,255,.035)!important;
-  border-color:rgba(255,255,255,.10)!important;
+html:root .pre-editor,
+html:root .table-preview input,
+html:root .media-placeholder input{
+  background:var(--normal-glass-input,rgba(255,255,255,.035))!important;
+  border-color:var(--normal-glass-border,rgba(255,255,255,.10))!important;
 }
 
-html.liquid-glass-dark .backdrop{
-  background:rgba(0,0,0,.42)!important;
+html:root .backdrop{
+  background:var(--normal-glass-backdrop,rgba(0,0,0,.42))!important;
   backdrop-filter:blur(12px) saturate(120%)!important;
   -webkit-backdrop-filter:blur(12px) saturate(120%)!important;
 }
+
+html:not(.liquid-glass-dark) .primary-soft{color:var(--text)!important}
 
 /* ⚡ mode switch */
 .liquid-glass-toggle{
@@ -164,41 +191,41 @@ html.liquid-glass-dark .backdrop{
   transform:translateY(-.5px);
   filter:drop-shadow(0 1px 8px rgba(255,255,255,.16));
 }
-html.liquid-glass-dark .liquid-glass-toggle{
-  border-color:rgba(255,255,255,.22)!important;
+html:root .liquid-glass-toggle{
+  border-color:var(--normal-glass-border,rgba(255,255,255,.22))!important;
   background:
     radial-gradient(circle at 34% 18%,rgba(255,255,255,.20),transparent 36%),
     linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.025)),
-    rgba(18,18,22,.32)!important;
-  box-shadow:
+    var(--normal-glass-toggle,rgba(18,18,22,.32))!important;
+  box-shadow:var(--normal-glass-control-shadow,
     0 10px 28px rgba(0,0,0,.42),
     inset 0 1px 0 rgba(255,255,255,.28),
-    inset 0 -1px 0 rgba(255,255,255,.04)!important;
+    inset 0 -1px 0 rgba(255,255,255,.04))!important;
   backdrop-filter:blur(26px) saturate(175%)!important;
   -webkit-backdrop-filter:blur(26px) saturate(175%)!important;
 }
-html.liquid-glass-dark .liquid-glass-toggle .liquid-glass-bolt{
+html:root .liquid-glass-toggle .liquid-glass-bolt{
   filter:drop-shadow(0 0 10px rgba(255,255,255,.20));
 }
 
-html.liquid-glass-dark .fab-send{
+html:root .fab-send{
   background:
-    linear-gradient(145deg,color-mix(in srgb,var(--accent) 86%,#fff 8%),color-mix(in srgb,var(--accent) 72%,#050506 22%))!important;
-  box-shadow:0 14px 36px rgba(0,0,0,.46),inset 0 1px 0 rgba(255,255,255,.25)!important;
+    linear-gradient(145deg,color-mix(in srgb,var(--accent) 86%,#fff 8%),color-mix(in srgb,var(--accent) 72%,var(--normal-glass-bg,#050506) 22%))!important;
+  box-shadow:var(--normal-glass-send-shadow,0 14px 36px rgba(0,0,0,.46),inset 0 1px 0 rgba(255,255,255,.25))!important;
 }
 
-html.mobile-performance.liquid-glass-dark .editor-topbar,
-html.mobile-performance.liquid-glass-dark .toolbar-bubble,
-html.mobile-performance.liquid-glass-dark .popup-menu,
-html.mobile-performance.liquid-glass-dark .sheet,
-html.mobile-performance.liquid-glass-dark .starter-card,
-html.mobile-performance.liquid-glass-dark .sheet-item,
-html.mobile-performance.liquid-glass-dark .soft-btn,
-html.mobile-performance.liquid-glass-dark .primary-soft,
-html.mobile-performance.liquid-glass-dark .fab,
-html.mobile-performance.liquid-glass-dark .media-picker-card,
-html.mobile-performance.liquid-glass-dark .icon-btn,
-html.mobile-performance.liquid-glass-dark .composer-toolbar.floating-toolbar .toolbar-bubble button{
+html.mobile-performance:root .editor-topbar,
+html.mobile-performance:root .toolbar-bubble,
+html.mobile-performance:root .popup-menu,
+html.mobile-performance:root .sheet,
+html.mobile-performance:root .starter-card,
+html.mobile-performance:root .sheet-item,
+html.mobile-performance:root .soft-btn,
+html.mobile-performance:root .primary-soft,
+html.mobile-performance:root .fab,
+html.mobile-performance:root .media-picker-card,
+html.mobile-performance:root .icon-btn,
+html.mobile-performance:root .composer-toolbar.floating-toolbar .toolbar-bubble button{
   backdrop-filter:blur(14px) saturate(135%)!important;
   -webkit-backdrop-filter:blur(14px) saturate(135%)!important;
 }
