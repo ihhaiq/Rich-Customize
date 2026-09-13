@@ -1,54 +1,16 @@
 from __future__ import annotations
 
-from typing import Any
-
 from aiogram.enums import ButtonStyle
-from aiogram.types import CopyTextButton, DisabledButton, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.i18n import t
 
 
 def build_pages_keyboard(
-    pages: list[dict[str, Any]],
-    page_index: int = 0,
-    total_pages: int = 1,
     *,
     show_controls: bool = False,
-    pagination_prefix: str = "r:pages",
 ) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
-    for page in pages:
-        page_id = str(page["page_id"])
-        title = str(page.get("title") or page_id)[:24]
-        rows.append([InlineKeyboardButton(
-            text=f"📄 {title}",
-            callback_data=f"r:pageopen:{page_id}",
-            style=ButtonStyle.PRIMARY,
-        )])
-        rows.append([
-            InlineKeyboardButton(text=f"📋 {page_id}", copy_text=CopyTextButton(text=page_id)),
-            InlineKeyboardButton(text="✏️", callback_data=f"r:prename:{page_id}:{page_index}"),
-            InlineKeyboardButton(
-                text="🗑", callback_data=f"r:pdelete:{page_id}:{page_index}",
-                style=ButtonStyle.DANGER,
-            ),
-        ])
-    if total_pages > 1:
-        rows.append([
-            InlineKeyboardButton(
-                text="◀️",
-                callback_data=None if page_index <= 0 else f"{pagination_prefix}:{page_index - 1}",
-                disabled=DisabledButton() if page_index <= 0 else None,
-            ),
-            InlineKeyboardButton(
-                text=f"{page_index + 1}/{total_pages}", disabled=DisabledButton(),
-            ),
-            InlineKeyboardButton(
-                text="▶️",
-                callback_data=None if page_index >= total_pages - 1 else f"{pagination_prefix}:{page_index + 1}",
-                disabled=DisabledButton() if page_index >= total_pages - 1 else None,
-            ),
-        ])
     if show_controls:
         rows.append([
             InlineKeyboardButton(text=t("pages.search_button"), callback_data="r:psearch"),

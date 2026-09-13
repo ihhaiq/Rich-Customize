@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-import html
-
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.i18n import t
 from app.keyboards import build_pages_keyboard
-from app.routers.editor_ui import MAIN_TEXT, edit_saved_ui, edit_ui
+from app.routers.editor_ui import MAIN_TEXT
 from app.routers.button_support import save_changed_draft
 from app.services.page_editor import query_user_pages
+from app.services.pages_ui import build_pages_rich_message, edit_pages_ui
 
 
-def saved_pages_text(page_index: int = 0, total_pages: int = 1) -> str:
+def saved_pages_text() -> str:
     return "\n".join([
         t("pages.saved_title"),
-        f"{page_index + 1}/{total_pages}",
         "",
         t("pages.open_prompt"),
     ])
@@ -45,28 +43,25 @@ async def render_pages_screen(
     if not pages and not query:
         return False
     if pages:
-        text = saved_pages_text(page_index, total_pages)
+        text = saved_pages_text()
         if query:
-            text += "\n\n" + t("pages.search_results", query=html.escape(query))
+            text += "\n\n" + t("pages.search_results", query=query)
     else:
-        text = t("pages.search_none", query=html.escape(query))
-    keyboard = build_pages_keyboard(
+        text = t("pages.search_none", query=query)
+    rich_message = build_pages_rich_message(
+        text,
         visible,
         page_index,
         total_pages,
-        show_controls=total_count > 1,
         pagination_prefix="r:presults" if query else "r:pages",
     )
-    if saved:
-        await edit_saved_ui(
-            bot=message.bot,
-            state=state,
-            text=text,
-            reply_markup=keyboard,
-            parse_mode="HTML",
-        )
-    else:
-        await edit_ui(message, text, keyboard, parse_mode="HTML")
+    await edit_pages_ui(
+        message,
+        state,
+        rich_message,
+        build_pages_keyboard(show_controls=total_count > 1),
+        saved=saved,
+    )
     return True
 
 

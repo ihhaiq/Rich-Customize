@@ -8,6 +8,7 @@ EDITOR_PHRASES: dict[str, str] = {
     "block.duplicated": "Block duplicated.",
     "editor.showcase_button": "🧩 Every Rich Block",
     "editor.current_position": "This is the current position.",
+    "pages.copy_code": "Copy code",
 }
 
 EDITOR_AR_PHRASES: dict[str, str] = {
@@ -18,6 +19,7 @@ EDITOR_AR_PHRASES: dict[str, str] = {
     "block.duplicated": "تم نسخ الـBlock.",
     "editor.showcase_button": "🧩 قالب كل البلوكات",
     "editor.current_position": "هذا هو الموقع الحالي",
+    "pages.copy_code": "نسخ الكود",
 }
 
 EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
@@ -29,6 +31,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Bloque duplicado.",
         "editor.showcase_button": "🧩 Todos los bloques",
         "editor.current_position": "Esta es la posición actual.",
+        "pages.copy_code": "Copiar código",
     },
     "fr": {
         "math.add_prompt": "Envoyez ou transférez un Rich Message prêt contenant un bloc Math.",
@@ -38,6 +41,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Bloc dupliqué.",
         "editor.showcase_button": "🧩 Tous les blocs",
         "editor.current_position": "C’est la position actuelle.",
+        "pages.copy_code": "Copier le code",
     },
     "de": {
         "math.add_prompt": "Sende oder leite eine fertige Rich Message mit einem Math-Block weiter.",
@@ -47,6 +51,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Block dupliziert.",
         "editor.showcase_button": "🧩 Alle Blöcke",
         "editor.current_position": "Das ist die aktuelle Position.",
+        "pages.copy_code": "Code kopieren",
     },
     "it": {
         "math.add_prompt": "Invia o inoltra un Rich Message già pronto che contenga un blocco Math.",
@@ -56,6 +61,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Blocco duplicato.",
         "editor.showcase_button": "🧩 Tutti i blocchi",
         "editor.current_position": "Questa è la posizione attuale.",
+        "pages.copy_code": "Copia codice",
     },
     "pt": {
         "math.add_prompt": "Envie ou encaminhe um Rich Message pronto que contenha um bloco Math.",
@@ -65,6 +71,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Bloco duplicado.",
         "editor.showcase_button": "🧩 Todos os blocos",
         "editor.current_position": "Esta é a posição atual.",
+        "pages.copy_code": "Copiar código",
     },
     "nl": {
         "math.add_prompt": "Stuur of stuur een kant-en-klaar Rich Message door met een Math-blok.",
@@ -74,6 +81,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Blok gedupliceerd.",
         "editor.showcase_button": "🧩 Alle blokken",
         "editor.current_position": "Dit is de huidige positie.",
+        "pages.copy_code": "Code kopiëren",
     },
     "pl": {
         "math.add_prompt": "Wyślij lub przekaż gotową Rich Message zawierającą blok Math.",
@@ -83,6 +91,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Blok zduplikowany.",
         "editor.showcase_button": "🧩 Wszystkie bloki",
         "editor.current_position": "To jest bieżąca pozycja.",
+        "pages.copy_code": "Kopiuj kod",
     },
     "uk": {
         "math.add_prompt": "Надішліть або перешліть готове Rich Message, що містить блок Math.",
@@ -92,6 +101,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Блок продубльовано.",
         "editor.showcase_button": "🧩 Усі блоки",
         "editor.current_position": "Це поточна позиція.",
+        "pages.copy_code": "Копіювати код",
     },
     "ru": {
         "math.add_prompt": "Отправьте или перешлите готовое Rich Message с блоком Math.",
@@ -101,6 +111,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Блок продублирован.",
         "editor.showcase_button": "🧩 Все блоки",
         "editor.current_position": "Это текущая позиция.",
+        "pages.copy_code": "Копировать код",
     },
     "tr": {
         "math.add_prompt": "Math bloğu içeren hazır bir Rich Message gönderin veya iletin.",
@@ -110,6 +121,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Blok çoğaltıldı.",
         "editor.showcase_button": "🧩 Tüm bloklar",
         "editor.current_position": "Bu mevcut konum.",
+        "pages.copy_code": "Kodu kopyala",
     },
     "fa": {
         "math.add_prompt": "یک Rich Message آماده که دارای بلوک Math است ارسال یا فوروارد کنید.",
@@ -119,6 +131,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "بلوک تکثیر شد.",
         "editor.showcase_button": "🧩 همه بلوک‌ها",
         "editor.current_position": "این موقعیت فعلی است.",
+        "pages.copy_code": "کپی کد",
     },
     "ku": {
         "math.add_prompt": "Rich Messageeke amade ku bloka Math tê de heye bişîne an jî forward bike.",
@@ -128,6 +141,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Blok hate dubarekirin.",
         "editor.showcase_button": "🧩 Hemû blok",
         "editor.current_position": "Ev cihê niha ye.",
+        "pages.copy_code": "Kodê kopî bike",
     },
     "ur": {
         "math.add_prompt": "ایک تیار Rich Message بھیجیں یا فارورڈ کریں جس میں Math بلاک موجود ہو۔",
@@ -137,6 +151,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "بلاک کی نقل بن گئی۔",
         "editor.showcase_button": "🧩 تمام بلاکس",
         "editor.current_position": "یہ موجودہ پوزیشن ہے۔",
+        "pages.copy_code": "کوڈ کاپی کریں",
     },
     "hi": {
         "math.add_prompt": "एक तैयार Rich Message भेजें या फ़ॉरवर्ड करें जिसमें Math ब्लॉक हो।",
@@ -146,6 +161,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "ब्लॉक की प्रतिलिपि बन गई।",
         "editor.showcase_button": "🧩 सभी ब्लॉक",
         "editor.current_position": "यह वर्तमान स्थान है।",
+        "pages.copy_code": "कोड कॉपी करें",
     },
     "id": {
         "math.add_prompt": "Kirim atau teruskan Rich Message siap pakai yang berisi blok Math.",
@@ -155,6 +171,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Blok diduplikasi.",
         "editor.showcase_button": "🧩 Semua blok",
         "editor.current_position": "Ini posisi saat ini.",
+        "pages.copy_code": "Salin kode",
     },
     "ja": {
         "math.add_prompt": "Math ブロックを含む完成済みの Rich Message を送信または転送してください。",
@@ -164,6 +181,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "ブロックを複製しました。",
         "editor.showcase_button": "🧩 すべてのブロック",
         "editor.current_position": "現在の位置です。",
+        "pages.copy_code": "コードをコピー",
     },
     "ko": {
         "math.add_prompt": "Math 블록이 포함된 완성된 Rich Message를 보내거나 전달하세요.",
@@ -173,6 +191,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "블록을 복제했습니다.",
         "editor.showcase_button": "🧩 모든 블록",
         "editor.current_position": "현재 위치입니다.",
+        "pages.copy_code": "코드 복사",
     },
     "vi": {
         "math.add_prompt": "Gửi hoặc chuyển tiếp một Rich Message hoàn chỉnh có chứa khối Math.",
@@ -182,6 +201,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "Đã nhân bản khối.",
         "editor.showcase_button": "🧩 Tất cả khối",
         "editor.current_position": "Đây là vị trí hiện tại.",
+        "pages.copy_code": "Sao chép mã",
     },
     "th": {
         "math.add_prompt": "ส่งหรือส่งต่อ Rich Message ที่พร้อมใช้งานและมีบล็อก Math",
@@ -191,6 +211,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "ทำสำเนาบล็อกแล้ว",
         "editor.showcase_button": "🧩 บล็อกทั้งหมด",
         "editor.current_position": "นี่คือตำแหน่งปัจจุบัน",
+        "pages.copy_code": "คัดลอกรหัส",
     },
     "zh-hans": {
         "math.add_prompt": "发送或转发一条已包含 Math 区块的现成 Rich Message。",
@@ -200,6 +221,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "区块已复制。",
         "editor.showcase_button": "🧩 所有区块",
         "editor.current_position": "这是当前位置。",
+        "pages.copy_code": "复制代码",
     },
     "zh-hant": {
         "math.add_prompt": "傳送或轉傳一則已包含 Math 區塊的現成 Rich Message。",
@@ -209,6 +231,7 @@ EDITOR_KEY_TRANSLATIONS: dict[str, dict[str, str]] = {
         "block.duplicated": "區塊已複製。",
         "editor.showcase_button": "🧩 所有區塊",
         "editor.current_position": "這是目前位置。",
+        "pages.copy_code": "複製代碼",
     },
 }
 
