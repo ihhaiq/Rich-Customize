@@ -261,7 +261,7 @@ class CoreLocalizationRegressionTests(unittest.TestCase):
         finally:
             i18n_core._language.reset(token)
 
-        self.assertEqual(rich.blocks[2].cells[-1][2].text, "2/3")
+        self.assertEqual(rich.blocks[2].cells[-1][1].text.button.text, "2️⃣")
         self.assertIsNone(ARABIC_RE.search(rich.model_dump_json(exclude_none=True)))
 
 
