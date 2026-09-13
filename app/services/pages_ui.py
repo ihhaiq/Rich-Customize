@@ -6,7 +6,6 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     CopyTextButton,
-    DisabledButton,
     InlineKeyboardMarkup,
     InputRichBlockDivider,
     InputRichBlockParagraph,
@@ -24,14 +23,12 @@ from app.i18n import t
 def _button_cell(
     button: RichMessageButton,
     *,
-    colspan: int | None = None,
     align: str = "center",
 ) -> RichBlockTableCell:
     return RichBlockTableCell(
         text=RichTextButton(button=button),
         align=align,
         valign="middle",
-        colspan=colspan,
     )
 
 
@@ -53,9 +50,6 @@ def build_pages_rich_message(
     text: str,
     pages: list[dict[str, Any]],
     page_index: int = 0,
-    total_pages: int = 1,
-    *,
-    pagination_prefix: str = "r:pages",
 ) -> InputRichMessage:
     """Render saved pages as one compact management row per page."""
     heading = InputRichBlockParagraph(text=text)
@@ -95,25 +89,6 @@ def build_pages_rich_message(
             ),
         ])
 
-    counter = "".join(f"{digit}\ufe0f\u20e3" for digit in str(page_index + 1))
-    rows.append([
-        _button_cell(RichMessageButton(
-            text="⬅️",
-            callback_data=f"{pagination_prefix}:{page_index - 1}" if page_index > 0 else None,
-            disabled=DisabledButton() if page_index <= 0 else None,
-        )),
-        _button_cell(
-            RichMessageButton(text=counter, disabled=DisabledButton()),
-            colspan=2,
-        ),
-        _button_cell(RichMessageButton(
-            text="➡️",
-            callback_data=(
-                f"{pagination_prefix}:{page_index + 1}" if page_index < total_pages - 1 else None
-            ),
-            disabled=DisabledButton() if page_index >= total_pages - 1 else None,
-        )),
-    ])
     return InputRichMessage(blocks=[
         heading,
         InputRichBlockDivider(),
