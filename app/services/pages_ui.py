@@ -95,6 +95,8 @@ def build_pages_rich_message(
 
     safe_total = max(total_pages, 1)
     safe_index = min(max(page_index, 0), safe_total - 1)
+    # Keep four physical cells here. Telegram clients can stretch a pager row
+    # vertically when it uses colspan, even when the table itself is compact.
     rows.append([
         _button_cell(RichMessageButton(
             text="⬅️",
