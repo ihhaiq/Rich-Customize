@@ -70,11 +70,16 @@ def get_button_value(button: dict[str, Any]) -> str:
 
 def normalize_button_url(value: str) -> str | None:
     url = value.strip()
+    if any(char.isspace() for char in url):
+        return None
     if TELEGRAM_USERNAME_RE.fullmatch(url):
         return f"https://t.me/{url[1:]}"
     if url.casefold().startswith(("t.me/", "telegram.me/")):
         url = f"https://{url}"
-    parsed = urlparse(url)
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None
     if parsed.scheme in {"http", "https"} and parsed.netloc:
         hostname = parsed.hostname or ""
         if (
@@ -117,6 +122,27 @@ def infer_button_type_and_value(
     if normalize_button_url(raw) is not None:
         return "url", raw
     return (current_type if current_type in BUTTON_TYPES else "url"), raw
+
+
+def parse_message_button_spec(value: str) -> tuple[str, str, str] | None:
+    """Parse one managed keyboard button without invoking the rich-text parser."""
+    match = re.fullmatch(r"\{([^{}]+)\}", value.strip(), re.DOTALL)
+    if match is None:
+        return None
+    body = match.group(1).strip()
+    # Prefer a spaced separator so hyphens in titles and URLs remain intact.
+    parts = re.split(r"\s+[-–—]\s+", body, maxsplit=1)
+    if len(parts) != 2:
+        parts = re.split(r"[-–—]", body, maxsplit=1)
+    if len(parts) != 2:
+        return None
+    title, specification = (part.strip() for part in parts)
+    if not title or "\n" in title or not specification:
+        return None
+    button_type, content = infer_button_type_and_value(specification)
+    if not content and button_type not in {"disabled", "switch_inline", "switch_inline_current"}:
+        return None
+    return title, button_type, content
 
 
 def add_message_button(

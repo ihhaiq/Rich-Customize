@@ -43,7 +43,7 @@ def button_style_label(button: dict[str, Any]) -> str:
     style = str(button.get("style", "default"))
     key = (
         f"ux.buttons.style.{style}"
-        if style in {"default", "primary", "success", "danger", "link"}
+        if style in {"default", "primary", "success", "danger"}
         else "ux.buttons.style.default"
     )
     return t(key)
@@ -61,6 +61,9 @@ def build_message_buttons_keyboard(
     buttons: list[dict[str, Any]], *, buttons_per_row: int = 1,
     include_back: bool = False,
     back_text: str | None = None,
+    source_page_id: str | None = None,
+    navigation_token: str | None = None,
+    extra_markup: InlineKeyboardMarkup | None = None,
 ) -> InlineKeyboardMarkup:
     rendered: list[InlineKeyboardButton] = []
     for button in normalize_button_positions(buttons):
@@ -90,11 +93,19 @@ def build_message_buttons_keyboard(
         elif button_type == "disabled":
             rendered.append(InlineKeyboardButton(**common, disabled=DisabledButton()))
         elif button_type == "page":
-            rendered.append(InlineKeyboardButton(**common, callback_data=f"r:page:{value}"))
+            prefix = "r:spage" if button.get("audience") == "subscribers" else "r:page"
+            callback_parts = [prefix, value]
+            if source_page_id:
+                callback_parts.append(source_page_id)
+                if navigation_token:
+                    callback_parts.append(navigation_token)
+            rendered.append(InlineKeyboardButton(**common, callback_data=":".join(callback_parts)))
         else:
             rendered.append(InlineKeyboardButton(**common, url=value or "https://t.me"))
     width = max(1, min(8, int(buttons_per_row)))
     rows = [rendered[index:index + width] for index in range(0, len(rendered), width)]
+    if extra_markup:
+        rows.extend(extra_markup.inline_keyboard)
     if include_back:
         rows.append([InlineKeyboardButton(
             text=back_text or t("ux.common.back"), callback_data="r:bpback",
@@ -102,7 +113,13 @@ def build_message_buttons_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def build_button_type_keyboard(callback_prefix: str = "r:bat") -> InlineKeyboardMarkup:
+def build_button_input_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=t("ux.common.back"), callback_data="r:buttons"),
+    ]])
+
+
+def build_button_type_keyboard(callback_prefix: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t("ux.buttons.category.links"), disabled=DisabledButton())],
         [InlineKeyboardButton(text=t("ux.buttons.type.url"), callback_data=f"{callback_prefix}:url")],
@@ -217,16 +234,16 @@ def build_button_picker_keyboard(
 
 
 def build_button_style_keyboard(
-    button_id: str, current_style: str, *, allow_link: bool = False,
+    button_id: str, current_style: str,
 ) -> InlineKeyboardMarkup:
+    if current_style == "link":
+        current_style = "default"
     choices = [
         (f"⚪ {t('ux.buttons.style.default')}", "default", None),
         (f"🔵 {t('ux.buttons.style.primary')}", "primary", ButtonStyle.PRIMARY),
         (f"🟢 {t('ux.buttons.style.success')}", "success", ButtonStyle.SUCCESS),
         (f"🔴 {t('ux.buttons.style.danger')}", "danger", ButtonStyle.DANGER),
     ]
-    if allow_link:
-        choices.append((f"🔗 {t('ux.buttons.style.link')}", "link", None))
     rows = [[InlineKeyboardButton(
         text=f"{'✅ ' if current_style == value else ''}{text}",
         callback_data=f"r:bsc:{button_id}:{value}",
@@ -253,6 +270,7 @@ def build_button_position_keyboard(
 
 
 __all__ = [
+    "build_button_input_keyboard",
     "build_button_picker_keyboard",
     "build_button_editor_keyboard",
     "build_button_delete_confirmation_keyboard",

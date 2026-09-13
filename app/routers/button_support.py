@@ -10,7 +10,7 @@ from aiogram.types import Message
 from app.editor.draft_store import EditorDraft, draft_store
 from app.editor.history import remember
 from app.i18n import preserve_user_content, t, tr
-from app.keyboards import build_message_buttons_keyboard
+from app.keyboards.message_buttons import build_button_input_keyboard, build_message_buttons_keyboard
 from app.services.buttons import (
     BUTTON_TYPES,
     get_button_type,
@@ -21,16 +21,11 @@ from app.services.buttons import (
 )
 from app.services.popup_registry import popup_registry
 
-from app.routers.button_guide import (
-    answer_with_button_guide as render_button_guide,
-    button_guide_blocks,
-)
 from app.routers.editor_ui import (
     delete_input_message as remove_input_message,
-    edit_button_ui as render_button_ui,
-    edit_saved_button_ui as render_saved_button_ui,
+    edit_ui as edit_button_ui,
+    edit_saved_ui as edit_saved_button_ui,
 )
-from app.services.renderer import build_input_rich_message
 
 
 def buttons_per_row(data: dict[str, Any]) -> int:
@@ -98,21 +93,14 @@ def normalize_button_value(button_type: str, value: str) -> tuple[str | None, st
     return value, None
 
 
-async def answer_with_button_guide(message: Message, prompt: str, reply_markup=None) -> Message:
-    return await render_button_guide(message, prompt, reply_markup)
-
-
-async def edit_button_ui(message: Message, text: str, reply_markup) -> None:
-    await render_button_ui(message, text, reply_markup)
-
-
-async def edit_saved_button_ui(
-    bot: Bot,
-    state: FSMContext,
-    text: str,
-    reply_markup,
+async def prompt_button_input(
+    message: Message, state: FSMContext, prompt: str,
 ) -> None:
-    await render_saved_button_ui(bot, state, text, reply_markup)
+    await edit_button_ui(message, prompt, build_button_input_keyboard())
+    await state.update_data(
+        management_chat_id=message.chat.id,
+        management_message_id=message.message_id,
+    )
 
 
 async def delete_input_message(message: Message) -> None:
@@ -126,11 +114,10 @@ async def preview_buttons(
     width: int,
 ) -> Message:
     with preserve_user_content():
-        return await bot.send_rich_message(
+        return await bot.send_message(
             chat_id=user_id,
-            rich_message=build_input_rich_message(
-                button_guide_blocks(t("button_preview")),
-            ),
+            text=t("button_preview"),
+            parse_mode=None,
             reply_markup=build_message_buttons_keyboard(
                 buttons,
                 buttons_per_row=width,
@@ -141,13 +128,13 @@ async def preview_buttons(
 
 
 __all__ = [
-    "answer_with_button_guide",
     "buttons_per_row",
     "delete_input_message",
     "edit_button_ui",
     "edit_saved_button_ui",
     "normalize_button_value",
     "prepare_message_buttons",
+    "prompt_button_input",
     "preview_buttons",
     "save_changed_draft",
 ]

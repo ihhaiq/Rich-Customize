@@ -18,7 +18,7 @@ from app.keyboards import (
     build_buttons_manager_keyboard,
 )
 from app.i18n import t, tr
-from app.routers.button_support import answer_with_button_guide, edit_button_ui, save_changed_draft
+from app.routers.button_support import prompt_button_input, edit_button_ui, save_changed_draft
 from app.services.buttons import delete_message_button, get_button_type, get_message_button
 from app.states import RichEditorStates
 
@@ -58,7 +58,10 @@ async def open_buttons_manager(callback: CallbackQuery, state: FSMContext) -> No
         return
     draft = await draft_store.load(state)
     await state.set_state(RichEditorStates.managing)
-    await state.update_data(current_button_id=None, pending_button_action=None)
+    await state.update_data(
+        current_button_id=None, pending_button_action=None,
+        pending_button_text=None, pending_button_type=None,
+    )
     await edit_button_ui(
         callback.message,
         manager_text(len(draft.message_buttons)),
@@ -146,7 +149,6 @@ async def edit_selected_button(callback: CallbackQuery, state: FSMContext) -> No
             t("ux.buttons.editing", title=str(button.get("text") or "Button")),
             build_button_style_keyboard(
                 button_id, str(button.get("style", "default")),
-                allow_link=get_button_type(button) == "popup",
             ),
         )
     elif action == "move":
@@ -172,7 +174,7 @@ async def edit_selected_button(callback: CallbackQuery, state: FSMContext) -> No
             if action == "title"
             else t("ux.buttons.send_new_value")
         )
-        await answer_with_button_guide(callback.message, prompt)
+        await prompt_button_input(callback.message, state, prompt)
     else:
         await callback.answer(t("invalid"), show_alert=True)
         return
@@ -256,7 +258,6 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
             build_button_style_keyboard(
                 button_id,
                 str(button.get("style", "default")),
-                allow_link=get_button_type(button) == "popup",
             ),
         )
         await callback.answer()
@@ -289,7 +290,7 @@ async def select_message_button(callback: CallbackQuery, state: FSMContext) -> N
         if pending_action == "title"
         else t("ux.buttons.send_new_value")
     )
-    await answer_with_button_guide(callback.message, prompt)
+    await prompt_button_input(callback.message, state, prompt)
     await callback.answer()
 
 

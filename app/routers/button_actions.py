@@ -7,9 +7,7 @@ feature routers own those responsibilities separately.
 from aiogram import Router
 
 from app.routers.button_create import (
-    choose_new_button_type,
     router as create_router,
-    select_button_page,
     start_add_button,
 )
 from app.routers.button_manager import (
@@ -23,6 +21,7 @@ from app.routers.button_modify import (
     change_button_position,
     change_button_style,
     change_button_type,
+    select_button_page,
     router as modify_router,
 )
 from app.routers.button_preview_actions import (
@@ -45,7 +44,6 @@ __all__ = [
     "change_button_type",
     "change_buttons_per_row",
     "choose_button_action",
-    "choose_new_button_type",
     "close_buttons_preview",
     "open_buttons_manager",
     "preview_message_buttons",

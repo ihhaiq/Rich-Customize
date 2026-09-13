@@ -7,6 +7,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import InlineQuery, InlineQueryResultArticle, InputRichMessageContent, Message
 
 from app.i18n import tr
+from app.keyboards.message_buttons import build_message_buttons_keyboard
 from app.services.buttons import normalize_page_code
 from app.services.renderer import RichMessageRenderError, build_input_rich_message
 
@@ -27,16 +28,18 @@ async def saved_page_query_result(page_id: str) -> InlineQueryResultArticle | No
     prepared_buttons = await prepare_message_buttons(page.get("buttons") or [])
     rich_message = build_input_rich_message(
         page.get("blocks") or [],
-        prepared_buttons,
-        buttons_per_row=int(page.get("buttons_per_row", 1)),
-        buttons_align=str(page.get("buttons_align", "center")),
         source_page_id=page_id,
     )
+    reply_markup = build_message_buttons_keyboard(
+        prepared_buttons, buttons_per_row=int(page.get("buttons_per_row", 1)),
+        source_page_id=page_id,
+    ) if prepared_buttons else None
     return InlineQueryResultArticle(
         id=f"page-{page_id}",
         title=str(page.get("title") or page_id),
         description=f"{tr('رسالة غنية محفوظة · ')}{page_id}",
         input_message_content=InputRichMessageContent(rich_message=rich_message),
+        reply_markup=reply_markup,
     )
 
 

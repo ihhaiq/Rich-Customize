@@ -8,7 +8,7 @@ from app.editor.history import UNDO_KEY
 from app.editor.session import load_editor_session as _session
 from app.i18n import t, tr
 from app.lang import TRANSLATIONS
-from app.lang.catalogs.common import (
+from app.lang.catalogs.common_data import (
     DETAILS_INNER_KEYS,
     EDITOR_UX_KEYS,
     KEY_TRANSLATIONS,

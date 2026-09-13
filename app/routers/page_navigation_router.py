@@ -17,6 +17,7 @@ from app.services.guest_message_registry import guest_message_registry
 from app.services.page_navigation import page_navigation_registry
 from app.services.page_registry import page_registry
 from app.routers.button_support import prepare_message_buttons
+from app.keyboards.message_buttons import build_message_buttons_keyboard
 
 
 router = Router(name="page_navigation")
@@ -103,12 +104,13 @@ async def _open_page_link(
     try:
         rich_message = build_input_rich_message(
             page.get("blocks", []),
-            prepared_buttons,
-            buttons_per_row=int(page.get("buttons_per_row", 1)),
-            buttons_align=str(page.get("buttons_align", "center")),
             source_page_id=target_id,
             navigation_token=navigation.token,
             navigation_buttons=page_navigation_buttons(navigation),
+        )
+        reply_markup = build_message_buttons_keyboard(
+            prepared_buttons, buttons_per_row=int(page.get("buttons_per_row", 1)),
+            source_page_id=target_id, navigation_token=navigation.token,
         )
         if ephemeral_message_id:
             await bot.edit_ephemeral_message_text(
@@ -116,11 +118,13 @@ async def _open_page_link(
                 receiver_user_id=callback.from_user.id,
                 ephemeral_message_id=ephemeral_message_id,
                 rich_message=rich_message,
+                reply_markup=reply_markup,
             )
         elif chat_type in {"group", "supergroup", "channel"}:
             await bot.send_rich_message(
                 chat_id=chat_id,
                 rich_message=rich_message,
+                reply_markup=reply_markup,
                 ephemeral_message_parameters=EphemeralMessageParameters(
                     receiver_user_id=callback.from_user.id,
                     callback_query_id=callback.id,
@@ -131,6 +135,7 @@ async def _open_page_link(
             await bot.send_rich_message(
                 chat_id=callback.from_user.id,
                 rich_message=rich_message,
+                reply_markup=reply_markup,
             )
     except (RichMessageRenderError, TelegramAPIError, ValueError) as error:
         logger.exception(
@@ -169,12 +174,13 @@ async def render_navigation_page(
         prepared_buttons = await prepare_message_buttons(page.get("buttons") or [])
         rich_message = build_input_rich_message(
             page.get("blocks", []),
-            prepared_buttons,
-            buttons_per_row=int(page.get("buttons_per_row", 1)),
-            buttons_align=str(page.get("buttons_align", "center")),
             source_page_id=page_id,
             navigation_token=navigation.token,
             navigation_buttons=page_navigation_buttons(navigation),
+        )
+        reply_markup = build_message_buttons_keyboard(
+            prepared_buttons, buttons_per_row=int(page.get("buttons_per_row", 1)),
+            source_page_id=page_id, navigation_token=navigation.token,
         )
         if callback_message.ephemeral_message_id:
             await bot.edit_ephemeral_message_text(
@@ -182,11 +188,13 @@ async def render_navigation_page(
                 receiver_user_id=callback.from_user.id,
                 ephemeral_message_id=callback_message.ephemeral_message_id,
                 rich_message=rich_message,
+                reply_markup=reply_markup,
             )
         else:
             await bot.send_rich_message(
                 chat_id=callback_message.chat.id,
                 rich_message=rich_message,
+                reply_markup=reply_markup,
             )
     except (RichMessageRenderError, TelegramAPIError, ValueError) as error:
         logger.exception(
