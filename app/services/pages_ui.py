@@ -6,6 +6,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     CopyTextButton,
+    DisabledButton,
     InlineKeyboardMarkup,
     InputRichBlockDivider,
     InputRichBlockParagraph,
@@ -50,6 +51,9 @@ def build_pages_rich_message(
     text: str,
     pages: list[dict[str, Any]],
     page_index: int = 0,
+    total_pages: int = 1,
+    *,
+    pagination_prefix: str = "r:pages",
 ) -> InputRichMessage:
     """Render saved pages as one compact management row per page."""
     heading = InputRichBlockParagraph(text=text)
@@ -88,6 +92,36 @@ def build_pages_rich_message(
                 align="right",
             ),
         ])
+
+    safe_total = max(total_pages, 1)
+    safe_index = min(max(page_index, 0), safe_total - 1)
+    # Keep four physical cells here. Telegram clients can stretch a pager row
+    # vertically when it uses colspan, even when the table itself is compact.
+    rows.append([
+        _button_cell(RichMessageButton(
+            text="⬅️",
+            callback_data=(
+                f"{pagination_prefix}:{safe_index - 1}"
+                if safe_index > 0
+                else None
+            ),
+            disabled=DisabledButton() if safe_index <= 0 else None,
+        )),
+        RichBlockTableCell(
+            align="center",
+            valign="middle",
+        ),
+        _text_cell(f"{safe_index + 1}/{safe_total}", align="left"),
+        _button_cell(RichMessageButton(
+            text="➡️",
+            callback_data=(
+                f"{pagination_prefix}:{safe_index + 1}"
+                if safe_index < safe_total - 1
+                else None
+            ),
+            disabled=DisabledButton() if safe_index >= safe_total - 1 else None,
+        )),
+    ])
 
     return InputRichMessage(blocks=[
         heading,
