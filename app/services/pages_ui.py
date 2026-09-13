@@ -21,12 +21,31 @@ from aiogram.types import (
 from app.i18n import t
 
 
-def _button_cell(button: RichMessageButton, *, colspan: int | None = None) -> RichBlockTableCell:
+def _button_cell(
+    button: RichMessageButton,
+    *,
+    colspan: int | None = None,
+    align: str = "center",
+) -> RichBlockTableCell:
     return RichBlockTableCell(
         text=RichTextButton(button=button),
-        align="center",
+        align=align,
         valign="middle",
         colspan=colspan,
+    )
+
+
+def _text_cell(
+    text: str,
+    *,
+    is_header: bool = False,
+    align: str = "center",
+) -> RichBlockTableCell:
+    return RichBlockTableCell(
+        text=text,
+        align=align,
+        valign="middle",
+        is_header=is_header or None,
     )
 
 
@@ -38,32 +57,42 @@ def build_pages_rich_message(
     *,
     pagination_prefix: str = "r:pages",
 ) -> InputRichMessage:
-    """Put each page name above three separate action cells and a shared pager."""
+    """Render saved pages as one compact management row per page."""
     heading = InputRichBlockParagraph(text=text)
     if not pages:
         return InputRichMessage(blocks=[heading])
 
-    rows: list[list[RichBlockTableCell]] = []
+    rows: list[list[RichBlockTableCell]] = [[
+        _text_cell("🗑️", is_header=True),
+        _text_cell("✏️", is_header=True),
+        _text_cell(t("pages.copy_code"), is_header=True),
+        _text_cell(t("pages.sort_title"), is_header=True, align="right"),
+    ]]
+
     for page in pages:
         page_id = str(page["page_id"])
-        rows.append([_button_cell(
-            RichMessageButton(
-                text=str(page.get("title") or page_id),
-                callback_data=f"r:pageopen:{page_id}",
-                style="primary",
-            ),
-            colspan=3,
-        )])
         rows.append([
             _button_cell(RichMessageButton(
-                text="🗑️", callback_data=f"r:pdelete:{page_id}:{page_index}", style="danger",
+                text="🗑️",
+                callback_data=f"r:pdelete:{page_id}:{page_index}",
+                style="danger",
             )),
             _button_cell(RichMessageButton(
-                text="✏️", callback_data=f"r:prename:{page_id}:{page_index}",
+                text="✏️",
+                callback_data=f"r:prename:{page_id}:{page_index}",
             )),
             _button_cell(RichMessageButton(
-                text=t("pages.copy_code"), copy_text=CopyTextButton(text=page_id),
+                text=t("pages.copy_code"),
+                copy_text=CopyTextButton(text=page_id),
             )),
+            _button_cell(
+                RichMessageButton(
+                    text=str(page.get("title") or page_id),
+                    callback_data=f"r:pageopen:{page_id}",
+                    style="primary",
+                ),
+                align="right",
+            ),
         ])
 
     counter = "".join(f"{digit}\ufe0f\u20e3" for digit in str(page_index + 1))
@@ -73,7 +102,10 @@ def build_pages_rich_message(
             callback_data=f"{pagination_prefix}:{page_index - 1}" if page_index > 0 else None,
             disabled=DisabledButton() if page_index <= 0 else None,
         )),
-        _button_cell(RichMessageButton(text=counter, disabled=DisabledButton())),
+        _button_cell(
+            RichMessageButton(text=counter, disabled=DisabledButton()),
+            colspan=2,
+        ),
         _button_cell(RichMessageButton(
             text="➡️",
             callback_data=(
