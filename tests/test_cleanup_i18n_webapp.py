@@ -25,6 +25,19 @@ def assert_no_legacy_translation_calls(path: Path) -> None:
     assert not calls, f"Legacy tr() calls in {path}: {calls}"
 
 
+def test_obsolete_localization_layers_are_removed() -> None:
+    obsolete = (
+        "MIGRATION.md",
+        "catalogs/migration_semantic.py",
+        "catalogs/recent_ui.py",
+        "catalogs/welcome_revision.py",
+        "catalogs/welcome_compact.py",
+    )
+    lang = APP / "lang"
+    for relative in obsolete:
+        assert not (lang / relative).exists(), relative
+
+
 def test_common_catalog_is_a_small_facade() -> None:
     facade = APP / "lang" / "catalogs" / "common.py"
     data = APP / "lang" / "catalogs" / "common_data.py"
