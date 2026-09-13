@@ -4,16 +4,15 @@ import logging
 from typing import Any
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.editor.draft_store import EditorDraft, draft_store
 from app.i18n import t
 from app.keyboards import build_rich_editor_keyboard
-from app.routers.button_guide import answer_with_button_guide, button_guide_blocks
+from app.routers.button_guide import answer_with_button_guide
 from app.services.blocks import BLOCK_LABELS
-from app.services.renderer import build_input_rich_message
 from app.states import RichEditorStates
 
 
@@ -79,21 +78,6 @@ async def edit_ui(
             raise
 
 
-async def edit_button_ui(message: Message, text: str, reply_markup) -> None:
-    text = str(text)
-    try:
-        await message.bot.edit_message_text(
-            chat_id=message.chat.id,
-            message_id=message.message_id,
-            rich_message=build_input_rich_message(button_guide_blocks(text)),
-            reply_markup=reply_markup,
-        )
-    except TelegramAPIError as error:
-        if "message is not modified" in str(error).lower():
-            return
-        await edit_ui(message, text, reply_markup)
-
-
 async def edit_saved_ui(
     bot: Bot,
     state: FSMContext,
@@ -118,40 +102,6 @@ async def edit_saved_ui(
             reply_markup=reply_markup,
             parse_mode=parse_mode,
         )
-        await state.update_data(
-            management_chat_id=sent.chat.id,
-            management_message_id=sent.message_id,
-        )
-
-
-async def edit_saved_button_ui(
-    bot: Bot,
-    state: FSMContext,
-    text: str,
-    reply_markup,
-) -> None:
-    text = str(text)
-    data = await state.get_data()
-    try:
-        await bot.edit_message_text(
-            chat_id=data["management_chat_id"],
-            message_id=data["management_message_id"],
-            rich_message=build_input_rich_message(button_guide_blocks(text)),
-            reply_markup=reply_markup,
-        )
-    except (KeyError, TelegramAPIError) as error:
-        if "message is not modified" in str(error).lower():
-            return
-        try:
-            sent = await bot.send_rich_message(
-                chat_id=data.get("management_chat_id"),
-                rich_message=build_input_rich_message(button_guide_blocks(text)),
-                reply_markup=reply_markup,
-            )
-        except TelegramAPIError:
-            sent = await bot.send_message(
-                data.get("management_chat_id"), text, reply_markup=reply_markup,
-            )
         await state.update_data(
             management_chat_id=sent.chat.id,
             management_message_id=sent.message_id,
@@ -297,8 +247,6 @@ __all__ = [
     "delete_add_step_messages",
     "delete_input_message",
     "delete_stored_block_prompt",
-    "edit_button_ui",
-    "edit_saved_button_ui",
     "edit_saved_ui",
     "edit_ui",
     "editor_dashboard_text",

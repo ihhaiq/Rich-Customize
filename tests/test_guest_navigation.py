@@ -22,7 +22,7 @@ class GuestNavigationTests(unittest.IsolatedAsyncioTestCase):
                 1,
                 "الصفحة الثانية",
                 [new_block("paragraph", {"text": "النص الجديد", "html": "<p>النص الجديد</p>"})],
-                [],
+                [{"id": "next", "text": "التالي", "type": "page", "value": "page-three"}],
                 1,
                 "center",
             )
@@ -70,6 +70,10 @@ class GuestNavigationTests(unittest.IsolatedAsyncioTestCase):
                             "r:pback:",
                         ),
                     )
+                    self.assertEqual(len(rendered["blocks"]), 2)
+                    inline_button = arguments["reply_markup"].inline_keyboard[0][0]
+                    self.assertEqual(inline_button.text, "التالي")
+                    self.assertTrue(inline_button.callback_data.startswith(f"r:page:page-three:{target}:"))
 
     async def test_back_deletes_ephemeral_layer_and_reveals_original(self):
         callback = SimpleNamespace(

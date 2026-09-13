@@ -10,12 +10,11 @@ from app.editor.draft_store import draft_store
 from app.editor.session import load_editor_session
 from app.i18n import t, tr
 from app.keyboards import build_buttons_manager_keyboard, build_page_target_keyboard
-from app.routers.button_support import answer_with_button_guide, edit_button_ui, save_changed_draft
+from app.routers.button_support import prompt_button_input, edit_button_ui, save_changed_draft
 from app.services.buttons import (
     BUTTON_STYLES,
     BUTTON_TYPES,
     change_message_button_type,
-    get_button_type,
     get_message_button,
     move_message_button,
 )
@@ -87,7 +86,7 @@ async def change_button_type(callback: CallbackQuery, state: FSMContext) -> None
         pending_button_action="change_type_value",
         pending_button_type=button_type,
     )
-    await answer_with_button_guide(callback.message, prompts[button_type])
+    await prompt_button_input(callback.message, state, prompts[button_type])
     await callback.answer()
 
 
@@ -106,7 +105,7 @@ async def change_button_style(callback: CallbackQuery, state: FSMContext) -> Non
     if (
         current is None
         or style not in BUTTON_STYLES
-        or (style == "link" and get_button_type(current) != "popup")
+        or style == "link"
     ):
         await callback.answer(tr("هذا الزر أو اللون لم يعد موجودًا."), show_alert=True)
         return
@@ -148,4 +147,44 @@ async def change_button_position(callback: CallbackQuery, state: FSMContext) -> 
     await callback.answer(tr("تم تغيير الترتيب"))
 
 
-__all__ = ["change_button_position", "change_button_style", "change_button_type", "router"]
+@router.callback_query(F.data.startswith("r:bpg:"))
+async def select_button_page(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await load_editor_session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
+    parts = callback.data.split(":")
+    action = parts[2] if len(parts) > 2 else ""
+    if action == "change" and len(parts) == 5:
+        button_id, page_id = parts[3], parts[4]
+    else:
+        await callback.answer(t("invalid"), show_alert=True)
+        return
+    page = await page_registry.get(page_id)
+    if page is None or int(page.get("owner_id", 0)) != callback.from_user.id:
+        await callback.answer(tr("الصفحة محذوفة أو لا تخصك."), show_alert=True)
+        return
+    before = await draft_store.load(state)
+    after = copy.deepcopy(before)
+    button = get_message_button(after.message_buttons, str(button_id))
+    if button is None:
+        await callback.answer(t("ux.buttons.missing"), show_alert=True)
+        return
+    change_message_button_type(button, "page", page_id)
+    await save_changed_draft(state, before, after)
+    await state.set_state(RichEditorStates.managing)
+    await state.update_data(
+        current_button_id=None,
+        pending_button_action=None,
+        pending_button_text=None,
+        pending_button_type=None,
+    )
+    title = str(page.get("title") or page_id)
+    await edit_button_ui(
+        callback.message,
+        f"{tr('✅ تم ربط الزر بالصفحة «')}{title}».\n\n{t('buttons_manage')}",
+        build_buttons_manager_keyboard(after.message_buttons, after.buttons_per_row),
+    )
+    await callback.answer(tr("تم ربط الصفحة"))
+
+
+__all__ = ["change_button_position", "change_button_style", "change_button_type", "select_button_page", "router"]

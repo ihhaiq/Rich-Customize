@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 from app.lang import AR_PHRASES, KEY_TRANSLATIONS, PHRASES, SUPPORTED_LANGUAGES
@@ -8,6 +9,20 @@ from app.lang.catalogs.migration_semantic import SEMANTIC_PHRASES
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app"
+
+
+def assert_no_legacy_translation_calls(path: Path) -> None:
+    tree = ast.parse(path.read_text("utf-8"), filename=str(path))
+    calls = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and (
+            isinstance(node.func, ast.Name) and node.func.id == "tr"
+            or isinstance(node.func, ast.Attribute) and node.func.attr == "tr"
+        )
+    ]
+    assert not calls, f"Legacy tr() calls in {path}: {calls}"
 
 
 def test_common_catalog_is_a_small_facade() -> None:
@@ -36,7 +51,7 @@ def test_semantic_migration_keys_cover_every_locale() -> None:
 
 def test_keyboards_are_semantic_i18n_only() -> None:
     for path in (APP / "keyboards").glob("*.py"):
-        assert "tr(" not in path.read_text("utf-8"), path
+        assert_no_legacy_translation_calls(path)
 
 
 def test_migrated_editor_surfaces_are_semantic_i18n_only() -> None:
@@ -47,7 +62,7 @@ def test_migrated_editor_surfaces_are_semantic_i18n_only() -> None:
         APP / "services" / "publish_ui.py",
     ]
     for path in paths:
-        assert "tr(" not in path.read_text("utf-8"), path
+        assert_no_legacy_translation_calls(path)
 
 
 def test_miniapp_backend_is_feature_scoped() -> None:

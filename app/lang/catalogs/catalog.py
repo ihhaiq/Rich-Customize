@@ -279,3 +279,135 @@ _PUBLISH_SELECT_TRANSLATIONS: dict[str, str] = {
 
 for language, label in _PUBLISH_SELECT_TRANSLATIONS.items():
     CATALOG_TRANSLATIONS[language]["ux.publish.select"] = label
+
+
+# Single-message input for managed InlineKeyboardButton creation.
+_BUTTON_INPUT_TRANSLATIONS: dict[str, tuple[str, str, str]] = {
+    "en": (
+        "Send the button in this format:\n{label}",
+        "button name - URL or alert:text or popup:text or cbd:code",
+        "Invalid button format. Send one button in braces with a name, a - separator, and its action.",
+    ),
+    "ar": (
+        "أرسل تنسيق الزر:\n{label}",
+        "اسم الزر - الرابط أو alert:النص أو popup:النص أو cbd:الكود",
+        "صيغة الزر غير صالحة. أرسل زرًا واحدًا بين القوسين، يتضمن الاسم ثم - ثم وظيفة الزر.",
+    ),
+    "es": (
+        "Envía el botón con este formato:\n{label}",
+        "nombre del botón - URL o alert:texto o popup:texto o cbd:código",
+        "Formato de botón no válido. Envía un botón entre llaves con un nombre, el separador - y su acción.",
+    ),
+    "fr": (
+        "Envoyez le bouton sous cette forme :\n{label}",
+        "nom du bouton - URL ou alert:texte ou popup:texte ou cbd:code",
+        "Format du bouton invalide. Envoyez un bouton entre accolades avec un nom, le séparateur - et son action.",
+    ),
+    "de": (
+        "Sende den Button in diesem Format:\n{label}",
+        "Buttonname - URL oder alert:Text oder popup:Text oder cbd:Code",
+        "Ungültiges Buttonformat. Sende einen Button in geschweiften Klammern mit Name, Trennzeichen - und Aktion.",
+    ),
+    "it": (
+        "Invia il pulsante in questo formato:\n{label}",
+        "nome del pulsante - URL oppure alert:testo oppure popup:testo oppure cbd:codice",
+        "Formato del pulsante non valido. Invia un pulsante tra parentesi graffe con nome, separatore - e azione.",
+    ),
+    "pt": (
+        "Envie o botão neste formato:\n{label}",
+        "nome do botão - URL ou alert:texto ou popup:texto ou cbd:código",
+        "Formato de botão inválido. Envie um botão entre chaves com nome, separador - e ação.",
+    ),
+    "nl": (
+        "Stuur de knop in dit formaat:\n{label}",
+        "knopnaam - URL of alert:tekst of popup:tekst of cbd:code",
+        "Ongeldig knopformaat. Stuur één knop tussen accolades met een naam, het scheidingsteken - en de actie.",
+    ),
+    "pl": (
+        "Wyślij przycisk w tym formacie:\n{label}",
+        "nazwa przycisku - URL lub alert:tekst lub popup:tekst lub cbd:kod",
+        "Nieprawidłowy format przycisku. Wyślij jeden przycisk w nawiasach klamrowych z nazwą, separatorem - i działaniem.",
+    ),
+    "uk": (
+        "Надішліть кнопку в такому форматі:\n{label}",
+        "назва кнопки - URL або alert:текст або popup:текст або cbd:код",
+        "Неправильний формат кнопки. Надішліть одну кнопку у фігурних дужках із назвою, роздільником - і дією.",
+    ),
+    "ru": (
+        "Отправьте кнопку в таком формате:\n{label}",
+        "название кнопки - URL или alert:текст или popup:текст или cbd:код",
+        "Неверный формат кнопки. Отправьте одну кнопку в фигурных скобках с названием, разделителем - и действием.",
+    ),
+    "tr": (
+        "Düğmeyi bu biçimde gönderin:\n{label}",
+        "düğme adı - URL veya alert:metin veya popup:metin veya cbd:kod",
+        "Geçersiz düğme biçimi. Süslü parantezler içinde ad, - ayırıcı ve eylem içeren tek bir düğme gönderin.",
+    ),
+    "fa": (
+        "دکمه را با این قالب بفرستید:\n{label}",
+        "نام دکمه - پیوند یا alert:متن یا popup:متن یا cbd:کد",
+        "قالب دکمه نامعتبر است. یک دکمه داخل آکولاد با نام، جداکننده - و عملکرد بفرستید.",
+    ),
+    "ku": (
+        "Bişkojkê bi vî şêweyî bişîne:\n{label}",
+        "navê bişkojkê - URL an alert:nivîs an popup:nivîs an cbd:kod",
+        "Şêweya bişkojkê nederbasdar e. Yek bişkojkê di nav kevanên kelem de bi nav, veqetînera - û kiryarê bişîne.",
+    ),
+    "ur": (
+        "بٹن اس فارمیٹ میں بھیجیں:\n{label}",
+        "بٹن کا نام - لنک یا alert:متن یا popup:متن یا cbd:کوڈ",
+        "بٹن کا فارمیٹ درست نہیں۔ بڑے قوسین میں ایک بٹن بھیجیں جس میں نام، - کی علامت اور عمل ہو۔",
+    ),
+    "hi": (
+        "बटन इस प्रारूप में भेजें:\n{label}",
+        "बटन का नाम - URL या alert:पाठ या popup:पाठ या cbd:कोड",
+        "बटन का प्रारूप अमान्य है। घुंघराले कोष्ठकों में नाम, - विभाजक और क्रिया वाला एक बटन भेजें।",
+    ),
+    "id": (
+        "Kirim tombol dengan format ini:\n{label}",
+        "nama tombol - URL atau alert:teks atau popup:teks atau cbd:kode",
+        "Format tombol tidak valid. Kirim satu tombol dalam kurung kurawal dengan nama, pemisah -, dan tindakannya.",
+    ),
+    "ja": (
+        "次の形式でボタンを送信してください：\n{label}",
+        "ボタン名 - URL または alert:本文 または popup:本文 または cbd:コード",
+        "ボタンの形式が正しくありません。名前、区切り文字 -、動作を波括弧で囲んで、ボタンを1つ送信してください。",
+    ),
+    "ko": (
+        "다음 형식으로 버튼을 보내세요:\n{label}",
+        "버튼 이름 - URL 또는 alert:내용 또는 popup:내용 또는 cbd:코드",
+        "버튼 형식이 올바르지 않습니다. 이름, 구분 기호 -, 동작을 중괄호로 감싼 버튼 하나를 보내세요.",
+    ),
+    "vi": (
+        "Gửi nút theo định dạng này:\n{label}",
+        "tên nút - URL hoặc alert:văn bản hoặc popup:văn bản hoặc cbd:mã",
+        "Định dạng nút không hợp lệ. Gửi một nút trong dấu ngoặc nhọn gồm tên, dấu phân cách - và hành động.",
+    ),
+    "th": (
+        "ส่งปุ่มในรูปแบบนี้:\n{label}",
+        "ชื่อปุ่ม - URL หรือ alert:ข้อความ หรือ popup:ข้อความ หรือ cbd:รหัส",
+        "รูปแบบปุ่มไม่ถูกต้อง ส่งปุ่มหนึ่งปุ่มในวงเล็บปีกกา โดยมีชื่อ ตัวคั่น - และการทำงานของปุ่ม",
+    ),
+    "zh-hans": (
+        "请按此格式发送按钮：\n{label}",
+        "按钮名称 - 链接 或 alert:文本 或 popup:文本 或 cbd:代码",
+        "按钮格式无效。请发送一个用花括号包围的按钮，包含名称、分隔符 - 和按钮功能。",
+    ),
+    "zh-hant": (
+        "請依此格式傳送按鈕：\n{label}",
+        "按鈕名稱 - 連結 或 alert:文字 或 popup:文字 或 cbd:代碼",
+        "按鈕格式無效。請傳送一個用大括號包圍的按鈕，包含名稱、分隔符 - 和按鈕功能。",
+    ),
+}
+
+for language, button_input_texts in _BUTTON_INPUT_TRANSLATIONS.items():
+    button_catalog = (
+        CATALOG_EN if language == "en"
+        else CATALOG_AR if language == "ar"
+        else CATALOG_TRANSLATIONS[language]
+    )
+    button_catalog.update(zip(
+        ("buttons.send_format", "buttons.format_parts", "buttons.invalid_format"),
+        button_input_texts,
+        strict=True,
+    ))

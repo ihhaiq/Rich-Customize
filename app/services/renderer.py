@@ -18,6 +18,7 @@ from aiogram.types import (
 from pydantic import ValidationError
 
 from app.i18n import preserve_user_content, t, tr
+from app.keyboards.message_buttons import build_message_buttons_keyboard
 from app.services.anchors import anchor_navigation_rich_text
 from app.services.inline_buttons import inline_button_rich_text
 
@@ -707,9 +708,13 @@ async def send_rich_message_post(
     source_page_id: str | None = None,
 ):
     rich = build_input_rich_message(
-        blocks, buttons, buttons_per_row=buttons_per_row, buttons_align=buttons_align,
-        source_page_id=source_page_id,
+        blocks, source_page_id=source_page_id,
     )
+    if buttons:
+        reply_markup = build_message_buttons_keyboard(
+            buttons, buttons_per_row=buttons_per_row,
+            source_page_id=source_page_id, extra_markup=reply_markup,
+        )
     with preserve_user_content():
         try:
             return await bot.send_rich_message(
@@ -735,13 +740,16 @@ async def edit_rich_message_page(
 ):
     """Edit the current message in place to show a different saved page."""
     rich = build_input_rich_message(
-        blocks, buttons, buttons_per_row=buttons_per_row, buttons_align=buttons_align,
-        source_page_id=source_page_id,
+        blocks, source_page_id=source_page_id,
+    )
+    reply_markup = build_message_buttons_keyboard(
+        buttons or [], buttons_per_row=buttons_per_row, source_page_id=source_page_id,
     )
     with preserve_user_content():
         try:
             return await bot.edit_message_text(
                 chat_id=chat_id, message_id=message_id, rich_message=rich,
+                reply_markup=reply_markup,
             )
         except TelegramBadRequest as error:
             raise RichMessageRenderError(str(error)) from error
@@ -758,9 +766,13 @@ async def send_rich_message_preview(
     source_page_id: str | None = None,
 ) -> list:
     rich = build_input_rich_message(
-        blocks, buttons, buttons_per_row=buttons_per_row, buttons_align=buttons_align,
-        source_page_id=source_page_id,
+        blocks, source_page_id=source_page_id,
     )
+    if buttons:
+        reply_markup = build_message_buttons_keyboard(
+            buttons, buttons_per_row=buttons_per_row,
+            source_page_id=source_page_id, extra_markup=reply_markup,
+        )
     with preserve_user_content():
         try:
             await bot.send_rich_message_draft(
