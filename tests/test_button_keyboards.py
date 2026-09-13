@@ -243,15 +243,17 @@ class ButtonKeyboardTests(unittest.TestCase):
             "Pages",
             [{"page_id": "a1b2c3d4", "title": "صفحة مهمة"}],
             page_index=2,
-            total_pages=4,
         )
         row = rich.blocks[2].cells[1]
         delete_button, rename_button, copy_button, open_button = [
             cell.text.button for cell in row
         ]
-        pager = rich.blocks[2].cells[-1]
-        previous_button = pager[0].text.button
-        next_button = pager[3].text.button
+        keyboard = build_pages_keyboard(
+            show_pager=True,
+            page_index=2,
+            total_pages=4,
+        )
+        previous_button, counter_button, next_button = keyboard.inline_keyboard[0]
 
         self.assertEqual(open_button.style, ButtonStyle.PRIMARY)
         self.assertEqual(copy_button.copy_text.text, "a1b2c3d4")
@@ -260,8 +262,8 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertEqual(delete_button.callback_data, "r:pdelete:a1b2c3d4:2")
         self.assertEqual(delete_button.style, ButtonStyle.DANGER)
         self.assertEqual(previous_button.callback_data, "r:pages:1")
-        self.assertEqual(pager[2].text, "3/4")
-        self.assertTrue(all(cell.colspan is None for cell in pager))
+        self.assertEqual(counter_button.text, "3/4")
+        self.assertEqual(counter_button.callback_data, "r:pages:2")
         self.assertEqual(next_button.callback_data, "r:pages:3")
 
     def test_saved_page_controls_appear_and_search_results_keep_their_pager(self):
@@ -269,10 +271,14 @@ class ButtonKeyboardTests(unittest.TestCase):
             "Pages",
             [{"page_id": "a1", "title": "صفحة"}],
             page_index=0,
+        )
+        keyboard = build_pages_keyboard(
+            show_controls=True,
+            show_pager=True,
+            page_index=0,
             total_pages=2,
             pagination_prefix="r:presults",
         )
-        keyboard = build_pages_keyboard(show_controls=True)
         callbacks = {
             button.callback_data
             for row in keyboard.inline_keyboard
@@ -280,11 +286,15 @@ class ButtonKeyboardTests(unittest.TestCase):
             if button.callback_data
         }
 
-        pager = rich.blocks[2].cells[-1]
-        self.assertEqual(pager[2].text, "1/2")
-        self.assertEqual(pager[3].text.button.callback_data, "r:presults:1")
-        self.assertEqual(callbacks, {"r:psearch", "r:psort", "r:back"})
-        self.assertEqual([len(row) for row in keyboard.inline_keyboard], [2, 1])
+        self.assertEqual(len(rich.blocks[2].cells), 2)
+        pager = keyboard.inline_keyboard[0]
+        self.assertEqual([button.text for button in pager], ["⬅️", "1/2", "➡️"])
+        self.assertEqual(pager[2].callback_data, "r:presults:1")
+        self.assertEqual(
+            callbacks,
+            {"r:presults:0", "r:presults:1", "r:psearch", "r:psort", "r:back"},
+        )
+        self.assertEqual([len(row) for row in keyboard.inline_keyboard], [3, 2, 1])
 
     def test_page_sort_marks_the_current_filter(self):
         keyboard = build_page_sort_keyboard("updated")
