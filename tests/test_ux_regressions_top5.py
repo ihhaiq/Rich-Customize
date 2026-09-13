@@ -16,6 +16,7 @@ from app.routers.details_edit import receive_nested_replacement
 from app.routers.editor_navigation import back_to_main
 from app.routers.page_actions import open_saved_page
 from app.routers.page_support import saved_pages_text
+from app.services.pages_ui import build_pages_rich_message
 
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
@@ -254,12 +255,14 @@ class CoreLocalizationRegressionTests(unittest.TestCase):
     def test_french_saved_pages_screen_tests_the_real_renderer(self):
         token = i18n_core._language.set("fr")
         try:
-            rendered = saved_pages_text(1, 3)
+            rich = build_pages_rich_message(
+                saved_pages_text(), [{"page_id": "code", "title": "Demo"}], 1, 3,
+            )
         finally:
             i18n_core._language.reset(token)
 
-        self.assertIn("2/3", rendered)
-        self.assertIsNone(ARABIC_RE.search(rendered))
+        self.assertEqual(rich.blocks[2].cells[-1][1].text.button.text, "2️⃣")
+        self.assertIsNone(ARABIC_RE.search(rich.model_dump_json(exclude_none=True)))
 
 
 if __name__ == "__main__":
