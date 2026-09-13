@@ -8,7 +8,6 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.methods import EditMessageText
 
 from app.i18n import t, use_language
-from app.keyboards import build_pages_keyboard
 from app.lang import SUPPORTED_LANGUAGES
 from app.routers.page_support import render_pages_screen, saved_pages_text
 from app.services.pages_ui import build_pages_rich_message
@@ -30,7 +29,7 @@ class PagesRichLayoutTests(unittest.TestCase):
         table = rich.blocks[2]
         self.assertTrue(table.is_bordered)
         self.assertTrue(table.is_compact)
-        self.assertEqual([len(row) for row in table.cells], [4, 4, 4])
+        self.assertEqual([len(row) for row in table.cells], [4, 4, 4, 4])
 
         header = table.cells[0]
         self.assertTrue(all(cell.is_header for cell in header))
@@ -47,31 +46,39 @@ class PagesRichLayoutTests(unittest.TestCase):
             self.assertEqual(row[3].text.button.text, page["title"])
             self.assertEqual(row[3].align, "right")
 
-    def test_pager_is_outside_table_and_uses_current_over_total(self):
+    def test_pager_stays_inside_table_without_colspan(self):
         for index, total in ((0, 1), (0, 3), (1, 3), (2, 3), (11, 13)):
             with self.subTest(index=index, total=total):
-                rich = build_pages_rich_message("Pages", [{"page_id": "code"}], index)
-                self.assertEqual(len(rich.blocks[2].cells), 2)
+                rich = build_pages_rich_message(
+                    "Pages",
+                    [{"page_id": "code"}],
+                    index,
+                    total,
+                )
+                pager = rich.blocks[2].cells[-1]
+                previous = pager[0].text.button
+                following = pager[3].text.button
 
-                keyboard = build_pages_keyboard(
-                    show_pager=True,
-                    page_index=index,
-                    total_pages=total,
-                )
-                previous, counter, following = keyboard.inline_keyboard[0]
-                self.assertEqual(counter.text, f"{index + 1}/{total}")
+                self.assertEqual(len(pager), 4)
+                self.assertTrue(all(cell.colspan is None for cell in pager))
+                self.assertIsNone(pager[1].text)
+                self.assertEqual(pager[2].text, f"{index + 1}/{total}")
                 self.assertEqual(
-                    previous.callback_data,
-                    f"r:pages:{max(index - 1, 0)}",
+                    previous.disabled is not None,
+                    index == 0,
                 )
                 self.assertEqual(
-                    counter.callback_data,
-                    f"r:pages:{index}",
+                    following.disabled is not None,
+                    index == total - 1,
                 )
-                self.assertEqual(
-                    following.callback_data,
-                    f"r:pages:{min(index + 1, total - 1)}",
-                )
+                if index > 0:
+                    self.assertEqual(previous.callback_data, f"r:pages:{index - 1}")
+                else:
+                    self.assertIsNone(previous.callback_data)
+                if index < total - 1:
+                    self.assertEqual(following.callback_data, f"r:pages:{index + 1}")
+                else:
+                    self.assertIsNone(following.callback_data)
 
     def test_copy_label_is_localized_without_translating_user_titles_or_codes(self):
         title = "Choose a page to open and edit: < & >"
@@ -116,18 +123,15 @@ class PagesRichScreenTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("parse_mode", sent)
         rich = sent["rich_message"]
         self.assertIn("< & >", rich.blocks[0].text)
-        pager = sent["reply_markup"].inline_keyboard[0]
-        previous, counter, following = pager
-        self.assertEqual([button.text for button in pager], ["⬅️", "2/3", "➡️"])
+        pager = rich.blocks[2].cells[-1]
+        previous = pager[0].text.button
+        following = pager[3].text.button
+        self.assertEqual(pager[2].text, "2/3")
         self.assertEqual(previous.callback_data, "r:presults:0")
-        self.assertEqual(counter.callback_data, "r:presults:1")
         self.assertEqual(following.callback_data, "r:presults:2")
         self.assertEqual(
             [button.callback_data for row in sent["reply_markup"].inline_keyboard for button in row],
-            [
-                "r:presults:0", "r:presults:1", "r:presults:2",
-                "r:psearch", "r:psort", "r:back",
-            ],
+            ["r:psearch", "r:psort", "r:back"],
         )
         self.bot.send_rich_message.assert_not_awaited()
 
