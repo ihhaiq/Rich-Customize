@@ -21,6 +21,7 @@ from app.services.welcome import (
 
 WELCOME_KEYS = set(WELCOME_PHRASES)
 
+
 class WelcomeRichLocalizationTests(unittest.TestCase):
     def test_every_supported_locale_has_welcome_copy(self):
         self.assertEqual(set(WELCOME_AR_PHRASES), WELCOME_KEYS)
