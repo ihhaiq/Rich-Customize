@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 from app.lang import AR_PHRASES, KEY_TRANSLATIONS, PHRASES, SUPPORTED_LANGUAGES
-from app.lang.catalogs.migration_semantic import SEMANTIC_PHRASES
+from app.lang.catalogs.ui_semantic import UI_PHRASES
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,8 +41,8 @@ def test_chinese_compatibility_bridge_is_gone() -> None:
     assert "app.lang.catalogs.chinese" in source
 
 
-def test_semantic_migration_keys_cover_every_locale() -> None:
-    required = set(SEMANTIC_PHRASES)
+def test_shared_semantic_keys_cover_every_locale() -> None:
+    required = set(UI_PHRASES)
     assert required <= set(PHRASES)
     assert required <= set(AR_PHRASES)
     for language in SUPPORTED_LANGUAGES - {"ar", "en"}:
