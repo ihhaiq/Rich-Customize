@@ -1,19 +1,16 @@
 # Language packages
 
-`app.lang` is the canonical locale package for the bot.
+`app.lang` هو المصدر العام لحزم اللغات في البوت.
 
-Each supported Telegram locale has its own package under `app/lang/<locale>/`.
-Shared translation catalogs and source-string compatibility maps live under
-`app/lang/catalogs/`; no runtime translation data is owned by `app.locales`.
+- كل لغة مدعومة لها package داخل `app/lang/<locale>/`.
+- `app/lang/catalogs/welcome_semantic.py` هو المصدر الوحيد لنصوص الترحيب semantic.
+- `app/lang/catalogs/ui_semantic.py` يحتوي مفاتيح UI semantic المشتركة التي لا تنتمي إلى catalog متخصص.
+- `app/lang/catalogs/legacy_normalization.py` يجمع مسار التوافق القديم للنصوص المصدرية التي ما زالت تستخدم `tr()`.
+- `app/lang/catalogs/common_data.py` يحتوي البيانات التاريخية الكبيرة، بينما `common.py` يبقى facade صغيرًا ومستقرًا.
+- `app/lang/bundle_loader.py` يجمع المصادر السابقة في `LocaleBundle`.
 
-Chinese Telegram locale codes remain `zh-hans` and `zh-hant`, while their
-Python package names are `zh_hans` and `zh_hant`.
+النصوص الجديدة في التطبيق يجب أن تستخدم `t("namespace.key")`. لا تضف UI جديدة إلى source-string maps أو `tr()`; تلك موجودة فقط للتوافق إلى أن تُرحّل الأسطح القديمة.
 
-Application code should import public locale registries from `app.lang` and UI
-code should prefer semantic `t("...")` keys. Historical `tr()` source-string
-translation remains only as a compatibility path while old UI strings are
-migrated.
+رموز Telegram الصينية تبقى `zh-hans` و`zh-hant`، بينما أسماء Python packages هي `zh_hans` و`zh_hant`.
 
-`app.lang` exports the existing public registries (`PHRASES`, `AR_PHRASES`,
-`KEY_TRANSLATIONS`, `TRANSLATIONS`, catalog data, profiles and supported
-languages), so the public localization behavior remains stable during cleanup.
+السجلات العامة التي يصدرها `app.lang` — مثل `PHRASES` و`AR_PHRASES` و`KEY_TRANSLATIONS` و`TRANSLATIONS` و`SUPPORTED_LANGUAGES` — تعتبر API داخلية مستقرة ويجب الحفاظ على سلوكها أثناء التنظيف.
