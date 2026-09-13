@@ -1,6 +1,6 @@
 # Telegram Rich Message Editor
 
-محرّر Blocks كامل لرسائل Telegram الغنية باستخدام Python وAiogram 3.31 / Bot API 10.3.
+بوت Telegram لبناء وتحرير ونشر Rich Messages باستخدام Python وAiogram، مع محرر Mini App وصفحات محفوظة وأزرار Inline ونشر إلى القنوات والمجموعات.
 
 ## التشغيل
 
@@ -11,30 +11,35 @@ python -m venv .venv
 source .venv/bin/activate       # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 cp .env.example .env            # Windows: copy .env.example .env
-```
-
-ضع توكن البوت في `.env` ثم شغّل:
-
-```bash
 python main.py
 ```
 
-أرسل `/editor` للبوت، ثم أرسل Rich Message أو نصًا أو ملف وسائط أو Album.
+ضع `BOT_TOKEN` و`DEVELOPER_ID` وبقية الإعدادات في `.env`. ملف الإعداد المرجعي الوحيد هو `.env.example`.
 
-### لوحة المطوّر واستيراد البيانات
+## أهم الميزات
 
-ضع رقم حساب المطوّر في متغير البيئة `DEVELOPER_ID`، أو عدة أرقام مفصولة بفواصل
-في `DEVELOPER_IDS`. بعدها يعرض الأمر `/dev` زرًا لرفع ملف ZIP أو ملف JSON.
-يفحص البوت الملفات ويعرض تأكيدًا قبل استبدال بيانات الـVolume، ولا يسمح باستيراد
-التوكن أو متغيرات البيئة:
+- محرر Rich Blocks كامل: Paragraph، Heading، Footer، Divider، Preformatted، Math، Anchor، List، Table، Details، Quotes ووسائط Telegram.
+- استقبال Rich Message أو نص/وسائط وتحويلها إلى Blocks قابلة للتعديل.
+- تعديل وحذف وتحريك البلوكات مع الحفاظ على Telegram entities وCustom Emoji.
+- Mini App للمحرر مع أدوات النص والجداول والوسائط وLiquid Glass.
+- صفحات محفوظة بأسماء وأكواد، مع بحث وفرز وتنقل وربط الصفحات عبر CBD.
+- InlineKeyboardButton تحت الرسالة للروابط والنسخ وcallbacks والتنبيهات والتنقل.
+- Rich Buttons داخل محتوى البلوكات كمسار مستقل.
+- نشر إلى قنوات ومجموعات يكون المستخدم والبوت مشرفين فيها.
+- Inline/Guest delivery للصفحات المحفوظة.
+- Showcase لكل Rich Blocks عبر `/draft`.
+- توطين متعدد اللغات مع مفاتيح semantic للواجهات الجديدة.
+- PostgreSQL كمخزن أساسي مع JSON fallback وإعادة مزامنة.
 
-```env
-DEVELOPER_ID=123456789
-```
+## أوامر مهمة
 
-### أزرار داخل النص
+- `/editor` — فتح المحرر.
+- `/dev` — لوحة المطور.
+- `/draft` — قالب Showcase لكل البلوكات.
 
-يمكن وضع الزر في أي موضع داخل النص بهذه الصيغة:
+## أزرار داخل النص
+
+Rich Buttons داخل النص لها تنسيق مستقل عن أزرار Inline تحت الرسالة:
 
 ```text
 {اسم الزر:النوع القيمة#اللون}
@@ -43,135 +48,77 @@ DEVELOPER_ID=123456789
 أمثلة:
 
 ```text
-قبل الزر {الموقع:url https://example.com#b} وبعده
+{الموقع:url https://example.com#b}
 {تنفيذ:callback_data action:1#r}
 {نسخ:copy النص المطلوب#g}
 {الملف الشخصي:user#p}
 {التالي:cbd a86d3132#b}
 ```
 
-الأنواع المدعومة: `url` (أو `link`)، و`cbd` للصفحات، و`callback_data`، و`copy`، و`web_app`،
-و`login_url`، و`switch_inline_query`، و`switch_inline_query_current_chat`، و`disabled`.
-الألوان: `#r` أحمر، و`#b` أو `#p` أزرق، و`#g` أخضر، ويمكن حذف اللون لاستعمال الافتراضي.
+الأنواع تشمل `url`، `cbd`، `callback_data`، `copy`، `user`، `web_app`، `login_url`، Inline query والزر المعطل. الألوان الاختيارية: `#r` و`#b`/`#p` و`#g`.
 
-النوع `cbd` هو الطريقة المبسطة لفتح Rich Message محفوظة: ضع بعده كود الصفحة فقط،
-مثل `{التالي:cbd a86d3132#b}`. يحوّله البوت تلقائيًا إلى Callback تنقّل داخلي ويضيف
-الصفحة الحالية للرجوع، لذلك لا يحتاج المستخدم إلى كتابة `r:page:` أو `callback_data`.
+## أزرار Inline تحت الرسالة
 
-النوع `user` لا يحتاج إلى قيمة. بعد إرسال النص يوقف البوت العملية ويعرض كيبورد اختيار
-مستخدم، ثم يربط الزر بملفه الشخصي ويكمل فتح المحرّر. عند وجود عدة أزرار `user` يطلب
-اختيار مستخدم لكل زر بالتسلسل.
+قسم إضافة الأزرار في المحرر ينشئ `InlineKeyboardButton` تحت الرسالة. الإضافة تتم برسالة واحدة، مثل:
 
-## ما يدعمه المشروع
+```text
+{ قناتي - https://t.me/Rich_archive }
+{ تنبيه - alert: نص التنبيه }
+{ تنبيه - popup: نص التنبيه }
+{ الصفحة - cbd:كود_الصفحة }
+{ نسخ - copy:النص }
+```
 
-- استقبال `Message.rich_message` الحقيقي وتحويل كل Top-Level Rich Block إلى Block مستقل.
-- استقبال النص، الصورة، الفيديو، GIF، Audio، Voice، Document، Sticker وVideo Note.
-- فصل Caption العادي كـBlock مستقل قابل للتعديل والحذف والنقل.
-- تجميع عناصر `media_group_id` بعد فترة هدوء قصيرة قبل فتح المحرّر.
-- معرّفات ثابتة قصيرة للـBlocks بدل الاعتماد على الفهرس.
-- تعديل النوع نفسه مع الاحتفاظ بـTelegram entities وCustom Emoji عبر `entities`.
-- Block من نوع `details` يقبل نصًا أو أي وسائط أو Album ويستبدل محتواه الداخلي مع إبقاء عنوانه.
-- يمكن تعديل عنوان `Details` وحده من صفحة الـBlock.
-- يمكن تعديل تذييل الوسائط ومصدرها، وتعديل الكاتب (`credit`) في Blockquote وPullquote.
-- زر `➕ إضافة Block` يدعم جميع أنواع Rich Blocks النهائية الرسمية:
-  Paragraph، Section Heading، Preformatted، Footer، Divider، Mathematical Expression، Anchor،
-  List، Blockquote، Pullquote، Collage، Slideshow، Table، Details، Map، Animation، Audio، Photo،
-  Video وVoice Note.
-- قسم `🔘 إضافة أزرار` مخصص لأزرار `InlineKeyboardButton` تحت الرسالة في المعاينة
-  والنشر والصفحات المحفوظة وInline وGuest. يطلب إضافة زر بخطوة واحدة ثم يعود إلى لوحة
-  الإدارة مباشرةً، بدون دليل أزرار النص أو خطوات منفصلة للاسم والنوع واللون.
-  أرسل زرًا واحدًا في كل مرة، مثل `{ قناتي - https://t.me/Rich_archive }` أو
-  `{ تنبيه - alert: نص التنبيه }` أو `{ تنبيه - popup: نص التنبيه }` أو
-  `{ الصفحة - cbd:كود_صفحتي }`. يستعمل `alert` و`popup` نفس التنبيه، حتى 200 حرف،
-  ويجب أن يشير `cbd` إلى كود صفحة محفوظة يملكها المستخدم.
-- يقبل الإدخال أيضًا أنواع الإنلاين المدعومة مثل `copy:النص` و`callback_data:القيمة`.
-  يبدأ الزر باللون الافتراضي، ويمكن تغيير اللون أو الترتيب أو عدد الأزرار في الصف لاحقًا.
-  أزرار `richbtn` داخل محتوى البلوكات لها مسارها المستقل الموضح أعلاه.
-- يمكن تغيير نوع زر موجود مع إبقاء عنوانه ولونه وترتيبه؛ مثل تحويل الرابط إلى زر معطّل
-  أو `callback_data` أو نسخ أو Popup أو بقية الأنواع المدعومة.
-- يمكن حفظ الرسالة كصفحة باسم واضح من `💾 حفظ الصفحة`، وفتحها لاحقًا من `📚 صفحاتي`،
-  ثم ربط أي زر بها من `📄 ربط بصفحة` باختيار الاسم مباشرةً بدل نسخ الكود يدويًا.
-- عند الضغط على زر صفحة في مجموعة أو Supergroup، يرسل البوت الصفحة كـEphemeral Message
-  لا يراها إلا المستخدم الضاغط، وتُفتح الصفحات التالية وزر الرجوع داخل الرسالة الخاصة نفسها.
-  Telegram لا يدعم Ephemeral Messages في القنوات؛ لذلك يرسل البوت الصفحة إلى خاص الضاغط هناك.
-- يمكن استدعاء صفحة محفوظة بصيغة `@BotUsername كود_الصفحة`، فيرد البوت نفسه برسالة
-  غنية عبر Guest Mode حتى لو لم يكن عضوًا في المحادثة. فعّل `Guest Mode` من إعدادات البوت
-  داخل Mini App الخاص بـ`@BotFather`. يدعم المشروع أيضًا نفس الصيغة عبر Inline Mode؛
-  لتفعيل طريقة الاختيار التقليدية نفّذ `/setinline` في `@BotFather`.
-- إذا احتوت رسالة Guest الغنية زر صفحة، فالضغط عليه يعرض محتوى الصفحة التالية كـRich
-  Ephemeral Message للضاغط فقط، ثم تُعدّل نفس الرسالة المؤقتة عند التنقل أو الرجوع.
-- يدعم `InputRichBlockDocument` لإضافة الملفات العامة مع التذييل والمصدر.
-- يقبل محرّر Pullquote الوسائط والملفات ويضعها داخل إطار الاقتباس مع النص والكاتب مثل
-  الصورة المرجعية. يُرسل هذا التركيب كـ`InputRichBlockBlockQuotation` ذي Blocks داخلية؛
-  لأن `InputRichBlockPullQuotation` الرسمي نفسه نصي فقط.
-- زر `📝 إنشاء منشور` بجانب النتيجة يعرض القنوات والمجموعات المسجلة التي يكون فيها المستخدم
-  والبوت مشرفين، ويولد روابط Telegram رسمية لإضافة البوت عند عدم وجود محادثات.
-- عند وصول البوت إلى قناة أو مجموعة يرسل إشعارًا في الخاص، ثم يتيح إرسال المنشور بصمت
-  (`disable_notification`) أو مع منع التوجيه والحفظ (`protect_content`).
-- يظهر Thinking في القائمة للتوضيح فقط؛ Telegram يسمح به في `sendRichMessageDraft` ولا يقبله في النتيجة النهائية.
-- حذف مؤكد، إعادة ترتيب صحيحة، رجوع هرمي، وحماية من callbacks القديمة والضغط المكرر.
-- زر النتيجة بـ`ButtonStyle.SUCCESS` وإرسال Rich Message حقيقية متى كانت الأنواع قابلة للدمج.
-- fallback مرتب للـDocument وSticker وVideo Note أو عند رفض Telegram تركيبًا معينًا.
-- قالب Showcase شامل لجميع Rich Blocks والتنسيقات، يُستدعى بالأمر `/draft` أو بكتابة `دريفت` أو من زر رسالة الترحيب.
-- واجهة عربية/إنجليزية تلقائية حسب لغة المستخدم، تشمل الرسائل والأزرار واسم البوت والوصف والـBio والأوامر.
+يمكن تعديل النوع واللون والترتيب وعدد الأزرار في الصف لاحقًا. `cbd` يجب أن يشير إلى صفحة محفوظة يملكها المستخدم.
+
+## صفحاتي
+
+واجهة الصفحات المحفوظة تستخدم Rich Table مضغوطًا:
+- كل صفحة في صف واحد.
+- الحذف، تعديل الاسم، نسخ الكود، واسم الصفحة داخل الجدول.
+- الترقيم خارج الجدول كأزرار Inline: `⬅️ | 1/9 | ➡️`.
+- البحث والفرز والرجوع أزرار Inline عادية.
+
+يمكن استدعاء صفحة محفوظة أيضًا عبر Inline/Guest حسب إعدادات Telegram المتاحة.
+
+## Mini App
+
+المسار العام هو `/miniapp`. إذا استخدمت Named Mini App في BotFather فالقيمة الافتراضية لـ`MINI_APP_SHORT_NAME` هي `editor`.
+
+فحص الصحة:
+
+```text
+/healthz
+```
 
 ## البنية
 
-- `app/routers/rich_editor.py`: نقطة تجميع Router المحرّر بعد تفكيك الملف القديم.
-- `app/routers/editor_*.py` و`block_*.py`: جلسة المحرّر وواجهة الـBlocks وتعديلها ومعاينتها.
-- `app/routers/button_*.py`: إنشاء الأزرار وتعديلها ومعاينتها واختيار أهدافها.
-- `app/routers/page_*.py`: الصفحات المحفوظة والبحث والتنقّل والتسليم.
-- `app/routers/publish_*.py`: اختيار الوجهات وإعدادات النشر والتنفيذ.
-- `app/services/parser.py`: تحويل رسائل Telegram إلى Blocks وتحديث بيانات Block.
-- `app/services/blocks.py`: البحث والحذف والنقل وتطبيع المواقع.
-- `app/services/buttons.py`: التحقق من روابط الأزرار وإضافتها وحذفها وإعادة ترتيبها.
-- `app/services/inline_buttons.py`: تحليل أزرار النص وحل أزرار اختيار المستخدم.
-- `app/services/chat_registry.py`: حفظ المحادثات المرتبطة بالمشرف والتحقق منها قبل النشر.
-- `app/services/page_registry.py`: حفظ الصفحات المسماة وأكواد استدعائها وروابط التنقل بينها.
-- `app/services/guest_message_registry.py`: ربط رسالة Guest المؤقتة بالمحادثة حتى تعمل
-  أزرار الصفحات كـEphemeral بعد وصول Callback الذي يحتوي `inline_message_id` فقط.
-- `app/services/renderer.py`: إنشاء `InputRichMessage` والمعاينة الاحتياطية.
-- `app/services/factory.py`: إنشاء الأنواع الجديدة وتحويل مدخلات المستخدم إلى بيانات Rich Blocks.
-- `app/services/albums.py`: تجميع الألبومات بصورة متزامنة وآمنة.
-- `app/keyboards/`: Keyboard Builders مقسمة حسب المجال.
-- `app/states.py`: حالات FSM.
+- `app/editor/` — نماذج البلوكات، registry، workflow، draft store وhistory.
+- `app/routers/` — Telegram handlers وcallbacks حسب الميزة.
+- `app/keyboards/` — Inline keyboard builders.
+- `app/services/parser.py` — تحويل رسائل Telegram إلى Blocks.
+- `app/services/renderer.py` — بناء Rich Message والمعاينات.
+- `app/services/buttons.py` و`inline_buttons.py` — منطق الأزرار.
+- `app/services/page_registry.py` و`page_navigation.py` و`pages_ui.py` — الصفحات المحفوظة.
+- `app/services/media.py` و`media_library.py` — الوسائط.
+- `app/services/albums.py` — تجميع media groups.
+- `app/services/showcase.py` — قالب Showcase.
+- `app/storage/hybrid.py` — PostgreSQL + JSON fallback.
+- `app/webapp/` — Backend للـMini App.
+- `app/miniapp_static/` — واجهة Mini App.
+- `app/lang/` و`app/i18n*.py` — التوطين.
+- `tests/` — اختبارات الوحدة والـregressions.
 
-يوفر السيرفر المسار `/healthz` لفحص صحة الخدمة من Railway أو Docker من دون الحاجة
-إلى Telegram `initData`.
-
-## الحالات الجديدة
-
-- `RichEditorStates.waiting_input`
-- `RichEditorStates.selecting_button_user`
-- `RichEditorStates.saving_page_name`
-- `RichEditorStates.managing`
-- `RichEditorStates.editing_block`
-- `RichEditorStates.adding_block`
-- `RichEditorStates.editing_button`
+للتفاصيل المعمارية راجع `docs/editor_architecture.md`.
 
 ## قاعدة البيانات
 
-يدعم البوت PostgreSQL كمخزن أساسي مع fallback تلقائي إلى ملفات JSON. في Railway أضف
-خدمة PostgreSQL إلى المشروع، ثم أضف إلى متغيرات خدمة البوت مرجع الاتصال:
+عند وجود `DATABASE_URL` يستخدم البوت PostgreSQL كمخزن أساسي. إذا تعذر الاتصال يستمر على JSON fallback ثم يعيد المزامنة عند عودة PostgreSQL.
+
+مثال Railway:
 
 ```env
 DATABASE_URL=${{Postgres.DATABASE_URL}}
-```
-
-إذا كان اسم خدمة القاعدة مختلفًا عن `Postgres` استبدله بالاسم الظاهر في Railway. ينشئ
-البوت جدولي `rich_state` و`rich_fsm` تلقائيًا عند أول اتصال، ويستورد ملفات JSON القديمة
-إلى قاعدة فارغة من دون حذفها. تشمل المزامنة الصفحات، المحادثات، رسائل Guest، نصوص Popup،
-تنقّل الصفحات، بيانات الوسائط، مكتبة Showcase وجلسات المحرّر FSM.
-
-تبقى متغيرات `*_STATE` مطلوبة كمسارات fallback ولا ينبغي حذفها. عند نجاح الكتابة إلى
-PostgreSQL يحتفظ البوت أيضًا بنسخة JSON حديثة. وإذا انقطع الاتصال يكمل العمل على JSON،
-ثم يرفع التغييرات المحلية قبل العودة إلى PostgreSQL عند إعادة الاتصال. يفحص الاتصال
-تلقائيًا كل 30 ثانية، ويمكن للمطوّر فحصه فورًا من `/dev` عبر زر `فحص قاعدة البيانات`.
-
-لتبقى ملفات fallback بعد إعادة نشر Railway، اربط Volume دائمًا واجعل المسارات تحته؛
-بدون Volume يستمر fallback خلال عمر الـDeployment الحالي فقط. أهم إعدادات الاتصال:
-
-```env
 DATABASE_POOL_MAX_SIZE=5
 DATABASE_CONNECT_TIMEOUT=5
 DATABASE_COMMAND_TIMEOUT=5
@@ -179,18 +126,23 @@ DATABASE_RECONNECT_INTERVAL=30
 DATABASE_FALLBACK_STATE=data/database_fallback.json
 ```
 
-### خطأ `BOT_DOMAIN_INVALID`
+تبقى متغيرات `*_STATE` مهمة لمسارات fallback. لاستمرار ملفات JSON بين Deployments على Railway استخدم Volume دائمًا.
 
-هذا الخطأ يخص زر `login_url` عندما لا يطابق دومين الرابط الدومين المسجل للبوت. افتح
-`@BotFather`، اختر البوت، نفّذ `/setdomain` وسجّل الدومين فقط مثل `example.com`، ثم استعمل
-رابط `https://example.com/...`. إذا لا تحتاج تسجيل دخول Telegram، غيّر نوع الزر إلى `url`
-عادي ولا يحتاج `/setdomain`.
+## لوحة المطور
+
+ضع رقم الحساب في `DEVELOPER_ID` (أو القيم التي يدعمها إعداد المشروع). الأمر `/dev` يوفر أدوات المطور، ومنها فحص قاعدة البيانات والاستيراد/التصدير وتحديث قناة المعاينة.
+
+لا تضع Tokens أو Secrets داخل ملفات ZIP/JSON التي ترفعها للمستودع.
+
+## خطأ BOT_DOMAIN_INVALID
+
+يخص `login_url`. يجب تسجيل الدومين في BotFather عبر `/setdomain` واستخدام HTTPS مطابق. إذا لا تحتاج Telegram Login استخدم زر `url` عادي.
 
 ## الاختبارات
 
 ```bash
-python -m pytest -q
 python -m ruff check .
 python -m mypy app main.py
 python -m compileall -q app main.py
+python -m pytest -q
 ```
