@@ -14,7 +14,7 @@ from app.services.pages_ui import build_pages_rich_message
 
 
 class PagesRichLayoutTests(unittest.TestCase):
-    def test_only_page_names_span_columns_and_table_has_two_dividers(self):
+    def test_compact_table_uses_header_and_one_row_per_page(self):
         pages = [
             {"page_id": "first", "title": "الصفحة <الأولى> & عنوان طويل " * 2},
             {"page_id": "second", "title": "Second"},
@@ -28,22 +28,31 @@ class PagesRichLayoutTests(unittest.TestCase):
         )
         table = rich.blocks[2]
         self.assertTrue(table.is_bordered)
-        self.assertEqual([len(row) for row in table.cells], [1, 3, 1, 3, 3])
-        for index, page in enumerate(pages):
-            name = table.cells[index * 2][0]
-            self.assertEqual(name.colspan, 3)
-            self.assertEqual(name.text.button.text, page["title"])
-            actions = table.cells[index * 2 + 1]
-            self.assertEqual([cell.colspan for cell in actions], [None, None, None])
-            self.assertEqual([cell.text.button.text for cell in actions], ["🗑️", "✏️", "نسخ الكود"])
-            self.assertEqual(actions[2].text.button.copy_text.text, page["page_id"])
-            self.assertIsNone(actions[2].text.button.callback_data)
+        self.assertTrue(table.is_compact)
+        self.assertEqual([len(row) for row in table.cells], [4, 4, 4, 3])
+
+        header = table.cells[0]
+        self.assertTrue(all(cell.is_header for cell in header))
+        self.assertEqual([cell.text for cell in header[:2]], ["🗑️", "✏️"])
+        self.assertEqual(header[2].text, "نسخ الكود")
+        self.assertEqual(header[3].align, "right")
+
+        for index, page in enumerate(pages, start=1):
+            row = table.cells[index]
+            self.assertEqual([cell.colspan for cell in row], [None, None, None, None])
+            self.assertEqual([cell.text.button.text for cell in row[:3]], ["🗑️", "✏️", "نسخ الكود"])
+            self.assertEqual(row[2].text.button.copy_text.text, page["page_id"])
+            self.assertIsNone(row[2].text.button.callback_data)
+            self.assertEqual(row[3].text.button.text, page["title"])
+            self.assertEqual(row[3].align, "right")
 
     def test_pager_disables_boundaries_and_supports_multi_digit_page_numbers(self):
         for index, total in ((0, 1), (0, 3), (1, 3), (2, 3), (11, 13)):
             with self.subTest(index=index, total=total):
                 rich = build_pages_rich_message("Pages", [{"page_id": "code"}], index, total)
-                previous, counter, following = [cell.text.button for cell in rich.blocks[2].cells[-1]]
+                pager = rich.blocks[2].cells[-1]
+                previous, counter, following = [cell.text.button for cell in pager]
+                self.assertEqual([cell.colspan for cell in pager], [None, 2, None])
                 self.assertEqual(previous.disabled is not None, index == 0)
                 self.assertEqual(following.disabled is not None, index == total - 1)
                 self.assertIsNotNone(counter.disabled)
@@ -60,7 +69,7 @@ class PagesRichLayoutTests(unittest.TestCase):
                     saved_pages_text(), [{"page_id": "abc12345", "title": title}],
                 )
                 rows = rich.blocks[2].cells
-                self.assertEqual(rows[0][0].text.button.text, title)
+                self.assertEqual(rows[1][3].text.button.text, title)
                 copy = rows[1][2].text.button
                 self.assertEqual(copy.copy_text.text, "abc12345")
                 self.assertEqual(copy.text, t("pages.copy_code"))
