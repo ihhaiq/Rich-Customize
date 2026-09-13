@@ -48,18 +48,19 @@ async def render_pages_screen(
             text += "\n\n" + t("pages.search_results", query=query)
     else:
         text = t("pages.search_none", query=query)
-    rich_message = build_pages_rich_message(
-        text,
-        visible,
-        page_index,
-        total_pages,
-        pagination_prefix="r:presults" if query else "r:pages",
-    )
+    pagination_prefix = "r:presults" if query else "r:pages"
+    rich_message = build_pages_rich_message(text, visible, page_index)
     await edit_pages_ui(
         message,
         state,
         rich_message,
-        build_pages_keyboard(show_controls=total_count > 1),
+        build_pages_keyboard(
+            show_controls=total_count > 1,
+            show_pager=bool(pages),
+            page_index=page_index,
+            total_pages=total_pages,
+            pagination_prefix=pagination_prefix,
+        ),
         saved=saved,
     )
     return True
