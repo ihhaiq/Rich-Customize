@@ -9,7 +9,7 @@ from app import i18n_core
 from app.i18n import EN, t, tr
 from app.lang import AR_PHRASES, KEY_TRANSLATIONS, PHRASES, SUPPORTED_LANGUAGES, TRANSLATIONS
 from app.lang.catalogs.pages import PAGE_AR_TO_EN
-from app.lang.catalogs.recent_ui import RECENT_AR_TO_EN
+from app.lang.catalogs.legacy_normalization import RECENT_AR_TO_EN
 from app.services.blocks import BLOCK_LABEL_KEYS, get_block_label
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
