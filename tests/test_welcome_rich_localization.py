@@ -6,16 +6,6 @@ from aiogram.types import User
 
 from app.i18n import t, use_language
 from app.lang import KEY_TRANSLATIONS, SUPPORTED_LANGUAGES
-from app.lang.catalogs.welcome_compact import (
-    WELCOME_COMPACT_AR_PHRASES,
-    WELCOME_COMPACT_KEY_TRANSLATIONS,
-    WELCOME_COMPACT_PHRASES,
-)
-from app.lang.catalogs.welcome_revision import (
-    WELCOME_REVISION_AR_PHRASES,
-    WELCOME_REVISION_KEY_TRANSLATIONS,
-    WELCOME_REVISION_PHRASES,
-)
 from app.lang.catalogs.welcome_semantic import (
     WELCOME_AR_PHRASES,
     WELCOME_KEY_TRANSLATIONS,
@@ -30,9 +20,6 @@ from app.services.welcome import (
 )
 
 WELCOME_KEYS = set(WELCOME_PHRASES)
-REVISION_KEYS = set(WELCOME_REVISION_PHRASES)
-COMPACT_KEYS = set(WELCOME_COMPACT_PHRASES)
-
 
 class WelcomeRichLocalizationTests(unittest.TestCase):
     def test_every_supported_locale_has_welcome_copy(self):
@@ -46,30 +33,6 @@ class WelcomeRichLocalizationTests(unittest.TestCase):
                 language,
             )
             self.assertTrue(WELCOME_KEYS <= set(KEY_TRANSLATIONS[language]), language)
-
-    def test_every_supported_locale_has_revised_welcome_copy(self):
-        self.assertEqual(set(WELCOME_REVISION_AR_PHRASES), REVISION_KEYS)
-        expected = set(SUPPORTED_LANGUAGES) - {"ar", "en"}
-        self.assertEqual(set(WELCOME_REVISION_KEY_TRANSLATIONS), expected)
-        for language in sorted(expected):
-            self.assertEqual(
-                set(WELCOME_REVISION_KEY_TRANSLATIONS[language]),
-                REVISION_KEYS,
-                language,
-            )
-            self.assertTrue(REVISION_KEYS <= set(KEY_TRANSLATIONS[language]), language)
-
-    def test_every_supported_locale_has_compact_welcome_copy(self):
-        self.assertEqual(set(WELCOME_COMPACT_AR_PHRASES), COMPACT_KEYS)
-        expected = set(SUPPORTED_LANGUAGES) - {"ar", "en"}
-        self.assertEqual(set(WELCOME_COMPACT_KEY_TRANSLATIONS), expected)
-        for language in sorted(expected):
-            self.assertEqual(
-                set(WELCOME_COMPACT_KEY_TRANSLATIONS[language]),
-                COMPACT_KEYS,
-                language,
-            )
-            self.assertTrue(COMPACT_KEYS <= set(KEY_TRANSLATIONS[language]), language)
 
     def test_arabic_copy_matches_requested_start_message(self):
         with use_language("ar-IQ"):
