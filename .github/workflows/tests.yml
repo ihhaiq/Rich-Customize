@@ -4,10 +4,12 @@ on:
   push:
     branches: [main, rich-core-rust-poc]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -15,10 +17,15 @@ jobs:
           python-version: "3.12"
           cache: pip
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "rich_core -> target"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt maturin==1.9.4
+      - name: Test Rust core
+        run: cargo test --manifest-path rich_core/Cargo.toml --lib
       - name: Build native rich core
         run: maturin develop --release --manifest-path rich_core/Cargo.toml
       - name: Check native rich core
@@ -28,6 +35,10 @@ jobs:
       - name: Type-check application
         run: python -m mypy app main.py
       - name: Compile Python sources
-        run: python -m compileall -q app main.py tests
+        run: python -m compileall -q app main.py tests benchmarks
       - name: Run tests
         run: python -m pytest -q
+      - name: Benchmark Rust core dimensions
+        run: |
+          python benchmarks/rich_core_bench.py --iterations 15 | tee rich-core-benchmark.md
+          cat rich-core-benchmark.md >> "$GITHUB_STEP_SUMMARY"
