@@ -21,22 +21,44 @@ def native_available() -> bool:
     return enabled and _native is not None
 
 
-def _decode_json(callable_name: str, value: str) -> Any | None:
+def native_max_nesting() -> int | None:
+    """Expose the native safety cap for stress/regression tests."""
+    if _native is None:
+        return None
+    value = getattr(_native, "MAX_HTML_NESTING", None)
+    return int(value) if isinstance(value, int) else None
+
+
+def _call_native(
+    callable_name: str,
+    legacy_json_name: str,
+    value: str,
+) -> Any | None:
     if not native_available():
         return None
     try:
-        raw = getattr(_native, callable_name)(value)
+        direct = getattr(_native, callable_name, None)
+        if direct is not None:
+            return direct(value)
+
+        # Compatibility for an older locally-built POC extension. Production
+        # builds expose the direct function and do not pay this JSON round-trip.
+        raw = getattr(_native, legacy_json_name)(value)
         return json.loads(raw)
     except Exception:
-        # The native path is an optimization. Any extension/runtime issue must
-        # preserve the Python implementation instead of breaking the editor.
-        logger.debug("Rust rich core call %s failed; using Python fallback", callable_name, exc_info=True)
+        # Native acceleration must never take down the editor. Depth limits,
+        # ABI/import issues, or parser errors deliberately fall back to Python.
+        logger.debug(
+            "Rust rich core call %s failed; using Python fallback",
+            callable_name,
+            exc_info=True,
+        )
         return None
 
 
 def parse_inline_markers(text: str) -> list[dict[str, Any]] | None:
     """Parse inline rich-button markers with the Rust core when available."""
-    parsed = _decode_json("parse_inline_markers_json", text)
+    parsed = _call_native("parse_inline_markers", "parse_inline_markers_json", text)
     if parsed is None:
         return None
     if not isinstance(parsed, list) or not all(isinstance(item, dict) for item in parsed):
@@ -45,8 +67,13 @@ def parse_inline_markers(text: str) -> list[dict[str, Any]] | None:
 
 
 def html_to_rich(value: str) -> Any | None:
-    """Convert Telegram inline HTML to the RichText JSON shape via Rust."""
-    return _decode_json("html_to_rich_json", value)
+    """Convert Telegram inline HTML to RichText via Rust, otherwise return None."""
+    return _call_native("html_to_rich", "html_to_rich_json", value)
 
 
-__all__ = ["html_to_rich", "native_available", "parse_inline_markers"]
+__all__ = [
+    "html_to_rich",
+    "native_available",
+    "native_max_nesting",
+    "parse_inline_markers",
+]
