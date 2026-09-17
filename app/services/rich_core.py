@@ -13,6 +13,7 @@ except (ImportError, OSError):  # Native extension is optional outside Docker/CI
     _native = None
 
 _DISABLED_VALUES = {"0", "false", "no", "off"}
+_RAWTEXT_TAG_PREFIXES = ("<script", "</script", "<style", "</style")
 
 
 def native_available() -> bool:
@@ -64,6 +65,14 @@ def _needs_python_entity_fallback(value: str) -> bool:
         index = amp + 1
 
 
+def _needs_python_html_fallback(value: str) -> bool:
+    """Return True for HTMLParser-specific syntax outside the native subset."""
+    folded = value.casefold()
+    if any(prefix in folded for prefix in _RAWTEXT_TAG_PREFIXES):
+        return True
+    return _needs_python_entity_fallback(value)
+
+
 def _call_native(
     callable_name: str,
     legacy_json_name: str,
@@ -103,7 +112,7 @@ def parse_inline_markers(text: str) -> list[dict[str, Any]] | None:
 
 def html_to_rich(value: str) -> Any | None:
     """Convert Telegram inline HTML to RichText via Rust, otherwise return None."""
-    if _needs_python_entity_fallback(value):
+    if _needs_python_html_fallback(value):
         return None
     return _call_native("html_to_rich", "html_to_rich_json", value)
 
