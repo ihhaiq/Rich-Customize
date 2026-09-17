@@ -21,6 +21,7 @@ from app.i18n import preserve_user_content, t, tr
 from app.keyboards.message_buttons import build_message_buttons_keyboard
 from app.services.anchors import anchor_navigation_rich_text
 from app.services.inline_buttons import inline_button_rich_text
+from app.services.rich_core import html_to_rich as native_html_to_rich
 
 logger = logging.getLogger(__name__)
 
@@ -277,6 +278,9 @@ def _html_rich_text(value: Any, fallback: str = "") -> Any:
         return fallback
     if not isinstance(value, str):
         return value
+    native = native_html_to_rich(value)
+    if native is not None:
+        return native if native not in ("", []) else fallback
     parser = _RichTextHTMLParser()
     try:
         parser.feed(value)
