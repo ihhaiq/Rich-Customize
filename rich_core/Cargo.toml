@@ -6,7 +6,7 @@ publish = false
 
 [lib]
 name = "rich_core_native"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [features]
 default = ["extension-module"]
