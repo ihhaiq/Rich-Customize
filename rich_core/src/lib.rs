@@ -232,65 +232,41 @@ fn parse_marker_parts(marker: &str) -> Option<(String, String, String, Option<St
 }
 
 fn parse_inline_markers(text: &str) -> Vec<Marker> {
-    let chars: Vec<(usize, char)> = text.char_indices().collect();
+    // One streaming pass keeps memory proportional to the number of matches,
+    // rather than allocating a (byte, char) entry for every character in 32K text.
     let mut markers = Vec::new();
-    let mut index = 0;
+    let mut candidate: Option<(usize, usize)> = None;
 
-    while index < chars.len() {
-        if chars[index].1 != '{' {
-            index += 1;
-            continue;
-        }
-
-        let mut cursor = index + 1;
-        let mut close_index = None;
-        let mut invalid = false;
-        while cursor < chars.len() {
-            match chars[cursor].1 {
-                '{' | '\n' => {
-                    invalid = true;
-                    break;
+    for (char_index, (byte_index, ch)) in text.char_indices().enumerate() {
+        match ch {
+            '{' => candidate = Some((byte_index, char_index)),
+            '\n' => candidate = None,
+            '}' => {
+                let Some((byte_start, char_start)) = candidate.take() else {
+                    continue;
+                };
+                if char_index <= char_start + 1 {
+                    continue;
                 }
-                '}' => {
-                    close_index = Some(cursor);
-                    break;
+                let byte_end = byte_index + ch.len_utf8();
+                let marker = &text[byte_start..byte_end];
+                if let Some((title, button_type, value, color, audience)) =
+                    parse_marker_parts(marker)
+                {
+                    markers.push(Marker {
+                        start: char_start,
+                        end: char_index + 1,
+                        marker: marker.to_string(),
+                        title,
+                        button_type,
+                        value,
+                        color,
+                        audience,
+                    });
                 }
-                _ => cursor += 1,
             }
+            _ => {}
         }
-
-        if invalid {
-            index += 1;
-            continue;
-        }
-        let Some(close_index) = close_index else {
-            index += 1;
-            continue;
-        };
-        if close_index == index + 1 {
-            index = close_index + 1;
-            continue;
-        }
-
-        let byte_start = chars[index].0;
-        let byte_end = chars
-            .get(close_index + 1)
-            .map(|item| item.0)
-            .unwrap_or(text.len());
-        let marker = &text[byte_start..byte_end];
-        if let Some((title, button_type, value, color, audience)) = parse_marker_parts(marker) {
-            markers.push(Marker {
-                start: index,
-                end: close_index + 1,
-                marker: marker.to_string(),
-                title,
-                button_type,
-                value,
-                color,
-                audience,
-            });
-        }
-        index = close_index + 1;
     }
 
     markers
@@ -374,7 +350,7 @@ fn parse_attributes(value: &str) -> CoreResult<TagAttrs> {
             index += first.len_utf8();
             continue;
         }
-        let key = value[key_start..index].to_ascii_lowercase();
+        let key = &value[key_start..index];
         index = skip_whitespace(value, index)?;
 
         let mut raw_value = "";
@@ -393,15 +369,16 @@ fn parse_attributes(value: &str) -> CoreResult<TagAttrs> {
                         }
                         index += ch.len_utf8();
                     }
-                    raw_value = &value[content_start..index];
-                    if index < value.len() {
-                        index += quote.len_utf8();
+                    if index >= value.len() {
+                        return Err("unterminated quoted HTML attribute".to_string());
                     }
+                    raw_value = &value[content_start..index];
+                    index += quote.len_utf8();
                 } else {
                     let content_start = index;
                     while index < value.len() {
                         let ch = next_char(value, index)?;
-                        if ch.is_whitespace() || ch == '/' {
+                        if ch.is_whitespace() {
                             break;
                         }
                         index += ch.len_utf8();
@@ -411,9 +388,9 @@ fn parse_attributes(value: &str) -> CoreResult<TagAttrs> {
             }
         }
 
-        if key == "href" {
+        if key.eq_ignore_ascii_case("href") {
             attrs.href = Some(html_escape::decode_html_entities(raw_value).into_owned());
-        } else if key == "emoji-id" {
+        } else if key.eq_ignore_ascii_case("emoji-id") {
             attrs.emoji_id = Some(html_escape::decode_html_entities(raw_value).into_owned());
         }
     }
@@ -423,18 +400,38 @@ fn parse_attributes(value: &str) -> CoreResult<TagAttrs> {
 
 fn parse_tag(raw: &str) -> CoreResult<Option<TagToken>> {
     let mut value = raw.trim();
-    if value.is_empty() || value.starts_with('!') || value.starts_with('?') {
+    if value.is_empty() {
         return Ok(None);
+    }
+    if value.starts_with('!') || value.starts_with('?') {
+        return Err("HTML declaration/comment requires Python fallback".to_string());
     }
 
     let closing = value.starts_with('/');
     if closing {
         value = value[1..].trim_start();
     }
+    let Some(first_name_char) = value.chars().next() else {
+        return Ok(None);
+    };
+    if !first_name_char.is_ascii_alphabetic() {
+        return Err("ambiguous HTML-like text requires Python fallback".to_string());
+    }
 
-    let self_closing = !closing && value.ends_with('/');
-    if self_closing {
-        value = value[..value.len() - 1].trim_end();
+    let mut self_closing = false;
+    if !closing && value.ends_with('/') {
+        let slash_index = value.len() - 1;
+        let before_slash = value[..slash_index].chars().next_back();
+        let has_attributes = value[..slash_index].chars().any(char::is_whitespace);
+        let unambiguous = !has_attributes
+            || before_slash.is_some_and(|ch| ch.is_whitespace() || ch == '"' || ch == '\'');
+        if !unambiguous {
+            // Python HTMLParser treats <a href=x/> as href="x/", not a self-closing tag.
+            // Falling back avoids silently changing the URL or wrapper lifetime.
+            return Err("ambiguous self-closing HTML tag requires Python fallback".to_string());
+        }
+        self_closing = true;
+        value = value[..slash_index].trim_end();
     }
 
     let mut name_end = value.len();
@@ -444,7 +441,7 @@ fn parse_tag(raw: &str) -> CoreResult<Option<TagToken>> {
             break;
         }
     }
-    let name = value[..name_end].trim().to_lowercase();
+    let name = value[..name_end].trim().to_ascii_lowercase();
     if name.is_empty() {
         return Ok(None);
     }
@@ -460,6 +457,27 @@ fn parse_tag(raw: &str) -> CoreResult<Option<TagToken>> {
         closing,
         self_closing,
     }))
+}
+
+fn find_tag_end(input: &str, start: usize) -> CoreResult<usize> {
+    let Some(rest) = input.get(start + 1..) else {
+        return Err("invalid HTML tag boundary".to_string());
+    };
+    let mut quote: Option<char> = None;
+    for (relative, ch) in rest.char_indices() {
+        if let Some(active_quote) = quote {
+            if ch == active_quote {
+                quote = None;
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' => quote = Some(ch),
+            '>' => return Ok(start + 1 + relative),
+            _ => {}
+        }
+    }
+    Err("unterminated HTML tag requires Python fallback".to_string())
 }
 
 fn compact_content(mut parts: Vec<Value>) -> Value {
@@ -609,11 +627,7 @@ fn html_to_rich_value(input: &str) -> CoreResult<Value> {
         let start = cursor + relative_start;
         append_text(&mut stack, &input[cursor..start])?;
 
-        let Some(relative_end) = input[start + 1..].find('>') else {
-            append_text(&mut stack, &input[start..])?;
-            break;
-        };
-        let end = start + 1 + relative_end;
+        let end = find_tag_end(input, start)?;
         let raw = &input[start + 1..end];
 
         if let Some(tag) = parse_tag(raw)? {
@@ -752,6 +766,47 @@ mod tests {
     }
 
     #[test]
+    fn quoted_gt_inside_href_is_not_mistaken_for_tag_end() {
+        let parsed = html_to_rich_value(
+            "<a href=\"https://example.com/?q=a>b\">x</a>",
+        );
+        assert_eq!(
+            parsed,
+            Ok(json!({
+                "type": "url",
+                "text": "x",
+                "url": "https://example.com/?q=a>b"
+            }))
+        );
+    }
+
+    #[test]
+    fn unquoted_href_keeps_url_slashes() {
+        let parsed = html_to_rich_value("<a href=https://example.com/a/b>x</a>");
+        assert_eq!(
+            parsed,
+            Ok(json!({
+                "type": "url",
+                "text": "x",
+                "url": "https://example.com/a/b"
+            }))
+        );
+    }
+
+    #[test]
+    fn ambiguous_unquoted_self_close_uses_fallback() {
+        let parsed = html_to_rich_value("<a href=https://example.com/>x</a>");
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn malformed_or_declaration_html_uses_fallback() {
+        assert!(html_to_rich_value("x<b").is_err());
+        assert!(html_to_rich_value("<!-- comment > still comment -->x").is_err());
+        assert!(html_to_rich_value("x<3>y").is_err());
+    }
+
+    #[test]
     fn deep_rich_text_above_realistic_depth_is_safe() {
         let depth = 64;
         let mut html = "<b>".repeat(depth);
@@ -842,5 +897,13 @@ mod tests {
             assert_eq!(marker.title, format!("زر {index}"));
             assert_eq!(marker.value, format!("action:{index}"));
         }
+    }
+
+    #[test]
+    fn marker_scan_resets_to_inner_open_brace_like_python_regex() {
+        let markers = parse_inline_markers("prefix {bad {ok - callback_data: yes} suffix");
+        assert_eq!(markers.len(), 1);
+        assert_eq!(markers[0].title, "ok");
+        assert_eq!(markers[0].value, "yes");
     }
 }
