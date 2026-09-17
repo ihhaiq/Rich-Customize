@@ -29,6 +29,41 @@ def native_max_nesting() -> int | None:
     return int(value) if isinstance(value, int) else None
 
 
+def _needs_python_entity_fallback(value: str) -> bool:
+    """Keep Python HTML5 entity semantics for cases html-escape handles differently.
+
+    The Rust html-escape crate intentionally decodes exact semicolon-terminated
+    named/numeric references, while Python's HTMLParser also accepts legacy
+    semicolonless references and applies HTML5 numeric replacement rules. For
+    correctness, conservatively route those ambiguous inputs to the Python
+    fallback rather than allowing native output to differ silently.
+    """
+    index = 0
+    while True:
+        amp = value.find("&", index)
+        if amp < 0 or amp + 1 >= len(value):
+            return False
+        following = value[amp + 1:]
+
+        # Numeric references have HTML5 edge cases (for example C1 control
+        # replacements) which html-escape deliberately does not emulate.
+        if following.startswith("#"):
+            return True
+
+        first = following[0]
+        if first.isascii() and first.isalpha():
+            end = 1
+            while end < len(following):
+                char = following[end]
+                if not (char.isascii() and char.isalnum()):
+                    break
+                end += 1
+            if end >= len(following) or following[end] != ";":
+                return True
+
+        index = amp + 1
+
+
 def _call_native(
     callable_name: str,
     legacy_json_name: str,
@@ -68,6 +103,8 @@ def parse_inline_markers(text: str) -> list[dict[str, Any]] | None:
 
 def html_to_rich(value: str) -> Any | None:
     """Convert Telegram inline HTML to RichText via Rust, otherwise return None."""
+    if _needs_python_entity_fallback(value):
+        return None
     return _call_native("html_to_rich", "html_to_rich_json", value)
 
 
