@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from app.services.buttons import normalize_button_url, normalize_page_code
+from app.services.rich_core import parse_inline_markers as native_parse_inline_markers
 
 
 MARKER_RE = re.compile(r"\{([^{}\n]+)\}")
@@ -54,10 +55,13 @@ AUDIENCE_ALIASES = {
     "مشتركين": "subscribers",
 }
 
+MarkerParts = tuple[str, str, str, str | None, str]
+MarkerMatch = tuple[int, int, str, MarkerParts]
+
 
 def _marker_parts(
     marker: str,
-) -> tuple[str, str, str, str | None, str] | None:
+) -> MarkerParts | None:
     if not marker.startswith("{") or not marker.endswith("}"):
         return None
     body = marker[1:-1].strip()
@@ -129,13 +133,46 @@ def _marker_parts(
     return title, button_type, value, color, audience
 
 
-def find_user_button_markers(text: str | None) -> list[dict[str, str | None]]:
-    markers: list[dict[str, str | None]] = []
-    for match in MARKER_RE.finditer(text or ""):
+def _python_marker_matches(text: str) -> list[MarkerMatch]:
+    matches: list[MarkerMatch] = []
+    for match in MARKER_RE.finditer(text):
         marker = match.group(0)
         parts = _marker_parts(marker)
-        if not parts:
-            continue
+        if parts is not None:
+            matches.append((match.start(), match.end(), marker, parts))
+    return matches
+
+
+def _marker_matches(text: str) -> list[MarkerMatch]:
+    """Use Rust for scanning/parsing while retaining Python as the safe fallback."""
+    native = native_parse_inline_markers(text)
+    if native is not None:
+        try:
+            parsed: list[MarkerMatch] = []
+            for item in native:
+                start = int(item["start"])
+                end = int(item["end"])
+                marker = str(item.get("marker") or text[start:end])
+                title = str(item["title"])
+                button_type = str(item["button_type"])
+                value = str(item.get("value", ""))
+                raw_color = item.get("color")
+                color = str(raw_color) if raw_color is not None else None
+                audience = str(item.get("audience", "all"))
+                if not (0 <= start < end <= len(text)) or text[start:end] != marker:
+                    raise ValueError("native marker offsets do not match source text")
+                parsed.append(
+                    (start, end, marker, (title, button_type, value, color, audience))
+                )
+            return parsed
+        except (KeyError, TypeError, ValueError):
+            pass
+    return _python_marker_matches(text)
+
+
+def find_user_button_markers(text: str | None) -> list[dict[str, str | None]]:
+    markers: list[dict[str, str | None]] = []
+    for _start, _end, marker, parts in _marker_matches(text or ""):
         title, button_type, value, color, _audience = parts
         if button_type == "user" and not value:
             markers.append({"marker": marker, "title": title, "color": color})
@@ -253,17 +290,14 @@ def inline_button_rich_text(value: Any) -> Any:
     result: list[Any] = []
     cursor = 0
     changed = False
-    for match in MARKER_RE.finditer(value):
-        parts = _marker_parts(match.group(0))
-        if not parts:
-            continue
-        payload = _button_payload(*parts)  # (title, type, value, color, audience)
+    for start, end, _marker, parts in _marker_matches(value):
+        payload = _button_payload(*parts)
         if payload is None:
             continue
-        if match.start() > cursor:
-            result.append(value[cursor:match.start()])
+        if start > cursor:
+            result.append(value[cursor:start])
         result.append(payload)
-        cursor = match.end()
+        cursor = end
         changed = True
     if not changed:
         return value
