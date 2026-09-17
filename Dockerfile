@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM python:3.12-slim AS native-builder
 
 ENV CARGO_HOME=/usr/local/cargo \
@@ -14,7 +15,10 @@ RUN pip install --no-cache-dir maturin==1.9.4
 
 WORKDIR /build
 COPY rich_core ./rich_core
-RUN maturin build --release --manifest-path rich_core/Cargo.toml --out /wheels
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/rich_core/target \
+    maturin build --release --manifest-path rich_core/Cargo.toml --out /wheels
 
 
 FROM python:3.12-slim
