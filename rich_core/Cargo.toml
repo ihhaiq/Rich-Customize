@@ -10,6 +10,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 html-escape = "0.2"
-pyo3 = { version = "0.22.6", features = ["extension-module"] }
+pyo3 = { version = "0.22.6", features = ["extension-module", "abi3-py312"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
