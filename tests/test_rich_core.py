@@ -111,6 +111,16 @@ class NativeRichCoreTests(unittest.TestCase):
     def test_html_to_rich_decodes_entities_and_breaks(self):
         self.assertEqual(html_to_rich("A&amp;B<br>C"), ["A&B", "\n", "C"])
 
+    def test_legacy_semicolonless_entity_falls_back_to_python(self):
+        source = "A&ampB"
+        self.assertIsNone(html_to_rich(source))
+        self.assertEqual(_html_rich_text(source), "A&B")
+
+    def test_html5_numeric_entity_edge_falls_back_to_python(self):
+        source = "A&#128;B"
+        self.assertIsNone(html_to_rich(source))
+        self.assertEqual(_html_rich_text(source), "A€B")
+
     def test_quoted_gt_in_href_matches_python_parser(self):
         source = '<a href="https://example.com/?q=a>b">x</a>'
         parser = _RichTextHTMLParser()
