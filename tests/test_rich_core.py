@@ -80,6 +80,15 @@ class NativeRichCoreTests(unittest.TestCase):
         self.assertEqual(marker["color"], "g")
         self.assertEqual(marker["audience"], "subscribers")
 
+    def test_inline_marker_nested_open_brace_matches_python_regex_behavior(self):
+        parsed = parse_inline_markers("قبل {bad {ok - callback_data: yes} بعد")
+
+        self.assertIsNotNone(parsed)
+        self.assertEqual(len(parsed), 1)
+        marker = parsed[0]
+        self.assertEqual(marker["title"], "ok")
+        self.assertEqual(marker["value"], "yes")
+
     def test_html_to_rich_handles_nested_formatting_links_and_custom_emoji(self):
         parsed = html_to_rich(
             '<p>قبل <b>غامق</b> <a href="#prices">الأسعار</a> '
@@ -101,6 +110,49 @@ class NativeRichCoreTests(unittest.TestCase):
 
     def test_html_to_rich_decodes_entities_and_breaks(self):
         self.assertEqual(html_to_rich("A&amp;B<br>C"), ["A&B", "\n", "C"])
+
+    def test_quoted_gt_in_href_matches_python_parser(self):
+        source = '<a href="https://example.com/?q=a>b">x</a>'
+        parser = _RichTextHTMLParser()
+        parser.feed(source)
+        expected = parser.result()
+
+        self.assertEqual(
+            expected,
+            {"type": "url", "text": "x", "url": "https://example.com/?q=a>b"},
+        )
+        self.assertEqual(html_to_rich(source), expected)
+
+    def test_unquoted_href_slashes_match_python_parser(self):
+        source = "<a href=https://example.com/a/b>x</a>"
+        parser = _RichTextHTMLParser()
+        parser.feed(source)
+        expected = parser.result()
+
+        self.assertEqual(
+            expected,
+            {"type": "url", "text": "x", "url": "https://example.com/a/b"},
+        )
+        self.assertEqual(html_to_rich(source), expected)
+
+    def test_ambiguous_unquoted_self_close_falls_back_to_python(self):
+        source = "<a href=https://example.com/>x</a>"
+        parser = _RichTextHTMLParser()
+        parser.feed(source)
+        expected = parser.result()
+
+        self.assertIsNone(html_to_rich(source))
+        self.assertEqual(_html_rich_text(source), expected)
+
+    def test_comment_and_incomplete_tag_fall_back_to_python(self):
+        for source in ("<!-- comment > still comment -->x", "x<b", "x<3>y"):
+            with self.subTest(source=source):
+                parser = _RichTextHTMLParser()
+                parser.feed(source)
+                expected = parser.result()
+
+                self.assertIsNone(html_to_rich(source))
+                self.assertEqual(_html_rich_text(source), expected)
 
     def test_mismatched_close_tag_matches_python_parser_exactly(self):
         source = "<b><i>x</b>y</i>"
