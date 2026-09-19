@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from html.parser import HTMLParser
 
 from aiogram import Bot
@@ -22,6 +23,34 @@ class _ContentProbe(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self.has_content |= tag in {"hr", "img", "video", "audio", "tg-document", "tg-map", "tg-button"}
+
+
+
+class _DirectionProbe(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.is_rtl: bool | None = None
+
+    def handle_data(self, data: str) -> None:
+        if self.is_rtl is not None:
+            return
+        for char in data:
+            direction = unicodedata.bidirectional(char)
+            if direction in {"R", "AL"}:
+                self.is_rtl = True
+                return
+            if direction == "L":
+                self.is_rtl = False
+                return
+
+
+def export_source_html(code: str) -> str:
+    """Wrap serialized rich HTML with the editor transport markers."""
+    probe = _DirectionProbe()
+    probe.feed(code)
+    probe.close()
+    direction = "<isrtl>" if probe.is_rtl else ""
+    return f"<rich>{direction}{code}"
 
 
 def has_export_content(code: str) -> bool:

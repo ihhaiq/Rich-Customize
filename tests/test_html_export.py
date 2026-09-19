@@ -12,7 +12,7 @@ from app.keyboards.editor import build_rich_editor_keyboard
 from app.lang import SUPPORTED_LANGUAGES
 from app.lang.catalogs.html_export import HTML_EXPORT_TRANSLATIONS
 from app.routers.editor_export import export_html
-from app.services.html_export import export_filename, has_export_content, send_html_export
+from app.services.html_export import export_filename, export_source_html, has_export_content, send_html_export
 from app.services.renderer import build_input_rich_message, build_input_rich_message_html
 from app.services.rich_html import rich_block_to_html, rich_text_to_html
 
@@ -99,7 +99,7 @@ class HTMLExportTests(unittest.IsolatedAsyncioTestCase):
         })]})
         rich = self.bot.send_rich_message.call_args.kwargs['rich_message']
         self.assertEqual(rich.blocks[2].text.text,
-                         '<p><code>&lt;rich&gt;&lt;h1&gt;عنوان&lt;/h1&gt;&lt;/rich&gt;</code></p>')
+                         '<rich><p><code>&lt;rich&gt;&lt;h1&gt;عنوان&lt;/h1&gt;&lt;/rich&gt;</code></p>')
 
     async def test_callback_uses_official_builder_without_mutating_state(self):
         blocks = [make_block('paragraph', {'text': 'العربية English 👩🏽‍💻', 'html': '<b>العربية English 👩🏽‍💻</b>'})]
@@ -110,14 +110,14 @@ class HTMLExportTests(unittest.IsolatedAsyncioTestCase):
             await self.export_state(data)
         builder.assert_called_once_with(blocks, source_page_id='page')
         rich = self.bot.send_rich_message.call_args.kwargs['rich_message']
-        self.assertEqual(rich.blocks[2].text.text, '<p><b>العربية English 👩🏽‍💻</b></p>')
+        self.assertEqual(rich.blocks[2].text.text, '<rich><isrtl><p><b>العربية English 👩🏽‍💻</b></p>')
 
     async def test_long_callback_sends_named_file_without_mutation(self):
         code = '<p>' + 'ع😀' * 13_000 + '</p>'
         await self.export_state({'blocks': [make_block('paragraph', {'html': code})], 'current_page_title': 'صفحتي'})
         document = self.bot.send_document.call_args.kwargs['document']
         self.assertEqual(document.filename, 'صفحتي_html.txt')
-        self.assertEqual(document.data, code.encode('utf-8'))
+        self.assertEqual(document.data, ('<rich><isrtl>' + code).encode('utf-8'))
         self.bot.send_rich_message.assert_not_awaited()
 
     async def test_empty_content_alert(self):
@@ -148,6 +148,17 @@ class HTMLExportTests(unittest.IsolatedAsyncioTestCase):
                     await self.export_state({'blocks': [make_block('paragraph', {'text': text})]})
                 self.assertEqual(self.bot.send_message.call_args.args[1], 'تعذر تصدير HTML. حاول مرة ثانية.')
                 method.side_effect = None
+
+    def test_export_source_envelope_matches_expected_rich_syntax(self):
+        arabic = '<h1>شرح حذف الرسائل</h1><hr/><p>لحذف الجزء الأخير</p>'
+        self.assertEqual(
+            export_source_html(arabic),
+            '<rich><isrtl><h1>شرح حذف الرسائل</h1><hr/><p>لحذف الجزء الأخير</p>',
+        )
+        self.assertEqual(
+            export_source_html('<h1>Delete messages</h1><p>Example</p>'),
+            '<rich><h1>Delete messages</h1><p>Example</p>',
+        )
 
     def test_multiple_blocks_keep_final_renderer_semantics(self):
         child = make_block('paragraph', {'html': '<b>B</b><i>I</i><u>U</u><s>S</s><a href="https://example.com?a=1&amp;b=2">link</a>'})
