@@ -15,8 +15,6 @@ from app.editor.models import (
 )
 from app.i18n import tr
 from app.services.media import media_store, native_file_data
-from app.services.rich_html import rich_block_to_html as _native_html
-from app.services.rich_html import rich_text_to_html as _rich_text_to_html
 
 
 TEXT_NATIVE_TYPES = {"paragraph"}
@@ -80,6 +78,100 @@ def _formatted_message_text_blocks(message: Message, start_position: int) -> lis
         cursor = match.end()
     append_text(formatted[cursor:])
     return blocks
+
+
+def _rich_text_to_html(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return html.escape(value)
+    if isinstance(value, list):
+        return "".join(_rich_text_to_html(item) for item in value)
+    if not isinstance(value, dict):
+        return html.escape(str(value))
+    kind = str(value.get("type", "plain"))
+    inner = _rich_text_to_html(value.get("text", value.get("children", "")))
+    wrappers = {
+        "bold": "b", "italic": "i", "underline": "u", "strikethrough": "s",
+        "spoiler": "tg-spoiler", "code": "code", "marked": "mark",
+        "subscript": "sub", "superscript": "sup",
+    }
+    if kind in wrappers:
+        tag = wrappers[kind]
+        return f"<{tag}>{inner}</{tag}>"
+    if kind in {"url", "anchor_link", "reference_link"}:
+        url = html.escape(str(value.get("url", value.get("href", ""))), quote=True)
+        return f'<a href="{url}">{inner}</a>'
+    if kind == "text_mention" and value.get("user", {}).get("id"):
+        return f'<a href="tg://user?id={value["user"]["id"]}">{inner}</a>'
+    if kind == "custom_emoji" and value.get("custom_emoji_id"):
+        return f'<tg-emoji emoji-id="{value["custom_emoji_id"]}">{inner}</tg-emoji>'
+    if "text" in value and isinstance(value["text"], str):
+        return html.escape(value["text"])
+    return inner
+
+
+def _native_html(block: dict[str, Any]) -> str:
+    kind = str(block.get("type", ""))
+    text = _rich_text_to_html(block.get("text"))
+    if kind == "paragraph":
+        return f"<p>{text}</p>"
+    if kind in {"heading", "section_heading"}:
+        level = max(1, min(6, int(block.get("size", block.get("level", 2)))))
+        return f"<h{level}>{text}</h{level}>"
+    if kind == "preformatted":
+        return f"<pre>{text}</pre>"
+    if kind == "footer":
+        return f"<footer>{text}</footer>"
+    if kind == "divider":
+        return "<hr/>"
+    if kind in {"blockquote", "block_quotation"}:
+        nested = "".join(_native_html(item) for item in block.get("blocks", []))
+        credit = _rich_text_to_html(block.get("credit"))
+        return f"<blockquote>{nested}{f'<cite>{credit}</cite>' if credit else ''}</blockquote>"
+    if kind in {"pullquote", "pull_quotation"}:
+        credit = _rich_text_to_html(block.get("credit"))
+        return f"<aside>{text}{f'<cite>{credit}</cite>' if credit else ''}</aside>"
+    if kind == "mathematical_expression":
+        expression = html.escape(str(block.get("expression", "")))
+        return f"<tg-math-block>{expression}</tg-math-block>"
+    if kind == "anchor":
+        return f'<a name="{html.escape(str(block.get("name", "")), quote=True)}"></a>'
+    if kind == "list":
+        items_html: list[str] = []
+        ordered = False
+        for item in block.get("items", []):
+            item_blocks = "".join(_native_html(child) for child in item.get("blocks", []))
+            checked = ""
+            if item.get("has_checkbox"):
+                checked = "☑ " if item.get("is_checked") else "☐ "
+            if item.get("value") is not None:
+                ordered = True
+            items_html.append(f"<li>{checked}{item_blocks}</li>")
+        tag = "ol" if ordered else "ul"
+        return f"<{tag}>{''.join(items_html)}</{tag}>"
+    if kind == "table":
+        rows_html: list[str] = []
+        for row in block.get("cells", []):
+            cells_html: list[str] = []
+            for cell in row:
+                tag = "th" if cell.get("is_header") else "td"
+                attrs: list[str] = []
+                for key in ("colspan", "rowspan", "align", "valign"):
+                    if cell.get(key) is not None:
+                        attrs.append(f'{key}="{html.escape(str(cell[key]), quote=True)}"')
+                value = _rich_text_to_html(cell.get("text"))
+                cells_html.append(f"<{tag}{' ' + ' '.join(attrs) if attrs else ''}>{value}</{tag}>")
+            rows_html.append(f"<tr>{''.join(cells_html)}</tr>")
+        flags = " bordered" if block.get("is_bordered") else ""
+        flags += " striped" if block.get("is_striped") else ""
+        caption = _rich_text_to_html(block.get("caption"))
+        return f"<table{flags}>{f'<caption>{caption}</caption>' if caption else ''}{''.join(rows_html)}</table>"
+    if kind == "details":
+        summary = _rich_text_to_html(block.get("summary", block.get("title")))
+        nested = "".join(_native_html(item) for item in block.get("blocks", []))
+        return f"<details><summary>{summary}</summary>{nested}</details>"
+    return text
 
 
 def _native_type(kind: str) -> str:
