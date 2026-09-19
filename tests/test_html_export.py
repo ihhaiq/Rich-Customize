@@ -149,6 +149,34 @@ class HTMLExportTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(self.bot.send_message.call_args.args[1], 'تعذر تصدير HTML. حاول مرة ثانية.')
                 method.side_effect = None
 
+    def test_embedded_rich_source_is_unwrapped_without_entity_escaping(self):
+        wrapped = (
+            '<h1>شرح حذف الرسائل</h1><hr/><p><code>'
+            '&lt;rich&gt;&lt;isrtl&gt;&lt;h1&gt;شرح حذف الرسائل&lt;/h1&gt;'
+            '&lt;hr/&gt;&lt;p&gt;لحذف الجزء الأخير&lt;br&gt;'
+            '&lt;code&gt;/multidel&lt;/code&gt;&lt;/p&gt;'
+            '</code></p><hr/>'
+        )
+        self.assertEqual(
+            export_source_html(wrapped),
+            '<rich><isrtl><h1>شرح حذف الرسائل</h1><hr/><p>لحذف الجزء الأخير<br><code>/multidel</code></p>',
+        )
+
+    def test_normal_code_example_is_not_unwrapped(self):
+        wrapped = (
+            '<h1>مثال</h1><hr/><p><code>'
+            '&lt;div&gt;hello&lt;/div&gt;'
+            '</code></p><hr/>'
+        )
+        self.assertEqual(
+            export_source_html(wrapped),
+            '<rich><isrtl>' + wrapped,
+        )
+
+    def test_already_wrapped_rich_source_is_not_wrapped_twice(self):
+        source = '<rich><isrtl><h1>عنوان</h1><p>نص</p>'
+        self.assertEqual(export_source_html(source), source)
+
     def test_export_source_envelope_matches_expected_rich_syntax(self):
         arabic = '<h1>شرح حذف الرسائل</h1><hr/><p>لحذف الجزء الأخير</p>'
         self.assertEqual(
