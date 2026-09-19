@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 import unicodedata
 from html.parser import HTMLParser
@@ -44,8 +45,31 @@ class _DirectionProbe(HTMLParser):
                 return
 
 
+def _embedded_rich_source(code: str) -> str | None:
+    """Extract a previously embedded Rich source instead of exporting its display wrapper."""
+    pattern = re.compile(
+        r"^<h[1-6]>(?P<title>.*?)</h[1-6]><hr/>"
+        r"<p><code>(?P<source>.*?)</code></p><hr/>"
+        r"(?:<footer>.*?</footer>)?$",
+        re.DOTALL,
+    )
+    match = pattern.fullmatch(code)
+    if not match:
+        return None
+    source = html.unescape(match.group("source")).strip()
+    if not source.startswith("<rich>"):
+        return None
+    return source
+
+
 def export_source_html(code: str) -> str:
-    """Wrap serialized rich HTML with the editor transport markers."""
+    """Return the raw Rich source users can copy and reuse directly."""
+    code = code.strip()
+    embedded = _embedded_rich_source(code)
+    if embedded is not None:
+        return embedded
+    if code.startswith("<rich>"):
+        return code
     probe = _DirectionProbe()
     probe.feed(code)
     probe.close()
