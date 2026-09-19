@@ -106,6 +106,10 @@ def build_rich_editor_keyboard(
             text=t("ux.editor.preview"), callback_data="r:result",
             style=ButtonStyle.PRIMARY,
         ),
+        InlineKeyboardButton(
+            text=t("editor.html_export_button"), callback_data="r:exporthtml",
+            style=ButtonStyle.PRIMARY,
+        ),
     ])
     if len(blocks) >= 2:
         rows.append([

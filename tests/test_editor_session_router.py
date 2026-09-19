@@ -51,6 +51,7 @@ class EditorSessionRouterTests(unittest.TestCase):
             {
                 "editor_showcase",
                 "editor_preview",
+                "editor_export",
                 "editor_navigation",
                 "editor_entry",
             },
@@ -61,7 +62,7 @@ class EditorSessionRouterTests(unittest.TestCase):
         sets = {
             "callback_query": {
                 "start_editor_from_button", "showcase_from_button", "no_op",
-                "back_to_main", "open_editor_tools", "preview",
+                "back_to_main", "open_editor_tools", "preview", "export_html",
             },
             "message": {
                 "start", "new_editor", "showcase_from_message", "receive_source",

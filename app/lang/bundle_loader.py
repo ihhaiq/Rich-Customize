@@ -13,6 +13,7 @@ from app.lang.catalogs.common import UX_KEY_ALIASES
 from app.lang.catalogs.details_semantic import DETAILS_AR_PHRASES, DETAILS_KEY_TRANSLATIONS, DETAILS_PHRASES
 from app.lang.catalogs.editor_semantic import EDITOR_AR_PHRASES, EDITOR_KEY_TRANSLATIONS, EDITOR_PHRASES
 from app.lang.catalogs.guide import GUIDE_TRANSLATIONS
+from app.lang.catalogs.html_export import HTML_EXPORT_TRANSLATIONS
 from app.lang.catalogs.legacy_normalization import (
     LEGACY_AR_TO_EN,
     RECENT_AR_TO_EN,
@@ -288,6 +289,7 @@ def build_bundle(code: str) -> LocaleBundle:
         catalog = dict(CATALOG_AR)
     else:
         catalog = dict(CATALOG_TRANSLATIONS.get(code, {}))
+    catalog.update(HTML_EXPORT_TRANSLATIONS[code])
     return LocaleBundle(
         code=code,
         phrases=_semantic_phrases(code),
