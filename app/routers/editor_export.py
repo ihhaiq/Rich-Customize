@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from app.i18n import t
-from app.services.html_export import has_export_content, send_html_export
+from app.services.html_export import export_source_html, has_export_content, send_html_export
 from app.services.renderer import build_input_rich_message_html
 
 
@@ -30,7 +30,7 @@ async def export_html(callback: CallbackQuery, state: FSMContext, bot: Bot) -> N
             await callback.answer(t("editor.html_export_empty"), show_alert=True)
             return
         rich = build_input_rich_message_html(blocks, source_page_id=data.get("current_page_id"))
-        code = rich.html or ""
+        code = export_source_html(rich.html or "")
         if not has_export_content(code):
             await callback.answer(t("editor.html_export_empty"), show_alert=True)
             return
