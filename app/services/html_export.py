@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import html
 import re
 from html.parser import HTMLParser
 
@@ -45,7 +44,7 @@ async def send_html_export(
     if not has_export_content(code):
         raise ValueError("No content to export")
     with preserve_user_content():
-        # len(str) يحسب حروف Unicode قبل escaping، مو بايتات UTF-8.
+        # len(str) يحسب حروف Unicode، مو بايتات UTF-8.
         if len(code) > HTML_MESSAGE_LIMIT:
             await bot.send_document(
                 chat_id=chat_id,
@@ -58,11 +57,15 @@ async def send_html_export(
         await bot.send_rich_message(
             chat_id=chat_id,
             rich_message=InputRichMessage(
-                html=(
-                    f"<h2>{html.escape(t('editor.html_export_title'))}</h2><hr/>"
-                    f"<p>{html.escape(code)}</p><hr/>"
-                    f"<footer>{html.escape(t('editor.html_export_footer'))}</footer>"
-                ),
+                blocks=[
+                    {"type": "heading", "size": 2, "text": t("editor.html_export_title")},
+                    {"type": "divider"},
+                    # code داخل الفقرة حتى يننسخ كله، بدون تفسير HTML أو escaping إضافي.
+                    {"type": "paragraph", "text": {"type": "code", "text": code}},
+                    {"type": "divider"},
+                    {"type": "footer", "text": t("editor.html_export_footer")},
+                ],
+                is_rtl=False,
                 skip_entity_detection=True,
             ),
             protect_content=False,
