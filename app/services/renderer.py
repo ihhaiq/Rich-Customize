@@ -21,6 +21,7 @@ from app.i18n import preserve_user_content, t, tr
 from app.keyboards.message_buttons import build_message_buttons_keyboard
 from app.services.anchors import anchor_navigation_rich_text
 from app.services.inline_buttons import inline_button_rich_text
+from app.services.rich_html import rich_block_to_html
 
 logger = logging.getLogger(__name__)
 
@@ -692,6 +693,19 @@ def build_input_rich_message(
         blocks, buttons, buttons_per_row, buttons_align, source_page_id,
         navigation_token, navigation_buttons,
     )
+
+
+def build_input_rich_message_html(
+    blocks: list[dict[str, Any]], *, source_page_id: str | None = None,
+) -> InputRichMessage:
+    """HTML لنفس بلوكات النشر، مع إبقاء مراجع الوسائط مرتبطة بملفاتها."""
+    rich = build_input_rich_message(copy.deepcopy(blocks), source_page_id=source_page_id)
+    payload = rich.model_dump(mode="python", exclude_none=True)
+    media: list[dict[str, Any]] = []
+    rendered = "".join(
+        rich_block_to_html(block, media=media) for block in payload["blocks"]
+    )
+    return InputRichMessage(html=rendered, media=media or None, is_rtl=rich.is_rtl)
 
 
 async def send_rich_message_post(
