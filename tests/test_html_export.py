@@ -1,6 +1,6 @@
 import copy
+import json
 import unittest
-from html.parser import HTMLParser
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -15,26 +15,6 @@ from app.routers.editor_export import export_html
 from app.services.html_export import export_filename, has_export_content, send_html_export
 from app.services.renderer import build_input_rich_message, build_input_rich_message_html
 from app.services.rich_html import rich_block_to_html, rich_text_to_html
-
-
-class CodeReader(HTMLParser):
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.in_paragraph = False
-        self.parts = []
-        self.tags = []
-
-    def handle_starttag(self, tag, attrs):
-        self.tags.append(tag)
-        self.in_paragraph = tag == 'p'
-
-    def handle_endtag(self, tag):
-        if tag == 'p':
-            self.in_paragraph = False
-
-    def handle_data(self, data):
-        if self.in_paragraph:
-            self.parts.append(data)
 
 
 class HTMLExportTests(unittest.IsolatedAsyncioTestCase):
@@ -59,10 +39,14 @@ class HTMLExportTests(unittest.IsolatedAsyncioTestCase):
         code = '<p>  عربي English 😀 &amp; &lt;b&gt;\n<b>غامق</b>  </p>'
         await send_html_export(self.bot, 123, code)
         kwargs = self.bot.send_rich_message.call_args.kwargs
-        reader = CodeReader()
-        reader.feed(kwargs['rich_message'].html)
-        self.assertEqual(''.join(reader.parts), code)
-        self.assertEqual(reader.tags, ['h2', 'hr', 'p', 'hr', 'footer'])
+        rich = kwargs['rich_message']
+        self.assertIsNone(rich.html)
+        self.assertIsNone(rich.markdown)
+        self.assertEqual([block.type for block in rich.blocks], ['heading', 'divider', 'paragraph', 'divider', 'footer'])
+        self.assertEqual(rich.blocks[2].text.type, 'code')
+        self.assertEqual(rich.blocks[2].text.text, code)
+        self.assertFalse(rich.is_rtl)
+        self.assertEqual(rich.blocks[4].text, '📋 اضغط على الكود لنسخه')
         self.assertTrue(kwargs['rich_message'].skip_entity_detection)
         self.assertFalse(kwargs['protect_content'])
         self.assertNotIn('reply_markup', kwargs)
@@ -79,9 +63,9 @@ class HTMLExportTests(unittest.IsolatedAsyncioTestCase):
                     await send_html_export(self.bot, 123, code)
                     if count <= 25_000:
                         self.bot.send_rich_message.assert_awaited_once()
-                        reader = CodeReader()
-                        reader.feed(self.bot.send_rich_message.call_args.kwargs['rich_message'].html)
-                        self.assertEqual(''.join(reader.parts), code)
+                        rich = self.bot.send_rich_message.call_args.kwargs['rich_message']
+                        self.assertEqual(rich.blocks[2].text.type, 'code')
+                        self.assertEqual(rich.blocks[2].text.text, code)
                         self.bot.send_document.assert_not_awaited()
                     else:
                         self.bot.send_document.assert_awaited_once()
@@ -89,6 +73,33 @@ class HTMLExportTests(unittest.IsolatedAsyncioTestCase):
                         self.assertEqual(document.data.decode('utf-8'), code)
                         self.assertEqual(document.filename, 'message_html.txt')
                         self.bot.send_rich_message.assert_not_awaited()
+
+    async def test_copy_payload_is_one_code_entity_without_extra_escaping(self):
+        code = (
+            '<h1>شرح حذف الرسائل</h1><hr/>'
+            '<p><code>&lt;rich&gt;&lt;h1&gt;مثال&lt;/h1&gt;</code>'
+            ' عربي English 😀 &amp; &#60; &lt;literal&gt;\n'
+            '  <a href="https://example.com?a=1&amp;b=2">رابط</a></p><hr/>'
+        )
+        await send_html_export(self.bot, 123, code)
+        rich = self.bot.send_rich_message.call_args.kwargs['rich_message']
+        payload = json.loads(rich.model_dump_json(exclude_none=True))
+        self.assertNotIn('html', payload)
+        self.assertNotIn('markdown', payload)
+        self.assertEqual(payload['blocks'][2], {
+            'type': 'paragraph', 'text': {'type': 'code', 'text': code},
+        })
+        self.assertNotIn('اضغط مطولًا', payload['blocks'][4]['text'])
+        self.assertFalse(payload['is_rtl'])
+
+    async def test_exported_example_code_keeps_required_html_entities(self):
+        literal = '<rich><h1>عنوان</h1></rich>'
+        await self.export_state({'blocks': [make_block('paragraph', {
+            'rich_text': {'type': 'code', 'text': literal},
+        })]})
+        rich = self.bot.send_rich_message.call_args.kwargs['rich_message']
+        self.assertEqual(rich.blocks[2].text.text,
+                         '<p><code>&lt;rich&gt;&lt;h1&gt;عنوان&lt;/h1&gt;&lt;/rich&gt;</code></p>')
 
     async def test_callback_uses_official_builder_without_mutating_state(self):
         blocks = [make_block('paragraph', {'text': 'العربية English 👩🏽‍💻', 'html': '<b>العربية English 👩🏽‍💻</b>'})]
@@ -98,9 +109,8 @@ class HTMLExportTests(unittest.IsolatedAsyncioTestCase):
         with patch('app.services.renderer.build_input_rich_message', wraps=build_input_rich_message) as builder:
             await self.export_state(data)
         builder.assert_called_once_with(blocks, source_page_id='page')
-        reader = CodeReader()
-        reader.feed(self.bot.send_rich_message.call_args.kwargs['rich_message'].html)
-        self.assertEqual(''.join(reader.parts), '<p><b>العربية English 👩🏽‍💻</b></p>')
+        rich = self.bot.send_rich_message.call_args.kwargs['rich_message']
+        self.assertEqual(rich.blocks[2].text.text, '<p><b>العربية English 👩🏽‍💻</b></p>')
 
     async def test_long_callback_sends_named_file_without_mutation(self):
         code = '<p>' + 'ع😀' * 13_000 + '</p>'
