@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.editor.history import remember
+from app.editor.limits import EditorLimitError, validate_editor_limits
 from app.editor.draft_store import draft_store
 from app.editor.workflow import editor_workflow
 from app.i18n import t, tr
@@ -19,7 +20,7 @@ from app.states import RichEditorStates
 
 from app.editor.session import load_editor_session, user_locks
 from app.routers.block_view import block_page
-from app.routers.editor_ui import MAIN_TEXT, edit_ui, editor_dashboard_text
+from app.routers.editor_ui import MAIN_TEXT, edit_ui, editor_dashboard_text, editor_limit_text
 from app.routers.block_keyboard import build_managed_block_keyboard
 from app.routers.block_support import block_by_id, save_blocks
 from app.services.anchors import (
@@ -70,6 +71,11 @@ async def duplicate_block_action(callback: CallbackQuery, state: FSMContext) -> 
         await callback.answer(t("missing_block"), show_alert=True)
         return
     result = editor_workflow.duplicate(blocks, block_id, after=True)
+    try:
+        validate_editor_limits(result.blocks)
+    except EditorLimitError as error:
+        await callback.answer(editor_limit_text(error), show_alert=True)
+        return
     if not result.changed or result.block is None:
         await callback.answer(tr("تعذر نسخ هذا الجزء."), show_alert=True)
         return
