@@ -9,6 +9,7 @@ from aiogram.types import Message
 from app.editor.document import get_block_by_id
 from app.editor.draft_store import draft_store
 from app.editor.history import remember
+from app.editor.limits import EditorLimitError, validate_editor_limits
 from app.editor.models import make_block
 from app.editor.workflow import editor_workflow
 from app.i18n import tr
@@ -18,6 +19,7 @@ from app.states import RichEditorStates
 from app.routers.editor_ui import (
     delete_add_step_messages,
     editor_dashboard_text,
+    editor_limit_text,
     repost_saved_ui,
 )
 
@@ -35,11 +37,16 @@ async def finish_add(
     block: dict[str, Any],
     *,
     index: int | None = None,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     data = await state.get_data()
     draft = await draft_store.load(state)
-    await remember(state)
     result = editor_workflow.add(draft.blocks, block, index=index)
+    try:
+        validate_editor_limits(result.blocks)
+    except EditorLimitError as error:
+        await message.answer(editor_limit_text(error))
+        return None
+    await remember(state)
     draft.blocks = result.blocks
     await draft_store.save(state, draft)
     await state.set_state(RichEditorStates.managing)
