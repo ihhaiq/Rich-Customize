@@ -235,6 +235,14 @@ class PostgresStateDatabase:
         )
         await pool.execute(
             """
+            CREATE TABLE IF NOT EXISTS rich_migrations (
+                name TEXT PRIMARY KEY,
+                completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        await pool.execute(
+            """
             CREATE TABLE IF NOT EXISTS rich_pages (
                 page_id TEXT PRIMARY KEY,
                 owner_id BIGINT NOT NULL,
@@ -512,8 +520,16 @@ class PostgresStateDatabase:
         pool = self._pool
         if pool is None:
             return 0
-        migrated = 0
+        migration_name = "saved_pages_jsonb_to_rows_v1"
         try:
+            already_done = await pool.fetchval(
+                "SELECT 1 FROM rich_migrations WHERE name = $1",
+                migration_name,
+            )
+            if already_done:
+                return 0
+
+            migrated = 0
             async with pool.acquire() as connection:
                 async with connection.transaction():
                     for page_id, raw in pages.items():
@@ -564,6 +580,14 @@ class PostgresStateDatabase:
                         )
                         if result.endswith(" 1"):
                             migrated += 1
+                    await connection.execute(
+                        """
+                        INSERT INTO rich_migrations (name, completed_at)
+                        VALUES ($1, NOW())
+                        ON CONFLICT (name) DO NOTHING
+                        """,
+                        migration_name,
+                    )
             return migrated
         except Exception as error:
             await self._disconnect(error)
