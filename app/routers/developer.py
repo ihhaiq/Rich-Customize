@@ -109,6 +109,8 @@ async def send_data_export(callback: CallbackQuery) -> None:
     await callback.answer("جاري تجهيز ملف التصدير…")
     async with _export_lock:
         try:
+            await page_registry.export_snapshot()
+            await usage_stats.flush()
             exported = await asyncio.to_thread(build_data_export)
             if exported is None:
                 await callback.message.answer("لا توجد بيانات لتصديرها.")
@@ -218,6 +220,8 @@ async def confirm_data_import(callback: CallbackQuery, state: FSMContext) -> Non
         try:
             imported = await asyncio.to_thread(apply_data_import, prepared)
             await state_database.sync_local_paths(list(prepared))
+            if any(path.endswith("rich_pages.json") for path in prepared):
+                await page_registry.replace_from_local_backup()
             await showcase_media_library.reload()
             await showcase_channel_store.reload()
             await page_registry.rebuild_media_pins()
