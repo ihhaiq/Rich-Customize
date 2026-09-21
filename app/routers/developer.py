@@ -415,14 +415,15 @@ async def show_user_statistics(callback: CallbackQuery) -> None:
         await callback.answer()
         return
     try:
-        page = max(0, int(callback.data.rsplit(":", 1)[-1]))
-    except (TypeError, ValueError):
-        page = 0
+        requested_page = max(0, int(callback.data.rsplit(":", 1)[-1]))
+    except (AttributeError, TypeError, ValueError):
+        requested_page = 0
 
+    page = requested_page
     users, total = await usage_stats.users_page(page, page_size=10, sort_mode="recent")
     max_page = max(0, (total - 1) // 10)
     page = min(page, max_page)
-    if page != max(0, int(callback.data.rsplit(":", 1)[-1])):
+    if page != requested_page:
         users, total = await usage_stats.users_page(page, page_size=10, sort_mode="recent")
 
     page_counts = await asyncio.gather(
