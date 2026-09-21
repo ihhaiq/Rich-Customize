@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
 from app.editor.history import remember
+from app.editor.limits import EditorLimitError, validate_editor_limits
 from app.editor.session import load_editor_session, user_locks
 from app.i18n import t
 from app.keyboards import build_error_recovery_keyboard, build_rich_editor_keyboard
@@ -18,6 +19,7 @@ from app.routers.editor_ui import (
     delete_input_message,
     edit_saved_ui,
     editor_dashboard_text,
+    editor_limit_text,
     friendly_rich_error,
     repost_saved_ui,
 )
@@ -125,6 +127,11 @@ async def import_rich_message_into_editor(
     blocks = message_to_blocks(message)
     if not blocks:
         await message.answer(t("editor.rich_import_failed"))
+        return
+    try:
+        validate_editor_limits(blocks)
+    except EditorLimitError as error:
+        await message.answer(editor_limit_text(error))
         return
     before = await draft_store.load(state)
     after = copy.deepcopy(before)
