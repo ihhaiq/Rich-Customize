@@ -569,6 +569,49 @@ class PostgresStateDatabase:
             await self._disconnect(error)
             return 0
 
+    async def replace_pages_snapshot(self, pages: Mapping[str, Any]) -> bool:
+        pool = self._pool
+        if pool is None:
+            return False
+        try:
+            async with pool.acquire() as connection:
+                async with connection.transaction():
+                    await connection.execute("DELETE FROM rich_pages")
+                    for page_id, raw in pages.items():
+                        if not isinstance(raw, Mapping):
+                            continue
+                        try:
+                            owner_id = int(raw.get("owner_id", 0))
+                        except (TypeError, ValueError):
+                            continue
+                        if not owner_id:
+                            continue
+                        now = int(time.time())
+                        created_at = int(raw.get("created_at") or now)
+                        updated_at = int(raw.get("updated_at") or created_at)
+                        await connection.execute(
+                            """
+                            INSERT INTO rich_pages (
+                                page_id, owner_id, title, blocks, buttons,
+                                buttons_per_row, buttons_align, created_at, updated_at
+                            )
+                            VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)
+                            """,
+                            str(page_id),
+                            owner_id,
+                            str(raw.get("title") or "صفحة بلا اسم")[:64],
+                            _encode_json(raw.get("blocks") or []),
+                            _encode_json(raw.get("buttons") or []),
+                            int(raw.get("buttons_per_row") or 1),
+                            str(raw.get("buttons_align") or "center"),
+                            created_at,
+                            updated_at,
+                        )
+            return True
+        except Exception as error:
+            await self._disconnect(error)
+            return False
+
     async def get_page(self, page_id: str) -> tuple[bool, dict[str, Any] | None]:
         pool = self._pool
         if pool is None:
