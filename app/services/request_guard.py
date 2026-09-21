@@ -18,14 +18,16 @@ def _scope(
     data: dict[str, Any] | None = None,
 ) -> tuple[str, int, float] | None:
     if isinstance(event, CallbackQuery):
-        data = event.data or ""
-        if data.startswith("dev:"):
+        callback_data = event.data or ""
+        if callback_data.startswith("dev:"):
             return "developer", 5, 10.0
-        if data == "r:postsend":
+        if callback_data == "r:postsend":
             return "publish", 2, 10.0
-        if data == "r:savepage" or data.startswith(("r:pdelete", "r:prestore")):
+        if callback_data == "r:savepage" or callback_data.startswith(
+            ("r:pdelete", "r:prestore")
+        ):
             return "save", 4, 10.0
-        if data.startswith("r:"):
+        if callback_data.startswith("r:"):
             return "editor", 30, 10.0
     if isinstance(event, Message):
         text = (event.text or "").strip().casefold()
