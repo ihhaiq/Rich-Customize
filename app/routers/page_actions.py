@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
-from app.editor.limits import MAX_SAVED_PAGES
+from app.editor.limits import EditorLimitError, MAX_SAVED_PAGES
 from app.editor.session import load_editor_session
 from app.i18n import t, tr
 from app.keyboards import (
@@ -21,6 +21,7 @@ from app.routers.editor_ui import (
     edit_saved_ui,
     edit_ui,
     editor_dashboard_text,
+    editor_limit_text,
     send_add_prompt,
 )
 from app.routers.page_support import render_pages_screen
@@ -68,15 +69,19 @@ async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
         return
 
     title = str(draft.current_page_title or existing.get("title") or existing_id)[:64]
-    code = await page_registry.save(
-        callback.from_user.id,
-        title,
-        draft.blocks,
-        draft.message_buttons,
-        draft.buttons_per_row,
-        draft.buttons_align,
-        page_id=existing_id,
-    )
+    try:
+        code = await page_registry.save(
+            callback.from_user.id,
+            title,
+            draft.blocks,
+            draft.message_buttons,
+            draft.buttons_per_row,
+            draft.buttons_align,
+            page_id=existing_id,
+        )
+    except EditorLimitError as error:
+        await callback.answer(editor_limit_text(error), show_alert=True)
+        return
     draft.current_page_id = code
     draft.current_page_title = title
     await draft_store.save(state, draft)
@@ -119,6 +124,9 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
             before.buttons_align,
             page_id=existing_id,
         )
+    except EditorLimitError as error:
+        await message.answer(editor_limit_text(error))
+        return
     except PageLimitError:
         await delete_add_step_messages(bot, message, data, state)
         await state.set_state(RichEditorStates.managing)
