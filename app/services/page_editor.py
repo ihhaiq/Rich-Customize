@@ -28,13 +28,27 @@ async def query_user_pages(
     query: str = "",
     sort_mode: str = "updated",
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, int, int]:
-    pages, total_count = await page_registry.query_for_user(
+    requested = max(0, int(requested_index))
+    visible, filtered_total, total_count = await page_registry.query_page_for_user(
         user_id,
+        requested,
+        PAGES_PER_SCREEN,
         query=query,
         sort_mode=sort_mode,
     )
-    visible, page_index, total_pages = paginate_pages(pages, requested_index)
-    return pages, visible, page_index, total_pages, total_count
+    total_pages = max(1, (filtered_total + PAGES_PER_SCREEN - 1) // PAGES_PER_SCREEN)
+    page_index = min(requested, total_pages - 1)
+    if page_index != requested:
+        visible, filtered_total, total_count = await page_registry.query_page_for_user(
+            user_id,
+            page_index,
+            PAGES_PER_SCREEN,
+            query=query,
+            sort_mode=sort_mode,
+        )
+    # First value historically meant the full result set. Only its truthiness is used
+    # by the UI, so return the paginated slice and avoid loading every page into Python.
+    return visible, visible, page_index, total_pages, total_count
 
 
 async def persist_page_draft_change(
