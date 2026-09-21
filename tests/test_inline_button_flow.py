@@ -186,8 +186,7 @@ class InlineButtonDeliveryTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(delivery=delivery.__name__):
                 bot = SimpleNamespace(send_rich_message=AsyncMock(), send_rich_message_draft=AsyncMock(), edit_message_text=AsyncMock())
                 kwargs = {"message_id": 10} if delivery is edit_rich_message_page else {}
-                with patch("app.services.renderer.asyncio.sleep", AsyncMock()):
-                    await delivery(bot, 1, blocks=self.blocks, buttons=self.buttons, buttons_per_row=2, source_page_id="source", **kwargs)
+                await delivery(bot, 1, blocks=self.blocks, buttons=self.buttons, buttons_per_row=2, source_page_id="source", **kwargs)
                 method = bot.edit_message_text if kwargs else bot.send_rich_message
                 self.assert_keyboard_payload(method.await_args.kwargs)
 

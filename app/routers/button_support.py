@@ -65,7 +65,7 @@ def normalize_button_value(button_type: str, value: str) -> tuple[str | None, st
     if button_type == "url":
         normalized = normalize_button_url(value)
         if normalized is None or len(normalized) > 256:
-            return None, tr("الرابط غير صالح. أرسل @username أو رابطًا يبدأ بـ http:// أو https:// أو tg://")
+            return None, t("ux.buttons.invalid_url")
         return normalized, None
     if button_type in {"web_app", "login_url"}:
         normalized = normalize_https_url(value)
