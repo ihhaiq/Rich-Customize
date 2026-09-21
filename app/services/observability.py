@@ -79,7 +79,8 @@ def configure_observability(log_level: str) -> None:
 
 def memory_rss_bytes() -> int:
     try:
-        pages = int(open("/proc/self/statm", encoding="ascii").read().split()[1])
+        with open("/proc/self/statm", encoding="ascii") as handle:
+            pages = int(handle.read().split()[1])
         return pages * os.sysconf("SC_PAGE_SIZE")
     except (OSError, ValueError, IndexError):
         usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
