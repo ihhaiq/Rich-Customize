@@ -347,7 +347,8 @@ class PostgresStateDatabase:
                 except Exception as error:
                     await self._disconnect(error)
 
-            if not self._migrations_ready:
+            custom_factory = self._pool_factory is not None
+            if not self._migrations_ready and not custom_factory:
                 try:
                     async with asyncio.timeout(
                         _bounded_env_int("DATABASE_MIGRATION_TIMEOUT", 20, 5, 120)
@@ -361,6 +362,8 @@ class PostgresStateDatabase:
                         self._last_error,
                     )
                     return self.status()
+            elif custom_factory:
+                self._migrations_ready = True
 
             factory = self._pool_factory
             if factory is None:
@@ -379,7 +382,8 @@ class PostgresStateDatabase:
                     timeout=_bounded_env_int("DATABASE_CONNECT_TIMEOUT", 5, 1, 30),
                     command_timeout=_bounded_env_int("DATABASE_COMMAND_TIMEOUT", 5, 2, 60),
                 )
-                await self._verify_schema(pool)
+                if not custom_factory:
+                    await self._verify_schema(pool)
                 await pool.fetchval("SELECT 1")
                 self._pool = pool
                 self._record_success()
