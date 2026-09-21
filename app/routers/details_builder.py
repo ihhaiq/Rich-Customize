@@ -9,6 +9,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
 from app.editor.history import remember
+from app.editor.limits import EditorLimitError, validate_editor_limits
 from app.editor.workflow import editor_workflow
 from app.i18n import t
 from app.keyboards import (
@@ -28,6 +29,7 @@ from app.routers.editor_ui import (
     edit_saved_ui,
     edit_ui,
     repost_saved_ui,
+    editor_limit_text,
     send_add_prompt,
 )
 from app.routers.details_support import details_builder_text
@@ -47,11 +49,16 @@ async def _finish_details_add(
     state: FSMContext,
     bot: Bot,
     block: dict[str, Any],
-) -> None:
+) -> bool:
     data = await state.get_data()
     draft = await draft_store.load(state)
-    await remember(state)
     result = editor_workflow.add(draft.blocks, block)
+    try:
+        validate_editor_limits(result.blocks)
+    except EditorLimitError as error:
+        await message.answer(editor_limit_text(error))
+        return False
+    await remember(state)
     draft.blocks = result.blocks
     await draft_store.save(state, draft)
     await state.set_state(RichEditorStates.managing)
@@ -71,6 +78,7 @@ async def _finish_details_add(
         f"{t('details.added')}\n\n{MAIN_TEXT}",
         build_rich_editor_keyboard(result.blocks),
     )
+    return True
 
 
 async def store_pending_details_child(
@@ -236,7 +244,7 @@ async def finish_details_builder(
             show_alert=True,
         )
         return
-    await _finish_details_add(
+    added = await _finish_details_add(
         callback.message,
         state,
         bot,
@@ -245,7 +253,10 @@ async def finish_details_builder(
             details_data(str(summary_html), children),
         ),
     )
-    await callback.answer(t("details.added"))
+    if added:
+        await callback.answer(t("details.added"))
+    else:
+        await callback.answer()
 
 
 @router.callback_query(F.data.startswith("r:details:type:"))
