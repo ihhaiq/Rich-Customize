@@ -42,8 +42,11 @@ def _is_developer(user_id: int | None) -> bool:
     return user_id is not None and user_id in developer_ids()
 
 
-def _developer_panel_rich_message(text: str) -> InputRichMessage:
-    return InputRichMessage(blocks=[
+def _developer_panel_rich_message(
+    text: str,
+    extra_buttons: list[dict[str, str]] | None = None,
+) -> InputRichMessage:
+    blocks: list[dict[str, object]] = [
         {"type": "paragraph", "text": text},
         {
             "type": "buttons",
@@ -66,13 +69,25 @@ def _developer_panel_rich_message(text: str) -> InputRichMessage:
             ],
             "align": "center",
         },
-    ])
+    ]
+    if extra_buttons:
+        blocks.append({
+            "type": "buttons",
+            "buttons": extra_buttons,
+            "align": "center",
+        })
+    return InputRichMessage(blocks=blocks)
 
 
-async def _send_developer_panel(message: Message, text: str) -> None:
+async def _send_developer_panel(
+    message: Message,
+    text: str,
+    *,
+    extra_buttons: list[dict[str, str]] | None = None,
+) -> None:
     await message.bot.send_rich_message(
         chat_id=message.chat.id,
-        rich_message=_developer_panel_rich_message(text),
+        rich_message=_developer_panel_rich_message(text, extra_buttons),
         reply_markup=build_developer_keyboard(),
     )
 
@@ -259,6 +274,45 @@ def _format_stats_time(value: int | None) -> str:
     return datetime.fromtimestamp(value, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
+def _format_bytes(value: int | None) -> str:
+    if value is None:
+        return "—"
+    size = float(max(0, value))
+    units = ("B", "KB", "MB", "GB", "TB")
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
+        size /= 1024
+    return f"{int(value)} B"
+
+
+def _format_duration(seconds: int) -> str:
+    total = max(0, int(seconds))
+    days, remainder = divmod(total, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, _ = divmod(remainder, 60)
+    if days:
+        return f"{days}d {hours}h {minutes}m"
+    if hours:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m"
+
+
+def _user_label(user: dict[str, object]) -> str:
+    username = user.get("username")
+    if isinstance(username, str) and username:
+        return f"@{username}"
+    name = " ".join(
+        part
+        for part in (
+            str(user.get("first_name") or "").strip(),
+            str(user.get("last_name") or "").strip(),
+        )
+        if part
+    )
+    return name or str(user.get("user_id") or "—")
+
+
 @router.callback_query(F.data == "dev:stats")
 async def show_usage_statistics(callback: CallbackQuery) -> None:
     if not _is_developer(callback.from_user.id):
@@ -268,18 +322,27 @@ async def show_usage_statistics(callback: CallbackQuery) -> None:
         await callback.answer()
         return
 
-    snapshot = await usage_stats.snapshot()
+    now = int(datetime.now(tz=timezone.utc).timestamp())
+    snapshot = await usage_stats.snapshot(now=now)
+    operational = await usage_stats.operational_snapshot(now=now)
     page_stats = await page_registry.statistics()
+    runtime = await state_database.runtime_statistics(now - (2 * 60 * 60))
+    database_status = state_database.status()
+
     tracked_users = int(snapshot.get("tracked_users") or 0)
     events = int(snapshot.get("events") or 0)
-    active_24h = int(snapshot.get("active_24h") or 0)
-    active_7d = int(snapshot.get("active_7d") or 0)
-    active_30d = int(snapshot.get("active_30d") or 0)
-    new_24h = int(snapshot.get("new_24h") or 0)
-    new_7d = int(snapshot.get("new_7d") or 0)
-    new_30d = int(snapshot.get("new_30d") or 0)
-    saved_pages = int(page_stats.get("pages") or 0)
-    page_owners = int(page_stats.get("page_owners") or 0)
+    languages = snapshot.get("languages")
+    language_text = "—"
+    if isinstance(languages, dict) and languages:
+        language_text = "، ".join(
+            f"{code}: {count}"
+            for code, count in sorted(
+                languages.items(),
+                key=lambda item: int(item[1]),
+                reverse=True,
+            )[:5]
+        )
+
     oldest_candidates = [
         value
         for value in (
@@ -289,25 +352,126 @@ async def show_usage_statistics(callback: CallbackQuery) -> None:
         if isinstance(value, int) and value > 0
     ]
     oldest = min(oldest_candidates) if oldest_candidates else None
+    operations = operational.get("operations")
+    operations = operations if isinstance(operations, dict) else {}
 
     await callback.answer()
     await _send_developer_panel(
         callback.message,
         "📊 بيانات / إحصائيات\n\n"
-        f"الفترة المتاحة: {_format_stats_time(oldest)} → الآن\n"
-        f"إجمالي المستخدمين المعروفين: {tracked_users:,}\n"
-        f"إجمالي التفاعلات المسجلة: {events:,}\n\n"
-        f"نشطون آخر 24 ساعة: {active_24h:,}\n"
-        f"نشطون آخر 7 أيام: {active_7d:,}\n"
-        f"نشطون آخر 30 يوم: {active_30d:,}\n\n"
-        f"مستخدمون جدد آخر 24 ساعة: {new_24h:,}\n"
-        f"مستخدمون جدد آخر 7 أيام: {new_7d:,}\n"
-        f"مستخدمون جدد آخر 30 يوم: {new_30d:,}\n\n"
-        f"الصفحات المحفوظة حاليًا: {saved_pages:,}\n"
-        f"مستخدمون لديهم صفحات: {page_owners:,}\n"
-        f"بداية عدّاد التفاعلات: {_format_stats_time(snapshot['started_at'])}\n\n"
-        "أقدم تاريخ متاح يُستعاد من الصفحات المحفوظة عند وجود بيانات أقدم. "
-        "عداد التفاعلات نفسه دائم ويُحفظ في PostgreSQL مع JSON احتياطي، لذلك لا يتصفر عند إعادة التشغيل.",
+        "👥 المستخدمون\n"
+        f"الإجمالي المعروف: {tracked_users:,}\n"
+        f"لديهم بيانات حساب: {int(snapshot.get('profiled_users') or 0):,}\n"
+        f"لديهم username: {int(snapshot.get('users_with_username') or 0):,}\n"
+        f"نشطون آخر ساعة: {int(snapshot.get('active_1h') or 0):,}\n"
+        f"نشطون آخر 24 ساعة: {int(snapshot.get('active_24h') or 0):,}\n"
+        f"نشطون آخر 7 أيام: {int(snapshot.get('active_7d') or 0):,}\n"
+        f"نشطون آخر 30 يوم: {int(snapshot.get('active_30d') or 0):,}\n"
+        f"جدد آخر 24 ساعة: {int(snapshot.get('new_24h') or 0):,}\n"
+        f"جدد آخر 7 أيام: {int(snapshot.get('new_7d') or 0):,}\n"
+        f"أكثر اللغات: {language_text}\n"
+        f"إجمالي التفاعلات: {events:,}\n\n"
+        "⚙️ التشغيل والأداء\n"
+        f"Uptime: {_format_duration(int(operational.get('uptime_seconds') or 0))}\n"
+        f"Requests هذه الدقيقة: {int(operational.get('requests_current_minute') or 0):,}\n"
+        f"متوسط requests/min آخر 5 دقائق: {float(operational.get('requests_per_minute_5m') or 0):.2f}\n"
+        f"متوسط الاستجابة آخر 5 دقائق: {float(operational.get('avg_response_ms_5m') or 0):.1f}ms\n"
+        f"أعلى استجابة مسجلة: {float(operational.get('max_response_ms') or 0):.1f}ms\n"
+        f"أخطاء handlers آخر ساعة: {int(operational.get('failures_last_hour') or 0):,}\n"
+        f"Preview: ✅ {int(operations.get('preview_success') or 0):,} | ❌ {int(operations.get('preview_failed') or 0):,}\n"
+        f"Publish: ✅ {int(operations.get('publish_success') or 0):,} | ❌ {int(operations.get('publish_failed') or 0):,}\n"
+        f"Rate-limit events: {int(operations.get('rate_limited') or 0):,}\n\n"
+        "🗄 قاعدة البيانات\n"
+        f"الحالة: {'PostgreSQL' if database_status.connected else 'JSON fallback'}\n"
+        f"DB latency: {database_status.latency_ms or 0}ms\n"
+        f"حجم قاعدة البيانات: {_format_bytes(runtime.get('database_bytes'))}\n"
+        f"حجم جدول الصفحات: {_format_bytes(runtime.get('pages_table_bytes'))}\n"
+        f"FSM sessions: {int(runtime.get('fsm_sessions') or 0):,}\n"
+        f"المحررات النشطة: {int(runtime.get('active_editors') or 0):,}\n"
+        f"الصفحات المحفوظة: {int(page_stats.get('pages') or 0):,}\n"
+        f"مستخدمون لديهم صفحات: {int(page_stats.get('page_owners') or 0):,}\n\n"
+        f"الفترة المتاحة: {_format_stats_time(oldest)} → الآن",
+        extra_buttons=[
+            {
+                "text": "👥 إحصائيات المستخدمين",
+                "callback_data": "dev:stats:users:0",
+                "style": "primary",
+            },
+            {
+                "text": "🔄 تحديث",
+                "callback_data": "dev:stats",
+                "style": "primary",
+            },
+        ],
+    )
+
+
+@router.callback_query(F.data.startswith("dev:stats:users:"))
+async def show_user_statistics(callback: CallbackQuery) -> None:
+    if not _is_developer(callback.from_user.id):
+        await callback.answer("هذا الخيار للمطوّر فقط.", show_alert=True)
+        return
+    if not isinstance(callback.message, Message):
+        await callback.answer()
+        return
+    try:
+        page = max(0, int(callback.data.rsplit(":", 1)[-1]))
+    except (TypeError, ValueError):
+        page = 0
+
+    users, total = await usage_stats.users_page(page, page_size=10, sort_mode="recent")
+    max_page = max(0, (total - 1) // 10)
+    page = min(page, max_page)
+    if page != max(0, int(callback.data.rsplit(":", 1)[-1])):
+        users, total = await usage_stats.users_page(page, page_size=10, sort_mode="recent")
+
+    page_counts = await asyncio.gather(
+        *(page_registry.count_for_user(int(user["user_id"])) for user in users)
+    )
+    lines = [
+        "👥 إحصائيات المستخدمين",
+        f"المستخدمون: {total:,}",
+        f"الصفحة: {page + 1}/{max_page + 1}",
+        "",
+    ]
+    for index, (user, page_count) in enumerate(zip(users, page_counts), start=page * 10 + 1):
+        language = str(user.get("language_code") or "—")
+        lines.extend([
+            f"{index}) {_user_label(user)}",
+            f"ID: {int(user['user_id'])}",
+            f"التفاعلات: {int(user.get('events') or 0):,} | الصفحات: {page_count}",
+            f"اللغة: {language}",
+            f"أول ظهور: {_format_stats_time(int(user.get('first_seen') or 0))}",
+            f"آخر ظهور: {_format_stats_time(int(user.get('last_seen') or 0))}",
+            "",
+        ])
+    if not users:
+        lines.append("لا توجد بيانات مستخدمين بعد.")
+
+    buttons: list[dict[str, str]] = []
+    if page > 0:
+        buttons.append({
+            "text": "⬅️ السابق",
+            "callback_data": f"dev:stats:users:{page - 1}",
+            "style": "primary",
+        })
+    buttons.append({
+        "text": "📊 الملخص",
+        "callback_data": "dev:stats",
+        "style": "primary",
+    })
+    if page < max_page:
+        buttons.append({
+            "text": "التالي ➡️",
+            "callback_data": f"dev:stats:users:{page + 1}",
+            "style": "primary",
+        })
+
+    await callback.answer()
+    await _send_developer_panel(
+        callback.message,
+        "\n".join(lines),
+        extra_buttons=buttons,
     )
 
 
