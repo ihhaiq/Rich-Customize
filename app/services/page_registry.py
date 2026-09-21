@@ -17,6 +17,12 @@ def _registry_path() -> Path:
     return Path(configured) if configured else Path("data") / "rich_pages.json"
 
 
+class PageLimitError(ValueError):
+    def __init__(self, limit: int = MAX_SAVED_PAGES) -> None:
+        self.limit = limit
+        super().__init__(f"saved page limit reached: {limit}")
+
+
 class PageRegistry:
     """Persist saved rich-message pages so «page» buttons can navigate between them."""
 
@@ -51,6 +57,16 @@ class PageRegistry:
                 and isinstance(existing, dict)
                 and int(existing.get("owner_id", 0)) == owner_id
             )
+            validate_editor_limits(blocks)
+            if not reuse and owner_id not in developer_ids():
+                owned_count = sum(
+                    1
+                    for page in pages.values()
+                    if isinstance(page, dict)
+                    and int(page.get("owner_id", 0)) == owner_id
+                )
+                if owned_count >= MAX_SAVED_PAGES:
+                    raise PageLimitError()
             code = page_id if reuse and page_id is not None else secrets.token_hex(4)
             while not reuse and code in pages:
                 code = secrets.token_hex(4)
@@ -165,6 +181,71 @@ class PageRegistry:
             page["updated_at"] = int(time.time())
             await self._write(pages)
             return True
+
+    async def usage_history(self) -> dict[int, dict[str, int]]:
+        """Best-effort historical user range recoverable from saved pages."""
+        async with self._lock:
+            pages = await self._read()
+            history: dict[int, dict[str, int]] = {}
+            now = int(time.time())
+            for page in pages.values():
+                if not isinstance(page, dict):
+                    continue
+                try:
+                    owner_id = int(page.get("owner_id", 0))
+                except (TypeError, ValueError):
+                    continue
+                if not owner_id:
+                    continue
+                try:
+                    created_at = int(page.get("created_at") or now)
+                except (TypeError, ValueError):
+                    created_at = now
+                try:
+                    updated_at = int(page.get("updated_at") or created_at)
+                except (TypeError, ValueError):
+                    updated_at = created_at
+                current = history.get(owner_id)
+                if current is None:
+                    history[owner_id] = {
+                        "first_seen": created_at,
+                        "last_seen": updated_at,
+                    }
+                else:
+                    current["first_seen"] = min(current["first_seen"], created_at)
+                    current["last_seen"] = max(current["last_seen"], updated_at)
+            return history
+
+    async def statistics(self) -> dict[str, int | None]:
+        async with self._lock:
+            pages = await self._read()
+            valid_pages = [page for page in pages.values() if isinstance(page, dict)]
+            owners: set[int] = set()
+            created: list[int] = []
+            updated: list[int] = []
+            for page in valid_pages:
+                try:
+                    owner_id = int(page.get("owner_id", 0))
+                except (TypeError, ValueError):
+                    owner_id = 0
+                if owner_id:
+                    owners.add(owner_id)
+                try:
+                    created.append(int(page.get("created_at") or 0))
+                except (TypeError, ValueError):
+                    pass
+                try:
+                    updated.append(int(page.get("updated_at") or 0))
+                except (TypeError, ValueError):
+                    pass
+            created = [value for value in created if value > 0]
+            updated = [value for value in updated if value > 0]
+            return {
+                "pages": len(valid_pages),
+                "page_owners": len(owners),
+                "oldest_page": min(created) if created else None,
+                "latest_page_update": max(updated) if updated else None,
+            }
 
     async def rebuild_media_pins(self) -> None:
         """Rebuild pins at startup so existing page codes survive cache cleanup."""
