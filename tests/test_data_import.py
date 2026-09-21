@@ -87,6 +87,7 @@ class DataImportTests(unittest.TestCase):
                 "BUTTON_POPUPS_STATE": str(Path(directory) / "missing_popups.json"),
                 "SHOWCASE_MEDIA_LIBRARY": str(Path(directory) / "missing_showcase.json"),
                 "SHOWCASE_CHANNEL_STATE": str(Path(directory) / "missing_showcase_channel.json"),
+                "USAGE_STATS_STATE": str(Path(directory) / "missing_usage_stats.json"),
             },
         ):
             pages = Path(directory) / "rich_pages.json"
@@ -127,6 +128,7 @@ class DataImportTests(unittest.TestCase):
                     ("BUTTON_POPUPS_STATE", ""),
                     ("SHOWCASE_MEDIA_LIBRARY", ""),
                     ("SHOWCASE_CHANNEL_STATE", ""),
+                    ("USAGE_STATS_STATE", ""),
                 ))
             },
         ):
