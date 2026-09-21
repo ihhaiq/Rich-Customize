@@ -237,6 +237,8 @@ async def confirm_data_import(callback: CallbackQuery, state: FSMContext) -> Non
             await state_database.sync_local_paths(list(prepared))
             if any(path.endswith("rich_pages.json") for path in prepared):
                 await page_registry.replace_from_local_backup()
+            if any(path.endswith("usage_stats.json") for path in prepared):
+                await usage_stats.reload(await page_registry.usage_history())
             await showcase_media_library.reload()
             await showcase_channel_store.reload()
             await page_registry.rebuild_media_pins()
