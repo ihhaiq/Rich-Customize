@@ -8,7 +8,6 @@ from typing import Any
 from aiogram.types import Message, MessageEntity
 from aiogram.utils.text_decorations import html_decoration
 
-from app.editor.limits import validate_table_rows
 from app.editor.models import make_block
 
 CODE_LANGUAGE_RE = re.compile(r"^[A-Za-z0-9_+.#-]{1,32}$")
@@ -110,7 +109,6 @@ def table_data(
             cell_start = position + 1
         rows.append(row)
 
-    validate_table_rows(rows)
     widest_row = max((len(row) for row in rows), default=1)
     normalized_rows: list[list[Any]] = []
     for row in rows:
