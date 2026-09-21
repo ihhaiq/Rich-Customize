@@ -31,6 +31,7 @@ from app.routers.editor_ui import (
     send_add_prompt,
 )
 from app.routers.details_support import details_builder_text
+from app.routers.slideshow import SLIDESHOW_LIMIT, receive_slideshow, start_slideshow
 from app.services.details_editor import DETAILS_TYPE
 from app.editor.builders import container_data, details_data, map_data, new_block, text_data
 from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES, compatible_child_block_types
@@ -308,7 +309,7 @@ async def choose_details_child_type(
         "blockquote": t("details.send_quote"),
         "pullquote": t("details.send_pullquote"),
         "collage": t("details.send_collage"),
-        "slideshow": t("details.send_slideshow"),
+        "slideshow": t("slideshow.send_more", limit=SLIDESHOW_LIMIT),
         "map": t("details.send_map"),
         "animation": t("details.send_animation"),
         "audio": t("details.send_audio"),
@@ -325,6 +326,8 @@ async def choose_details_child_type(
         ),
         pending_child_type=child_type,
     )
+    if child_type == "slideshow":
+        await start_slideshow(state)
     await edit_ui(
         callback.message,
         prompts[child_type],
@@ -563,7 +566,11 @@ async def receive_details_add(
             return
         child: dict[str, Any] | None = None
 
-        if child_type in {"collage", "slideshow"}:
+        if child_type == "slideshow":
+            await receive_slideshow(message, state, bot)
+            return
+
+        if child_type == "collage":
             if message.media_group_id:
                 collected = await albums.collect(message)
                 if collected is None:
