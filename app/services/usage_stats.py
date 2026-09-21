@@ -408,6 +408,36 @@ class UsageStats:
             "operations": operations,
         }
 
+    async def users_page(
+        self,
+        page: int,
+        *,
+        page_size: int = 10,
+        sort_mode: str = "recent",
+    ) -> tuple[list[dict[str, Any]], int]:
+        safe_page = max(0, int(page))
+        size = min(25, max(1, int(page_size)))
+        async with self._lock:
+            users = [
+                {"user_id": int(user_id), **copy.deepcopy(data)}
+                for user_id, data in self._users.items()
+                if user_id.lstrip("-").isdigit()
+            ]
+        if sort_mode == "events":
+            users.sort(
+                key=lambda item: (
+                    int(item.get("events") or 0),
+                    int(item.get("last_seen") or 0),
+                ),
+                reverse=True,
+            )
+        elif sort_mode == "oldest":
+            users.sort(key=lambda item: int(item.get("first_seen") or 0))
+        else:
+            users.sort(key=lambda item: int(item.get("last_seen") or 0), reverse=True)
+        start = safe_page * size
+        return users[start : start + size], len(users)
+
     async def top_users(self, limit: int = 10) -> list[dict[str, Any]]:
         async with self._lock:
             users = [
