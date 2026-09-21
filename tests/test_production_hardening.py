@@ -174,8 +174,22 @@ class ProductionHardeningTests(unittest.IsolatedAsyncioTestCase):
 
         callback = SimpleNamespace(data="dev:stats")
         with patch("app.services.request_guard.CallbackQuery", type(callback)):
-            scope = _scope(callback)
-        self.assertEqual(scope, ("developer", 5, 10.0))
+            dev_scope = _scope(callback)
+        self.assertEqual(dev_scope, ("developer", 5, 10.0))
+
+        editor_callback = SimpleNamespace(data="r:addmenu")
+        with patch("app.services.request_guard.CallbackQuery", type(editor_callback)):
+            editor_scope = _scope(editor_callback)
+        self.assertEqual(editor_scope, ("editor", 30, 10.0))
+        self.assertLess(dev_scope[1], editor_scope[1])
+
+        save_message = SimpleNamespace(text="صفحتي")
+        with patch("app.services.request_guard.Message", type(save_message)):
+            save_scope = _scope(
+                save_message,
+                {"raw_state": "RichEditorStates:saving_page_name"},
+            )
+        self.assertEqual(save_scope, ("save", 4, 10.0))
 
     async def test_duplicate_telegram_update_is_claimed_only_once(self):
         middleware = IdempotencyMiddleware()
