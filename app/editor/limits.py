@@ -67,12 +67,39 @@ def _block_children(block: dict[str, Any]) -> Iterable[dict[str, Any]]:
                         yield child
 
 
+def _quota_children(block: dict[str, Any]) -> Iterable[dict[str, Any]]:
+    """Nested editor blocks that consume the 30-block editor quota.
+
+    Media inside collage/slideshow/quotes keep their dedicated media limits and
+    do not consume extra editor-block slots.
+    """
+    data = block.get("data")
+    if not isinstance(data, dict):
+        return
+    if str(block.get("type") or "") == "details":
+        children = data.get("children")
+        if isinstance(children, list):
+            for child in children:
+                if isinstance(child, dict):
+                    yield child
+    items = data.get("items")
+    if isinstance(items, list):
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            children = item.get("blocks")
+            if isinstance(children, list):
+                for child in children:
+                    if isinstance(child, dict):
+                        yield child
+
+
 def iter_editor_blocks(blocks: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
     for block in blocks:
         if not isinstance(block, dict):
             continue
         yield block
-        yield from iter_editor_blocks(_block_children(block))
+        yield from iter_editor_blocks(_quota_children(block))
 
 
 def block_count(blocks: list[dict[str, Any]]) -> int:
