@@ -14,6 +14,7 @@ from aiogram.types import (
 
 from app.i18n import t
 from app.services.buttons import (
+    button_rows,
     get_button_type,
     get_button_value,
     get_message_button,
@@ -102,8 +103,11 @@ def build_message_buttons_keyboard(
             rendered.append(InlineKeyboardButton(**common, callback_data=":".join(callback_parts)))
         else:
             rendered.append(InlineKeyboardButton(**common, url=value or "https://t.me"))
-    width = max(1, min(8, int(buttons_per_row)))
-    rows = [rendered[index:index + width] for index in range(0, len(rendered), width)]
+    rows = []
+    offset = 0
+    for row in button_rows(buttons, buttons_per_row):
+        rows.append(rendered[offset:offset + len(row)])
+        offset += len(row)
     if extra_markup:
         rows.extend(extra_markup.inline_keyboard)
     if include_back:
@@ -177,7 +181,8 @@ def build_buttons_manager_keyboard(
             text=t("ux.buttons.add"), callback_data="r:ba", style=ButtonStyle.PRIMARY,
         )],
         [InlineKeyboardButton(
-            text=t("ux.buttons.layout", count=buttons_per_row), callback_data="r:brow",
+            text=(t("ux.buttons.layout_custom") if any("row_end" in button for button in buttons)
+                  else t("ux.buttons.layout", count=buttons_per_row)), callback_data="r:brow",
         )],
         [InlineKeyboardButton(
             text=f"{t('button_preview')} ({len(ordered)})", callback_data="r:bpreview",

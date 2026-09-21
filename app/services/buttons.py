@@ -74,7 +74,9 @@ def normalize_button_url(value: str) -> str | None:
         return None
     if TELEGRAM_USERNAME_RE.fullmatch(url):
         return f"https://t.me/{url[1:]}"
-    if url.casefold().startswith(("t.me/", "telegram.me/")):
+    if "://" not in url and re.match(
+        r"^(?:[\w-]+\.)+[\w-]+(?::[0-9]+)?(?:[/?#]|$)", url,
+    ):
         url = f"https://{url}"
     try:
         parsed = urlparse(url)
@@ -203,3 +205,44 @@ def move_message_button(
         buttons.insert(new_index, buttons.pop(old_index))
     reindex_buttons(buttons)
     return True
+
+
+def button_rows(
+    buttons: list[dict[str, Any]], width: int = 1,
+) -> list[list[dict[str, Any]]]:
+    """Keep custom row boundaries with the saved buttons and cap rows at eight."""
+    ordered = sorted(buttons, key=lambda item: int(item.get("position", 0)))
+    width = max(1, min(8, int(width)))
+    rows: list[list[dict[str, Any]]] = []
+    row: list[dict[str, Any]] = []
+    for button in ordered:
+        row.append(button)
+        limit = 8 if "row_end" in button else width
+        if button.get("row_end") or len(row) >= limit:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    return rows
+
+
+def set_button_row_width(
+    buttons: list[dict[str, Any]], width: int, row_index: int, count: int,
+) -> None:
+    rows = button_rows(buttons, width)
+    if not 0 <= row_index < len(rows) or not 1 <= count <= 8:
+        raise ValueError("Invalid button row")
+    ordered = [button for row in rows for button in row]
+    sizes = [len(row) for row in rows]
+    sizes[row_index] = count
+    for button in ordered:
+        button["row_end"] = False
+    offset = 0
+    for size in sizes:
+        if offset >= len(ordered):
+            break
+        offset = min(len(ordered), offset + size)
+        ordered[offset - 1]["row_end"] = True
+    while offset < len(ordered):
+        offset = min(len(ordered), offset + width)
+        ordered[offset - 1]["row_end"] = True

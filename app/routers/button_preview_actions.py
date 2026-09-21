@@ -24,16 +24,16 @@ async def preview_message_buttons(callback: CallbackQuery, state: FSMContext, bo
     if not draft.message_buttons:
         await callback.answer(tr("لا توجد أزرار لمعاينتها."), show_alert=True)
         return
+    await callback.answer()
     prepared = await prepare_message_buttons(draft.message_buttons)
+    sent = await preview_buttons(bot, callback.from_user.id, prepared, draft.buttons_per_row)
+    await state.update_data(button_preview_message_id=sent.message_id)
     old_preview_id = data.get("button_preview_message_id")
     if old_preview_id:
         try:
             await bot.delete_message(chat_id=callback.from_user.id, message_id=old_preview_id)
         except TelegramBadRequest:
             pass
-    sent = await preview_buttons(bot, callback.from_user.id, prepared, draft.buttons_per_row)
-    await state.update_data(button_preview_message_id=sent.message_id)
-    await callback.answer(tr("تم فتح المعاينة"))
 
 
 @router.callback_query(F.data == "r:bpback")

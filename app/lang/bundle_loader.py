@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.lang.catalogs.asia import PROFILES as ASIA_PROFILES, TRANSLATIONS as ASIA_TRANSLATIONS
+from app.lang.catalogs.button_layout import BUTTON_LAYOUT_TRANSLATIONS
 from app.lang.catalogs.catalog import CATALOG_AR, CATALOG_EN, CATALOG_TRANSLATIONS
 from app.lang.catalogs.chinese import ZH_HANS, ZH_HANT
 from app.lang.catalogs.common import AR_PHRASES as COMMON_AR_PHRASES
@@ -278,6 +279,7 @@ def _keyed(code: str) -> dict[str, str]:
     details = _details_native_fallbacks(code)
     details.update(DETAILS_KEY_TRANSLATIONS.get(code, {}))
     result.update(details)
+    result.update(BUTTON_LAYOUT_TRANSLATIONS.get(code, {}))
     return result
 
 

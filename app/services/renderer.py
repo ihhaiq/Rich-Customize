@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import copy
 import html
 import logging
-import secrets
 from html.parser import HTMLParser
 from typing import Any
 
@@ -17,8 +15,9 @@ from aiogram.types import (
 )
 from pydantic import ValidationError
 
-from app.i18n import preserve_user_content, t, tr
+from app.i18n import preserve_user_content, tr
 from app.keyboards.message_buttons import build_message_buttons_keyboard
+from app.services.buttons import button_rows
 from app.services.anchors import anchor_navigation_rich_text
 from app.services.inline_buttons import inline_button_rich_text
 
@@ -498,19 +497,17 @@ def _button_blocks(
 ) -> list[dict[str, Any]]:
     if not buttons:
         return []
-    ordered = sorted(buttons, key=lambda item: int(item.get("position", 0)))
-    width = max(1, min(8, int(buttons_per_row)))
     safe_align = align if align in {"left", "center", "right"} else "center"
     return [
         {
             "type": "buttons",
             "buttons": [
                 _rich_button_payload(item, source_page_id, navigation_token)
-                for item in ordered[index:index + width]
+                for item in row
             ],
             "align": safe_align,
         }
-        for index in range(0, len(ordered), width)
+        for row in button_rows(buttons, buttons_per_row)
     ]
 
 
@@ -774,19 +771,6 @@ async def send_rich_message_preview(
             source_page_id=source_page_id, extra_markup=reply_markup,
         )
     with preserve_user_content():
-        try:
-            await bot.send_rich_message_draft(
-                chat_id=chat_id,
-                draft_id=secrets.randbelow(2_147_483_647) + 1,
-                rich_message=InputRichMessage(
-                    html=f"<tg-thinking>{t('preview_generating')}</tg-thinking>",
-                ),
-            )
-            # Give Telegram clients enough time to render the animated draft.
-            await asyncio.sleep(0.8)
-        except Exception as error:
-            # A draft is only visual feedback; it must never block the result.
-            logger.warning("Thinking draft failed; continuing with final preview: %s", error)
         try:
             sent = await bot.send_rich_message(
                 chat_id=chat_id, rich_message=rich, reply_markup=reply_markup,

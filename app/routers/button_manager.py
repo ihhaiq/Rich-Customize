@@ -19,7 +19,11 @@ from app.keyboards import (
 )
 from app.i18n import t, tr
 from app.routers.button_support import prompt_button_input, edit_button_ui, save_changed_draft
-from app.services.buttons import delete_message_button, get_button_type, get_message_button
+from app.services.buttons import (
+    button_rows, delete_message_button, get_button_type, get_message_button, set_button_row_width,
+)
+from app.services.button_layout_ui import build_button_layout_ui
+from app.services.pages_ui import edit_pages_ui
 from app.states import RichEditorStates
 
 router = Router(name="button_manager")
@@ -186,16 +190,49 @@ async def change_buttons_per_row(callback: CallbackQuery, state: FSMContext) -> 
     session = await load_editor_session(callback, state)
     if not session or not isinstance(callback.message, Message):
         return
+    draft = await draft_store.load(state)
+    rich, markup = build_button_layout_ui(draft.message_buttons, draft.buttons_per_row)
+    await edit_pages_ui(callback.message, state, rich, markup)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("r:browset:"))
+@router.callback_query(F.data.startswith("r:browcustom:"))
+@router.callback_query(F.data.startswith("r:browcustompage:"))
+async def select_button_layout(callback: CallbackQuery, state: FSMContext) -> None:
+    session = await load_editor_session(callback, state)
+    if not session or not isinstance(callback.message, Message):
+        return
     before = await draft_store.load(state)
     after = copy.deepcopy(before)
-    after.buttons_per_row = 1 if before.buttons_per_row >= 8 else before.buttons_per_row + 1
+    parts = (callback.data or "").split(":")
+    custom = parts[1] != "browset"
+    page = 0
+    try:
+        if parts[1] == "browcustompage":
+            page = int(parts[2])
+        elif custom:
+            index, count, page = map(int, parts[2:])
+            rows = button_rows(after.message_buttons, after.buttons_per_row)
+            if not 0 <= index < len(rows) or count > sum(len(row) for row in rows[index:]):
+                raise ValueError("Invalid row")
+            set_button_row_width(after.message_buttons, after.buttons_per_row, index, count)
+        else:
+            count = int(parts[2])
+            if not 1 <= count <= 8:
+                raise ValueError("Invalid width")
+            after.buttons_per_row = count
+            for button in after.message_buttons:
+                button.pop("row_end", None)
+    except (ValueError, IndexError):
+        await callback.answer(t("invalid"), show_alert=True)
+        return
     await save_changed_draft(state, before, after)
-    await edit_button_ui(
-        callback.message,
-        manager_text(len(after.message_buttons)),
-        build_buttons_manager_keyboard(after.message_buttons, after.buttons_per_row),
+    rich, markup = build_button_layout_ui(
+        after.message_buttons, after.buttons_per_row, custom=custom, page=page,
     )
-    await callback.answer(t("ux.buttons.layout", count=after.buttons_per_row))
+    await edit_pages_ui(callback.message, state, rich, markup)
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("r:bs:"))
