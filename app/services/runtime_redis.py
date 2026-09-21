@@ -8,10 +8,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncIterator
 
-try:
-    from redis.asyncio import Redis
-except ImportError:  # pragma: no cover - dependency is installed in production.
-    Redis = None  # type: ignore[assignment]
+from redis.asyncio import Redis
 
 
 _SLIDING_WINDOW_SCRIPT = """
@@ -67,9 +64,7 @@ class RuntimeRedis:
         return RedisStatus(self.configured, self.connected, self._last_error)
 
     async def startup(self) -> RedisStatus:
-        if not self.configured or Redis is None:
-            if self.configured and Redis is None:
-                self._last_error = "redis package is not installed"
+        if not self.configured:
             return self.status()
         async with self._connect_lock:
             if self.client is not None:
