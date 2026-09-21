@@ -5,6 +5,8 @@ import copy
 import os
 import secrets
 import time
+
+import orjson
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +31,9 @@ class PageRegistry:
     """Persist saved pages in PostgreSQL rows, with a local JSON recovery copy."""
 
     def __init__(self, path: Path | None = None) -> None:
+        is_global = path is None
         self.path = path or _registry_path()
+        self._pending_path = self.path.with_name(f"{self.path.name}.pending.json")
         self._lock = asyncio.Lock()
         # This file is backup/import/export only. It must not be mirrored back into
         # rich_state as one giant JSONB document after the row-table migration.
@@ -38,6 +42,8 @@ class PageRegistry:
             self.path,
             register=False,
         )
+        if is_global:
+            state_database.register_reconnect_hook(self.replay_pending)
 
     async def startup(self) -> int:
         """One-time migration from the pre-table JSON/JSONB page snapshot."""
@@ -54,6 +60,103 @@ class PageRegistry:
 
     async def _write_fallback(self, pages: dict[str, dict[str, Any]]) -> None:
         await self._repository.write_local(pages)
+
+    def _read_pending_sync(self) -> dict[str, dict[str, Any]]:
+        if not self._pending_path.exists():
+            return {}
+        try:
+            value = orjson.loads(self._pending_path.read_bytes())
+        except (OSError, orjson.JSONDecodeError):
+            return {}
+        return value if isinstance(value, dict) else {}
+
+    def _write_pending_sync(self, pending: dict[str, dict[str, Any]]) -> None:
+        if not pending:
+            self._pending_path.unlink(missing_ok=True)
+            return
+        self._pending_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self._pending_path.with_name(f".{self._pending_path.name}.tmp")
+        try:
+            temporary.write_bytes(orjson.dumps(pending, option=orjson.OPT_INDENT_2))
+            temporary.replace(self._pending_path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    async def _record_pending_upsert(
+        self,
+        page_id: str,
+        page: dict[str, Any],
+    ) -> None:
+        if not state_database.configured:
+            return
+        pending = await asyncio.to_thread(self._read_pending_sync)
+        pending[page_id] = {
+            "op": "upsert",
+            "owner_id": int(page.get("owner_id", 0)),
+            "page": copy.deepcopy(page),
+        }
+        await asyncio.to_thread(self._write_pending_sync, pending)
+
+    async def _record_pending_delete(self, page_id: str, owner_id: int) -> None:
+        if not state_database.configured:
+            return
+        pending = await asyncio.to_thread(self._read_pending_sync)
+        pending[page_id] = {
+            "op": "delete",
+            "owner_id": int(owner_id),
+        }
+        await asyncio.to_thread(self._write_pending_sync, pending)
+
+    async def replay_pending(self) -> None:
+        """Replay only offline mutations after PostgreSQL reconnects."""
+        if not state_database.connected:
+            return
+        pending = await asyncio.to_thread(self._read_pending_sync)
+        if not pending:
+            return
+
+        remaining = copy.deepcopy(pending)
+        for page_id, operation in pending.items():
+            if not isinstance(operation, dict):
+                continue
+            try:
+                owner_id = int(operation.get("owner_id", 0))
+            except (TypeError, ValueError):
+                continue
+            if not owner_id:
+                continue
+
+            if operation.get("op") == "delete":
+                available, _deleted = await state_database.delete_page_row(
+                    page_id,
+                    owner_id,
+                )
+                if available:
+                    remaining.pop(page_id, None)
+                continue
+
+            page = operation.get("page")
+            if not isinstance(page, dict):
+                continue
+            now = int(time.time())
+            available, status = await state_database.save_page_row_limited(
+                page_id,
+                owner_id,
+                str(page.get("title") or "صفحة بلا اسم")[:64],
+                copy.deepcopy(page.get("blocks") or []),
+                copy.deepcopy(page.get("buttons") or []),
+                int(page.get("buttons_per_row") or 1),
+                str(page.get("buttons_align") or "center"),
+                int(page.get("created_at") or now),
+                int(page.get("updated_at") or now),
+                max_pages=None if owner_id in developer_ids() else MAX_SAVED_PAGES,
+            )
+            if available and status == "saved":
+                remaining.pop(page_id, None)
+
+        await asyncio.to_thread(self._write_pending_sync, remaining)
+        if not remaining and state_database.connected:
+            await self.export_snapshot()
 
     @staticmethod
     def _page_payload(
@@ -174,6 +277,7 @@ class PageRegistry:
                 updated_at=now,
             )
             await self._write_fallback(pages)
+            await self._record_pending_upsert(code, pages[code])
             media_store.remember_blocks(blocks)
             media_store.pin_page(code, blocks)
             return code
@@ -288,6 +392,7 @@ class PageRegistry:
                 return False
             pages.pop(page_id, None)
             await self._write_fallback(pages)
+            await self._record_pending_delete(page_id, owner_id)
             media_store.unpin_page(page_id)
             return True
 
@@ -347,6 +452,7 @@ class PageRegistry:
                     return False
             pages[page_id] = page
             await self._write_fallback(pages)
+            await self._record_pending_upsert(page_id, page)
             media_store.remember_blocks(page["blocks"])
             media_store.pin_page(page_id, page["blocks"])
             return True
@@ -370,6 +476,7 @@ class PageRegistry:
             page["title"] = cleaned
             page["updated_at"] = now
             await self._write_fallback(pages)
+            await self._record_pending_upsert(page_id, page)
             return True
 
     async def usage_history(self) -> dict[int, dict[str, int]]:
@@ -469,7 +576,10 @@ class PageRegistry:
             return False
         if not state_database.connected:
             return True
-        return await state_database.replace_pages_snapshot(pages)
+        replaced = await state_database.replace_pages_snapshot(pages)
+        if replaced:
+            await asyncio.to_thread(self._write_pending_sync, {})
+        return replaced
 
     async def restore_drill(self) -> dict[str, int | bool]:
         """Parse and validate the fallback without mutating production data."""
