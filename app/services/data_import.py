@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import io
 import json
+
+import orjson
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -45,8 +47,8 @@ def configured_state_destinations() -> dict[str, Path]:
 
 def _validated_json(name: str, payload: bytes) -> bytes:
     try:
-        value = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        value = orjson.loads(payload)
+    except orjson.JSONDecodeError as error:
         raise DataImportError(f"ملف {name} لا يحتوي JSON صالحًا.") from error
     if not isinstance(value, dict):
         raise DataImportError(f"ملف {name} يجب أن يبدأ بكائن JSON.")
@@ -82,7 +84,7 @@ def build_data_export(*, created_at: datetime | None = None) -> DataExport | Non
         }
         archive.writestr(
             "manifest.json",
-            json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"),
+            orjson.dumps(manifest, option=orjson.OPT_INDENT_2),
         )
 
     return DataExport(
