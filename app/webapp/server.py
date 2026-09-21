@@ -70,6 +70,10 @@ async def health(_: web.Request) -> web.Response:
 
 
 async def metrics(_: web.Request) -> web.Response:
+    database = state_database.status()
+    redis = runtime_redis.status()
+    DB_LATENCY.set(float(database.latency_ms or 0))
+    REDIS_CONNECTED.set(1 if redis.connected else 0)
     payload, content_type = prometheus_payload()
     return web.Response(body=payload, headers={"Content-Type": content_type})
 
