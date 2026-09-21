@@ -13,7 +13,10 @@ from app.services.runtime_redis import runtime_redis
 from app.services.usage_stats import usage_stats
 
 
-def _scope(event: TelegramObject) -> tuple[str, int, float] | None:
+def _scope(
+    event: TelegramObject,
+    data: dict[str, Any] | None = None,
+) -> tuple[str, int, float] | None:
     if isinstance(event, CallbackQuery):
         data = event.data or ""
         if data.startswith("dev:"):
@@ -26,10 +29,15 @@ def _scope(event: TelegramObject) -> tuple[str, int, float] | None:
             return "editor", 30, 10.0
     if isinstance(event, Message):
         text = (event.text or "").strip().casefold()
-        if text.startswith("/dev"):
+        raw_state = str((data or {}).get("raw_state") or "")
+        if text.startswith("/dev") or raw_state.startswith("DeveloperStates:"):
             return "developer", 3, 10.0
+        if raw_state.endswith(":saving_page_name") or raw_state.endswith(":renaming_page"):
+            return "save", 4, 10.0
         if text.startswith("/editor"):
             return "editor", 8, 10.0
+        if raw_state.startswith("RichEditorStates:"):
+            return "editor", 30, 10.0
     return None
 
 
@@ -42,7 +50,7 @@ class SlidingWindowThrottleMiddleware(BaseMiddleware):
     ) -> Any:
         user = data.get("event_from_user") or getattr(event, "from_user", None)
         user_id = getattr(user, "id", None)
-        rule = _scope(event)
+        rule = _scope(event, data)
         if not isinstance(user_id, int) or rule is None:
             return await handler(event, data)
 
