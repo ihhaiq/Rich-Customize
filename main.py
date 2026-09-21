@@ -230,6 +230,9 @@ async def main() -> None:
             database_status.last_error or "DATABASE_URL is not configured",
         )
 
+    migrated_pages = await page_registry.startup()
+    if migrated_pages:
+        logger.info("Migrated %s saved pages into indexed PostgreSQL rows", migrated_pages)
     await usage_stats.startup(await page_registry.usage_history())
 
     fsm_storage = HybridFSMStorage()
