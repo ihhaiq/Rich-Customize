@@ -23,6 +23,7 @@ from app.routers import router
 from app.services.media import cleanup_interval_seconds, media_store
 from app.services.media_library import showcase_media_library
 from app.services.page_registry import page_registry
+from app.services.usage_stats import UsageStatsMiddleware, usage_stats
 from app.storage import HybridFSMStorage, state_database
 
 
@@ -177,6 +178,15 @@ async def _media_cleanup_loop() -> None:
         await asyncio.sleep(interval)
 
 
+async def _usage_stats_flush_loop() -> None:
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await usage_stats.flush()
+        except Exception:
+            logger.exception("Usage statistics flush failed")
+
+
 async def main() -> None:
     settings = Settings.from_env()
     logging.basicConfig(
@@ -204,14 +214,21 @@ async def main() -> None:
             database_status.last_error or "DATABASE_URL is not configured",
         )
 
+    await usage_stats.startup(await page_registry.usage_history())
+
     dispatcher = Dispatcher(storage=HybridFSMStorage())
     dispatcher.message.outer_middleware(LocaleMiddleware())
+    dispatcher.message.outer_middleware(UsageStatsMiddleware())
     dispatcher.guest_message.outer_middleware(LocaleMiddleware())
+    dispatcher.guest_message.outer_middleware(UsageStatsMiddleware())
     dispatcher.callback_query.outer_middleware(LocaleMiddleware())
+    dispatcher.callback_query.outer_middleware(UsageStatsMiddleware())
     dispatcher.my_chat_member.outer_middleware(LocaleMiddleware())
+    dispatcher.my_chat_member.outer_middleware(UsageStatsMiddleware())
     dispatcher.include_router(router)
 
     cleanup_task: asyncio.Task[None] | None = None
+    stats_task: asyncio.Task[None] | None = None
     database_task: asyncio.Task[None] | None = None
     miniapp_runner = None
     try:
@@ -234,6 +251,7 @@ async def main() -> None:
         await page_registry.rebuild_media_pins()
         await asyncio.to_thread(media_store.cleanup)
         cleanup_task = asyncio.create_task(_media_cleanup_loop(), name="rich-media-cleanup")
+        stats_task = asyncio.create_task(_usage_stats_flush_loop(), name="usage-stats-flush")
         await configure_bot_profile(bot)
         logger.info("Starting Telegram polling")
         await dispatcher.start_polling(
@@ -253,6 +271,16 @@ async def main() -> None:
                 await cleanup_task
             except asyncio.CancelledError:
                 pass
+        if stats_task is not None:
+            stats_task.cancel()
+            try:
+                await stats_task
+            except asyncio.CancelledError:
+                pass
+        try:
+            await usage_stats.flush()
+        except Exception:
+            logger.exception("Final usage statistics flush failed")
         if miniapp_runner is not None:
             await miniapp_runner.cleanup()
         await state_database.close()
