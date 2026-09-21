@@ -485,6 +485,28 @@ class PostgresStateDatabase:
             await self._disconnect(error)
             return False, None, {}
 
+    async def cleanup_expired_editor_fsm(self, cutoff_epoch: int) -> int:
+        """Delete editor FSM rows whose inactivity TTL has elapsed."""
+        pool = self._pool
+        if pool is None:
+            return 0
+        try:
+            result = await pool.execute(
+                """
+                DELETE FROM rich_fsm
+                WHERE jsonb_typeof(data -> 'editor_last_activity_at') = 'number'
+                  AND (data ->> 'editor_last_activity_at')::double precision < $1
+                """,
+                float(cutoff_epoch),
+            )
+            try:
+                return int(str(result).rsplit(" ", 1)[-1])
+            except (TypeError, ValueError):
+                return 0
+        except Exception as error:
+            await self._disconnect(error)
+            return 0
+
     async def write_fsm(
         self,
         storage_key: str,
@@ -711,6 +733,33 @@ class HybridFSMStorage(BaseStorage):
             if await self._expire_editor_if_stale(key, encoded):
                 return {}
             return await self.fallback.get_data(key)
+
+    async def cleanup_expired_editor_sessions(self) -> int:
+        """Drop stale editor sessions from the in-process MemoryStorage fallback."""
+        storage = getattr(self.fallback, "storage", None)
+        if not isinstance(storage, dict):
+            return 0
+        cutoff = int(time.time()) - EDITOR_SESSION_TTL_SECONDS
+        expired: list[StorageKey] = []
+        for key, record in tuple(storage.items()):
+            data = getattr(record, "data", None)
+            if not isinstance(data, dict):
+                continue
+            raw_activity = data.get("editor_last_activity_at")
+            try:
+                last_activity = int(raw_activity)
+            except (TypeError, ValueError):
+                continue
+            if last_activity < cutoff:
+                expired.append(key)
+
+        for key in expired:
+            storage.pop(key, None)
+            encoded = self._key(key)
+            self._loaded.discard(encoded)
+            self._dirty.pop(encoded, None)
+            self._locks.pop(encoded, None)
+        return len(expired)
 
     async def close(self) -> None:
         await self.fallback.close()
