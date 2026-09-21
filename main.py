@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import unicodedata
 from typing import Any
 
@@ -17,6 +18,7 @@ from aiogram.exceptions import (
 from aiogram.utils.token import TokenValidationError
 
 from app.config import Settings
+from app.editor.limits import EDITOR_SESSION_TTL_SECONDS
 from app.i18n import LocaleMiddleware, LocalizedBot, configure_bot_profile
 from app.miniapp import BETA_VERSION, start_mini_app_server
 from app.routers import router
@@ -187,6 +189,20 @@ async def _usage_stats_flush_loop() -> None:
             logger.exception("Usage statistics flush failed")
 
 
+async def _editor_session_cleanup_loop(storage: HybridFSMStorage) -> None:
+    while True:
+        cutoff = int(time.time()) - EDITOR_SESSION_TTL_SECONDS
+        removed_database = await state_database.cleanup_expired_editor_fsm(cutoff)
+        removed_memory = await storage.cleanup_expired_editor_sessions()
+        if removed_database or removed_memory:
+            logger.info(
+                "Expired editor cleanup: postgres=%s memory=%s",
+                removed_database,
+                removed_memory,
+            )
+        await asyncio.sleep(300)
+
+
 async def main() -> None:
     settings = Settings.from_env()
     logging.basicConfig(
@@ -216,7 +232,8 @@ async def main() -> None:
 
     await usage_stats.startup(await page_registry.usage_history())
 
-    dispatcher = Dispatcher(storage=HybridFSMStorage())
+    fsm_storage = HybridFSMStorage()
+    dispatcher = Dispatcher(storage=fsm_storage)
     dispatcher.message.outer_middleware(LocaleMiddleware())
     dispatcher.message.outer_middleware(UsageStatsMiddleware())
     dispatcher.guest_message.outer_middleware(LocaleMiddleware())
@@ -229,6 +246,7 @@ async def main() -> None:
 
     cleanup_task: asyncio.Task[None] | None = None
     stats_task: asyncio.Task[None] | None = None
+    editor_cleanup_task: asyncio.Task[None] | None = None
     database_task: asyncio.Task[None] | None = None
     miniapp_runner = None
     try:
@@ -252,6 +270,13 @@ async def main() -> None:
         await asyncio.to_thread(media_store.cleanup)
         cleanup_task = asyncio.create_task(_media_cleanup_loop(), name="rich-media-cleanup")
         stats_task = asyncio.create_task(_usage_stats_flush_loop(), name="usage-stats-flush")
+        cutoff = int(time.time()) - EDITOR_SESSION_TTL_SECONDS
+        await state_database.cleanup_expired_editor_fsm(cutoff)
+        await fsm_storage.cleanup_expired_editor_sessions()
+        editor_cleanup_task = asyncio.create_task(
+            _editor_session_cleanup_loop(fsm_storage),
+            name="editor-session-cleanup",
+        )
         await configure_bot_profile(bot)
         logger.info("Starting Telegram polling")
         await dispatcher.start_polling(
@@ -275,6 +300,12 @@ async def main() -> None:
             stats_task.cancel()
             try:
                 await stats_task
+            except asyncio.CancelledError:
+                pass
+        if editor_cleanup_task is not None:
+            editor_cleanup_task.cancel()
+            try:
+                await editor_cleanup_task
             except asyncio.CancelledError:
                 pass
         try:
