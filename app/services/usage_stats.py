@@ -305,6 +305,10 @@ class UsageStats:
                 self._operations[key] = 0
             self._operations[key] += amount
             self._dirty = True
+        if name == "publish":
+            from app.services.observability import PUBLISH
+
+            PUBLISH.labels(outcome="success" if success else "failed").inc(amount)
 
     async def record_rate_limit(self) -> None:
         async with self._lock:
@@ -491,10 +495,16 @@ class UsageStatsMiddleware(BaseMiddleware):
             failed = True
             raise
         finally:
+            duration_seconds = time.perf_counter() - started
             await usage_stats.record_request(
-                (time.perf_counter() - started) * 1000,
+                duration_seconds * 1000,
                 failed=failed,
             )
+            from app.services.observability import ERRORS, REQUEST_DURATION
+
+            REQUEST_DURATION.observe(duration_seconds)
+            if failed:
+                ERRORS.inc()
 
 
 usage_stats = UsageStats()
