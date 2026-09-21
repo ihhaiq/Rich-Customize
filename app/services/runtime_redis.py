@@ -98,6 +98,15 @@ class RuntimeRedis:
         if client is not None:
             await client.aclose(close_connection_pool=True)
 
+    async def _drop_client(self, error: Exception) -> None:
+        self._last_error = f"{type(error).__name__}: {str(error)[:180]}"
+        client, self.client = self.client, None
+        if client is not None:
+            try:
+                await client.aclose(close_connection_pool=True)
+            except Exception:
+                pass
+
     async def sliding_window_allow(
         self,
         key: str,
@@ -122,8 +131,8 @@ class RuntimeRedis:
                     window_ms,
                 )
                 return bool(result)
-            except Exception:
-                self.client = None
+            except Exception as error:
+                await self._drop_client(error)
 
         now = time.monotonic()
         bucket = self._memory_windows[key]
@@ -147,8 +156,8 @@ class RuntimeRedis:
                         nx=True,
                     )
                 )
-            except Exception:
-                self.client = None
+            except Exception as error:
+                await self._drop_client(error)
 
         now = time.monotonic()
         expires = self._memory_seen.get(key, 0.0)
