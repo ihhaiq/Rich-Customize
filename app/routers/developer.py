@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
 from datetime import datetime, timezone
 
@@ -21,6 +20,7 @@ from app.services.data_import import (
     build_data_export, prepare_data_import,
 )
 from app.services.media_library import showcase_media_library
+from app.services.media_safety import safe_telegram_download
 from app.services.page_registry import page_registry
 from app.services.showcase_channel import showcase_channel_store
 from app.services.usage_stats import usage_stats
@@ -174,13 +174,17 @@ async def receive_data_import(message: Message, state: FSMContext) -> None:
         await message.answer("حجم الملف أكبر من الحد المسموح وهو 20MB.")
         return
 
-    buffer = io.BytesIO()
     try:
-        await message.bot.download(message.document, destination=buffer)
+        payload = await safe_telegram_download(
+            message.bot,
+            message.document.file_id,
+            max_bytes=MAX_IMPORT_ARCHIVE_BYTES,
+            timeout=20.0,
+        )
         prepared = await asyncio.to_thread(
             prepare_data_import,
             message.document.file_name or "data.zip",
-            buffer.getvalue(),
+            payload,
         )
     except DataImportError as error:
         await message.answer(f"❌ تعذر قبول الملف:\n{error}")
