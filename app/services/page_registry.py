@@ -339,6 +339,13 @@ class PageRegistry:
                     current["last_seen"] = max(current["last_seen"], updated_at)
             return history
 
+    async def count_for_user(self, owner_id: int) -> int:
+        available, count = await state_database.count_pages_for_user(owner_id)
+        if available:
+            return count
+        pages = await self.list_for_user(owner_id)
+        return len(pages)
+
     async def statistics(self) -> dict[str, int | None]:
         available, stats = await state_database.page_statistics()
         if available:
