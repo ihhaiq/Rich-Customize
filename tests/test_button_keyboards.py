@@ -70,6 +70,11 @@ class ButtonKeyboardTests(unittest.TestCase):
         self.assertEqual(database_button["callback_data"], "dev:database:check")
         self.assertEqual(database_button["style"], "primary")
 
+        stats_button = rich_payload["blocks"][1]["buttons"][2]
+        self.assertEqual(stats_button["text"], "بيانات / إحصائيات")
+        self.assertEqual(stats_button["callback_data"], "dev:stats")
+        self.assertEqual(stats_button["style"], "primary")
+
         confirmation = build_developer_import_confirmation_keyboard()
         self.assertEqual(
             [button.callback_data for button in confirmation.inline_keyboard[0]],
