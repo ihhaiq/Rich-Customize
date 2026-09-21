@@ -149,6 +149,7 @@ async def prepare_telegram(bot: LocalizedBot) -> bool:
             )
             return False
         except TelegramRetryAfter as error:
+            await usage_stats.record_rate_limit()
             retry_delay = min(max(int(error.retry_after) + 1, retry_delay), MAX_RETRY_DELAY)
             logger.warning(
                 "Telegram rate limit during %s (attempt=%s); retrying in %ss",
