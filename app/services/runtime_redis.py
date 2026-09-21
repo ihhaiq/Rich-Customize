@@ -74,6 +74,7 @@ class RuntimeRedis:
         async with self._connect_lock:
             if self.client is not None:
                 return self.status()
+            candidate = None
             try:
                 candidate = Redis.from_url(
                     self.url,
@@ -89,10 +90,11 @@ class RuntimeRedis:
                 self._last_error = None
             except Exception as error:
                 self._last_error = f"{type(error).__name__}: {str(error)[:180]}"
-                try:
-                    await candidate.aclose(close_connection_pool=True)  # type: ignore[possibly-undefined]
-                except Exception:
-                    pass
+                if candidate is not None:
+                    try:
+                        await candidate.aclose(close_connection_pool=True)
+                    except Exception:
+                        pass
                 self.client = None
             return self.status()
 
