@@ -175,6 +175,27 @@ class UsageStats:
         if changed:
             await self.flush()
 
+    async def reload(self, history: dict[int, dict[str, int]] | None = None) -> None:
+        async with self._lock:
+            self._started_at = int(time.time())
+            self._runtime_started_at = int(time.time())
+            self._users = {}
+            self._total_updates = 0
+            self._failed_updates = 0
+            self._handler_ms_total = 0.0
+            self._handler_ms_max = 0.0
+            self._minute_buckets = {}
+            self._operations = {
+                "preview_success": 0,
+                "preview_failed": 0,
+                "publish_success": 0,
+                "publish_failed": 0,
+                "rate_limited": 0,
+            }
+            self._dirty = False
+            self._loaded = False
+        await self.startup(history)
+
     async def observe(
         self,
         user_id: int,
