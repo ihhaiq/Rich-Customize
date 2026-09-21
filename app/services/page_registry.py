@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from app.config import developer_ids
+from app.editor.limits import MAX_SAVED_PAGES, validate_editor_limits
 from app.services.media import media_store
 from app.storage import HybridJSONRepository
 
@@ -158,10 +160,20 @@ class PageRegistry:
             pages = await self._read()
             if page_id in pages:
                 return False
+            if owner_id not in developer_ids():
+                owned_count = sum(
+                    1
+                    for candidate in pages.values()
+                    if isinstance(candidate, dict)
+                    and int(candidate.get("owner_id", 0)) == owner_id
+                )
+                if owned_count >= MAX_SAVED_PAGES:
+                    return False
             page = copy.deepcopy(snapshot)
             page["owner_id"] = owner_id
             page["title"] = str(page.get("title") or "صفحة بلا اسم").strip()[:64]
             page["blocks"] = copy.deepcopy(page.get("blocks") or [])
+            validate_editor_limits(page["blocks"])
             page["buttons"] = copy.deepcopy(page.get("buttons") or [])
             page["buttons_per_row"] = int(page.get("buttons_per_row", 1))
             page["buttons_align"] = str(page.get("buttons_align", "center"))
