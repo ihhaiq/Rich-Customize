@@ -6,6 +6,8 @@ import copy
 import hashlib
 import json
 import logging
+
+import orjson
 import os
 import secrets
 import time
@@ -19,6 +21,7 @@ from aiogram.fsm.storage.base import BaseStorage, StateType, StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.editor.limits import EDITOR_SESSION_TTL_SECONDS
+from app.storage.migrations import run_database_migrations
 
 try:
     import asyncpg
@@ -57,14 +60,23 @@ def _json_object_hook(value: dict[str, Any]) -> Any:
     return value
 
 
+def _restore_json(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_restore_json(item) for item in value]
+    if isinstance(value, dict):
+        restored = {str(key): _restore_json(item) for key, item in value.items()}
+        return _json_object_hook(restored)
+    return value
+
+
 def _encode_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=_json_default)
+    return orjson.dumps(value, default=_json_default).decode("utf-8")
 
 
 def _decode_json(value: Any) -> Any:
-    if isinstance(value, str):
-        return json.loads(value, object_hook=_json_object_hook)
-    return copy.deepcopy(value)
+    if isinstance(value, (str, bytes, bytearray)):
+        return _restore_json(orjson.loads(value))
+    return _restore_json(copy.deepcopy(value))
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +88,7 @@ class DatabaseStatus:
     pending_sync: int
     synced_namespaces: int
     last_error: str | None
+    circuit_open: bool
 
 
 class PostgresStateDatabase:
@@ -104,6 +117,9 @@ class PostgresStateDatabase:
         self._last_connect_attempt = 0.0
         self._last_latency_ms: int | None = None
         self._synced_namespaces = 0
+        self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
+        self._migrations_ready = False
 
     def _url(self) -> str:
         if self._database_url is not None:
@@ -122,6 +138,48 @@ class PostgresStateDatabase:
     def reconnect_interval(self) -> int:
         return _bounded_env_int("DATABASE_RECONNECT_INTERVAL", 30, 10, 3600)
 
+    @property
+    def circuit_failure_threshold(self) -> int:
+        return _bounded_env_int("DATABASE_CIRCUIT_FAILURES", 3, 1, 20)
+
+    @property
+    def circuit_cooldown(self) -> int:
+        return _bounded_env_int("DATABASE_CIRCUIT_COOLDOWN", 30, 5, 600)
+
+    def _pool_sizes(self) -> tuple[int, int]:
+        workers = _bounded_env_int(
+            "WEB_CONCURRENCY",
+            _bounded_env_int("WORKERS", 1, 1, 64),
+            1,
+            64,
+        )
+        total_budget = _bounded_env_int("DATABASE_POOL_TOTAL_BUDGET", 20, 2, 200)
+        configured_max = os.getenv("DATABASE_POOL_MAX_SIZE", "").strip()
+        max_size = (
+            _bounded_env_int("DATABASE_POOL_MAX_SIZE", 5, 1, 50)
+            if configured_max
+            else max(1, min(20, total_budget // workers))
+        )
+        min_size = min(
+            max_size,
+            _bounded_env_int("DATABASE_POOL_MIN_SIZE", 1, 0, 20),
+        )
+        return min_size, max_size
+
+    def _circuit_is_open(self) -> bool:
+        return time.monotonic() < self._circuit_open_until
+
+    def _record_failure(self, error: Exception) -> None:
+        self._consecutive_failures += 1
+        self._last_error = self._safe_error(error)
+        if self._consecutive_failures >= self.circuit_failure_threshold:
+            self._circuit_open_until = time.monotonic() + self.circuit_cooldown
+
+    def _record_success(self) -> None:
+        self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
+        self._last_error = None
+
     def status(self) -> DatabaseStatus:
         configured = self.configured
         connected = self.connected
@@ -133,6 +191,7 @@ class PostgresStateDatabase:
             pending_sync=len(self._dirty_namespaces),
             synced_namespaces=self._synced_namespaces,
             last_error=self._last_error,
+            circuit_open=self._circuit_is_open(),
         )
 
     def register(self, repository: HybridJSONRepository) -> None:
@@ -200,7 +259,7 @@ class PostgresStateDatabase:
                 terminate()
 
     async def _disconnect(self, error: Exception) -> None:
-        self._last_error = self._safe_error(error)
+        self._record_failure(error)
         self._last_latency_ms = None
         pool, self._pool = self._pool, None
         terminate = getattr(pool, "terminate", None)
@@ -213,61 +272,12 @@ class PostgresStateDatabase:
             self._last_error,
         )
 
-    async def _initialize_schema(self, pool: Any) -> None:
-        await pool.execute(
-            """
-            CREATE TABLE IF NOT EXISTS rich_state (
-                namespace TEXT PRIMARY KEY,
-                payload JSONB NOT NULL,
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-        await pool.execute(
-            """
-            CREATE TABLE IF NOT EXISTS rich_fsm (
-                storage_key TEXT PRIMARY KEY,
-                state TEXT,
-                data JSONB NOT NULL DEFAULT '{}'::jsonb,
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-        await pool.execute(
-            """
-            CREATE TABLE IF NOT EXISTS rich_migrations (
-                name TEXT PRIMARY KEY,
-                completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-        await pool.execute(
-            """
-            CREATE TABLE IF NOT EXISTS rich_pages (
-                page_id TEXT PRIMARY KEY,
-                owner_id BIGINT NOT NULL,
-                title TEXT NOT NULL,
-                blocks JSONB NOT NULL DEFAULT '[]'::jsonb,
-                buttons JSONB NOT NULL DEFAULT '[]'::jsonb,
-                buttons_per_row SMALLINT NOT NULL DEFAULT 1,
-                buttons_align TEXT NOT NULL DEFAULT 'center',
-                created_at BIGINT NOT NULL,
-                updated_at BIGINT NOT NULL
-            )
-            """
-        )
-        await pool.execute(
-            "CREATE INDEX IF NOT EXISTS idx_rich_pages_owner_updated "
-            "ON rich_pages (owner_id, updated_at DESC)"
-        )
-        await pool.execute(
-            "CREATE INDEX IF NOT EXISTS idx_rich_pages_owner_created "
-            "ON rich_pages (owner_id, created_at DESC)"
-        )
-        await pool.execute(
-            "CREATE INDEX IF NOT EXISTS idx_rich_pages_owner_title "
-            "ON rich_pages (owner_id, lower(title))"
-        )
+    async def _verify_schema(self, pool: Any) -> None:
+        required = ("rich_state", "rich_fsm", "rich_migrations", "rich_pages")
+        for table in required:
+            present = await pool.fetchval("SELECT to_regclass($1)", f"public.{table}")
+            if present is None:
+                raise RuntimeError(f"database migration missing table: {table}")
 
     async def _upsert_snapshot(self, namespace: str, payload: Any) -> None:
         assert self._pool is not None
