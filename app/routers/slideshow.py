@@ -15,6 +15,7 @@ from app.editor.builders import container_data, new_block
 from app.editor.session import albums
 from app.i18n import t
 from app.routers.editor_ui import delete_stored_block_prompt, send_add_prompt
+from app.services.media_safety import UnsafeMediaError, validate_slideshow_message
 from app.services.parser import message_to_blocks, messages_to_blocks
 from app.states import RichEditorStates
 
@@ -69,9 +70,24 @@ async def receive_slideshow(message: Message, state: FSMContext, bot: Bot) -> No
     try:
         if message.media_group_id:
             collected = await albums.collect(message)
-            children = messages_to_blocks(collected) if collected is not None else None
+            if collected is None:
+                children = None
+            else:
+                for item in collected:
+                    validate_slideshow_message(item)
+                children = messages_to_blocks(collected)
         else:
+            validate_slideshow_message(message)
             children = message_to_blocks(message)
+    except UnsafeMediaError:
+        async with _lock(state):
+            data = await state.get_data()
+            upload = dict(data.get("slideshow") or {})
+            if upload.get("token") == token:
+                upload["pending"] = max(0, int(upload.get("pending", 1)) - 1)
+                await state.update_data(slideshow=upload)
+        await message.answer("الوسائط كبيرة جدًا أو أبعادها غير آمنة للمعالجة.")
+        return
     except BaseException:
         async with _lock(state):
             data = await state.get_data()
