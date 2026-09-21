@@ -144,7 +144,7 @@ class UsageStatsMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        user = getattr(event, "from_user", None)
+        user = data.get("event_from_user") or getattr(event, "from_user", None)
         user_id = getattr(user, "id", None)
         if isinstance(user_id, int):
             await usage_stats.observe(user_id)
