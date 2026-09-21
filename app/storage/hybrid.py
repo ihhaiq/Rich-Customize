@@ -18,6 +18,8 @@ from aiogram.fsm.state import State
 from aiogram.fsm.storage.base import BaseStorage, StateType, StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
 
+from app.editor.limits import EDITOR_SESSION_TTL_SECONDS
+
 try:
     import asyncpg
 except ImportError:  # pragma: no cover - requirements install it in production.
@@ -669,19 +671,45 @@ class HybridFSMStorage(BaseStorage):
         encoded = self._key(key)
         async with self._locks.setdefault(encoded, asyncio.Lock()):
             await self._ensure_loaded(key, encoded)
+            if await self._expire_editor_if_stale(key, encoded):
+                return None
             return await self.fallback.get_state(key)
+
+    async def _expire_editor_if_stale(self, key: StorageKey, encoded: str) -> bool:
+        data = await self.fallback.get_data(key)
+        raw_activity = data.get("editor_last_activity_at")
+        if raw_activity is None:
+            return False
+        try:
+            last_activity = int(raw_activity)
+        except (TypeError, ValueError):
+            last_activity = 0
+        if (
+            last_activity > 0
+            and int(time.time()) - last_activity < EDITOR_SESSION_TTL_SECONDS
+        ):
+            return False
+        await self.fallback.set_state(key, None)
+        await self.fallback.set_data(key, {})
+        await self._persist(key, encoded)
+        return True
 
     async def set_data(self, key: StorageKey, data: Mapping[str, Any]) -> None:
         encoded = self._key(key)
         async with self._locks.setdefault(encoded, asyncio.Lock()):
             await self._ensure_loaded(key, encoded)
-            await self.fallback.set_data(key, data)
+            payload = dict(data)
+            if "editor_last_activity_at" in payload:
+                payload["editor_last_activity_at"] = int(time.time())
+            await self.fallback.set_data(key, payload)
             await self._persist(key, encoded)
 
     async def get_data(self, key: StorageKey) -> dict[str, Any]:
         encoded = self._key(key)
         async with self._locks.setdefault(encoded, asyncio.Lock()):
             await self._ensure_loaded(key, encoded)
+            if await self._expire_editor_if_stale(key, encoded):
+                return {}
             return await self.fallback.get_data(key)
 
     async def close(self) -> None:
