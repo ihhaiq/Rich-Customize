@@ -6,6 +6,7 @@ from aiohttp import web
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
+from app.editor.limits import EditorLimitError, validate_editor_limits
 from app.services.buttons import MAX_BUTTONS
 from app.services.chat_registry import managed_chat_registry
 from app.services.page_registry import page_registry
@@ -87,6 +88,12 @@ def page_content(
         raise web.HTTPBadRequest(text="blocks must be a list")
     if len(blocks) > MAX_PAGE_BLOCKS or any(not isinstance(block, dict) for block in blocks):
         raise web.HTTPBadRequest(text=f"blocks must contain at most {MAX_PAGE_BLOCKS} objects")
+    try:
+        validate_editor_limits(blocks)
+    except EditorLimitError as error:
+        raise web.HTTPBadRequest(
+            text=f"editor limit exceeded: {error.code} ({error.actual}/{error.limit})"
+        ) from error
     if not isinstance(buttons, list):
         raise web.HTTPBadRequest(text="buttons must be a list")
     if len(buttons) > MAX_BUTTONS or any(not isinstance(button, dict) for button in buttons):
