@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import io
-import json
+import os
 
 import orjson
-import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
