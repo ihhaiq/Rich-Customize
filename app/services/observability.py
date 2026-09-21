@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import orjson
 import logging
 import os
 import re
@@ -51,7 +51,7 @@ class JsonFormatter(logging.Formatter):
         }
         if record.exc_info:
             payload["exception"] = _redact(self.formatException(record.exc_info))
-        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        return orjson.dumps(payload).decode("utf-8")
 
 
 def configure_observability(log_level: str) -> None:
