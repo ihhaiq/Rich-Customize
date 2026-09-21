@@ -25,6 +25,7 @@ from app.routers.editor_ui import (
 )
 from app.services.parser import message_to_blocks
 from app.services.renderer import RichMessageRenderError, send_rich_message_preview
+from app.services.usage_stats import usage_stats
 from app.states import RichEditorStates
 
 
@@ -67,6 +68,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             await state.update_data(
                 preview_message_ids=[message.message_id for message in sent_messages]
             )
+        await usage_stats.record_operation("preview", success=True)
     except RichMessageRenderError as error:
         logger.exception(
             "Telegram rejected the single rich preview for user_id=%s",
@@ -78,6 +80,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             f"{t('common.reason', reason=friendly_rich_error(error))}",
             reply_markup=build_error_recovery_keyboard(),
         )
+        await usage_stats.record_operation("preview", success=False)
         panel_notice = f"⚠️ {t('preview_failed')}"
     except Exception:
         logger.exception(
@@ -88,6 +91,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             t("preview_failed"),
             reply_markup=build_error_recovery_keyboard(),
         )
+        await usage_stats.record_operation("preview", success=False)
         panel_notice = f"⚠️ {t('preview_failed')}"
 
     async with user_locks[callback.from_user.id]:
