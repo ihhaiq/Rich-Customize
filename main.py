@@ -189,6 +189,15 @@ async def _usage_stats_flush_loop() -> None:
             logger.exception("Usage statistics flush failed")
 
 
+async def _page_fallback_snapshot_loop() -> None:
+    while True:
+        await asyncio.sleep(300)
+        try:
+            await page_registry.export_snapshot()
+        except Exception:
+            logger.exception("Saved-page fallback snapshot failed")
+
+
 async def _editor_session_cleanup_loop(storage: HybridFSMStorage) -> None:
     while True:
         cutoff = int(time.time()) - EDITOR_SESSION_TTL_SECONDS
@@ -249,6 +258,7 @@ async def main() -> None:
 
     cleanup_task: asyncio.Task[None] | None = None
     stats_task: asyncio.Task[None] | None = None
+    page_snapshot_task: asyncio.Task[None] | None = None
     editor_cleanup_task: asyncio.Task[None] | None = None
     database_task: asyncio.Task[None] | None = None
     miniapp_runner = None
@@ -273,6 +283,11 @@ async def main() -> None:
         await asyncio.to_thread(media_store.cleanup)
         cleanup_task = asyncio.create_task(_media_cleanup_loop(), name="rich-media-cleanup")
         stats_task = asyncio.create_task(_usage_stats_flush_loop(), name="usage-stats-flush")
+        await page_registry.export_snapshot()
+        page_snapshot_task = asyncio.create_task(
+            _page_fallback_snapshot_loop(),
+            name="page-fallback-snapshot",
+        )
         cutoff = int(time.time()) - EDITOR_SESSION_TTL_SECONDS
         await state_database.cleanup_expired_editor_fsm(cutoff)
         await fsm_storage.cleanup_expired_editor_sessions()
@@ -305,6 +320,16 @@ async def main() -> None:
                 await stats_task
             except asyncio.CancelledError:
                 pass
+        if page_snapshot_task is not None:
+            page_snapshot_task.cancel()
+            try:
+                await page_snapshot_task
+            except asyncio.CancelledError:
+                pass
+        try:
+            await page_registry.export_snapshot()
+        except Exception:
+            logger.exception("Final saved-page fallback snapshot failed")
         if editor_cleanup_task is not None:
             editor_cleanup_task.cancel()
             try:
