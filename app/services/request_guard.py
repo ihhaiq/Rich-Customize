@@ -2,18 +2,15 @@ from __future__ import annotations
 
 import time
 from collections.abc import Awaitable, Callable
-from contextvars import ContextVar
 from typing import Any
 
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject, Update
 
 from app.config import developer_ids
+from app.services.context import correlation_id
 from app.services.runtime_redis import runtime_redis
 from app.services.usage_stats import usage_stats
-
-
-correlation_id: ContextVar[str] = ContextVar("correlation_id", default="-")
 
 
 def _scope(event: TelegramObject) -> tuple[str, int, float] | None:
