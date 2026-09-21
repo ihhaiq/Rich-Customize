@@ -611,6 +611,29 @@ class PostgresStateDatabase:
                         )
                         if result.endswith(" 1"):
                             migrated += 1
+                    expected_ids = [
+                        str(page_id)
+                        for page_id, raw in pages.items()
+                        if isinstance(raw, Mapping)
+                        and str(raw.get("owner_id") or "").lstrip("-").isdigit()
+                        and int(raw.get("owner_id") or 0) != 0
+                    ]
+                    if expected_ids:
+                        migrated_count = int(
+                            await connection.fetchval(
+                                """
+                                SELECT COUNT(*) FROM rich_pages
+                                WHERE page_id = ANY($1::text[])
+                                """,
+                                expected_ids,
+                            )
+                            or 0
+                        )
+                        if migrated_count != len(set(expected_ids)):
+                            raise RuntimeError(
+                                "legacy page migration verification failed: "
+                                f"expected={len(set(expected_ids))} actual={migrated_count}"
+                            )
                     await connection.execute(
                         """
                         INSERT INTO rich_migrations (name, completed_at)
@@ -619,6 +642,11 @@ class PostgresStateDatabase:
                         """,
                         migration_name,
                     )
+            logger.info(
+                "Legacy page migration verified: candidates=%s migrated_or_updated=%s",
+                len(expected_ids) if "expected_ids" in locals() else 0,
+                migrated,
+            )
             return migrated
         except Exception as error:
             await self._disconnect(error)
