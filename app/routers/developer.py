@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+from datetime import datetime, timezone
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
@@ -22,6 +23,7 @@ from app.services.data_import import (
 from app.services.media_library import showcase_media_library
 from app.services.page_registry import page_registry
 from app.services.showcase_channel import showcase_channel_store
+from app.services.usage_stats import usage_stats
 from app.storage import state_database
 
 
@@ -54,6 +56,11 @@ def _developer_panel_rich_message(text: str) -> InputRichMessage:
                 {
                     "text": "تحديث قناة المعاينة",
                     "callback_data": "dev:showcase:refresh",
+                    "style": "primary",
+                },
+                {
+                    "text": "بيانات / إحصائيات",
+                    "callback_data": "dev:stats",
                     "style": "primary",
                 },
             ],
@@ -240,6 +247,54 @@ async def cancel_data_import(callback: CallbackQuery, state: FSMContext) -> None
     if isinstance(callback.message, Message):
         await _send_developer_panel(callback.message, "تم إلغاء الاستيراد.")
     await callback.answer()
+
+
+def _format_stats_time(value: int | None) -> str:
+    if not value:
+        return "—"
+    return datetime.fromtimestamp(value, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+@router.callback_query(F.data == "dev:stats")
+async def show_usage_statistics(callback: CallbackQuery) -> None:
+    if not _is_developer(callback.from_user.id):
+        await callback.answer("هذا الخيار للمطوّر فقط.", show_alert=True)
+        return
+    if not isinstance(callback.message, Message):
+        await callback.answer()
+        return
+
+    snapshot = await usage_stats.snapshot()
+    page_stats = await page_registry.statistics()
+    oldest_candidates = [
+        value
+        for value in (
+            snapshot.get("oldest_seen"),
+            page_stats.get("oldest_page"),
+        )
+        if isinstance(value, int) and value > 0
+    ]
+    oldest = min(oldest_candidates) if oldest_candidates else None
+
+    await callback.answer()
+    await _send_developer_panel(
+        callback.message,
+        "📊 بيانات / إحصائيات\n\n"
+        f"الفترة المتاحة: {_format_stats_time(oldest)} → الآن\n"
+        f"إجمالي المستخدمين المعروفين: {snapshot['tracked_users']:,}\n"
+        f"إجمالي التفاعلات المسجلة: {snapshot['events']:,}\n\n"
+        f"نشطون آخر 24 ساعة: {snapshot['active_24h']:,}\n"
+        f"نشطون آخر 7 أيام: {snapshot['active_7d']:,}\n"
+        f"نشطون آخر 30 يوم: {snapshot['active_30d']:,}\n\n"
+        f"مستخدمون جدد آخر 24 ساعة: {snapshot['new_24h']:,}\n"
+        f"مستخدمون جدد آخر 7 أيام: {snapshot['new_7d']:,}\n"
+        f"مستخدمون جدد آخر 30 يوم: {snapshot['new_30d']:,}\n\n"
+        f"الصفحات المحفوظة حاليًا: {page_stats['pages']:,}\n"
+        f"مستخدمون لديهم صفحات: {page_stats['page_owners']:,}\n"
+        f"بداية عدّاد التفاعلات: {_format_stats_time(snapshot['started_at'])}\n\n"
+        "أقدم تاريخ متاح يُستعاد من الصفحات المحفوظة عند وجود بيانات أقدم. "
+        "عداد التفاعلات نفسه دائم ويُحفظ في PostgreSQL مع JSON احتياطي، لذلك لا يتصفر عند إعادة التشغيل.",
+    )
 
 
 @router.callback_query(F.data == "dev:database:check")
