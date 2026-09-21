@@ -1,8 +1,10 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock, PropertyMock, patch
 
 from app.services.page_registry import PageRegistry
+from app.storage import state_database
 
 
 class PageRegistryTests(unittest.IsolatedAsyncioTestCase):
@@ -28,6 +30,32 @@ class PageRegistryTests(unittest.IsolatedAsyncioTestCase):
 
             reloaded = PageRegistry(path)
             self.assertEqual((await reloaded.get(second))["title"], "ثانية")
+
+    async def test_startup_migrates_legacy_snapshot_once_database_is_connected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pages.json"
+            path.write_text(
+                '{"abc12345":{"owner_id":7,"title":"Legacy","blocks":[],"buttons":[]}}',
+                encoding="utf-8",
+            )
+            registry = PageRegistry(path)
+            migrate = AsyncMock(return_value=1)
+
+            with patch.object(
+                type(state_database),
+                "connected",
+                new_callable=PropertyMock,
+                return_value=True,
+            ), patch.object(
+                state_database,
+                "migrate_legacy_pages",
+                migrate,
+            ):
+                self.assertEqual(await registry.startup(), 1)
+
+            migrated = migrate.await_args.args[0]
+            self.assertIn("abc12345", migrated)
+            self.assertEqual(migrated["abc12345"]["owner_id"], 7)
 
     async def test_update_reuses_owned_code_and_delete_checks_owner(self):
         with tempfile.TemporaryDirectory() as directory:
