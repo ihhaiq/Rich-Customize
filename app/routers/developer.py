@@ -266,6 +266,16 @@ async def show_usage_statistics(callback: CallbackQuery) -> None:
 
     snapshot = await usage_stats.snapshot()
     page_stats = await page_registry.statistics()
+    tracked_users = int(snapshot.get("tracked_users") or 0)
+    events = int(snapshot.get("events") or 0)
+    active_24h = int(snapshot.get("active_24h") or 0)
+    active_7d = int(snapshot.get("active_7d") or 0)
+    active_30d = int(snapshot.get("active_30d") or 0)
+    new_24h = int(snapshot.get("new_24h") or 0)
+    new_7d = int(snapshot.get("new_7d") or 0)
+    new_30d = int(snapshot.get("new_30d") or 0)
+    saved_pages = int(page_stats.get("pages") or 0)
+    page_owners = int(page_stats.get("page_owners") or 0)
     oldest_candidates = [
         value
         for value in (
@@ -281,16 +291,16 @@ async def show_usage_statistics(callback: CallbackQuery) -> None:
         callback.message,
         "📊 بيانات / إحصائيات\n\n"
         f"الفترة المتاحة: {_format_stats_time(oldest)} → الآن\n"
-        f"إجمالي المستخدمين المعروفين: {snapshot['tracked_users']:,}\n"
-        f"إجمالي التفاعلات المسجلة: {snapshot['events']:,}\n\n"
-        f"نشطون آخر 24 ساعة: {snapshot['active_24h']:,}\n"
-        f"نشطون آخر 7 أيام: {snapshot['active_7d']:,}\n"
-        f"نشطون آخر 30 يوم: {snapshot['active_30d']:,}\n\n"
-        f"مستخدمون جدد آخر 24 ساعة: {snapshot['new_24h']:,}\n"
-        f"مستخدمون جدد آخر 7 أيام: {snapshot['new_7d']:,}\n"
-        f"مستخدمون جدد آخر 30 يوم: {snapshot['new_30d']:,}\n\n"
-        f"الصفحات المحفوظة حاليًا: {page_stats['pages']:,}\n"
-        f"مستخدمون لديهم صفحات: {page_stats['page_owners']:,}\n"
+        f"إجمالي المستخدمين المعروفين: {tracked_users:,}\n"
+        f"إجمالي التفاعلات المسجلة: {events:,}\n\n"
+        f"نشطون آخر 24 ساعة: {active_24h:,}\n"
+        f"نشطون آخر 7 أيام: {active_7d:,}\n"
+        f"نشطون آخر 30 يوم: {active_30d:,}\n\n"
+        f"مستخدمون جدد آخر 24 ساعة: {new_24h:,}\n"
+        f"مستخدمون جدد آخر 7 أيام: {new_7d:,}\n"
+        f"مستخدمون جدد آخر 30 يوم: {new_30d:,}\n\n"
+        f"الصفحات المحفوظة حاليًا: {saved_pages:,}\n"
+        f"مستخدمون لديهم صفحات: {page_owners:,}\n"
         f"بداية عدّاد التفاعلات: {_format_stats_time(snapshot['started_at'])}\n\n"
         "أقدم تاريخ متاح يُستعاد من الصفحات المحفوظة عند وجود بيانات أقدم. "
         "عداد التفاعلات نفسه دائم ويُحفظ في PostgreSQL مع JSON احتياطي، لذلك لا يتصفر عند إعادة التشغيل.",
