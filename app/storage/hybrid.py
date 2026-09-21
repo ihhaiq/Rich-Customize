@@ -233,6 +233,33 @@ class PostgresStateDatabase:
             )
             """
         )
+        await pool.execute(
+            """
+            CREATE TABLE IF NOT EXISTS rich_pages (
+                page_id TEXT PRIMARY KEY,
+                owner_id BIGINT NOT NULL,
+                title TEXT NOT NULL,
+                blocks JSONB NOT NULL DEFAULT '[]'::jsonb,
+                buttons JSONB NOT NULL DEFAULT '[]'::jsonb,
+                buttons_per_row SMALLINT NOT NULL DEFAULT 1,
+                buttons_align TEXT NOT NULL DEFAULT 'center',
+                created_at BIGINT NOT NULL,
+                updated_at BIGINT NOT NULL
+            )
+            """
+        )
+        await pool.execute(
+            "CREATE INDEX IF NOT EXISTS idx_rich_pages_owner_updated "
+            "ON rich_pages (owner_id, updated_at DESC)"
+        )
+        await pool.execute(
+            "CREATE INDEX IF NOT EXISTS idx_rich_pages_owner_created "
+            "ON rich_pages (owner_id, created_at DESC)"
+        )
+        await pool.execute(
+            "CREATE INDEX IF NOT EXISTS idx_rich_pages_owner_title "
+            "ON rich_pages (owner_id, lower(title))"
+        )
 
     async def _upsert_snapshot(self, namespace: str, payload: Any) -> None:
         assert self._pool is not None
@@ -467,6 +494,365 @@ class PostgresStateDatabase:
             except Exception as error:
                 await self._disconnect(error)
                 await self._set_dirty(repository.namespace, True)
+
+    @staticmethod
+    def _page_record(row: Any) -> dict[str, Any]:
+        return {
+            "owner_id": int(row["owner_id"]),
+            "title": str(row["title"]),
+            "blocks": _decode_json(row["blocks"]),
+            "buttons": _decode_json(row["buttons"]),
+            "buttons_per_row": int(row["buttons_per_row"]),
+            "buttons_align": str(row["buttons_align"]),
+            "created_at": int(row["created_at"]),
+            "updated_at": int(row["updated_at"]),
+        }
+
+    async def migrate_legacy_pages(self, pages: Mapping[str, Any]) -> int:
+        pool = self._pool
+        if pool is None:
+            return 0
+        migrated = 0
+        try:
+            async with pool.acquire() as connection:
+                async with connection.transaction():
+                    for page_id, raw in pages.items():
+                        if not isinstance(raw, Mapping):
+                            continue
+                        try:
+                            owner_id = int(raw.get("owner_id", 0))
+                        except (TypeError, ValueError):
+                            continue
+                        if not owner_id:
+                            continue
+                        now = int(time.time())
+                        try:
+                            created_at = int(raw.get("created_at") or now)
+                        except (TypeError, ValueError):
+                            created_at = now
+                        try:
+                            updated_at = int(raw.get("updated_at") or created_at)
+                        except (TypeError, ValueError):
+                            updated_at = created_at
+                        result = await connection.execute(
+                            """
+                            INSERT INTO rich_pages (
+                                page_id, owner_id, title, blocks, buttons,
+                                buttons_per_row, buttons_align, created_at, updated_at
+                            )
+                            VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)
+                            ON CONFLICT (page_id) DO UPDATE
+                            SET owner_id = EXCLUDED.owner_id,
+                                title = EXCLUDED.title,
+                                blocks = EXCLUDED.blocks,
+                                buttons = EXCLUDED.buttons,
+                                buttons_per_row = EXCLUDED.buttons_per_row,
+                                buttons_align = EXCLUDED.buttons_align,
+                                created_at = LEAST(rich_pages.created_at, EXCLUDED.created_at),
+                                updated_at = EXCLUDED.updated_at
+                            WHERE EXCLUDED.updated_at > rich_pages.updated_at
+                            """,
+                            str(page_id),
+                            owner_id,
+                            str(raw.get("title") or "صفحة بلا اسم")[:64],
+                            _encode_json(raw.get("blocks") or []),
+                            _encode_json(raw.get("buttons") or []),
+                            int(raw.get("buttons_per_row") or 1),
+                            str(raw.get("buttons_align") or "center"),
+                            created_at,
+                            updated_at,
+                        )
+                        if result.endswith(" 1"):
+                            migrated += 1
+            return migrated
+        except Exception as error:
+            await self._disconnect(error)
+            return 0
+
+    async def get_page(self, page_id: str) -> tuple[bool, dict[str, Any] | None]:
+        pool = self._pool
+        if pool is None:
+            return False, None
+        try:
+            row = await pool.fetchrow(
+                """
+                SELECT owner_id, title, blocks, buttons, buttons_per_row,
+                       buttons_align, created_at, updated_at
+                FROM rich_pages WHERE page_id = $1
+                """,
+                page_id,
+            )
+            return True, self._page_record(row) if row is not None else None
+        except Exception as error:
+            await self._disconnect(error)
+            return False, None
+
+    async def count_pages_for_user(self, owner_id: int) -> tuple[bool, int]:
+        pool = self._pool
+        if pool is None:
+            return False, 0
+        try:
+            value = await pool.fetchval(
+                "SELECT COUNT(*) FROM rich_pages WHERE owner_id = $1",
+                owner_id,
+            )
+            return True, int(value or 0)
+        except Exception as error:
+            await self._disconnect(error)
+            return False, 0
+
+    async def save_page_row(
+        self,
+        page_id: str,
+        owner_id: int,
+        title: str,
+        blocks: list[dict[str, Any]],
+        buttons: list[dict[str, Any]],
+        buttons_per_row: int,
+        buttons_align: str,
+        created_at: int,
+        updated_at: int,
+    ) -> bool:
+        pool = self._pool
+        if pool is None:
+            return False
+        try:
+            await pool.execute(
+                """
+                INSERT INTO rich_pages (
+                    page_id, owner_id, title, blocks, buttons,
+                    buttons_per_row, buttons_align, created_at, updated_at
+                )
+                VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)
+                ON CONFLICT (page_id) DO UPDATE
+                SET owner_id = EXCLUDED.owner_id,
+                    title = EXCLUDED.title,
+                    blocks = EXCLUDED.blocks,
+                    buttons = EXCLUDED.buttons,
+                    buttons_per_row = EXCLUDED.buttons_per_row,
+                    buttons_align = EXCLUDED.buttons_align,
+                    updated_at = EXCLUDED.updated_at
+                """,
+                page_id,
+                owner_id,
+                title,
+                _encode_json(blocks),
+                _encode_json(buttons),
+                buttons_per_row,
+                buttons_align,
+                created_at,
+                updated_at,
+            )
+            return True
+        except Exception as error:
+            await self._disconnect(error)
+            return False
+
+    async def query_pages_for_user(
+        self,
+        owner_id: int,
+        *,
+        query: str = "",
+        sort_mode: str = "updated",
+    ) -> tuple[bool, list[dict[str, Any]], int]:
+        pool = self._pool
+        if pool is None:
+            return False, [], 0
+        try:
+            total = int(await pool.fetchval(
+                "SELECT COUNT(*) FROM rich_pages WHERE owner_id = $1",
+                owner_id,
+            ) or 0)
+            conditions = ["owner_id = $1"]
+            args: list[Any] = [owner_id]
+            if query.strip():
+                args.append(f"%{query.strip()}%")
+                position = len(args)
+                conditions.append(
+                    f"(title ILIKE ${position} OR page_id ILIKE ${position})"
+                )
+            order = {
+                "title": "lower(title) ASC, page_id ASC",
+                "oldest": "created_at ASC, page_id ASC",
+                "newest": "created_at DESC, page_id ASC",
+                "updated": "updated_at DESC, page_id ASC",
+            }.get(sort_mode, "updated_at DESC, page_id ASC")
+            rows = await pool.fetch(
+                f"""
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages
+                WHERE {' AND '.join(conditions)}
+                ORDER BY {order}
+                """,
+                *args,
+            )
+            pages = [
+                {"page_id": str(row["page_id"]), **self._page_record(row)}
+                for row in rows
+            ]
+            return True, pages, total
+        except Exception as error:
+            await self._disconnect(error)
+            return False, [], 0
+
+    async def delete_page_row(self, page_id: str, owner_id: int) -> tuple[bool, bool]:
+        pool = self._pool
+        if pool is None:
+            return False, False
+        try:
+            result = await pool.execute(
+                "DELETE FROM rich_pages WHERE page_id = $1 AND owner_id = $2",
+                page_id,
+                owner_id,
+            )
+            return True, result.endswith(" 1")
+        except Exception as error:
+            await self._disconnect(error)
+            return False, False
+
+    async def rename_page_row(
+        self,
+        page_id: str,
+        owner_id: int,
+        title: str,
+        updated_at: int,
+    ) -> tuple[bool, bool]:
+        pool = self._pool
+        if pool is None:
+            return False, False
+        try:
+            result = await pool.execute(
+                """
+                UPDATE rich_pages
+                SET title = $3, updated_at = $4
+                WHERE page_id = $1 AND owner_id = $2
+                """,
+                page_id,
+                owner_id,
+                title,
+                updated_at,
+            )
+            return True, result.endswith(" 1")
+        except Exception as error:
+            await self._disconnect(error)
+            return False, False
+
+    async def all_pages_snapshot(self) -> tuple[bool, dict[str, dict[str, Any]]]:
+        pool = self._pool
+        if pool is None:
+            return False, {}
+        try:
+            rows = await pool.fetch(
+                """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages
+                """
+            )
+            return True, {
+                str(row["page_id"]): self._page_record(row)
+                for row in rows
+            }
+        except Exception as error:
+            await self._disconnect(error)
+            return False, {}
+
+    async def page_statistics(self) -> tuple[bool, dict[str, int | None]]:
+        pool = self._pool
+        if pool is None:
+            return False, {}
+        try:
+            row = await pool.fetchrow(
+                """
+                SELECT COUNT(*) AS pages,
+                       COUNT(DISTINCT owner_id) AS owners,
+                       MIN(created_at) AS oldest_page,
+                       MAX(updated_at) AS latest_page_update
+                FROM rich_pages
+                """
+            )
+            return True, {
+                "pages": int(row["pages"] or 0),
+                "page_owners": int(row["owners"] or 0),
+                "oldest_page": (
+                    int(row["oldest_page"]) if row["oldest_page"] is not None else None
+                ),
+                "latest_page_update": (
+                    int(row["latest_page_update"])
+                    if row["latest_page_update"] is not None
+                    else None
+                ),
+            }
+        except Exception as error:
+            await self._disconnect(error)
+            return False, {}
+
+    async def page_usage_history(self) -> tuple[bool, dict[int, dict[str, int]]]:
+        pool = self._pool
+        if pool is None:
+            return False, {}
+        try:
+            rows = await pool.fetch(
+                """
+                SELECT owner_id, MIN(created_at) AS first_seen, MAX(updated_at) AS last_seen
+                FROM rich_pages
+                GROUP BY owner_id
+                """
+            )
+            return True, {
+                int(row["owner_id"]): {
+                    "first_seen": int(row["first_seen"]),
+                    "last_seen": int(row["last_seen"]),
+                }
+                for row in rows
+            }
+        except Exception as error:
+            await self._disconnect(error)
+            return False, {}
+
+    async def runtime_statistics(self, active_after: int) -> dict[str, int | None]:
+        pool = self._pool
+        if pool is None:
+            return {
+                "fsm_sessions": 0,
+                "active_editors": 0,
+                "database_bytes": None,
+                "pages_table_bytes": None,
+                "fsm_table_bytes": None,
+            }
+        try:
+            row = await pool.fetchrow(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM rich_fsm) AS fsm_sessions,
+                    (
+                        SELECT COUNT(*) FROM rich_fsm
+                        WHERE jsonb_typeof(data -> 'editor_last_activity_at') = 'number'
+                          AND (data ->> 'editor_last_activity_at')::double precision >= $1
+                    ) AS active_editors,
+                    pg_database_size(current_database()) AS database_bytes,
+                    pg_total_relation_size('rich_pages') AS pages_table_bytes,
+                    pg_total_relation_size('rich_fsm') AS fsm_table_bytes
+                """,
+                float(active_after),
+            )
+            return {
+                "fsm_sessions": int(row["fsm_sessions"] or 0),
+                "active_editors": int(row["active_editors"] or 0),
+                "database_bytes": int(row["database_bytes"] or 0),
+                "pages_table_bytes": int(row["pages_table_bytes"] or 0),
+                "fsm_table_bytes": int(row["fsm_table_bytes"] or 0),
+            }
+        except Exception as error:
+            await self._disconnect(error)
+            return {
+                "fsm_sessions": 0,
+                "active_editors": 0,
+                "database_bytes": None,
+                "pages_table_bytes": None,
+                "fsm_table_bytes": None,
+            }
 
     async def read_fsm(self, storage_key: str) -> tuple[bool, str | None, dict[str, Any]]:
         pool = self._pool
