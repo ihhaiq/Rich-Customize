@@ -268,12 +268,21 @@ class UsageStats:
             self._trim_buckets(stamp)
             self._dirty = True
 
-    async def record_operation(self, name: str, *, success: bool = True) -> None:
+    async def record_operation(
+        self,
+        name: str,
+        *,
+        success: bool = True,
+        count: int = 1,
+    ) -> None:
         key = f"{name}_{'success' if success else 'failed'}"
+        amount = max(0, int(count))
+        if not amount:
+            return
         async with self._lock:
             if key not in self._operations:
                 self._operations[key] = 0
-            self._operations[key] += 1
+            self._operations[key] += amount
             self._dirty = True
 
     async def record_rate_limit(self) -> None:
