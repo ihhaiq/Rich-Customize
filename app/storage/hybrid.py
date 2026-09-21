@@ -323,6 +323,8 @@ class PostgresStateDatabase:
 
         async with self._connect_lock:
             now = time.monotonic()
+            if not force and self._circuit_is_open():
+                return self.status()
             if (
                 self._pool is None
                 and not force
@@ -331,18 +333,34 @@ class PostgresStateDatabase:
                 return self.status()
             self._last_connect_attempt = now
             started = time.perf_counter()
+
             if self._pool is not None:
                 try:
                     await self._pool.fetchval("SELECT 1")
                     self._last_latency_ms = max(
                         1, round((time.perf_counter() - started) * 1000)
                     )
-                    self._last_error = None
+                    self._record_success()
                     await self._flush_dirty_repositories()
                     await self._run_reconnect_hooks()
                     return self.status()
                 except Exception as error:
                     await self._disconnect(error)
+
+            if not self._migrations_ready:
+                try:
+                    async with asyncio.timeout(
+                        _bounded_env_int("DATABASE_MIGRATION_TIMEOUT", 20, 5, 120)
+                    ):
+                        await asyncio.to_thread(run_database_migrations, self._url())
+                    self._migrations_ready = True
+                except Exception as error:
+                    self._record_failure(error)
+                    logger.warning(
+                        "Database migration failed; continuing with JSON fallback (%s)",
+                        self._last_error,
+                    )
+                    return self.status()
 
             factory = self._pool_factory
             if factory is None:
@@ -351,18 +369,20 @@ class PostgresStateDatabase:
                     return self.status()
                 factory = asyncpg.create_pool
 
+            min_size, max_size = self._pool_sizes()
+            pool = None
             try:
                 pool = await factory(
                     dsn=self._url(),
-                    min_size=1,
-                    max_size=_bounded_env_int("DATABASE_POOL_MAX_SIZE", 5, 1, 20),
+                    min_size=min_size,
+                    max_size=max_size,
                     timeout=_bounded_env_int("DATABASE_CONNECT_TIMEOUT", 5, 1, 30),
                     command_timeout=_bounded_env_int("DATABASE_COMMAND_TIMEOUT", 5, 2, 60),
                 )
-                await self._initialize_schema(pool)
+                await self._verify_schema(pool)
                 await pool.fetchval("SELECT 1")
                 self._pool = pool
-                self._last_error = None
+                self._record_success()
                 self._last_latency_ms = max(
                     1, round((time.perf_counter() - started) * 1000)
                 )
@@ -372,18 +392,19 @@ class PostgresStateDatabase:
                     self._synced_namespaces += 1
                 await self._run_reconnect_hooks()
                 logger.info(
-                    "PostgreSQL connected; synchronized %s state namespaces",
+                    "PostgreSQL connected; pool=%s..%s synchronized=%s",
+                    min_size,
+                    max_size,
                     self._synced_namespaces,
                 )
             except Exception as error:
-                candidate = locals().get("pool")
-                if candidate is self._pool:
+                if pool is self._pool:
                     self._pool = None
-                if candidate is not None:
-                    await self._close_pool(candidate)
+                if pool is not None:
+                    await self._close_pool(pool)
                 self._pool = None
-                self._last_error = self._safe_error(error)
                 self._last_latency_ms = None
+                self._record_failure(error)
                 logger.warning(
                     "PostgreSQL connection failed; using JSON fallback (%s)",
                     self._last_error,
@@ -410,7 +431,7 @@ class PostgresStateDatabase:
     async def maintain_connection(self) -> None:
         while True:
             await asyncio.sleep(self.reconnect_interval)
-            await self.check_and_reconnect(force=True)
+            await self.check_and_reconnect(force=False)
 
     async def read_snapshot(self, repository: HybridJSONRepository) -> Any:
         pool = self._pool
