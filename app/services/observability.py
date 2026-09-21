@@ -31,12 +31,42 @@ REDIS_CONNECTED = Gauge("rich_redis_connected", "Whether Redis is connected (1/0
 
 
 _SECRET_RE = re.compile(r"\b\d{6,12}:[A-Za-z0-9_-]{20,}\b")
-_ID_RE = re.compile(r"\b(user_id|chat_id|message_id)=(-?\d+)\b")
+_ID_RE = re.compile(r"\b(user_id|chat_id|message_id|bot_id|owner_id)=(-?\d+)\b")
 
 
 def _redact(message: str) -> str:
     message = _SECRET_RE.sub("<redacted-token>", message)
     return _ID_RE.sub(lambda match: f"{match.group(1)}=<redacted>", message)
+
+
+def _scrub_sentry_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return _redact(value)
+    if isinstance(value, list):
+        return [_scrub_sentry_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_scrub_sentry_value(item) for item in value)
+    if isinstance(value, dict):
+        result: dict[Any, Any] = {}
+        for key, item in value.items():
+            if str(key).casefold() in {
+                "token",
+                "bot_token",
+                "authorization",
+                "password",
+                "database_url",
+                "redis_url",
+            }:
+                result[key] = "<redacted>"
+            else:
+                result[key] = _scrub_sentry_value(item)
+        return result
+    return value
+
+
+def _sentry_before_send(event: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any]:
+    scrubbed = _scrub_sentry_value(event)
+    return scrubbed if isinstance(scrubbed, dict) else event
 
 
 class JsonFormatter(logging.Formatter):
@@ -70,6 +100,7 @@ def configure_observability(log_level: str) -> None:
             sentry_sdk.init(
                 dsn=dsn,
                 send_default_pii=False,
+                before_send=_sentry_before_send,
                 traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
                 environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
             )
@@ -98,6 +129,7 @@ __all__ = [
     "PUBLISH",
     "REDIS_CONNECTED",
     "REQUEST_DURATION",
+    "_sentry_before_send",
     "configure_observability",
     "memory_rss_bytes",
     "prometheus_payload",
