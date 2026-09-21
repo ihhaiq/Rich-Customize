@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+
+import orjson
 from datetime import datetime, timezone
 
 from aiogram import Bot, F, Router
@@ -22,6 +24,7 @@ from app.services.data_import import (
 from app.services.media_library import showcase_media_library
 from app.services.media_safety import safe_telegram_download
 from app.services.page_registry import page_registry
+from app.services.runtime_redis import runtime_redis
 from app.services.showcase_channel import showcase_channel_store
 from app.services.usage_stats import usage_stats
 from app.storage import state_database
@@ -64,6 +67,11 @@ def _developer_panel_rich_message(
                 {
                     "text": "بيانات / إحصائيات",
                     "callback_data": "dev:stats",
+                    "style": "primary",
+                },
+                {
+                    "text": "إنشاء Snapshot الآن",
+                    "callback_data": "dev:snapshot",
                     "style": "primary",
                 },
             ],
@@ -319,6 +327,45 @@ def _user_label(user: dict[str, object]) -> str:
     return name or str(user.get("user_id") or "—")
 
 
+async def _cached_statistics_payload(now: int) -> dict[str, object]:
+    cached = await runtime_redis.cache_get("developer:stats:summary")
+    if cached:
+        try:
+            value = orjson.loads(cached)
+            if isinstance(value, dict):
+                return value
+        except orjson.JSONDecodeError:
+            pass
+
+    snapshot = await usage_stats.snapshot(now=now)
+    operational = await usage_stats.operational_snapshot(now=now)
+    page_stats = await page_registry.statistics()
+    runtime = await state_database.runtime_statistics(now - (2 * 60 * 60))
+    database_status = state_database.status()
+    redis_status = runtime_redis.status()
+    value: dict[str, object] = {
+        "snapshot": snapshot,
+        "operational": operational,
+        "page_stats": page_stats,
+        "runtime": runtime,
+        "database": {
+            "connected": database_status.connected,
+            "latency_ms": database_status.latency_ms,
+            "circuit_open": database_status.circuit_open,
+        },
+        "redis": {
+            "configured": redis_status.configured,
+            "connected": redis_status.connected,
+        },
+    }
+    await runtime_redis.cache_set(
+        "developer:stats:summary",
+        orjson.dumps(value).decode("utf-8"),
+        ttl_seconds=15,
+    )
+    return value
+
+
 @router.callback_query(F.data == "dev:stats")
 async def show_usage_statistics(callback: CallbackQuery) -> None:
     if not _is_developer(callback.from_user.id):
@@ -329,11 +376,19 @@ async def show_usage_statistics(callback: CallbackQuery) -> None:
         return
 
     now = int(datetime.now(tz=timezone.utc).timestamp())
-    snapshot = await usage_stats.snapshot(now=now)
-    operational = await usage_stats.operational_snapshot(now=now)
-    page_stats = await page_registry.statistics()
-    runtime = await state_database.runtime_statistics(now - (2 * 60 * 60))
-    database_status = state_database.status()
+    payload = await _cached_statistics_payload(now)
+    snapshot = payload.get("snapshot")
+    operational = payload.get("operational")
+    page_stats = payload.get("page_stats")
+    runtime = payload.get("runtime")
+    database_status = payload.get("database")
+    redis_status = payload.get("redis")
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    operational = operational if isinstance(operational, dict) else {}
+    page_stats = page_stats if isinstance(page_stats, dict) else {}
+    runtime = runtime if isinstance(runtime, dict) else {}
+    database_status = database_status if isinstance(database_status, dict) else {}
+    redis_status = redis_status if isinstance(redis_status, dict) else {}
 
     tracked_users = int(snapshot.get("tracked_users") or 0)
     events = int(snapshot.get("events") or 0)
@@ -388,8 +443,10 @@ async def show_usage_statistics(callback: CallbackQuery) -> None:
         f"Publish: ✅ {int(operations.get('publish_success') or 0):,} | ❌ {int(operations.get('publish_failed') or 0):,}\n"
         f"Rate-limit events: {int(operations.get('rate_limited') or 0):,}\n\n"
         "🗄 قاعدة البيانات\n"
-        f"الحالة: {'PostgreSQL' if database_status.connected else 'JSON fallback'}\n"
-        f"DB latency: {database_status.latency_ms or 0}ms\n"
+        f"الحالة: {'PostgreSQL' if database_status.get('connected') else 'JSON fallback'}\n"
+        f"DB latency: {database_status.get('latency_ms') or 0}ms\n"
+        f"Circuit breaker: {'OPEN' if database_status.get('circuit_open') else 'closed'}\n"
+        f"Redis: {'connected' if redis_status.get('connected') else ('configured/offline' if redis_status.get('configured') else 'not configured')}\n"
         f"حجم قاعدة البيانات: {_format_bytes(runtime.get('database_bytes'))}\n"
         f"حجم جدول الصفحات: {_format_bytes(runtime.get('pages_table_bytes'))}\n"
         f"FSM sessions: {int(runtime.get('fsm_sessions') or 0):,}\n"
@@ -432,9 +489,9 @@ async def show_user_statistics(callback: CallbackQuery) -> None:
     if page != requested_page:
         users, total = await usage_stats.users_page(page, page_size=10, sort_mode="recent")
 
-    page_counts = await asyncio.gather(
-        *(page_registry.count_for_user(int(user["user_id"])) for user in users)
-    )
+    user_ids = [int(user["user_id"]) for user in users]
+    counts = await page_registry.counts_for_users(user_ids)
+    page_counts = [counts.get(user_id, 0) for user_id in user_ids]
     lines = [
         "👥 إحصائيات المستخدمين",
         f"المستخدمون: {total:,}",
@@ -479,6 +536,32 @@ async def show_user_statistics(callback: CallbackQuery) -> None:
         callback.message,
         "\n".join(lines),
         extra_buttons=buttons,
+    )
+
+
+@router.callback_query(F.data == "dev:snapshot")
+async def create_page_snapshot(callback: CallbackQuery) -> None:
+    if not _is_developer(callback.from_user.id):
+        await callback.answer("هذا الخيار للمطوّر فقط.", show_alert=True)
+        return
+    if not isinstance(callback.message, Message):
+        await callback.answer()
+        return
+    await callback.answer("جاري إنشاء النسخة…")
+    async with runtime_redis.distributed_lock(
+        "maintenance:page-snapshot",
+        timeout=600,
+    ) as acquired:
+        if not acquired:
+            await callback.message.answer("توجد عملية Snapshot قيد التنفيذ.")
+            return
+        await page_registry.export_snapshot()
+        drill = await page_registry.restore_drill()
+    await _send_developer_panel(
+        callback.message,
+        "✅ تم إنشاء Snapshot للصفحات.\n"
+        f"الصفحات: {int(drill.get('pages') or 0):,}\n"
+        f"اختبار الاستعادة: {'ناجح' if drill.get('ok') else 'يحتاج مراجعة'}",
     )
 
 
