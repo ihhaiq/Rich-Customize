@@ -699,6 +699,95 @@ class PostgresStateDatabase:
             await self._disconnect(error)
             return False, 0
 
+    async def save_page_row_limited(
+        self,
+        page_id: str,
+        owner_id: int,
+        title: str,
+        blocks: list[dict[str, Any]],
+        buttons: list[dict[str, Any]],
+        buttons_per_row: int,
+        buttons_align: str,
+        created_at: int,
+        updated_at: int,
+        *,
+        max_pages: int | None,
+    ) -> tuple[bool, str]:
+        """Atomically enforce per-owner limits and save one page.
+
+        Returns (database_available, status), where status is one of
+        saved / limit / conflict / unavailable.
+        """
+        pool = self._pool
+        if pool is None:
+            return False, "unavailable"
+        try:
+            async with pool.acquire() as connection:
+                async with connection.transaction():
+                    # Serialize create/delete/restore decisions for one owner across
+                    # processes so two concurrent creates cannot both pass the limit.
+                    await connection.execute(
+                        "SELECT pg_advisory_xact_lock($1)",
+                        owner_id,
+                    )
+                    existing = await connection.fetchrow(
+                        """
+                        SELECT owner_id, created_at
+                        FROM rich_pages
+                        WHERE page_id = $1
+                        FOR UPDATE
+                        """,
+                        page_id,
+                    )
+                    if existing is not None and int(existing["owner_id"]) != owner_id:
+                        return True, "conflict"
+                    if existing is None and max_pages is not None:
+                        owned_count = int(
+                            await connection.fetchval(
+                                "SELECT COUNT(*) FROM rich_pages WHERE owner_id = $1",
+                                owner_id,
+                            )
+                            or 0
+                        )
+                        if owned_count >= max_pages:
+                            return True, "limit"
+
+                    effective_created_at = (
+                        int(existing["created_at"]) if existing is not None else created_at
+                    )
+                    result = await connection.execute(
+                        """
+                        INSERT INTO rich_pages (
+                            page_id, owner_id, title, blocks, buttons,
+                            buttons_per_row, buttons_align, created_at, updated_at
+                        )
+                        VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)
+                        ON CONFLICT (page_id) DO UPDATE
+                        SET title = EXCLUDED.title,
+                            blocks = EXCLUDED.blocks,
+                            buttons = EXCLUDED.buttons,
+                            buttons_per_row = EXCLUDED.buttons_per_row,
+                            buttons_align = EXCLUDED.buttons_align,
+                            updated_at = EXCLUDED.updated_at
+                        WHERE rich_pages.owner_id = EXCLUDED.owner_id
+                        """,
+                        page_id,
+                        owner_id,
+                        title,
+                        _encode_json(blocks),
+                        _encode_json(buttons),
+                        buttons_per_row,
+                        buttons_align,
+                        effective_created_at,
+                        updated_at,
+                    )
+                    if not result.endswith(" 1"):
+                        return True, "conflict"
+            return True, "saved"
+        except Exception as error:
+            await self._disconnect(error)
+            return False, "unavailable"
+
     async def save_page_row(
         self,
         page_id: str,
@@ -711,40 +800,130 @@ class PostgresStateDatabase:
         created_at: int,
         updated_at: int,
     ) -> bool:
-        pool = self._pool
-        if pool is None:
-            return False
-        try:
-            await pool.execute(
-                """
-                INSERT INTO rich_pages (
-                    page_id, owner_id, title, blocks, buttons,
-                    buttons_per_row, buttons_align, created_at, updated_at
-                )
-                VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)
-                ON CONFLICT (page_id) DO UPDATE
-                SET owner_id = EXCLUDED.owner_id,
-                    title = EXCLUDED.title,
-                    blocks = EXCLUDED.blocks,
-                    buttons = EXCLUDED.buttons,
-                    buttons_per_row = EXCLUDED.buttons_per_row,
-                    buttons_align = EXCLUDED.buttons_align,
-                    updated_at = EXCLUDED.updated_at
-                """,
-                page_id,
-                owner_id,
-                title,
-                _encode_json(blocks),
-                _encode_json(buttons),
-                buttons_per_row,
-                buttons_align,
-                created_at,
-                updated_at,
-            )
-            return True
-        except Exception as error:
-            await self._disconnect(error)
-            return False
+        available, status = await self.save_page_row_limited(
+            page_id,
+            owner_id,
+            title,
+            blocks,
+            buttons,
+            buttons_per_row,
+            buttons_align,
+            created_at,
+            updated_at,
+            max_pages=None,
+        )
+        return available and status == "saved"
+
+    @staticmethod
+    def _page_query_sql(query: bool, sort_mode: str, paged: bool) -> str:
+        mode = sort_mode if sort_mode in {"title", "oldest", "newest", "updated"} else "updated"
+        statements = {
+            (False, "title", False): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages WHERE owner_id = $1
+                ORDER BY lower(title) ASC, page_id ASC
+            """,
+            (False, "oldest", False): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages WHERE owner_id = $1
+                ORDER BY created_at ASC, page_id ASC
+            """,
+            (False, "newest", False): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages WHERE owner_id = $1
+                ORDER BY created_at DESC, page_id ASC
+            """,
+            (False, "updated", False): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages WHERE owner_id = $1
+                ORDER BY updated_at DESC, page_id ASC
+            """,
+            (True, "title", False): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages
+                WHERE owner_id = $1 AND (title ILIKE $2 OR page_id ILIKE $2)
+                ORDER BY lower(title) ASC, page_id ASC
+            """,
+            (True, "oldest", False): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages
+                WHERE owner_id = $1 AND (title ILIKE $2 OR page_id ILIKE $2)
+                ORDER BY created_at ASC, page_id ASC
+            """,
+            (True, "newest", False): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages
+                WHERE owner_id = $1 AND (title ILIKE $2 OR page_id ILIKE $2)
+                ORDER BY created_at DESC, page_id ASC
+            """,
+            (True, "updated", False): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages
+                WHERE owner_id = $1 AND (title ILIKE $2 OR page_id ILIKE $2)
+                ORDER BY updated_at DESC, page_id ASC
+            """,
+            (False, "title", True): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages WHERE owner_id = $1
+                ORDER BY lower(title) ASC, page_id ASC LIMIT $2 OFFSET $3
+            """,
+            (False, "oldest", True): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages WHERE owner_id = $1
+                ORDER BY created_at ASC, page_id ASC LIMIT $2 OFFSET $3
+            """,
+            (False, "newest", True): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages WHERE owner_id = $1
+                ORDER BY created_at DESC, page_id ASC LIMIT $2 OFFSET $3
+            """,
+            (False, "updated", True): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages WHERE owner_id = $1
+                ORDER BY updated_at DESC, page_id ASC LIMIT $2 OFFSET $3
+            """,
+            (True, "title", True): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages
+                WHERE owner_id = $1 AND (title ILIKE $2 OR page_id ILIKE $2)
+                ORDER BY lower(title) ASC, page_id ASC LIMIT $3 OFFSET $4
+            """,
+            (True, "oldest", True): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages
+                WHERE owner_id = $1 AND (title ILIKE $2 OR page_id ILIKE $2)
+                ORDER BY created_at ASC, page_id ASC LIMIT $3 OFFSET $4
+            """,
+            (True, "newest", True): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages
+                WHERE owner_id = $1 AND (title ILIKE $2 OR page_id ILIKE $2)
+                ORDER BY created_at DESC, page_id ASC LIMIT $3 OFFSET $4
+            """,
+            (True, "updated", True): """
+                SELECT page_id, owner_id, title, blocks, buttons,
+                       buttons_per_row, buttons_align, created_at, updated_at
+                FROM rich_pages
+                WHERE owner_id = $1 AND (title ILIKE $2 OR page_id ILIKE $2)
+                ORDER BY updated_at DESC, page_id ASC LIMIT $3 OFFSET $4
+            """,
+        }
+        return statements[(query, mode, paged)]
 
     async def query_pages_for_user(
         self,
@@ -752,47 +931,99 @@ class PostgresStateDatabase:
         *,
         query: str = "",
         sort_mode: str = "updated",
-    ) -> tuple[bool, list[dict[str, Any]], int]:
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[bool, list[dict[str, Any]], int, int]:
         pool = self._pool
         if pool is None:
-            return False, [], 0
+            return False, [], 0, 0
         try:
-            total = int(await pool.fetchval(
-                "SELECT COUNT(*) FROM rich_pages WHERE owner_id = $1",
-                owner_id,
-            ) or 0)
-            conditions = ["owner_id = $1"]
-            args: list[Any] = [owner_id]
-            if query.strip():
-                args.append(f"%{query.strip()}%")
-                position = len(args)
-                conditions.append(
-                    f"(title ILIKE ${position} OR page_id ILIKE ${position})"
+            normalized = query.strip()
+            if normalized:
+                pattern = f"%{normalized}%"
+                total = int(
+                    await pool.fetchval(
+                        """
+                        SELECT COUNT(*) FROM rich_pages
+                        WHERE owner_id = $1 AND (title ILIKE $2 OR page_id ILIKE $2)
+                        """,
+                        owner_id,
+                        pattern,
+                    )
+                    or 0
                 )
-            order = {
-                "title": "lower(title) ASC, page_id ASC",
-                "oldest": "created_at ASC, page_id ASC",
-                "newest": "created_at DESC, page_id ASC",
-                "updated": "updated_at DESC, page_id ASC",
-            }.get(sort_mode, "updated_at DESC, page_id ASC")
-            rows = await pool.fetch(
-                f"""
-                SELECT page_id, owner_id, title, blocks, buttons,
-                       buttons_per_row, buttons_align, created_at, updated_at
-                FROM rich_pages
-                WHERE {' AND '.join(conditions)}
-                ORDER BY {order}
-                """,
-                *args,
+            else:
+                total = int(
+                    await pool.fetchval(
+                        "SELECT COUNT(*) FROM rich_pages WHERE owner_id = $1",
+                        owner_id,
+                    )
+                    or 0
+                )
+            owned_total = int(
+                await pool.fetchval(
+                    "SELECT COUNT(*) FROM rich_pages WHERE owner_id = $1",
+                    owner_id,
+                )
+                or 0
             )
+            paged = limit is not None
+            sql = self._page_query_sql(bool(normalized), sort_mode, paged)
+            if normalized and paged:
+                rows = await pool.fetch(
+                    sql,
+                    owner_id,
+                    pattern,
+                    max(1, int(limit or 1)),
+                    max(0, int(offset)),
+                )
+            elif normalized:
+                rows = await pool.fetch(sql, owner_id, pattern)
+            elif paged:
+                rows = await pool.fetch(
+                    sql,
+                    owner_id,
+                    max(1, int(limit or 1)),
+                    max(0, int(offset)),
+                )
+            else:
+                rows = await pool.fetch(sql, owner_id)
             pages = [
                 {"page_id": str(row["page_id"]), **self._page_record(row)}
                 for row in rows
             ]
-            return True, pages, total
+            return True, pages, total, owned_total
         except Exception as error:
             await self._disconnect(error)
-            return False, [], 0
+            return False, [], 0, 0
+
+    async def count_pages_for_users(
+        self,
+        owner_ids: list[int],
+    ) -> tuple[bool, dict[int, int]]:
+        pool = self._pool
+        if pool is None:
+            return False, {}
+        unique = sorted(set(int(owner_id) for owner_id in owner_ids))
+        if not unique:
+            return True, {}
+        try:
+            rows = await pool.fetch(
+                """
+                SELECT owner_id, COUNT(*) AS page_count
+                FROM rich_pages
+                WHERE owner_id = ANY($1::bigint[])
+                GROUP BY owner_id
+                """,
+                unique,
+            )
+            return True, {
+                int(row["owner_id"]): int(row["page_count"] or 0)
+                for row in rows
+            }
+        except Exception as error:
+            await self._disconnect(error)
+            return False, {}
 
     async def delete_page_row(self, page_id: str, owner_id: int) -> tuple[bool, bool]:
         pool = self._pool
