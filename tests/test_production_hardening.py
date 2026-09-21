@@ -24,7 +24,7 @@ from app.services.media_safety import (
     safe_telegram_download,
     validate_slideshow_message,
 )
-from app.services.observability import JsonFormatter
+from app.services.observability import JsonFormatter, _sentry_before_send
 from app.services.request_guard import (
     IdempotencyMiddleware,
     _scope,
@@ -344,6 +344,22 @@ class ProductionHardeningTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("123456", value["message"])
         self.assertNotIn("987654", value["message"])
         self.assertNotIn("abcdefghijklmnopqrstuvwxyzABCDE", value["message"])
+
+    def test_sentry_payload_scrubs_secret_fields_and_ids(self):
+        event = {
+            "message": "owner_id=998877 bot_id=123456",
+            "extra": {
+                "BOT_TOKEN": "secret",
+                "DATABASE_URL": "postgresql://secret",
+                "nested": "chat_id=-100123456",
+            },
+        }
+        scrubbed = _sentry_before_send(event, {})
+        self.assertNotIn("998877", scrubbed["message"])
+        self.assertNotIn("123456", scrubbed["message"])
+        self.assertEqual(scrubbed["extra"]["BOT_TOKEN"], "<redacted>")
+        self.assertEqual(scrubbed["extra"]["DATABASE_URL"], "<redacted>")
+        self.assertNotIn("100123456", scrubbed["extra"]["nested"])
 
     def test_every_developer_handler_has_explicit_authorization_check(self):
         source = inspect.getsource(developer)
