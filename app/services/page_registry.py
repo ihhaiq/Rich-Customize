@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import developer_ids
-from app.editor.limits import MAX_SAVED_PAGES, validate_editor_limits
+from app.editor.limits import EditorLimitError, MAX_SAVED_PAGES, validate_editor_limits
 from app.services.media import media_store
 from app.storage import HybridJSONRepository
 
@@ -173,7 +173,10 @@ class PageRegistry:
             page["owner_id"] = owner_id
             page["title"] = str(page.get("title") or "صفحة بلا اسم").strip()[:64]
             page["blocks"] = copy.deepcopy(page.get("blocks") or [])
-            validate_editor_limits(page["blocks"])
+            try:
+                validate_editor_limits(page["blocks"])
+            except EditorLimitError:
+                return False
             page["buttons"] = copy.deepcopy(page.get("buttons") or [])
             page["buttons_per_row"] = int(page.get("buttons_per_row", 1))
             page["buttons_align"] = str(page.get("buttons_align", "center"))
