@@ -15,12 +15,14 @@ from app.routers.miniapp import router as miniapp_router
 from app.routers.pages import router as pages_router
 from app.routers.page_navigation_router import open_page_link, restore_original_message
 from app.routers.publishing import router as publishing_router
+from app.routers.slideshow import router as slideshow_router
 
 router = Router(name="rich_editor")
 router.include_router(developer_router)
 router.include_router(miniapp_router)
 router.include_router(block_preview_router)
 router.include_router(media_events_router)
+router.include_router(slideshow_router)
 router.include_router(details_router)
 router.include_router(history_router)
 # Native Math gets first chance to consume ready Rich Messages.

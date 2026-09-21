@@ -31,6 +31,7 @@ from app.routers.block_input_support import (
 from app.routers.block_support import finish_add
 from app.routers.button_target_picker import defer_text_for_user_buttons
 from app.routers.editor_ui import delete_add_step_messages, edit_ui, send_add_prompt
+from app.routers.slideshow import SLIDESHOW_LIMIT, receive_slideshow, start_slideshow
 
 
 router = Router(name="block_add")
@@ -142,7 +143,7 @@ async def choose_add_block(
         "blockquote": tr("أرسل نص الاقتباس، أو أرسل وسائط/ملفًا لوضعه داخل الاقتباس"),
         "pullquote": tr("أرسل نص الاقتباس البارز، أو أرسل وسائط/ملفًا لإرفاقه به"),
         "collage": tr("أرسل صور/فيديو أو Album للكولاج"),
-        "slideshow": tr("أرسل صور/فيديو أو Album لعرض الشرائح"),
+        "slideshow": t("slideshow.send_more", limit=SLIDESHOW_LIMIT),
         "map": tr("أرسل موقعًا من مرفقات Telegram"),
         "animation": tr("أرسل GIF أو Animation"),
         "audio": t("send_audio"),
@@ -161,6 +162,8 @@ async def choose_add_block(
         add_step=step,
         add_payload={},
     )
+    if block_type == "slideshow":
+        await start_slideshow(state)
     if isinstance(callback.message, Message):
         await send_add_prompt(callback.message, state, prompts[block_type])
     await callback.answer()
@@ -349,7 +352,11 @@ async def receive_added_block(
         )
         return
 
-    if block_type in {"collage", "slideshow"}:
+    if block_type == "slideshow":
+        await receive_slideshow(message, state, bot)
+        return
+
+    if block_type == "collage":
         if message.media_group_id:
             collected = await albums.collect(message)
             if collected is None:

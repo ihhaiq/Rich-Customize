@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.lang.catalogs.slideshow import SLIDESHOW_CATALOGS
+
 # Phase-two semantic UI catalog.
 #
 # New interface text must be added here (or a future domain-specific catalog)
@@ -411,3 +413,9 @@ for language, button_input_texts in _BUTTON_INPUT_TRANSLATIONS.items():
         button_input_texts,
         strict=True,
     ))
+
+CATALOG_EN.update(SLIDESHOW_CATALOGS["en"])
+CATALOG_AR.update(SLIDESHOW_CATALOGS["ar"])
+for language, slideshow_catalog in SLIDESHOW_CATALOGS.items():
+    if language not in {"en", "ar"}:
+        CATALOG_TRANSLATIONS[language].update(slideshow_catalog)

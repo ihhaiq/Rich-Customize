@@ -43,7 +43,7 @@ class SemanticCatalogTests(unittest.TestCase):
                 self.assertEqual(_fields(translations[key]), expected, f"{language}:{key}")
 
     def test_t_renders_every_catalog_key_for_every_locale(self):
-        values = {"label": "LABEL", "reason": "REASON"}
+        values = {"label": "LABEL", "reason": "REASON", "count": 10, "limit": 50}
         for language in SUPPORTED_LANGUAGES:
             token = i18n_core._language.set(language)
             try:
