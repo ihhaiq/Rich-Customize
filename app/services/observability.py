@@ -11,7 +11,7 @@ from typing import Any
 
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
-from app.services.request_guard import correlation_id
+from app.services.context import correlation_id
 
 
 REQUEST_DURATION = Histogram(
