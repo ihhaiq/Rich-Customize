@@ -12,6 +12,7 @@ from app.services.chat_registry import managed_chat_registry
 from app.services.page_registry import PageLimitError, page_registry
 from app.services.popup_registry import popup_registry
 from app.services.renderer import RichMessageRenderError, send_rich_message_post
+from app.services.usage_stats import usage_stats
 from app.webapp.auth import miniapp_user
 from app.webapp.constants import BETA_VERSION, MAX_PAGE_BLOCKS
 
@@ -252,7 +253,9 @@ async def api_send_page(request: web.Request) -> web.Response:
             source_page_id=page_id,
         )
     except RichMessageRenderError as error:
+        await usage_stats.record_operation("publish", success=False)
         raise web.HTTPBadRequest(text=str(error))
+    await usage_stats.record_operation("publish", success=True)
 
     return web.json_response({
         "ok": True,
