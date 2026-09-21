@@ -1285,13 +1285,15 @@ class HybridJSONRepository:
         default_factory: Callable[[], Any] = dict,
         *,
         database: PostgresStateDatabase | None = None,
+        register: bool = True,
     ) -> None:
         self.namespace = namespace
         self.path = path
         self.default_factory = default_factory
         self.database = database or state_database
         self._local_fingerprint: str | None = None
-        self.database.register(self)
+        if register:
+            self.database.register(self)
 
     @staticmethod
     def _fingerprint(payload: Any) -> str:
@@ -1477,7 +1479,10 @@ class HybridFSMStorage(BaseStorage):
         return len(expired)
 
     async def close(self) -> None:
-        await self.fallback.close()
+        try:
+            await self._flush_dirty()
+        finally:
+            await self.fallback.close()
 
 
 state_database = PostgresStateDatabase()
