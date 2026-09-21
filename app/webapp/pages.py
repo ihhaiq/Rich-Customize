@@ -9,7 +9,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from app.editor.limits import EditorLimitError, validate_editor_limits
 from app.services.buttons import MAX_BUTTONS
 from app.services.chat_registry import managed_chat_registry
-from app.services.page_registry import page_registry
+from app.services.page_registry import PageLimitError, page_registry
 from app.services.popup_registry import popup_registry
 from app.services.renderer import RichMessageRenderError, send_rich_message_post
 from app.webapp.auth import miniapp_user
@@ -149,14 +149,17 @@ async def api_create_page(request: web.Request) -> web.Response:
     payload = await _json_payload(request)
     blocks, buttons, buttons_per_row, buttons_align = page_content(payload)
     title = str(payload.get("title") or "Untitled")[:64]
-    code = await page_registry.save(
-        int(user["id"]),
-        title,
-        blocks,
-        buttons,
-        buttons_per_row,
-        buttons_align,
-    )
+    try:
+        code = await page_registry.save(
+            int(user["id"]),
+            title,
+            blocks,
+            buttons,
+            buttons_per_row,
+            buttons_align,
+        )
+    except PageLimitError as error:
+        raise web.HTTPConflict(text=f"saved page limit reached: {error.limit}") from error
     return web.json_response({
         "ok": True,
         "beta": BETA_VERSION,
