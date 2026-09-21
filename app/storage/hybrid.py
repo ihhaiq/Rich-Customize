@@ -1335,13 +1335,10 @@ class HybridJSONRepository:
         if not self.path.exists():
             return self.default_factory()
         try:
-            payload = json.loads(
-                self.path.read_text(encoding="utf-8"),
-                object_hook=_json_object_hook,
-            )
+            payload = _restore_json(orjson.loads(self.path.read_bytes()))
             self._local_fingerprint = self._fingerprint(payload)
             return payload
-        except (OSError, json.JSONDecodeError):
+        except (OSError, orjson.JSONDecodeError):
             return self.default_factory()
 
     def write_local_sync(self, payload: Any) -> None:
@@ -1350,9 +1347,12 @@ class HybridJSONRepository:
             f".{self.path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
         )
         try:
-            temporary.write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default),
-                encoding="utf-8",
+            temporary.write_bytes(
+                orjson.dumps(
+                    payload,
+                    default=_json_default,
+                    option=orjson.OPT_INDENT_2,
+                )
             )
             temporary.replace(self.path)
             self._local_fingerprint = self._fingerprint(payload)
