@@ -66,6 +66,18 @@ class EditorResourceLimitTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, "blocks")
 
+    def test_slideshow_media_keep_their_own_50_item_limit(self) -> None:
+        slideshow = {
+            "type": "slideshow",
+            "data": {
+                "children": [
+                    {"type": "photo", "data": {"file": {"file_id": str(index)}}}
+                    for index in range(50)
+                ],
+            },
+        }
+        validate_editor_limits([slideshow])
+
     def test_visible_character_limit_is_25000(self) -> None:
         validate_editor_limits([paragraph("x" * 25_000)])
 
