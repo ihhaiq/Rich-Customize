@@ -15,6 +15,7 @@ import {
 import { handleDeveloperPendingMessage, openDeveloperPanel } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
+import { handleEditorCoreMessage } from 'lib/editor-core';
 import { loadEditorSession } from 'lib/editor-session';
 
 function commandName(text) {
@@ -47,13 +48,13 @@ export default async function (message) {
 
     if (!matchesCommand(command, 'start')) {
       if (await handleEditorBlockMessage(message)) return;
+      if (await handleEditorCoreMessage(message)) return;
 
       const session = message?.from?.id
         ? await loadEditorSession(message.from.id)
         : null;
       if (
         session?.state === 'managing'
-        && !message?.rich_message
       ) {
         await api.sendMessage({
           chat_id: message.chat.id,
