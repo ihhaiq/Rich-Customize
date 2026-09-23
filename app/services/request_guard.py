@@ -111,13 +111,15 @@ class IdempotencyMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         token = correlation_id.set(f"u{event.update_id}")
+        key = f"telegram-update:{event.update_id}"
         try:
-            if not await runtime_redis.claim_once(
-                f"telegram-update:{event.update_id}",
-                ttl_seconds=900,
-            ):
+            if not await runtime_redis.claim_once(key, ttl_seconds=900):
                 return None
-            return await handler(event, data)
+            try:
+                return await handler(event, data)
+            except BaseException:
+                await runtime_redis.release_once(key)
+                raise
         finally:
             correlation_id.reset(token)
 

@@ -172,6 +172,16 @@ class RuntimeRedis:
             }
         return True
 
+    async def release_once(self, key: str) -> None:
+        self._memory_seen.pop(key, None)
+        client = self.client
+        if client is None:
+            return
+        try:
+            await client.delete(f"rich:once:{key}")
+        except Exception as error:
+            await self._drop_client(error)
+
     async def cache_get(self, key: str) -> str | None:
         client = self.client
         if client is None:
