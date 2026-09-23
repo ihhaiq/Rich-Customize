@@ -7,10 +7,15 @@ import {
   buildWelcomeKeyboard,
   buildWelcomeRichMessage,
 } from 'lib/welcome';
-import { openEditor } from 'lib/editor-home';
+import {
+  buildStartEditorKeyboard,
+  editorClosedHint,
+  openEditor,
+} from 'lib/editor-home';
 import { handleDeveloperPendingMessage, openDeveloperPanel } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
+import { loadEditorSession } from 'lib/editor-session';
 
 function commandName(text) {
   if (typeof text !== 'string') return '';
@@ -42,6 +47,20 @@ export default async function (message) {
 
     if (!matchesCommand(command, 'start')) {
       if (await handleEditorBlockMessage(message)) return;
+
+      const session = message?.from?.id
+        ? await loadEditorSession(message.from.id)
+        : null;
+      if (
+        session?.state === 'managing'
+        && !message?.rich_message
+      ) {
+        await api.sendMessage({
+          chat_id: message.chat.id,
+          text: editorClosedHint(languageCode),
+          reply_markup: buildStartEditorKeyboard(languageCode),
+        });
+      }
       return;
     }
 
