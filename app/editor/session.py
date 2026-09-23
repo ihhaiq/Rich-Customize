@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections import defaultdict
 from typing import Any
 
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
 from app.editor.types import BlockList
@@ -23,11 +25,17 @@ async def load_editor_session(
 ) -> tuple[dict[str, Any], BlockList] | None:
     data = await state.get_data()
     if not isinstance(data.get("blocks"), list):
+        if isinstance(callback.message, Message):
+            try:
+                await callback.message.edit_reply_markup(reply_markup=None)
+            except TelegramBadRequest:
+                pass
         await callback.answer(
             t("expired"),
             show_alert=True,
         )
         return None
+    await state.update_data(editor_last_activity_at=int(time.time()))
     draft = await draft_store.load(state)
     data.update(draft.as_state())
     return data, draft.blocks

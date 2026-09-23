@@ -13,6 +13,7 @@ from app.keyboards import build_post_back_keyboard
 from app.services.chat_registry import managed_chat_registry
 from app.services.publish_ui import build_post_settings_rich_message, edit_publish_ui
 from app.services.renderer import RichMessageRenderError, send_rich_message_post
+from app.services.usage_stats import usage_stats
 
 from app.editor.session import load_editor_session, user_locks
 from app.routers.button_support import prepare_message_buttons
@@ -76,6 +77,19 @@ async def send_post(callback: CallbackQuery, state: FSMContext, bot: Bot) -> Non
                 failed_reasons.append(friendly_rich_error(error))
             else:
                 succeeded.append(title)
+
+        if succeeded:
+            await usage_stats.record_operation(
+                "publish",
+                success=True,
+                count=len(succeeded),
+            )
+        if failed:
+            await usage_stats.record_operation(
+                "publish",
+                success=False,
+                count=len(failed),
+            )
 
         lines = [
             tr("نتيجة الإرسال:"),

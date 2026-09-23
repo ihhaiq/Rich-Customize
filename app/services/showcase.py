@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.errors import AppError
+
 import asyncio
 import secrets
 import time
@@ -30,7 +32,7 @@ MEDIA_LABELS = {
 }
 
 
-class MissingShowcaseMedia(RuntimeError):
+class MissingShowcaseMedia(AppError, RuntimeError):
     def __init__(self, missing: list[str]) -> None:
         self.missing = missing
         super().__init__(", ".join(missing))

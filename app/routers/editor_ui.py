@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from aiogram import Bot
@@ -9,6 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.editor.draft_store import EditorDraft, draft_store
+from app.editor.limits import EditorLimitError, validate_editor_limits
 from app.i18n import t
 from app.keyboards import build_rich_editor_keyboard
 from app.routers.button_guide import answer_with_button_guide
@@ -51,8 +53,19 @@ def editor_dashboard_text(draft: EditorDraft, notice: str | None = None) -> str:
     return "\n".join(lines)
 
 
+def editor_limit_text(error: EditorLimitError) -> str:
+    return t(f"limits.{error.code}", limit=error.limit)
+
+
 def friendly_rich_error(error: Exception) -> str:
     reason = str(error)
+    if reason.startswith("EDITOR_LIMIT:"):
+        try:
+            _, code, raw_actual, raw_limit = reason.split(":", 3)
+            limit_error = EditorLimitError(code, int(raw_limit), int(raw_actual))
+            return editor_limit_text(limit_error)
+        except (TypeError, ValueError):
+            return t("ux.errors.too_long")
     if "BOT_DOMAIN_INVALID" in reason:
         return t("ux.errors.login_domain")
     if "BUTTON_DATA_INVALID" in reason or "BUTTON_DATA" in reason:
@@ -157,6 +170,11 @@ async def open_editor(
     state: FSMContext,
     blocks: list[dict[str, Any]],
 ) -> None:
+    try:
+        validate_editor_limits(blocks)
+    except EditorLimitError as error:
+        await message.answer(editor_limit_text(error))
+        return
     draft = EditorDraft(blocks=blocks, message_buttons=[])
     text = (
         f"{t('editor.empty_hint')}\n\n{t('editor.forward_hint')}"
@@ -174,6 +192,7 @@ async def open_editor(
     await state.set_state(RichEditorStates.managing)
     await draft_store.save(state, draft)
     await state.update_data(
+        editor_last_activity_at=int(time.time()),
         current_block_id=None,
         pages_search_query="",
         pages_sort_mode="updated",
@@ -250,6 +269,7 @@ __all__ = [
     "edit_saved_ui",
     "edit_ui",
     "editor_dashboard_text",
+    "editor_limit_text",
     "editor_overview_text",
     "friendly_rich_error",
     "open_editor",

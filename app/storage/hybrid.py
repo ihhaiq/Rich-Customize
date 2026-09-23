@@ -6,6 +6,8 @@ import copy
 import hashlib
 import json
 import logging
+
+import orjson
 import os
 import secrets
 import time
@@ -17,6 +19,12 @@ from typing import Any
 from aiogram.fsm.state import State
 from aiogram.fsm.storage.base import BaseStorage, StateType, StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
+
+from app.editor.limits import EDITOR_SESSION_TTL_SECONDS
+from app.storage.migrations import run_database_migrations
+from app.storage.fsm_state_repository import FSMStateRepository
+from app.storage.pages_backup import PagesBackup
+from app.storage.pages_repository import PagesRepository
 
 try:
     import asyncpg
@@ -55,14 +63,23 @@ def _json_object_hook(value: dict[str, Any]) -> Any:
     return value
 
 
+def _restore_json(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_restore_json(item) for item in value]
+    if isinstance(value, dict):
+        restored = {str(key): _restore_json(item) for key, item in value.items()}
+        return _json_object_hook(restored)
+    return value
+
+
 def _encode_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=_json_default)
+    return orjson.dumps(value, default=_json_default).decode("utf-8")
 
 
 def _decode_json(value: Any) -> Any:
-    if isinstance(value, str):
-        return json.loads(value, object_hook=_json_object_hook)
-    return copy.deepcopy(value)
+    if isinstance(value, (str, bytes, bytearray)):
+        return _restore_json(orjson.loads(value))
+    return _restore_json(copy.deepcopy(value))
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +91,7 @@ class DatabaseStatus:
     pending_sync: int
     synced_namespaces: int
     last_error: str | None
+    circuit_open: bool
 
 
 class PostgresStateDatabase:
@@ -102,6 +120,21 @@ class PostgresStateDatabase:
         self._last_connect_attempt = 0.0
         self._last_latency_ms: int | None = None
         self._synced_namespaces = 0
+        self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
+        self._migrations_ready = False
+        self._pages_repository = PagesRepository(self)
+        self._pages_backup = PagesBackup(
+            self,
+            encode_json=_encode_json,
+            logger=logger,
+        )
+        self._fsm_state_repository = FSMStateRepository(
+            self,
+            encode_json=_encode_json,
+            decode_json=_decode_json,
+            logger=logger,
+        )
 
     def _url(self) -> str:
         if self._database_url is not None:
@@ -120,6 +153,48 @@ class PostgresStateDatabase:
     def reconnect_interval(self) -> int:
         return _bounded_env_int("DATABASE_RECONNECT_INTERVAL", 30, 10, 3600)
 
+    @property
+    def circuit_failure_threshold(self) -> int:
+        return _bounded_env_int("DATABASE_CIRCUIT_FAILURES", 3, 1, 20)
+
+    @property
+    def circuit_cooldown(self) -> int:
+        return _bounded_env_int("DATABASE_CIRCUIT_COOLDOWN", 30, 5, 600)
+
+    def _pool_sizes(self) -> tuple[int, int]:
+        workers = _bounded_env_int(
+            "WEB_CONCURRENCY",
+            _bounded_env_int("WORKERS", 1, 1, 64),
+            1,
+            64,
+        )
+        total_budget = _bounded_env_int("DATABASE_POOL_TOTAL_BUDGET", 20, 2, 200)
+        configured_max = os.getenv("DATABASE_POOL_MAX_SIZE", "").strip()
+        max_size = (
+            _bounded_env_int("DATABASE_POOL_MAX_SIZE", 5, 1, 50)
+            if configured_max
+            else max(1, min(20, total_budget // workers))
+        )
+        min_size = min(
+            max_size,
+            _bounded_env_int("DATABASE_POOL_MIN_SIZE", 1, 0, 20),
+        )
+        return min_size, max_size
+
+    def _circuit_is_open(self) -> bool:
+        return time.monotonic() < self._circuit_open_until
+
+    def _record_failure(self, error: Exception) -> None:
+        self._consecutive_failures += 1
+        self._last_error = self._safe_error(error)
+        if self._consecutive_failures >= self.circuit_failure_threshold:
+            self._circuit_open_until = time.monotonic() + self.circuit_cooldown
+
+    def _record_success(self) -> None:
+        self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
+        self._last_error = None
+
     def status(self) -> DatabaseStatus:
         configured = self.configured
         connected = self.connected
@@ -131,10 +206,9 @@ class PostgresStateDatabase:
             pending_sync=len(self._dirty_namespaces),
             synced_namespaces=self._synced_namespaces,
             last_error=self._last_error,
+            circuit_open=self._circuit_is_open(),
         )
 
-    def register(self, repository: HybridJSONRepository) -> None:
-        self._repositories[repository.namespace] = repository
 
     def register_reconnect_hook(self, hook: Callable[[], Awaitable[None]]) -> None:
         self._reconnect_hooks.append(hook)
@@ -198,7 +272,7 @@ class PostgresStateDatabase:
                 terminate()
 
     async def _disconnect(self, error: Exception) -> None:
-        self._last_error = self._safe_error(error)
+        self._record_failure(error)
         self._last_latency_ms = None
         pool, self._pool = self._pool, None
         terminate = getattr(pool, "terminate", None)
@@ -211,26 +285,12 @@ class PostgresStateDatabase:
             self._last_error,
         )
 
-    async def _initialize_schema(self, pool: Any) -> None:
-        await pool.execute(
-            """
-            CREATE TABLE IF NOT EXISTS rich_state (
-                namespace TEXT PRIMARY KEY,
-                payload JSONB NOT NULL,
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-        await pool.execute(
-            """
-            CREATE TABLE IF NOT EXISTS rich_fsm (
-                storage_key TEXT PRIMARY KEY,
-                state TEXT,
-                data JSONB NOT NULL DEFAULT '{}'::jsonb,
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
+    async def _verify_schema(self, pool: Any) -> None:
+        required = ("rich_state", "rich_fsm", "rich_migrations", "rich_pages")
+        for table in required:
+            present = await pool.fetchval("SELECT to_regclass($1)", f"public.{table}")
+            if present is None:
+                raise RuntimeError(f"database migration missing table: {table}")
 
     async def _upsert_snapshot(self, namespace: str, payload: Any) -> None:
         assert self._pool is not None
@@ -276,6 +336,8 @@ class PostgresStateDatabase:
 
         async with self._connect_lock:
             now = time.monotonic()
+            if not force and self._circuit_is_open():
+                return self.status()
             if (
                 self._pool is None
                 and not force
@@ -284,18 +346,37 @@ class PostgresStateDatabase:
                 return self.status()
             self._last_connect_attempt = now
             started = time.perf_counter()
+
             if self._pool is not None:
                 try:
                     await self._pool.fetchval("SELECT 1")
                     self._last_latency_ms = max(
                         1, round((time.perf_counter() - started) * 1000)
                     )
-                    self._last_error = None
+                    self._record_success()
                     await self._flush_dirty_repositories()
                     await self._run_reconnect_hooks()
                     return self.status()
                 except Exception as error:
                     await self._disconnect(error)
+
+            custom_factory = self._pool_factory is not None
+            if not self._migrations_ready and not custom_factory:
+                try:
+                    async with asyncio.timeout(
+                        _bounded_env_int("DATABASE_MIGRATION_TIMEOUT", 20, 5, 120)
+                    ):
+                        await asyncio.to_thread(run_database_migrations, self._url())
+                    self._migrations_ready = True
+                except Exception as error:
+                    self._record_failure(error)
+                    logger.warning(
+                        "Database migration failed; continuing with JSON fallback (%s)",
+                        self._last_error,
+                    )
+                    return self.status()
+            elif custom_factory:
+                self._migrations_ready = True
 
             factory = self._pool_factory
             if factory is None:
@@ -304,18 +385,21 @@ class PostgresStateDatabase:
                     return self.status()
                 factory = asyncpg.create_pool
 
+            min_size, max_size = self._pool_sizes()
+            pool = None
             try:
                 pool = await factory(
                     dsn=self._url(),
-                    min_size=1,
-                    max_size=_bounded_env_int("DATABASE_POOL_MAX_SIZE", 5, 1, 20),
+                    min_size=min_size,
+                    max_size=max_size,
                     timeout=_bounded_env_int("DATABASE_CONNECT_TIMEOUT", 5, 1, 30),
                     command_timeout=_bounded_env_int("DATABASE_COMMAND_TIMEOUT", 5, 2, 60),
                 )
-                await self._initialize_schema(pool)
+                if not custom_factory:
+                    await self._verify_schema(pool)
                 await pool.fetchval("SELECT 1")
                 self._pool = pool
-                self._last_error = None
+                self._record_success()
                 self._last_latency_ms = max(
                     1, round((time.perf_counter() - started) * 1000)
                 )
@@ -325,18 +409,19 @@ class PostgresStateDatabase:
                     self._synced_namespaces += 1
                 await self._run_reconnect_hooks()
                 logger.info(
-                    "PostgreSQL connected; synchronized %s state namespaces",
+                    "PostgreSQL connected; pool=%s..%s synchronized=%s",
+                    min_size,
+                    max_size,
                     self._synced_namespaces,
                 )
             except Exception as error:
-                candidate = locals().get("pool")
-                if candidate is self._pool:
+                if pool is self._pool:
                     self._pool = None
-                if candidate is not None:
-                    await self._close_pool(candidate)
+                if pool is not None:
+                    await self._close_pool(pool)
                 self._pool = None
-                self._last_error = self._safe_error(error)
                 self._last_latency_ms = None
+                self._record_failure(error)
                 logger.warning(
                     "PostgreSQL connection failed; using JSON fallback (%s)",
                     self._last_error,
@@ -363,125 +448,51 @@ class PostgresStateDatabase:
     async def maintain_connection(self) -> None:
         while True:
             await asyncio.sleep(self.reconnect_interval)
-            await self.check_and_reconnect(force=True)
+            await self.check_and_reconnect(force=False)
+
+
+
+
+
+
+    def register(self, repository: HybridJSONRepository) -> None:
+        self._fsm_state_repository.register(repository)
 
     async def read_snapshot(self, repository: HybridJSONRepository) -> Any:
-        pool = self._pool
-        if pool is None:
-            return await repository.read_local()
-        try:
-            stored = await pool.fetchval(
-                "SELECT payload FROM rich_state WHERE namespace = $1",
-                repository.namespace,
-            )
-            if stored is None:
-                payload = await repository.read_local()
-                await self._upsert_snapshot(repository.namespace, payload)
-                return payload
-            payload = _decode_json(stored)
-            await repository.refresh_local(payload)
-            return payload
-        except Exception as error:
-            await self._disconnect(error)
-            return await repository.read_local()
+        return await self._fsm_state_repository.read_snapshot(repository)
 
     async def write_snapshot(
         self,
         repository: HybridJSONRepository,
         payload: Any,
     ) -> None:
-        database_saved = False
-        if self._pool is not None:
-            try:
-                await self._upsert_snapshot(repository.namespace, payload)
-                database_saved = True
-                await self._set_dirty(repository.namespace, False)
-            except Exception as error:
-                await self._disconnect(error)
-
-        try:
-            await repository.write_local(payload)
-        except OSError:
-            if not database_saved:
-                raise
-            logger.exception(
-                "PostgreSQL write succeeded but JSON mirror failed for %s",
-                repository.namespace,
-            )
-
-        if self.configured and not database_saved:
-            await self._set_dirty(repository.namespace, True)
+        await self._fsm_state_repository.write_snapshot(repository, payload)
 
     async def mirror_local_snapshot(
         self,
         repository: HybridJSONRepository,
         payload: Any,
     ) -> None:
-        if self._pool is None:
-            if self.configured:
-                await self._set_dirty(repository.namespace, True)
-            return
-        try:
-            await self._upsert_snapshot(repository.namespace, payload)
-            await self._set_dirty(repository.namespace, False)
-        except Exception as error:
-            await self._disconnect(error)
-            await self._set_dirty(repository.namespace, True)
+        await self._fsm_state_repository.mirror_local_snapshot(repository, payload)
 
     def schedule_local_snapshot(
         self,
         repository: HybridJSONRepository,
         payload: Any,
     ) -> None:
-        if not self.configured:
-            return
-        # Mark it before scheduling so a simultaneous manual reconnect cannot
-        # hydrate this file from an older database snapshot.
-        self._dirty_namespaces.add(repository.namespace)
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-        task = loop.create_task(
-            self.mirror_local_snapshot(repository, copy.deepcopy(payload)),
-            name=f"postgres-mirror-{repository.namespace}",
-        )
-        self._background_tasks.add(task)
-        task.add_done_callback(self._background_tasks.discard)
+        self._fsm_state_repository.schedule_local_snapshot(repository, payload)
 
     async def sync_local_paths(self, paths: list[str]) -> None:
-        selected = {str(Path(path).resolve()) for path in paths}
-        for repository in tuple(self._repositories.values()):
-            if str(repository.path.resolve()) not in selected:
-                continue
-            payload = await repository.read_local()
-            if self._pool is None:
-                if self.configured:
-                    await self._set_dirty(repository.namespace, True)
-                continue
-            try:
-                await self._upsert_snapshot(repository.namespace, payload)
-                await self._set_dirty(repository.namespace, False)
-            except Exception as error:
-                await self._disconnect(error)
-                await self._set_dirty(repository.namespace, True)
+        await self._fsm_state_repository.sync_local_paths(paths)
 
-    async def read_fsm(self, storage_key: str) -> tuple[bool, str | None, dict[str, Any]]:
-        pool = self._pool
-        if pool is None:
-            return False, None, {}
-        try:
-            row = await pool.fetchrow(
-                "SELECT state, data FROM rich_fsm WHERE storage_key = $1",
-                storage_key,
-            )
-            if row is None:
-                return True, None, {}
-            data = _decode_json(row["data"])
-            return True, row["state"], data if isinstance(data, dict) else {}
-        except Exception as error:
-            await self._disconnect(error)
-            return False, None, {}
+    async def read_fsm(
+        self,
+        storage_key: str,
+    ) -> tuple[bool, str | None, dict[str, Any]]:
+        return await self._fsm_state_repository.read_fsm(storage_key)
+
+    async def cleanup_expired_editor_fsm(self, cutoff_epoch: int) -> int:
+        return await self._fsm_state_repository.cleanup_expired_editor_fsm(cutoff_epoch)
 
     async def write_fsm(
         self,
@@ -489,46 +500,158 @@ class PostgresStateDatabase:
         state: str | None,
         data: Mapping[str, Any],
     ) -> bool:
+        return await self._fsm_state_repository.write_fsm(storage_key, state, data)
+
+    @staticmethod
+    def _page_record(row: Any) -> dict[str, Any]:
+        return PagesRepository._page_record(row)
+    async def migrate_legacy_pages(self, pages: Mapping[str, Any]) -> int:
+        return await self._pages_backup.migrate_legacy_pages(pages)
+    async def replace_pages_snapshot(self, pages: Mapping[str, Any]) -> bool:
+        return await self._pages_backup.replace_pages_snapshot(pages)
+    async def get_page(self, page_id: str) -> tuple[bool, dict[str, Any] | None]:
+        return await self._pages_repository.get_page(page_id)
+    async def count_pages_for_user(self, owner_id: int) -> tuple[bool, int]:
+        return await self._pages_repository.count_pages_for_user(owner_id)
+    async def save_page_row_limited(
+        self,
+        page_id: str,
+        owner_id: int,
+        title: str,
+        blocks: list[dict[str, Any]],
+        buttons: list[dict[str, Any]],
+        buttons_per_row: int,
+        buttons_align: str,
+        created_at: int,
+        updated_at: int,
+        *,
+        max_pages: int | None,
+    ) -> tuple[bool, str]:
+        return await self._pages_repository.save_page_row_limited(
+            page_id,
+            owner_id,
+            title,
+            blocks,
+            buttons,
+            buttons_per_row,
+            buttons_align,
+            created_at,
+            updated_at,
+            max_pages=max_pages,
+        )
+    async def save_page_row(
+        self,
+        page_id: str,
+        owner_id: int,
+        title: str,
+        blocks: list[dict[str, Any]],
+        buttons: list[dict[str, Any]],
+        buttons_per_row: int,
+        buttons_align: str,
+        created_at: int,
+        updated_at: int,
+    ) -> bool:
+        return await self._pages_repository.save_page_row(
+            page_id,
+            owner_id,
+            title,
+            blocks,
+            buttons,
+            buttons_per_row,
+            buttons_align,
+            created_at,
+            updated_at,
+        )
+    @staticmethod
+    def _page_query_sql(query: bool, sort_mode: str, paged: bool) -> str:
+        return PagesRepository._page_query_sql(query, sort_mode, paged)
+    async def query_pages_for_user(
+        self,
+        owner_id: int,
+        *,
+        query: str = "",
+        sort_mode: str = "updated",
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[bool, list[dict[str, Any]], int, int]:
+        return await self._pages_repository.query_pages_for_user(
+            owner_id,
+            query=query,
+            sort_mode=sort_mode,
+            limit=limit,
+            offset=offset,
+        )
+    async def count_pages_for_users(
+        self,
+        owner_ids: list[int],
+    ) -> tuple[bool, dict[int, int]]:
+        return await self._pages_repository.count_pages_for_users(owner_ids)
+    async def delete_page_row(self, page_id: str, owner_id: int) -> tuple[bool, bool]:
+        return await self._pages_repository.delete_page_row(page_id, owner_id)
+    async def rename_page_row(
+        self,
+        page_id: str,
+        owner_id: int,
+        title: str,
+        updated_at: int,
+    ) -> tuple[bool, bool]:
+        return await self._pages_repository.rename_page_row(
+            page_id,
+            owner_id,
+            title,
+            updated_at,
+        )
+    async def all_pages_snapshot(self) -> tuple[bool, dict[str, dict[str, Any]]]:
+        return await self._pages_backup.all_pages_snapshot()
+    async def page_statistics(self) -> tuple[bool, dict[str, int | None]]:
+        return await self._pages_repository.page_statistics()
+    async def page_usage_history(self) -> tuple[bool, dict[int, dict[str, int]]]:
+        return await self._pages_repository.page_usage_history()
+    async def runtime_statistics(self, active_after: int) -> dict[str, int | None]:
         pool = self._pool
         if pool is None:
-            return False
+            return {
+                "fsm_sessions": 0,
+                "active_editors": 0,
+                "database_bytes": None,
+                "pages_table_bytes": None,
+                "fsm_table_bytes": None,
+            }
         try:
-            encoded_data = _encode_json(dict(data))
-        except TypeError:
-            logger.exception(
-                "FSM data is not JSON-compatible; keeping this session in memory only"
+            row = await pool.fetchrow(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM rich_fsm) AS fsm_sessions,
+                    (
+                        SELECT COUNT(*) FROM rich_fsm
+                        WHERE jsonb_typeof(data -> 'editor_last_activity_at') = 'number'
+                          AND (data ->> 'editor_last_activity_at')::double precision >= $1
+                    ) AS active_editors,
+                    pg_database_size(current_database()) AS database_bytes,
+                    pg_total_relation_size('rich_pages') AS pages_table_bytes,
+                    pg_total_relation_size('rich_fsm') AS fsm_table_bytes
+                """,
+                float(active_after),
             )
-            try:
-                await pool.execute(
-                    "DELETE FROM rich_fsm WHERE storage_key = $1", storage_key
-                )
-                return True
-            except Exception as error:
-                await self._disconnect(error)
-                return False
-        try:
-            if state is None and not data:
-                await pool.execute(
-                    "DELETE FROM rich_fsm WHERE storage_key = $1", storage_key
-                )
-            else:
-                await pool.execute(
-                    """
-                    INSERT INTO rich_fsm (storage_key, state, data, updated_at)
-                    VALUES ($1, $2, $3::jsonb, NOW())
-                    ON CONFLICT (storage_key) DO UPDATE
-                    SET state = EXCLUDED.state,
-                        data = EXCLUDED.data,
-                        updated_at = NOW()
-                    """,
-                    storage_key,
-                    state,
-                    encoded_data,
-                )
-            return True
+            return {
+                "fsm_sessions": int(row["fsm_sessions"] or 0),
+                "active_editors": int(row["active_editors"] or 0),
+                "database_bytes": int(row["database_bytes"] or 0),
+                "pages_table_bytes": int(row["pages_table_bytes"] or 0),
+                "fsm_table_bytes": int(row["fsm_table_bytes"] or 0),
+            }
         except Exception as error:
             await self._disconnect(error)
-            return False
+            return {
+                "fsm_sessions": 0,
+                "active_editors": 0,
+                "database_bytes": None,
+                "pages_table_bytes": None,
+                "fsm_table_bytes": None,
+            }
+
+
+
 
     async def close(self) -> None:
         tasks = tuple(self._background_tasks)
@@ -546,13 +669,15 @@ class HybridJSONRepository:
         default_factory: Callable[[], Any] = dict,
         *,
         database: PostgresStateDatabase | None = None,
+        register: bool = True,
     ) -> None:
         self.namespace = namespace
         self.path = path
         self.default_factory = default_factory
         self.database = database or state_database
         self._local_fingerprint: str | None = None
-        self.database.register(self)
+        if register:
+            self.database.register(self)
 
     @staticmethod
     def _fingerprint(payload: Any) -> str:
@@ -562,13 +687,10 @@ class HybridJSONRepository:
         if not self.path.exists():
             return self.default_factory()
         try:
-            payload = json.loads(
-                self.path.read_text(encoding="utf-8"),
-                object_hook=_json_object_hook,
-            )
+            payload = _restore_json(orjson.loads(self.path.read_bytes()))
             self._local_fingerprint = self._fingerprint(payload)
             return payload
-        except (OSError, json.JSONDecodeError):
+        except (OSError, orjson.JSONDecodeError):
             return self.default_factory()
 
     def write_local_sync(self, payload: Any) -> None:
@@ -577,9 +699,12 @@ class HybridJSONRepository:
             f".{self.path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
         )
         try:
-            temporary.write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default),
-                encoding="utf-8",
+            temporary.write_bytes(
+                orjson.dumps(
+                    payload,
+                    default=_json_default,
+                    option=orjson.OPT_INDENT_2,
+                )
             )
             temporary.replace(self.path)
             self._local_fingerprint = self._fingerprint(payload)
@@ -669,23 +794,85 @@ class HybridFSMStorage(BaseStorage):
         encoded = self._key(key)
         async with self._locks.setdefault(encoded, asyncio.Lock()):
             await self._ensure_loaded(key, encoded)
+            if await self._expire_editor_if_stale(key, encoded):
+                return None
             return await self.fallback.get_state(key)
+
+    async def _expire_editor_if_stale(self, key: StorageKey, encoded: str) -> bool:
+        """Enforce the shared editor TTL with an active timestamp check.
+
+        EditorRedisStorage applies the same EDITOR_SESSION_TTL_SECONDS rule
+        passively through Redis key expiration. Keep both mechanisms tied only
+        to that shared constant when the session duration changes.
+        """
+        data = await self.fallback.get_data(key)
+        raw_activity = data.get("editor_last_activity_at")
+        if raw_activity is None:
+            return False
+        try:
+            last_activity = int(raw_activity)
+        except (TypeError, ValueError):
+            last_activity = 0
+        if (
+            last_activity > 0
+            and int(time.time()) - last_activity < EDITOR_SESSION_TTL_SECONDS
+        ):
+            return False
+        await self.fallback.set_state(key, None)
+        await self.fallback.set_data(key, {})
+        await self._persist(key, encoded)
+        return True
 
     async def set_data(self, key: StorageKey, data: Mapping[str, Any]) -> None:
         encoded = self._key(key)
         async with self._locks.setdefault(encoded, asyncio.Lock()):
             await self._ensure_loaded(key, encoded)
-            await self.fallback.set_data(key, data)
+            payload = dict(data)
+            if "editor_last_activity_at" in payload:
+                payload["editor_last_activity_at"] = int(time.time())
+            await self.fallback.set_data(key, payload)
             await self._persist(key, encoded)
 
     async def get_data(self, key: StorageKey) -> dict[str, Any]:
         encoded = self._key(key)
         async with self._locks.setdefault(encoded, asyncio.Lock()):
             await self._ensure_loaded(key, encoded)
+            if await self._expire_editor_if_stale(key, encoded):
+                return {}
             return await self.fallback.get_data(key)
 
+    async def cleanup_expired_editor_sessions(self) -> int:
+        """Drop stale editor sessions from the in-process MemoryStorage fallback."""
+        storage = getattr(self.fallback, "storage", None)
+        if not isinstance(storage, dict):
+            return 0
+        cutoff = int(time.time()) - EDITOR_SESSION_TTL_SECONDS
+        expired: list[StorageKey] = []
+        for key, record in tuple(storage.items()):
+            data = getattr(record, "data", None)
+            if not isinstance(data, dict):
+                continue
+            raw_activity = data.get("editor_last_activity_at")
+            try:
+                last_activity = int(raw_activity)
+            except (TypeError, ValueError):
+                continue
+            if last_activity < cutoff:
+                expired.append(key)
+
+        for key in expired:
+            storage.pop(key, None)
+            encoded = self._key(key)
+            self._loaded.discard(encoded)
+            self._dirty.pop(encoded, None)
+            self._locks.pop(encoded, None)
+        return len(expired)
+
     async def close(self) -> None:
-        await self.fallback.close()
+        try:
+            await self._flush_dirty()
+        finally:
+            await self.fallback.close()
 
 
 state_database = PostgresStateDatabase()

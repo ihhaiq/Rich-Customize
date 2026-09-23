@@ -157,3 +157,35 @@ PAGE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "Page opened": "เปิดหน้าแล้ว",
     },
 }
+
+
+PAGE_LIMIT_SOURCE = (
+    "You can save at most {limit} pages. "
+    "Delete an old page before saving a new one."
+)
+PAGE_LIMIT_TRANSLATIONS = {
+    "es": "Puedes guardar como máximo {limit} páginas. Elimina una página antigua antes de guardar una nueva.",
+    "fr": "Vous pouvez enregistrer au maximum {limit} pages. Supprimez une ancienne page avant d’en enregistrer une nouvelle.",
+    "de": "Du kannst höchstens {limit} Seiten speichern. Lösche eine alte Seite, bevor du eine neue speicherst.",
+    "it": "Puoi salvare al massimo {limit} pagine. Elimina una vecchia pagina prima di salvarne una nuova.",
+    "pt": "Pode guardar no máximo {limit} páginas. Elimine uma página antiga antes de guardar uma nova.",
+    "nl": "Je kunt maximaal {limit} pagina's opslaan. Verwijder een oude pagina voordat je een nieuwe opslaat.",
+    "pl": "Możesz zapisać maksymalnie {limit} stron. Usuń starą stronę przed zapisaniem nowej.",
+    "uk": "Можна зберегти щонайбільше {limit} сторінок. Видаліть стару сторінку перед збереженням нової.",
+    "ru": "Можно сохранить не более {limit} страниц. Удалите старую страницу перед сохранением новой.",
+    "tr": "En fazla {limit} sayfa kaydedebilirsiniz. Yeni bir sayfa kaydetmeden önce eski bir sayfayı silin.",
+    "fa": "حداکثر می‌توانید {limit} صفحه ذخیره کنید. پیش از ذخیره صفحه جدید، یک صفحه قدیمی را حذف کنید.",
+    "ku": "Heta {limit} rûpel dikarî tomar bikî. Berî tomarkirina rûpelek nû, rûpelek kevn jê bibe.",
+    "ur": "آپ زیادہ سے زیادہ {limit} صفحات محفوظ کر سکتے ہیں۔ نیا صفحہ محفوظ کرنے سے پہلے ایک پرانا صفحہ حذف کریں۔",
+    "hi": "आप अधिकतम {limit} पेज सहेज सकते हैं। नया पेज सहेजने से पहले एक पुराना पेज हटाएँ।",
+    "id": "Anda dapat menyimpan paling banyak {limit} halaman. Hapus halaman lama sebelum menyimpan halaman baru.",
+    "ja": "保存できるページは最大 {limit} 件です。新しいページを保存する前に古いページを削除してください。",
+    "ko": "페이지는 최대 {limit}개까지 저장할 수 있습니다. 새 페이지를 저장하기 전에 기존 페이지를 하나 삭제하세요.",
+    "vi": "Bạn có thể lưu tối đa {limit} trang. Hãy xóa một trang cũ trước khi lưu trang mới.",
+    "th": "คุณบันทึกได้สูงสุด {limit} หน้า โปรดลบหน้าเก่าหนึ่งหน้าก่อนบันทึกหน้าใหม่",
+    "zh-hans": "最多可以保存 {limit} 个页面。保存新页面前请删除一个旧页面。",
+    "zh-hant": "最多可以儲存 {limit} 個頁面。儲存新頁面前請刪除一個舊頁面。",
+}
+
+for language, text in PAGE_LIMIT_TRANSLATIONS.items():
+    PAGE_TRANSLATIONS.setdefault(language, {})[PAGE_LIMIT_SOURCE] = text

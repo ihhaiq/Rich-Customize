@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.errors import AppError
+
 import copy
 import html
 import logging
@@ -15,6 +17,7 @@ from aiogram.types import (
 )
 from pydantic import ValidationError
 
+from app.editor.limits import EditorLimitError, validate_editor_limits
 from app.i18n import preserve_user_content, tr
 from app.keyboards.message_buttons import build_message_buttons_keyboard
 from app.services.buttons import button_rows
@@ -30,7 +33,7 @@ HTML_BLOCKS = {
 }
 
 
-class RichMessageRenderError(RuntimeError):
+class RichMessageRenderError(AppError, RuntimeError):
     """Raised when one rich message can't be built or accepted by Telegram."""
 
 
@@ -561,6 +564,12 @@ def _typed_input_rich_message(
 ) -> InputRichMessage:
     if not blocks:
         raise RichMessageRenderError("The rich message has no blocks")
+    try:
+        validate_editor_limits(blocks)
+    except EditorLimitError as error:
+        raise RichMessageRenderError(
+            f"EDITOR_LIMIT:{error.code}:{error.actual}:{error.limit}"
+        ) from error
     payloads: list[dict[str, Any]] = []
     anchor_navigation = anchor_navigation_rich_text(blocks)
     if anchor_navigation is not None:

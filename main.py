@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import time
 import unicodedata
 from typing import Any
 
@@ -14,22 +16,35 @@ from aiogram.exceptions import (
     TelegramServerError,
     TelegramUnauthorizedError,
 )
+from aiogram.fsm.storage.base import BaseStorage
 from aiogram.utils.token import TokenValidationError
 
 from app.config import Settings
+from app.editor.limits import EDITOR_SESSION_TTL_SECONDS
 from app.i18n import LocaleMiddleware, LocalizedBot, configure_bot_profile
 from app.miniapp import BETA_VERSION, start_mini_app_server
 from app.routers import router
 from app.services.media import cleanup_interval_seconds, media_store
 from app.services.media_library import showcase_media_library
+from app.services.observability import configure_observability
 from app.services.page_registry import page_registry
+from app.services.request_guard import (
+    DeveloperAccessMiddleware,
+    IdempotencyMiddleware,
+    SlidingWindowThrottleMiddleware,
+)
+from app.services.retry import retry_after_delay
+from app.services.runtime_redis import runtime_redis
+from app.services.usage_stats import UsageStatsMiddleware, usage_stats
 from app.storage import HybridFSMStorage, state_database
+from app.storage.redis_fsm import build_redis_fsm_storage
 
 
 logger = logging.getLogger(__name__)
-INITIAL_RETRY_DELAY = 5
-MAX_RETRY_DELAY = 60
+INITIAL_RETRY_DELAY = 5.0
+MAX_RETRY_DELAY = 60.0
 TELEGRAM_REQUEST_TIMEOUT = 30
+BOT_API_RETRY_ATTEMPTS = 3
 
 _VISIBLE_TEXT_KEYS = {
     "text",
@@ -42,16 +57,15 @@ _VISIBLE_TEXT_KEYS = {
 
 
 def _visible_rich_text(value: Any) -> list[str]:
-    """Collect user-visible text without structural fields such as block types or URLs."""
     if value is None:
         return []
     if isinstance(value, str):
         return [value]
     if isinstance(value, list):
-        list_result: list[str] = []
+        result: list[str] = []
         for item in value:
-            list_result.extend(_visible_rich_text(item))
-        return list_result
+            result.extend(_visible_rich_text(item))
+        return result
     if hasattr(value, "model_dump"):
         value = value.model_dump(exclude_none=True)
     if not isinstance(value, dict):
@@ -67,7 +81,6 @@ def _visible_rich_text(value: Any) -> list[str]:
 
 
 def _detect_rich_rtl(rich_message: Any) -> bool | None:
-    """Detect paragraph direction from the first strong directional character."""
     for text in _visible_rich_text(rich_message):
         for char in text:
             bidi = unicodedata.bidirectional(char)
@@ -79,7 +92,7 @@ def _detect_rich_rtl(rich_message: Any) -> bool | None:
 
 
 class DirectionAwareBot(LocalizedBot):
-    """Set Rich Message direction from its own text, independent of UI locale."""
+    """Direction-aware Bot API client with global 429 backoff + jitter."""
 
     async def __call__(self, method, request_timeout: int | None = None):
         rich_message = getattr(method, "rich_message", None)
@@ -88,7 +101,21 @@ class DirectionAwareBot(LocalizedBot):
             if is_rtl is not None and hasattr(rich_message, "model_copy"):
                 rich_message = rich_message.model_copy(update={"is_rtl": is_rtl})
                 method = method.model_copy(update={"rich_message": rich_message})
-        return await super().__call__(method, request_timeout=request_timeout)
+
+        for attempt in range(BOT_API_RETRY_ATTEMPTS + 1):
+            try:
+                return await super().__call__(method, request_timeout=request_timeout)
+            except TelegramRetryAfter as error:
+                await usage_stats.record_rate_limit()
+                if attempt >= BOT_API_RETRY_ATTEMPTS:
+                    raise
+                delay = retry_after_delay(float(error.retry_after), attempt)
+                logger.warning(
+                    "Telegram flood control; retrying API method in %.2fs",
+                    delay,
+                )
+                await asyncio.sleep(delay)
+        raise RuntimeError("unreachable Telegram retry loop")
 
 
 async def prepare_telegram(bot: LocalizedBot) -> bool:
@@ -126,40 +153,43 @@ async def prepare_telegram(bot: LocalizedBot) -> bool:
                 logger.info("Telegram webhook deleted; pending updates preserved")
             else:
                 logger.info("No Telegram webhook is configured; polling can start")
-
             return True
 
         except TelegramUnauthorizedError:
             logger.critical(
                 "Telegram rejected BOT_TOKEN during %s (401 Unauthorized). "
-                "The token is invalid, revoked, or belongs to a deleted bot. "
-                "Generate a fresh token in @BotFather and replace BOT_TOKEN.",
+                "Replace BOT_TOKEN with a fresh token from BotFather.",
                 stage,
             )
             return False
         except TelegramNotFound:
             logger.critical(
-                "Telegram returned 404 Not Found during %s. BOT_TOKEN is empty, "
-                "malformed, incomplete, or no longer valid. Replace BOT_TOKEN "
-                "with the exact token from @BotFather.",
+                "Telegram returned 404 during %s. BOT_TOKEN is malformed or invalid.",
                 stage,
             )
             return False
         except TelegramRetryAfter as error:
-            retry_delay = min(max(int(error.retry_after) + 1, retry_delay), MAX_RETRY_DELAY)
+            delay = retry_after_delay(float(error.retry_after), attempt)
+            retry_delay = max(retry_delay, delay)
             logger.warning(
-                "Telegram rate limit during %s (attempt=%s); retrying in %ss",
-                stage, attempt, retry_delay,
+                "Telegram rate limit during %s; retrying in %.2fs",
+                stage,
+                retry_delay,
             )
         except (TelegramNetworkError, TelegramServerError) as error:
             logger.warning(
-                "Temporary Telegram failure during %s (attempt=%s, error=%s); retrying in %ss",
-                stage, attempt, error, retry_delay,
+                "Temporary Telegram failure during %s (attempt=%s, error=%s); "
+                "retrying in %.2fs",
+                stage,
+                attempt,
+                error,
+                retry_delay,
             )
         except TelegramAPIError as error:
             logger.critical(
                 "Telegram rejected startup during %s with a non-retryable API error: %s",
-                stage, error,
+                stage,
+                error,
             )
             return False
 
@@ -171,26 +201,114 @@ async def _media_cleanup_loop() -> None:
     interval = cleanup_interval_seconds()
     while True:
         try:
-            await asyncio.to_thread(media_store.cleanup)
+            async with runtime_redis.distributed_lock(
+                "maintenance:media-cleanup",
+                timeout=max(60, interval - 5),
+            ) as acquired:
+                if acquired:
+                    await asyncio.to_thread(media_store.cleanup)
         except Exception:
             logger.exception("Rich-media cleanup failed")
         await asyncio.sleep(interval)
 
 
+async def _usage_stats_flush_loop() -> None:
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await usage_stats.flush()
+        except Exception:
+            logger.exception("Usage statistics flush failed")
+
+
+async def _page_fallback_snapshot_loop() -> None:
+    interval = max(3600, int(os.getenv("PAGE_SNAPSHOT_INTERVAL", "21600")))
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            async with runtime_redis.distributed_lock(
+                "maintenance:page-snapshot",
+                timeout=600,
+            ) as acquired:
+                if acquired:
+                    await page_registry.export_snapshot()
+        except Exception:
+            logger.exception("Saved-page fallback snapshot failed")
+
+
+async def _restore_drill_loop() -> None:
+    interval = max(3600, int(os.getenv("RESTORE_DRILL_INTERVAL", "86400")))
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            async with runtime_redis.distributed_lock(
+                "maintenance:restore-drill",
+                timeout=600,
+            ) as acquired:
+                if not acquired:
+                    continue
+                result = await page_registry.restore_drill()
+                if not result["ok"]:
+                    logger.error("JSON fallback restore drill failed: %s", result)
+                else:
+                    logger.info(
+                        "JSON fallback restore drill passed: pages=%s",
+                        result["pages"],
+                    )
+        except Exception:
+            logger.exception("JSON fallback restore drill crashed")
+
+
+async def _editor_session_cleanup_loop(storage: BaseStorage) -> None:
+    while True:
+        try:
+            async with runtime_redis.distributed_lock(
+                "maintenance:editor-cleanup",
+                timeout=240,
+            ) as acquired:
+                if acquired:
+                    cutoff = int(time.time()) - EDITOR_SESSION_TTL_SECONDS
+                    removed_database = await state_database.cleanup_expired_editor_fsm(cutoff)
+                    removed_memory = 0
+                    cleanup = getattr(storage, "cleanup_expired_editor_sessions", None)
+                    if callable(cleanup):
+                        removed_memory = int(await cleanup())
+                    if removed_database or removed_memory:
+                        logger.info(
+                            "Expired editor cleanup: postgres=%s fallback=%s",
+                            removed_database,
+                            removed_memory,
+                        )
+        except Exception:
+            logger.exception("Editor session cleanup failed")
+        await asyncio.sleep(300)
+
+
+async def _build_fsm_storage() -> BaseStorage:
+    redis_storage = await build_redis_fsm_storage()
+    if redis_storage is not None:
+        logger.info("FSM storage mode: Redis")
+        return redis_storage
+    if os.getenv("REDIS_URL", "").strip():
+        logger.warning("Redis FSM unavailable; falling back to PostgreSQL-backed FSM")
+    return HybridFSMStorage()
+
+
 async def main() -> None:
     settings = Settings.from_env()
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level, logging.INFO),
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-    )
+    configure_observability(settings.log_level)
+
     try:
         bot = DirectionAwareBot(settings.bot_token)
     except TokenValidationError:
         logger.critical(
-            "BOT_TOKEN has an invalid format. Paste only the exact token from @BotFather "
-            "without BOT_TOKEN=, quotes, spaces, or a URL."
+            "BOT_TOKEN has an invalid format. Paste only the exact token from BotFather."
         )
         return
+
+    redis_status = await runtime_redis.startup()
+    if redis_status.configured and not redis_status.connected:
+        logger.warning("Redis unavailable; local fallbacks are active: %s", redis_status.last_error)
 
     database_status = await state_database.startup()
     if database_status.connected:
@@ -204,23 +322,35 @@ async def main() -> None:
             database_status.last_error or "DATABASE_URL is not configured",
         )
 
-    dispatcher = Dispatcher(storage=HybridFSMStorage())
-    dispatcher.message.outer_middleware(LocaleMiddleware())
-    dispatcher.guest_message.outer_middleware(LocaleMiddleware())
-    dispatcher.callback_query.outer_middleware(LocaleMiddleware())
+    migrated_pages = await page_registry.startup()
+    if migrated_pages:
+        logger.info("Migrated %s saved pages into indexed PostgreSQL rows", migrated_pages)
+    await usage_stats.startup(await page_registry.usage_history())
+
+    fsm_storage = await _build_fsm_storage()
+    isolation_factory = getattr(fsm_storage, "create_isolation", None)
+    events_isolation = isolation_factory() if callable(isolation_factory) else None
+    dispatcher = Dispatcher(storage=fsm_storage, events_isolation=events_isolation)
+
+    dispatcher.update.outer_middleware(IdempotencyMiddleware())
+    for observer in (dispatcher.message, dispatcher.guest_message, dispatcher.callback_query):
+        observer.outer_middleware(DeveloperAccessMiddleware())
+        observer.outer_middleware(SlidingWindowThrottleMiddleware())
+        observer.outer_middleware(LocaleMiddleware())
+        observer.outer_middleware(UsageStatsMiddleware())
     dispatcher.my_chat_member.outer_middleware(LocaleMiddleware())
+    dispatcher.my_chat_member.outer_middleware(UsageStatsMiddleware())
     dispatcher.include_router(router)
 
-    cleanup_task: asyncio.Task[None] | None = None
-    database_task: asyncio.Task[None] | None = None
+    tasks: list[asyncio.Task[None]] = []
     miniapp_runner = None
     try:
         await showcase_media_library.reload()
         if state_database.configured:
-            database_task = asyncio.create_task(
+            tasks.append(asyncio.create_task(
                 state_database.maintain_connection(),
                 name="postgres-connection-monitor",
-            )
+            ))
         try:
             miniapp_runner = await start_mini_app_server(bot, settings.bot_token)
             logger.info("Mini App Beta %s server started", BETA_VERSION)
@@ -231,9 +361,26 @@ async def main() -> None:
             )
         if not await prepare_telegram(bot):
             return
+
         await page_registry.rebuild_media_pins()
         await asyncio.to_thread(media_store.cleanup)
-        cleanup_task = asyncio.create_task(_media_cleanup_loop(), name="rich-media-cleanup")
+        tasks.extend([
+            asyncio.create_task(_media_cleanup_loop(), name="rich-media-cleanup"),
+            asyncio.create_task(_usage_stats_flush_loop(), name="usage-stats-flush"),
+            asyncio.create_task(_page_fallback_snapshot_loop(), name="page-fallback-snapshot"),
+            asyncio.create_task(_restore_drill_loop(), name="restore-drill"),
+            asyncio.create_task(
+                _editor_session_cleanup_loop(fsm_storage),
+                name="editor-session-cleanup",
+            ),
+        ])
+
+        cutoff = int(time.time()) - EDITOR_SESSION_TTL_SECONDS
+        await state_database.cleanup_expired_editor_fsm(cutoff)
+        cleanup = getattr(fsm_storage, "cleanup_expired_editor_sessions", None)
+        if callable(cleanup):
+            await cleanup()
+
         await configure_bot_profile(bot)
         logger.info("Starting Telegram polling")
         await dispatcher.start_polling(
@@ -241,23 +388,33 @@ async def main() -> None:
             allowed_updates=dispatcher.resolve_used_update_types(),
         )
     finally:
-        if database_task is not None:
-            database_task.cancel()
-            try:
-                await database_task
-            except asyncio.CancelledError:
-                pass
-        if cleanup_task is not None:
-            cleanup_task.cancel()
-            try:
-                await cleanup_task
-            except asyncio.CancelledError:
-                pass
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Produce one recoverable copy after handlers have stopped mutating state.
+        try:
+            async with runtime_redis.distributed_lock(
+                "maintenance:page-snapshot",
+                timeout=600,
+            ) as acquired:
+                if acquired:
+                    await page_registry.export_snapshot()
+        except Exception:
+            logger.exception("Final saved-page fallback snapshot failed")
+
+        try:
+            await usage_stats.flush()
+        except Exception:
+            logger.exception("Final usage statistics flush failed")
+
         if miniapp_runner is not None:
             await miniapp_runner.cleanup()
         await state_database.close()
+        await runtime_redis.close()
         await bot.session.close()
-        logger.info("Telegram HTTP session closed")
+        logger.info("Graceful shutdown complete")
 
 
 if __name__ == "__main__":

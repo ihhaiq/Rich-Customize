@@ -6,11 +6,13 @@ from aiohttp import web
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
+from app.editor.limits import EditorLimitError, validate_editor_limits
 from app.services.buttons import MAX_BUTTONS
 from app.services.chat_registry import managed_chat_registry
-from app.services.page_registry import page_registry
+from app.services.page_registry import PageLimitError, page_registry
 from app.services.popup_registry import popup_registry
 from app.services.renderer import RichMessageRenderError, send_rich_message_post
+from app.services.usage_stats import usage_stats
 from app.webapp.auth import miniapp_user
 from app.webapp.constants import BETA_VERSION, MAX_PAGE_BLOCKS
 
@@ -87,6 +89,12 @@ def page_content(
         raise web.HTTPBadRequest(text="blocks must be a list")
     if len(blocks) > MAX_PAGE_BLOCKS or any(not isinstance(block, dict) for block in blocks):
         raise web.HTTPBadRequest(text=f"blocks must contain at most {MAX_PAGE_BLOCKS} objects")
+    try:
+        validate_editor_limits(blocks)
+    except EditorLimitError as error:
+        raise web.HTTPBadRequest(
+            text=f"editor limit exceeded: {error.code} ({error.actual}/{error.limit})"
+        ) from error
     if not isinstance(buttons, list):
         raise web.HTTPBadRequest(text="buttons must be a list")
     if len(buttons) > MAX_BUTTONS or any(not isinstance(button, dict) for button in buttons):
@@ -142,14 +150,17 @@ async def api_create_page(request: web.Request) -> web.Response:
     payload = await _json_payload(request)
     blocks, buttons, buttons_per_row, buttons_align = page_content(payload)
     title = str(payload.get("title") or "Untitled")[:64]
-    code = await page_registry.save(
-        int(user["id"]),
-        title,
-        blocks,
-        buttons,
-        buttons_per_row,
-        buttons_align,
-    )
+    try:
+        code = await page_registry.save(
+            int(user["id"]),
+            title,
+            blocks,
+            buttons,
+            buttons_per_row,
+            buttons_align,
+        )
+    except PageLimitError as error:
+        raise web.HTTPConflict(text=f"saved page limit reached: {error.limit}") from error
     return web.json_response({
         "ok": True,
         "beta": BETA_VERSION,
@@ -242,7 +253,9 @@ async def api_send_page(request: web.Request) -> web.Response:
             source_page_id=page_id,
         )
     except RichMessageRenderError as error:
+        await usage_stats.record_operation("publish", success=False)
         raise web.HTTPBadRequest(text=str(error))
+    await usage_stats.record_operation("publish", success=True)
 
     return web.json_response({
         "ok": True,

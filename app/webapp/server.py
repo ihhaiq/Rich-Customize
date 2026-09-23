@@ -6,6 +6,13 @@ from pathlib import Path
 from aiohttp import web
 from aiogram import Bot
 
+from app.services.observability import (
+    DB_LATENCY,
+    REDIS_CONNECTED,
+    memory_rss_bytes,
+    prometheus_payload,
+)
+from app.services.runtime_redis import runtime_redis
 from app.storage import state_database
 from app.webapp.auth import miniapp_user
 from app.webapp.buttons import register_rich_button_routes
@@ -31,19 +38,44 @@ async def index(_: web.Request) -> web.FileResponse:
 
 
 async def health(_: web.Request) -> web.Response:
-    """Lightweight unauthenticated probe for Railway/container health checks."""
+    """Lightweight probe: process memory plus DB/Redis dependency state."""
     database = state_database.status()
+    redis = runtime_redis.status()
+    DB_LATENCY.set(float(database.latency_ms or 0))
+    REDIS_CONNECTED.set(1 if redis.connected else 0)
     return web.json_response({
         "ok": True,
+        "degraded": bool(
+            (database.configured and not database.connected)
+            or (redis.configured and not redis.connected)
+        ),
         "service": "rich-customize",
         "beta": BETA_VERSION,
+        "memory": {
+            "rss_bytes": memory_rss_bytes(),
+        },
         "database": {
             "configured": database.configured,
             "connected": database.connected,
             "mode": database.mode,
             "pending_sync": database.pending_sync,
+            "latency_ms": database.latency_ms,
+            "circuit_open": database.circuit_open,
+        },
+        "redis": {
+            "configured": redis.configured,
+            "connected": redis.connected,
         },
     })
+
+
+async def metrics(_: web.Request) -> web.Response:
+    database = state_database.status()
+    redis = runtime_redis.status()
+    DB_LATENCY.set(float(database.latency_ms or 0))
+    REDIS_CONNECTED.set(1 if redis.connected else 0)
+    payload, content_type = prometheus_payload()
+    return web.Response(body=payload, headers={"Content-Type": content_type})
 
 
 def build_web_app(bot: Bot, bot_token: str) -> web.Application:
@@ -54,6 +86,7 @@ def build_web_app(bot: Bot, bot_token: str) -> web.Application:
     app["bot_token"] = bot_token
     app["miniapp_user"] = miniapp_user
     app.router.add_get("/healthz", health)
+    app.router.add_get("/metrics", metrics)
     app.router.add_get("/miniapp", index)
     app.router.add_get("/miniapp/", index)
     app.router.add_static("/miniapp/static", STATIC_DIR)
@@ -78,6 +111,7 @@ __all__ = [
     "STATIC_DIR",
     "build_web_app",
     "health",
+    "metrics",
     "index",
     "mini_app_url",
     "start_mini_app_server",

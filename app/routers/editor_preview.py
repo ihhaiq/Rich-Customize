@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
 from app.editor.history import remember
+from app.editor.limits import EditorLimitError, validate_editor_limits
 from app.editor.session import load_editor_session, user_locks
 from app.i18n import t
 from app.keyboards import build_error_recovery_keyboard, build_rich_editor_keyboard
@@ -18,11 +19,13 @@ from app.routers.editor_ui import (
     delete_input_message,
     edit_saved_ui,
     editor_dashboard_text,
+    editor_limit_text,
     friendly_rich_error,
     repost_saved_ui,
 )
 from app.services.parser import message_to_blocks
 from app.services.renderer import RichMessageRenderError, send_rich_message_preview
+from app.services.usage_stats import usage_stats
 from app.states import RichEditorStates
 
 
@@ -65,6 +68,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             await state.update_data(
                 preview_message_ids=[message.message_id for message in sent_messages]
             )
+        await usage_stats.record_operation("preview", success=True)
     except RichMessageRenderError as error:
         logger.exception(
             "Telegram rejected the single rich preview for user_id=%s",
@@ -76,6 +80,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             f"{t('common.reason', reason=friendly_rich_error(error))}",
             reply_markup=build_error_recovery_keyboard(),
         )
+        await usage_stats.record_operation("preview", success=False)
         panel_notice = f"⚠️ {t('preview_failed')}"
     except Exception:
         logger.exception(
@@ -86,6 +91,7 @@ async def preview(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             t("preview_failed"),
             reply_markup=build_error_recovery_keyboard(),
         )
+        await usage_stats.record_operation("preview", success=False)
         panel_notice = f"⚠️ {t('preview_failed')}"
 
     async with user_locks[callback.from_user.id]:
@@ -125,6 +131,11 @@ async def import_rich_message_into_editor(
     blocks = message_to_blocks(message)
     if not blocks:
         await message.answer(t("editor.rich_import_failed"))
+        return
+    try:
+        validate_editor_limits(blocks)
+    except EditorLimitError as error:
+        await message.answer(editor_limit_text(error))
         return
     before = await draft_store.load(state)
     after = copy.deepcopy(before)

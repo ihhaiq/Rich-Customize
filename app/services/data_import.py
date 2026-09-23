@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from app.errors import AppError
+
 import io
-import json
 import os
+
+import orjson
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -20,10 +23,11 @@ _CONFIGURED_STATES = (
     ("BUTTON_POPUPS_STATE", "data/button_popups.json"),
     ("SHOWCASE_MEDIA_LIBRARY", "data/showcase_media.json"),
     ("SHOWCASE_CHANNEL_STATE", "data/showcase_channel.json"),
+    ("USAGE_STATS_STATE", "data/usage_stats.json"),
 )
 
 
-class DataImportError(ValueError):
+class DataImportError(AppError, ValueError):
     pass
 
 
@@ -44,8 +48,8 @@ def configured_state_destinations() -> dict[str, Path]:
 
 def _validated_json(name: str, payload: bytes) -> bytes:
     try:
-        value = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        value = orjson.loads(payload)
+    except orjson.JSONDecodeError as error:
         raise DataImportError(f"ملف {name} لا يحتوي JSON صالحًا.") from error
     if not isinstance(value, dict):
         raise DataImportError(f"ملف {name} يجب أن يبدأ بكائن JSON.")
@@ -81,7 +85,7 @@ def build_data_export(*, created_at: datetime | None = None) -> DataExport | Non
         }
         archive.writestr(
             "manifest.json",
-            json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"),
+            orjson.dumps(manifest, option=orjson.OPT_INDENT_2),
         )
 
     return DataExport(

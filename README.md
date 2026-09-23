@@ -30,6 +30,8 @@ python main.py
 - Showcase لكل Rich Blocks عبر `/draft`.
 - توطين متعدد اللغات مع مفاتيح semantic للواجهات الجديدة.
 - PostgreSQL كمخزن أساسي مع JSON fallback وإعادة مزامنة.
+- Redis اختياري ومُوصى به لـFSM الدائم، throttling، idempotency، الأقفال الموزعة وكاش الإحصائيات.
+- Alembic لإدارة schema، وPrometheus/Sentry للمراقبة الاختيارية.
 
 ## أوامر مهمة
 
@@ -91,6 +93,14 @@ Rich Buttons داخل النص لها تنسيق مستقل عن أزرار Inli
 /healthz
 ```
 
+يعرض حالة PostgreSQL وRedis واستهلاك ذاكرة العملية. مقاييس Prometheus متوفرة على:
+
+```text
+/metrics
+```
+
+ولـSentry أضف `SENTRY_DSN` اختياريًا؛ التسجيل الافتراضي JSON ويخفي التوكنات ومعرفات Telegram الكاملة من الرسائل المنظمة.
+
 ## البنية
 
 - `app/editor/` — نماذج البلوكات، registry، workflow، draft store وhistory.
@@ -119,12 +129,30 @@ Rich Buttons داخل النص لها تنسيق مستقل عن أزرار Inli
 
 ```env
 DATABASE_URL=${{Postgres.DATABASE_URL}}
-DATABASE_POOL_MAX_SIZE=5
+DATABASE_POOL_MIN_SIZE=1
+DATABASE_POOL_TOTAL_BUDGET=20
 DATABASE_CONNECT_TIMEOUT=5
 DATABASE_COMMAND_TIMEOUT=5
+DATABASE_MIGRATION_TIMEOUT=20
 DATABASE_RECONNECT_INTERVAL=30
-DATABASE_FALLBACK_STATE=data/database_fallback.json
+DATABASE_CIRCUIT_FAILURES=3
+DATABASE_CIRCUIT_COOLDOWN=30
+
+# اربطه بخدمة Redis في Railway عند إضافتها.
+REDIS_URL=${{Redis.REDIS_URL}}
+REDIS_CONNECT_TIMEOUT=2
+REDIS_COMMAND_TIMEOUT=2
+REDIS_MAX_CONNECTIONS=20
+
+PAGE_SNAPSHOT_INTERVAL=21600
+RESTORE_DRILL_INTERVAL=86400
 ```
+
+عند وجود `REDIS_URL` تصبح جلسات FSM في Redis وتبقى عبر restart وتدعم أكثر من instance. إذا Redis غير متوفر عند التشغيل يرجع البوت تلقائيًا لمسار FSM الحالي المدعوم بـPostgreSQL/Memory fallback.
+
+Alembic يشغّل `upgrade head` عند أول اتصال PostgreSQL، والجداول الموجودة من الإصدارات السابقة تبقى متوافقة لأن migration الأولى تستخدم إنشاءً آمنًا غير هدّام.
+
+Snapshot الصفحات الكامل الافتراضي كل 6 ساعات، ويُنشأ أيضًا عند Export وعند الإغلاق الطبيعي ويمكن إنشاؤه يدويًا من لوحة المطور. يوجد Restore Drill افتراضي كل 24 ساعة للتحقق أن JSON fallback قابل للقراءة ويطابق page IDs في PostgreSQL.
 
 تبقى متغيرات `*_STATE` مهمة لمسارات fallback. لاستمرار ملفات JSON بين Deployments على Railway استخدم Volume دائمًا.
 

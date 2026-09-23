@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.editor.draft_store import draft_store
+from app.editor.limits import EditorLimitError, MAX_SAVED_PAGES
 from app.editor.session import load_editor_session
 from app.i18n import t, tr
 from app.keyboards import (
@@ -20,11 +21,12 @@ from app.routers.editor_ui import (
     edit_saved_ui,
     edit_ui,
     editor_dashboard_text,
+    editor_limit_text,
     send_add_prompt,
 )
 from app.routers.page_support import render_pages_screen
 from app.services.page_editor import persist_page_draft_change
-from app.services.page_registry import page_registry
+from app.services.page_registry import PageLimitError, page_registry
 from app.states import RichEditorStates
 
 
@@ -67,15 +69,19 @@ async def save_page(callback: CallbackQuery, state: FSMContext) -> None:
         return
 
     title = str(draft.current_page_title or existing.get("title") or existing_id)[:64]
-    code = await page_registry.save(
-        callback.from_user.id,
-        title,
-        draft.blocks,
-        draft.message_buttons,
-        draft.buttons_per_row,
-        draft.buttons_align,
-        page_id=existing_id,
-    )
+    try:
+        code = await page_registry.save(
+            callback.from_user.id,
+            title,
+            draft.blocks,
+            draft.message_buttons,
+            draft.buttons_per_row,
+            draft.buttons_align,
+            page_id=existing_id,
+        )
+    except EditorLimitError as error:
+        await callback.answer(editor_limit_text(error), show_alert=True)
+        return
     draft.current_page_id = code
     draft.current_page_title = title
     await draft_store.save(state, draft)
@@ -108,15 +114,32 @@ async def receive_page_name(message: Message, state: FSMContext, bot: Bot) -> No
         await message.answer(t("expired"))
         return
     existing_id = before.current_page_id
-    code = await page_registry.save(
-        message.from_user.id,
-        title,
-        before.blocks,
-        before.message_buttons,
-        before.buttons_per_row,
-        before.buttons_align,
-        page_id=existing_id,
-    )
+    try:
+        code = await page_registry.save(
+            message.from_user.id,
+            title,
+            before.blocks,
+            before.message_buttons,
+            before.buttons_per_row,
+            before.buttons_align,
+            page_id=existing_id,
+        )
+    except EditorLimitError as error:
+        await message.answer(editor_limit_text(error))
+        return
+    except PageLimitError:
+        await delete_add_step_messages(bot, message, data, state)
+        await state.set_state(RichEditorStates.managing)
+        await state.update_data(block_scroll_enabled=True)
+        notice = t("pages.limit_reached", limit=MAX_SAVED_PAGES)
+        await message.answer(notice)
+        await edit_saved_ui(
+            bot,
+            state,
+            editor_dashboard_text(before, notice),
+            build_rich_editor_keyboard(before.blocks, before.message_buttons),
+        )
+        return
     await delete_add_step_messages(bot, message, data, state)
     after = copy.deepcopy(before)
     after.current_page_id = code

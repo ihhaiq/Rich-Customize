@@ -15,6 +15,9 @@ class FakeState:
     async def get_data(self):
         return copy.deepcopy(self.data)
 
+    async def update_data(self, **kwargs):
+        self.data.update(copy.deepcopy(kwargs))
+
 
 class EditorSessionBoundaryTests(unittest.IsolatedAsyncioTestCase):
     async def test_session_reads_canonical_draft_through_boundary(self):
