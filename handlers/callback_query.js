@@ -2,6 +2,7 @@ import { api } from 'sdk';
 import { buildEditorHome, openEditor } from 'lib/editor-home';
 import { handleDeveloperCallback } from 'lib/developer';
 import { emptyPagesText, showPages } from 'lib/pages';
+import { observeRequest } from 'lib/usage-stats';
 
 function pagesIndex(data) {
   if (data === 'r:pages') return 0;
@@ -33,57 +34,58 @@ async function returnToEditor(query) {
 }
 
 export default async function (query) {
-  if (!query?.id) return;
+  const started = Date.now();
+  let failed = false;
+  try {
+    if (!query?.id) return;
+    if (await handleDeveloperCallback(query)) return;
 
-  if (await handleDeveloperCallback(query)) return;
+    const data = String(query.data || '');
 
-  const data = String(query.data || '');
+    if (data === 'r:starteditor') {
+      await api.answerCallbackQuery({ callback_query_id: query.id });
+      const chatId = query.message?.chat?.id;
+      if (!chatId) return;
 
-  if (data === 'r:starteditor') {
-    await api.answerCallbackQuery({
-      callback_query_id: query.id,
-    });
-
-    const chatId = query.message?.chat?.id;
-    if (!chatId) return;
-
-    await openEditor(chatId, query.from?.language_code || 'en');
-
-    const messageId = query.message?.message_id;
-    if (messageId) {
-      try {
-        await api.deleteMessage({
-          chat_id: chatId,
-          message_id: messageId,
-        });
-      } catch (error) {
-        console.warn('Could not delete welcome message after opening editor', error);
+      await openEditor(chatId, query.from?.language_code || 'en');
+      const messageId = query.message?.message_id;
+      if (messageId) {
+        try {
+          await api.deleteMessage({ chat_id: chatId, message_id: messageId });
+        } catch (error) {
+          console.warn('Could not delete welcome message after opening editor', error);
+        }
       }
+      return;
     }
-    return;
-  }
 
-  if (data === 'r:pages' || data.startsWith('r:pages:')) {
-    const rendered = await showPages(query, pagesIndex(data));
-    await api.answerCallbackQuery({
-      callback_query_id: query.id,
-      ...(rendered ? {} : {
-        text: emptyPagesText(query.from?.language_code || 'en'),
-        show_alert: true,
-      }),
-    });
-    return;
-  }
+    if (data === 'r:pages' || data.startsWith('r:pages:')) {
+      const rendered = await showPages(query, pagesIndex(data));
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        ...(rendered ? {} : {
+          text: emptyPagesText(query.from?.language_code || 'en'),
+          show_alert: true,
+        }),
+      });
+      return;
+    }
 
-  if (data === 'r:back') {
-    await api.answerCallbackQuery({
-      callback_query_id: query.id,
-    });
-    await returnToEditor(query);
-    return;
-  }
+    if (data === 'r:back') {
+      await api.answerCallbackQuery({ callback_query_id: query.id });
+      await returnToEditor(query);
+      return;
+    }
 
-  await api.answerCallbackQuery({
-    callback_query_id: query.id,
-  });
+    await api.answerCallbackQuery({ callback_query_id: query.id });
+  } catch (error) {
+    failed = true;
+    throw error;
+  } finally {
+    try {
+      await observeRequest(query?.from, Date.now() - started, failed);
+    } catch (error) {
+      console.warn('Could not record callback usage stats', error);
+    }
+  }
 }

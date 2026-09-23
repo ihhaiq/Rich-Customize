@@ -1,7 +1,5 @@
-import { index, integer, json, table, text } from 'sdk/db';
+import { index, integer, json, real, table, text } from 'sdk/db';
 
-// Saved pages keep the same logical shape as the old PostgreSQL/JSON storage so
-// existing page IDs and exported backups can be imported without rewriting data.
 export const richPages = table('rich_pages', {
   pageId: text('page_id').primaryKey(),
   ownerId: integer('owner_id').notNull(),
@@ -16,8 +14,6 @@ export const richPages = table('rich_pages', {
   ownerUpdatedIdx: index('idx_rich_pages_owner_updated').on(t.ownerId, t.updatedAt),
 }));
 
-// Serverless invocations are stateless. This table keeps the short /dev import
-// flow alive between pressing "رفع واستيراد", uploading a file and confirming it.
 export const developerStates = table('developer_states', {
   userId: integer('user_id').primaryKey(),
   state: text('state').notNull(),
@@ -25,4 +21,56 @@ export const developerStates = table('developer_states', {
   fileName: text('file_name'),
   createdAt: integer('created_at').notNull(),
   summary: json('summary'),
+});
+
+export const legacyStates = table('legacy_states', {
+  namespace: text('namespace').primaryKey(),
+  payload: json('payload').notNull().default({}),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const usageUsers = table('usage_users', {
+  userId: integer('user_id').primaryKey(),
+  username: text('username'),
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  languageCode: text('language_code'),
+  firstSeen: integer('first_seen').notNull(),
+  lastSeen: integer('last_seen').notNull(),
+  events: integer('events').notNull().default(0),
+}, (t) => ({
+  recentIdx: index('idx_usage_users_recent').on(t.lastSeen),
+}));
+
+export const usageMinutes = table('usage_minutes', {
+  minute: integer('minute').primaryKey(),
+  updates: integer('updates').notNull().default(0),
+  failures: integer('failures').notNull().default(0),
+  durationMs: real('duration_ms').notNull().default(0),
+});
+
+export const usageRuntime = table('usage_runtime', {
+  id: integer('id').primaryKey(),
+  startedAt: integer('started_at').notNull(),
+  totalUpdates: integer('total_updates').notNull().default(0),
+  failedUpdates: integer('failed_updates').notNull().default(0),
+  handlerMsTotal: real('handler_ms_total').notNull().default(0),
+  handlerMsMax: real('handler_ms_max').notNull().default(0),
+  previewSuccess: integer('preview_success').notNull().default(0),
+  previewFailed: integer('preview_failed').notNull().default(0),
+  publishSuccess: integer('publish_success').notNull().default(0),
+  publishFailed: integer('publish_failed').notNull().default(0),
+  rateLimited: integer('rate_limited').notNull().default(0),
+});
+
+export const pageSnapshots = table('page_snapshots', {
+  snapshotId: text('snapshot_id').primaryKey(),
+  payload: json('payload').notNull().default({}),
+  createdAt: integer('created_at').notNull(),
+  pageCount: integer('page_count').notNull().default(0),
+});
+
+export const maintenanceLocks = table('maintenance_locks', {
+  name: text('name').primaryKey(),
+  expiresAt: integer('expires_at').notNull(),
 });
