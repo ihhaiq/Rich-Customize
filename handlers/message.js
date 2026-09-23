@@ -10,6 +10,7 @@ import {
 import { openEditor } from 'lib/editor-home';
 import { handleDeveloperPendingMessage, openDeveloperPanel } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
+import { handleEditorBlockMessage } from 'lib/editor-block-flow';
 
 function commandName(text) {
   if (typeof text !== 'string') return '';
@@ -35,9 +36,11 @@ export default async function (message) {
     if (await handleDeveloperPendingMessage(message)) return;
 
     if (matchesCommand(command, 'editor')) {
-      await openEditor(message.chat.id, languageCode);
+      await openEditor(message.chat.id, languageCode, message.from?.id);
       return;
     }
+
+    if (await handleEditorBlockMessage(message)) return;
 
     if (!matchesCommand(command, 'start')) return;
 

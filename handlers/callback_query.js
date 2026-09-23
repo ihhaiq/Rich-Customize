@@ -3,6 +3,7 @@ import { buildEditorHome, openEditor } from 'lib/editor-home';
 import { handleDeveloperCallback } from 'lib/developer';
 import { emptyPagesText, showPages } from 'lib/pages';
 import { observeRequest } from 'lib/usage-stats';
+import { handleEditorBlockCallback } from 'lib/editor-block-flow';
 
 function pagesIndex(data) {
   if (data === 'r:pages') return 0;
@@ -39,6 +40,7 @@ export default async function (query) {
   try {
     if (!query?.id) return;
     if (await handleDeveloperCallback(query)) return;
+    if (await handleEditorBlockCallback(query)) return;
 
     const data = String(query.data || '');
 
@@ -47,7 +49,7 @@ export default async function (query) {
       const chatId = query.message?.chat?.id;
       if (!chatId) return;
 
-      await openEditor(chatId, query.from?.language_code || 'en');
+      await openEditor(chatId, query.from?.language_code || 'en', query.from?.id);
       const messageId = query.message?.message_id;
       if (messageId) {
         try {

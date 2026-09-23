@@ -74,3 +74,33 @@ export const maintenanceLocks = table('maintenance_locks', {
   name: text('name').primaryKey(),
   expiresAt: integer('expires_at').notNull(),
 });
+
+
+export const editorSessions = table('editor_sessions', {
+  userId: integer('user_id').primaryKey(),
+  chatId: integer('chat_id').notNull(),
+  state: text('state').notNull().default('managing'),
+  blocks: json('blocks').notNull().default([]),
+  messageButtons: json('message_buttons').notNull().default([]),
+  buttonsPerRow: integer('buttons_per_row').notNull().default(1),
+  buttonsAlign: text('buttons_align').notNull().default('center'),
+  currentPageId: text('current_page_id'),
+  currentPageTitle: text('current_page_title'),
+  currentBlockId: text('current_block_id'),
+  pendingAddType: text('pending_add_type'),
+  addStep: text('add_step'),
+  addPayload: json('add_payload').notNull().default({}),
+  expectedType: text('expected_type'),
+  editField: text('edit_field'),
+  headingSize: integer('heading_size'),
+  addPromptChatId: integer('add_prompt_chat_id'),
+  addPromptMessageId: integer('add_prompt_message_id'),
+  managementChatId: integer('management_chat_id'),
+  managementMessageId: integer('management_message_id'),
+  blockScrollOffset: integer('block_scroll_offset').notNull().default(0),
+  undoStack: json('undo_stack').notNull().default([]),
+  redoStack: json('redo_stack').notNull().default([]),
+  lastActivityAt: integer('last_activity_at').notNull(),
+}, (t) => ({
+  activityIdx: index('idx_editor_sessions_activity').on(t.lastActivityAt),
+}));
