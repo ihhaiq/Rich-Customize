@@ -13,3 +13,6 @@ data/rich_pages.json
 data/rich_media.json
 data/guest_messages.json
 data/page_navigation.json
+.tgcloud/
+node_modules/
+npm-debug.log*

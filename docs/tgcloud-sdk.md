@@ -1,5 +1,5 @@
-> SDK reference copied from `erfnzdeh/Telegram-Serverless-Bot-Template` (MIT License, © 2026 Pouri) for local project documentation.
-> Source: https://github.com/erfnzdeh/Telegram-Serverless-Bot-Template
+> Local SDK reference for Telegram Serverless.
+> Canonical documentation: https://core.telegram.org/bots/serverless
 
 # tgcloud SDK reference
 

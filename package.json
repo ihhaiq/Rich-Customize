@@ -1,5 +1,5 @@
 {
-  "name": "rich-customize-tgcloud",
+  "name": "rich-customize-telegram-serverless",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -7,10 +7,16 @@
     "@tgcloud/cli": "^0.1.2"
   },
   "scripts": {
+    "login": "tgcloud login",
     "status": "tgcloud status",
+    "diff": "tgcloud diff",
     "deploy": "tgcloud push",
     "migrate": "tgcloud migrate",
+    "migrate:dry": "tgcloud migrate --dry-run --local",
     "run": "tgcloud run",
-    "webhook": "tgcloud webhook"
+    "fetch": "tgcloud fetch",
+    "pull": "tgcloud pull",
+    "webhook": "tgcloud webhook",
+    "webhook:sync": "tgcloud webhook sync"
   }
 }
