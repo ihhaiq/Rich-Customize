@@ -102,7 +102,7 @@ class FSMStateRepository:
             return
         # Mark it before scheduling so a simultaneous manual reconnect cannot
         # hydrate this file from an older database snapshot.
-        self._dirty_namespaces.add(repository.namespace)
+        self.database._dirty_namespaces.add(repository.namespace)
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
