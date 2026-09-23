@@ -7,17 +7,28 @@ import {
   buildWelcomeKeyboard,
   buildWelcomeRichMessage,
 } from 'lib/welcome';
+import { openEditor } from 'lib/editor-home';
 
-function isStartCommand(text) {
-  if (typeof text !== 'string') return false;
-  const command = text.trim().split(/\\s+/, 1)[0].toLowerCase();
-  return command === '/start' || command.startsWith('/start@');
+function commandName(text) {
+  if (typeof text !== 'string') return '';
+  return text.trim().split(/\\s+/, 1)[0].toLowerCase();
+}
+
+function matchesCommand(command, name) {
+  return command === `/${name}` || command.startsWith(`/${name}@`);
 }
 
 export default async function (message) {
-  if (!isStartCommand(message?.text)) return;
-
+  const command = commandName(message?.text);
   const languageCode = message.from?.language_code || 'en';
+
+  if (matchesCommand(command, 'editor')) {
+    await openEditor(message.chat.id, languageCode);
+    return;
+  }
+
+  if (!matchesCommand(command, 'start')) return;
+
   const replyMarkup = buildWelcomeKeyboard(languageCode);
 
   try {
