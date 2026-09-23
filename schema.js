@@ -100,6 +100,8 @@ export const editorSessions = table('editor_sessions', {
   blockScrollOffset: integer('block_scroll_offset').notNull().default(0),
   undoStack: json('undo_stack').notNull().default([]),
   redoStack: json('redo_stack').notNull().default([]),
+  previewMessageIds: json('preview_message_ids').notNull().default([]),
+  blockPreviewMessageIds: json('block_preview_message_ids').notNull().default({}),
   lastActivityAt: integer('last_activity_at').notNull(),
 }, (t) => ({
   activityIdx: index('idx_editor_sessions_activity').on(t.lastActivityAt),
