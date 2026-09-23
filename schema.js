@@ -1,0 +1,40 @@
+import { table, integer, text, json, index, sql } from 'sdk/db';
+
+// Serverless port of the existing PostgreSQL storage contract.
+// No foreign keys: tgcloud deliberately runs SQLite without FK enforcement.
+
+export const richState = table('rich_state', {
+  namespace: text('namespace').primaryKey(),
+  payload: json('payload').notNull().default({}),
+  updatedAt: integer('updated_at').notNull().default(sql`(unixepoch())`),
+});
+
+export const richFsm = table('rich_fsm', {
+  storageKey: text('storage_key').primaryKey(),
+  state: text('state'),
+  data: json('data').notNull().default({}),
+  updatedAt: integer('updated_at').notNull().default(sql`(unixepoch())`),
+}, (t) => ({
+  updatedIdx: index('idx_rich_fsm_updated').on(t.updatedAt),
+}));
+
+export const richMigrations = table('rich_migrations', {
+  name: text('name').primaryKey(),
+  completedAt: integer('completed_at').notNull().default(sql`(unixepoch())`),
+});
+
+export const richPages = table('rich_pages', {
+  pageId: text('page_id').primaryKey(),
+  ownerId: integer('owner_id').notNull(),
+  title: text('title').notNull(),
+  blocks: json('blocks').notNull().default([]),
+  buttons: json('buttons').notNull().default([]),
+  buttonsPerRow: integer('buttons_per_row').notNull().default(1),
+  buttonsAlign: text('buttons_align').notNull().default('center'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  ownerUpdatedIdx: index('idx_rich_pages_owner_updated').on(t.ownerId, t.updatedAt),
+  ownerCreatedIdx: index('idx_rich_pages_owner_created').on(t.ownerId, t.createdAt),
+  ownerTitleIdx: index('idx_rich_pages_owner_title').on(t.ownerId, sql`lower(${t.title})`),
+}));

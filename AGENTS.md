@@ -1,107 +1,96 @@
-# AGENTS.md — Rich Customize
+# AGENTS.md
 
-تعليمات العمل على مستودع `ihhaiq/Rich-Customize`. الهدف من هذا الملف هو توثيق القواعد الثابتة الحالية فقط؛ لا تستخدمه كسجل تغييرات.
+Orientation for AI coding assistants (and humans) working in this project.
 
-## التشغيل
+This file is auto-loaded by Claude Code, Cursor, and similar tools — keep it short
+and true. For the full SDK reference (db, Bot API, fetch), see
+[docs/tgcloud-sdk.md](docs/tgcloud-sdk.md).
 
-- Python 3.12.
-- نقطة التشغيل: `python main.py`.
-- الاعتماديات من `requirements.txt` و`requirements-dev.txt`.
-- Aiogram مربوط بإصدار/commit يدعم Rich Messages التي يعتمد عليها المشروع.
-- Mini App: `/miniapp`.
-- فحص الصحة: `/healthz`.
-- الأوامر الرئيسية: `/editor` و`/dev` و`/draft`.
-- لا تضف أسرارًا أو Cookies أو Tokens إلى المستودع أو السجل.
+## What this project is
 
-## خريطة المشروع
+A **Telegram Mini App bot** running on Telegram's serverless platform. You write
+JavaScript modules (database schema, shared library code, update handlers); the
+platform runs them in a V8 isolate. The `tgcloud` CLI syncs this local project
+with the bot's cloud environment — think `wrangler`/`vercel` + `drizzle-kit`.
 
-| المسار | المسؤولية |
-| --- | --- |
-| `app/editor/` | نموذج البلوكات، السجل، البناء، المسودات، history وworkflow. |
-| `app/routers/` | أوامر Telegram وcallbacks، مقسمة حسب الميزة. |
-| `app/keyboards/` | Inline keyboard builders. |
-| `app/services/` | parsing/rendering والصفحات والوسائط والنشر والسجلات. |
-| `app/webapp/` | Backend الخاص بالـMini App. |
-| `app/miniapp_static/` | HTML/CSS/JS للـMini App. |
-| `app/lang/` و`app/i18n*.py` | التوطين وحزم اللغات. |
-| `app/storage/hybrid.py` | PostgreSQL مع JSON fallback والمزامنة. |
-| `tests/` | اختبارات السلوك والـregressions. |
+There is no server to run locally and no `node_modules` to import from at runtime:
+the only things available inside a module are the platform SDK and other modules
+in this project.
 
-التفاصيل المعمارية: `docs/editor_architecture.md`. قواعد التوطين: `docs/I18N_GUIDE.md` و`app/lang/README.md`.
+## Layout
 
-## قواعد التعديل
+| Path | What it is |
+|---|---|
+| `schema.js` | Database schema — tables as **named exports**. One file, at root. |
+| `lib/` | Shared modules. Subdirectories allowed (`lib/internal/util.js`). |
+| `handlers/` | Update handlers, **one level only**. Names match Telegram Bot API update types (`message`, `callback_query`, …). |
+| `docs/` | Reference docs (this project's, for you). Not deployed. |
+| `.tgcloud/` | CLI state (credentials, snapshot, cached layout). **Never edit or read from here** — it's gitignored machine state. |
 
-1. عدّل الوحدة المسؤولة عن الميزة فقط، ولا تعيد إنشاء ملفات legacy محذوفة.
-2. تغييرات البلوكات تمر عبر `app/editor/workflow.py` والحفظ عبر `draft_store.py` مع history عند الحاجة.
-3. النصوص الجديدة تستخدم `t("namespace.key")`. لا تترجم محتوى المستخدم أو أسماء الصفحات والقنوات والأكواد.
-4. `tr()` مسار توافق قديم فقط؛ لا تضف له UI جديدة.
-5. `app/miniapp.py` واجهة public صغيرة، والتنفيذ داخل `app/webapp/`.
-6. لا تغيّر ترتيب أزرار أو سلوك ميزة أخرى أثناء التنظيف.
-7. عند حذف ملف، ابحث عن imports والاختبارات والتوثيق المرتبط به قبل الحذف.
-8. حدّث الاختبارات عند تغيير بنية UI أو callback contracts.
+Only `.js` files in `schema.js`, `lib/`, and `handlers/` are deployed. Everything
+else (Markdown, config, `.tgcloud/`) is local-only.
 
-## سلوك يجب الحفاظ عليه
+## Module system — the rules that bite
 
-### صفحاتي
+- **Import by bare module name, never a relative path or file extension.**
+  The platform resolves modules by their name in the module space, not by the
+  filesystem.
+  - ✅ `import { users } from 'schema'`
+  - ✅ `import { addItem } from 'lib/cart'`
+  - ✅ `import { db, api, fetch } from 'sdk'` / `import { eq, sql } from 'sdk/db'`
+  - ❌ `import { users } from './schema'` or `'../schema'` → **won't compile**
+  - ❌ `import x from 'lib/cart.js'` → drop the `.js`
+- **No filesystem, no npm packages** at runtime. Only `sdk` (and its submodules
+  like `sdk/db`) and your own project modules exist.
+- A handler module's `export default` is what the platform invokes, with the
+  update's **payload** as the first argument — for `handlers/message` that's the
+  `Message` (i.e. `update.message`), for `handlers/callback_query` the
+  `CallbackQuery`, and so on. The full `Update` (with `update_id`) is on the
+  second argument: `ctx.update`.
 
-- `صفحاتي` تعرض Rich Table مضغوطًا بين فاصلين.
-- رأس الجدول يحتوي الحذف، تعديل الاسم، نسخ الكود، واسم الصفحة.
-- كل صفحة صف واحد: 🗑️ حذف، ✏️ تعديل الاسم، زر نسخ الكود، واسم الصفحة كزر غني أساسي.
-- أسماء الصفحات وأكوادها تبقى كما كتبها المستخدم ولا تُترجم.
-- الترقيم **خارج الجدول** كأزرار Inline عادية بالشكل: `⬅️ | 1/9 | ➡️`.
-- البحث والفرز والرجوع تبقى Inline عادية.
-- البحث يحافظ على prefix الخاص بنتائجه، وتحديث الاسم/الحذف/الاستعادة يعيد عرض لوحة الإدارة نفسها.
-- الملفات الرئيسية: `app/services/pages_ui.py`، `app/routers/page_support.py`، `app/keyboards/pages.py`.
+## Platform SDK (`import … from 'sdk'`)
 
-### أزرار الرسالة
+- **`db`** — the database (query builder + schema DSL). Full API: [docs/tgcloud-sdk.md](docs/tgcloud-sdk.md).
+- **`api`** — the Telegram Bot API. `api.<method>({...})` (e.g. `api.sendMessage`,
+  `api.getMe`) returns the **unwrapped** result and **throws `BotApiError`**
+  on failure (`import { BotApiError } from 'sdk'`; it has `.code`/`.description`/`.parameters`).
+- **`fetch`** — outbound HTTP, web-`fetch`-like (`res.status/ok`, `res.json()`,
+  `res.text()`, streaming via `for await`, redirects followed).
 
-- قسم إضافة الأزرار يدير `InlineKeyboardButton` تحت الرسالة، وليس Rich Button داخل النص.
-- الإضافة تتم بخطوة واحدة بصيغة `{ الاسم - القيمة }`، والقيمة قد تكون URL أو `alert:` أو `popup:` أو `cbd:` أو الأنواع المدعومة الأخرى.
-- `richbtn` داخل محتوى Rich Blocks مسار مستقل ولا يُخلط مع Inline keyboard.
-- حافظ على ملكية صفحات CBD، وعلى popup/callback limits، وعلى Inline/Guest navigation.
+## Database — the rules that bite
 
-### Rich Table في Mini App
+Full API in [docs/tgcloud-sdk.md](docs/tgcloud-sdk.md). The non-obvious parts:
 
-- تحديد الخلية يُظهر أدوات الخلية/الصف/العمود.
-- النقاط الست على يمين البلوك للتحريك فقط.
-- لا تجعل الضغط المطول الوسيلة الوحيدة لإظهار الأدوات.
-- التنفيذ في `app/miniapp_static/live_preview.js` و`editor_features.css`.
+- **Every DB call is async — always `await`.** `.all()`, `.get()`, `.values()`,
+  `.run()`, `db.$count()` and the raw `db.run/all/get` all return Promises.
+- **No foreign keys.** `.references()` and `foreignKey()` **throw at declaration**
+  — the runtime runs with FKs off, so they'd be silently inert. Enforce integrity
+  in application code (delete children before parents, etc.).
+- **Drops happen only via `.deprecated('reason')`** on a column/table/index.
+  Deleting the declaration does *not* drop anything.
+- **Type changes aren't automatic** — do them by hand with `db.run(...)`.
 
-### Showcase
+## Deploy & migrate workflow
 
-- `r:showcase` و`/draft` يبنيان رسالة Rich واحدة عبر `app/services/showcase.py`.
-- يستخدم البوت محتوى تجريبيًا ووسائط مكتبة القناة؛ لا يستبدل ذلك بإعادة إرسال منشورات القناة.
+**Deploying never touches the database.** Schema sync is a separate, explicit step.
 
-### الترحيب والأخطاء
-
-- النص العشوائي في الخاص عندما لا توجد حالة FSM يعرض الترحيب.
-- أخطاء المعاينة والقالب وحالات المحرر النشطة تحتفظ برسائلها الخاصة.
-
-### Liquid Glass
-
-- الوضع العادي والداكن يستخدمان Liquid Glass.
-- زر الصاعقة يبدل الوضع الأسود ويحفظ الاختيار في `localStorage` بالمفتاح `richCustomizeLiquidGlassDark`.
-- لا تكسر `mobile-performance` أو ترتيب تحميل CSS/JS في `index.html`.
-
-### لوحة المطور
-
-- `فحص قاعدة البيانات` و`تحديث قناة المعاينة` Rich Buttons داخل رسالة اللوحة.
-- حافظ على callbacks: `dev:database:check` و`dev:showcase:refresh`.
-
-### التخزين
-
-- PostgreSQL هو المخزن الأساسي عند توفره.
-- JSON fallback يبقى فعالًا عند انقطاع الاتصال.
-- عند عودة PostgreSQL تُزامن التغييرات المحلية قبل الرجوع للوضع الأساسي.
-- ملفات JSON لا تصبح دائمة عبر Deployments على Railway بدون Volume.
-
-## الفحوص قبل الدمج
+The CLI is a local dev-dependency, so run it with `npx tgcloud <command>` (or use
+the `npm run` scripts in package.json — e.g. `npm run deploy`):
 
 ```bash
-python -m ruff check .
-python -m mypy app main.py
-python -m compileall -q app main.py
-python -m pytest -q
+npx tgcloud status
+npx tgcloud push
+npx tgcloud migrate
+npx tgcloud run <module> [args]
+npx tgcloud pull
+npx tgcloud login
+npx tgcloud webhook
 ```
 
-إذا فشل GitHub Actions قبل تشغيل أي Step (بدون runner فعلي)، لا تنسب الفشل إلى الكود ولا تدّع نجاح CI.
+After you change `schema.js`, `push` reports what the DB *would* change but applies
+nothing — run `npx tgcloud migrate` to actually apply it.
+
+The platform manages the bot's webhook for you, derived from your deployed
+`handlers/*`, and refreshes it on `push`. If it ever drifts — e.g. someone called
+`setWebhook` with the raw bot token — `npx tgcloud webhook` shows the mismatch and
+`npx tgcloud webhook sync` repairs it.
