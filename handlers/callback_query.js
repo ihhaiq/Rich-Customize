@@ -4,6 +4,7 @@ import { handleDeveloperCallback } from 'lib/developer';
 import { emptyPagesText, showPages } from 'lib/pages';
 import { observeRequest } from 'lib/usage-stats';
 import { handleEditorBlockCallback } from 'lib/editor-block-flow';
+import { handlePageNavigationCallback } from 'lib/page-navigation';
 
 function pagesIndex(data) {
   if (data === 'r:pages') return 0;
@@ -40,6 +41,7 @@ export default async function (query) {
   try {
     if (!query?.id) return;
     if (await handleDeveloperCallback(query)) return;
+    if (await handlePageNavigationCallback(query)) return;
     if (await handleEditorBlockCallback(query)) return;
 
     const data = String(query.data || '');

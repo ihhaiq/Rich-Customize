@@ -108,3 +108,23 @@ export const editorSessions = table('editor_sessions', {
 }, (t) => ({
   activityIdx: index('idx_editor_sessions_activity').on(t.lastActivityAt),
 }));
+
+
+export const pageNavigationSessions = table('page_navigation_sessions', {
+  token: text('token').primaryKey(),
+  userId: integer('user_id').notNull(),
+  stack: json('stack').notNull().default([]),
+  previousStack: json('previous_stack'),
+  externalRoot: integer('external_root').notNull().default(0),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  userUpdatedIdx: index('idx_page_navigation_user_updated').on(t.userId, t.updatedAt),
+}));
+
+export const popupStates = table('popup_states', {
+  token: text('token').primaryKey(),
+  text: text('text').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  updatedIdx: index('idx_popup_states_updated').on(t.updatedAt),
+}));
