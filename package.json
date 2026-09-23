@@ -1,0 +1,16 @@
+{
+  "name": "rich-customize-serverless",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "devDependencies": {
+    "@tgcloud/cli": "^0.1.2"
+  },
+  "scripts": {
+    "status": "tgcloud status",
+    "deploy": "tgcloud push",
+    "run": "tgcloud run",
+    "migrate": "tgcloud migrate",
+    "webhook": "tgcloud webhook"
+  }
+}
