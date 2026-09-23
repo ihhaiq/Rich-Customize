@@ -407,7 +407,10 @@ class BlockPromptCleanupTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_empty_block_list_is_a_valid_editor_session(self):
         callback = SimpleNamespace(answer=AsyncMock())
-        state = SimpleNamespace(get_data=AsyncMock(return_value={"blocks": []}))
+        state = SimpleNamespace(
+            get_data=AsyncMock(return_value={"blocks": []}),
+            update_data=AsyncMock(),
+        )
 
         session = await _session(callback, state)
 
