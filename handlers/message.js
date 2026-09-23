@@ -11,7 +11,7 @@ import { openEditor } from 'lib/editor-home';
 
 function commandName(text) {
   if (typeof text !== 'string') return '';
-  return text.trim().split(/\\s+/, 1)[0].toLowerCase();
+  return text.trim().split(/\s+/, 1)[0].toLowerCase();
 }
 
 function matchesCommand(command, name) {
@@ -38,7 +38,6 @@ export default async function (message) {
       reply_markup: replyMarkup,
     });
   } catch (error) {
-    // Keep /start usable even if Telegram rejects a future Rich Message shape.
     console.error('sendRichMessage welcome failed; using plain fallback', error);
     await api.sendMessage({
       chat_id: message.chat.id,
