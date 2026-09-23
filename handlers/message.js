@@ -1,4 +1,4 @@
-// Telegram Serverless handler for the first converted feature: /start.
+// Telegram Serverless handler for /start and the first editor entry point.
 // The platform passes update.message directly as the first argument.
 
 import { api } from 'sdk';
