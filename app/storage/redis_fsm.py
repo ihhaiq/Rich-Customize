@@ -12,7 +12,13 @@ from app.editor.limits import EDITOR_SESSION_TTL_SECONDS
 
 
 class EditorRedisStorage(RedisStorage):
-    """Redis FSM that gives editor sessions a sliding two-hour TTL."""
+    """Persist editor FSM with Redis passive expiration.
+
+    Editor sessions always use EDITOR_SESSION_TTL_SECONDS. Redis enforces
+    that shared rule passively by expiring the state/data keys; the hybrid
+    storage enforces the same rule with an active timestamp check. Any future
+    session-duration change must continue to come only from the shared constant.
+    """
 
     async def set_data(self, key: StorageKey, data: Mapping[str, Any]) -> None:
         payload = dict(data)

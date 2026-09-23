@@ -1447,6 +1447,12 @@ class HybridFSMStorage(BaseStorage):
             return await self.fallback.get_state(key)
 
     async def _expire_editor_if_stale(self, key: StorageKey, encoded: str) -> bool:
+        """Enforce the shared editor TTL with an active timestamp check.
+
+        EditorRedisStorage applies the same EDITOR_SESSION_TTL_SECONDS rule
+        passively through Redis key expiration. Keep both mechanisms tied only
+        to that shared constant when the session duration changes.
+        """
         data = await self.fallback.get_data(key)
         raw_activity = data.get("editor_last_activity_at")
         if raw_activity is None:
