@@ -1,17 +1,21 @@
 # Rich Customize — Telegram Serverless migration
 
-This branch (`تنضيف`) is the Serverless migration workspace for the Rich Message Editor.
+Branch: `serverless-cleanup`
 
-## Current status
+This branch is the migration workspace for moving Rich Customize from Python/Aiogram/Railway to Telegram Serverless JavaScript.
 
-The first production slice has been converted from Python/Aiogram to Telegram Serverless JavaScript:
+Official Serverless reference: https://core.telegram.org/bots/serverless
 
-- `handlers/message.js` handles `/start`.
-- `lib/welcome.js` builds the localized Rich Message welcome screen.
-- The existing welcome languages are preserved.
-- Rich Message links for showcase, updates and support are preserved.
-- The add-to-group inline button is preserved.
-- If Telegram rejects the Rich Message payload, `/start` falls back to a plain text welcome instead of failing silently.
+The local scaffold reference remains in `docs/tgcloud-sdk.md`.
+
+## Converted so far
+
+- `handlers/message.js`: `/start` and `/editor`
+- `lib/welcome.js`: localized Rich Message welcome
+- `lib/editor-home.js`: first editor screen
+- `handlers/callback_query.js`: editor-entry and pages callbacks
+- `lib/pages.js`: initial `📚 صفحاتي` listing
+- `schema.js`: persistent `rich_pages` table
 
 The remaining Python files under `app/` and `tests/` are migration reference only. tgcloud does not deploy them.
 
@@ -21,33 +25,36 @@ The remaining Python files under `app/` and `tests/` are migration reference onl
 schema.js
 handlers/
   message.js
+  callback_query.js
 lib/
   welcome.js
+  editor-home.js
+  pages.js
 ```
 
-Only `schema.js`, `handlers/*.js` and JavaScript modules under `lib/` are deployed.
+Only `schema.js`, `handlers/*.js` and JavaScript modules under `lib/` deploy.
 
-## Local CLI
+## Deployment
 
 ```bash
-npm install
-npx tgcloud login
 npx tgcloud status
+npx tgcloud diff
 npx tgcloud push
-npx tgcloud webhook
+npx tgcloud migrate
+npx tgcloud webhook sync
 ```
 
-There are no database tables in this first slice, so `tgcloud migrate` is not required yet.
+Run `migrate` only when `push` reports schema changes.
 
-To test the message handler server-side:
+## Saved-page compatibility
 
-```bash
-npx tgcloud run handlers/message '{"chat":{"id":123456789,"type":"private"},"from":{"id":123456789,"is_bot":false,"first_name":"Hussein","language_code":"ar"},"text":"/start"}'
-```
+The Serverless page table keeps the old page IDs and page payload fields so the Railway backup can be imported.
+
+The 12-page limit is a creation limit, not a cleanup rule: old/imported pages are never deleted because an owner already has more than 12. Such a user simply cannot create another page until their count is below 12.
 
 ## Important
 
-- Do not add `BOT_TOKEN`; the platform provides Bot API access through `import { api } from 'sdk'`.
+- Do not add `BOT_TOKEN`; the Serverless SDK provides Bot API access.
 - Do not commit `.tgcloud/` or `node_modules/`.
 - Runtime modules cannot import npm packages.
-- Project-module imports are bare names such as `lib/welcome`, never relative paths.
+- Project imports use bare names such as `lib/welcome`, never relative paths.
