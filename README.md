@@ -1,47 +1,67 @@
 # Telegram Rich Message Editor
 
-بوت Telegram لبناء وتحرير ونشر Rich Messages باستخدام Python وAiogram، مع محرر Mini App وصفحات محفوظة وأزرار Inline ونشر إلى القنوات والمجموعات.
+بوت Telegram لبناء وتحرير وحفظ ونشر **Rich Messages** عبر Python 3.12 وAiogram، مع محرر داخل البوت، Mini App، صفحات محفوظة، أزرار غنية وInline، نشر للقنوات والمجموعات، وتخزين PostgreSQL مع fallback محلي.
 
-## التشغيل
+## أهم الميزات
 
-يتطلب Python 3.12 أو أحدث.
+- محرر Rich Blocks يدعم النصوص، العناوين، التفاصيل، الفواصل، القوائم، الجداول، الاقتباسات، الرياضيات، Anchor، Footer، الوسائط، Collage وSlideshow.
+- استقبال نصوص/وسائط ورسائل Rich وتحويلها إلى Blocks قابلة للتعديل.
+- تعديل، حذف، إعادة ترتيب ونقل البلوكات مع الحفاظ على Telegram entities وCustom Emoji.
+- Mini App للمحرر مع أدوات النص والجداول والوسائط وواجهة Liquid Glass.
+- صفحات محفوظة بأسماء وأكواد مع بحث وفرز وترقيم وإدارة من داخل `صفحاتي`.
+- Rich Buttons داخل محتوى الرسالة، وInlineKeyboardButton تحت الرسالة كمسارين منفصلين.
+- نشر إلى القنوات والمجموعات التي يملك المستخدم والبوت صلاحية الإدارة فيها.
+- Inline/Guest delivery للصفحات المحفوظة.
+- Showcase كامل للبلوكات عبر `/draft`.
+- توطين متعدد اللغات.
+- PostgreSQL كمخزن أساسي مع JSON fallback وإعادة مزامنة بعد عودة قاعدة البيانات.
+- Redis اختياري ومُوصى به لـFSM الدائم، throttling، idempotency، الأقفال الموزعة والكاش.
+- Alembic لإدارة schema.
+- Prometheus وSentry للمراقبة الاختيارية.
+- إحصائيات تشغيل ومستخدمين دائمة داخل لوحة المطور.
+
+## حدود المحرر الحالية
+
+الحدود الفعلية معرفة مركزيًا في `app/editor/limits.py`:
+
+| المورد | الحد |
+| --- | ---: |
+| الصفحات المحفوظة لكل مستخدم | 12 |
+| المطور | بدون حد صفحات |
+| عمر جلسة المحرر من آخر نشاط | ساعتان |
+| عدد البلوكات في الصفحة | 30 |
+| النص الظاهر داخل الصفحة | 25,000 حرف |
+| صفوف الجدول | 50 |
+| أعمدة الجدول | 25 |
+| عناصر Slideshow | 50 |
+
+تُطبّق الحدود على المسارات المشتركة للمحرر، وليست مجرد تحقق واجهة. جلسات المحرر المنتهية تُنظف دوريًا.
+
+## التشغيل المحلي
+
+يتطلب Python 3.12.
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\\Scripts\\activate
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env            # Windows: copy .env.example .env
 python main.py
 ```
 
-ضع `BOT_TOKEN` و`DEVELOPER_ID` وبقية الإعدادات في `.env`. ملف الإعداد المرجعي الوحيد هو `.env.example`.
+ضع `BOT_TOKEN` و`DEVELOPER_ID` وبقية الإعدادات داخل `.env`. الملف المرجعي للمتغيرات هو `.env.example`.
 
-## أهم الميزات
+## الأوامر الرئيسية
 
-- محرر Rich Blocks كامل: Paragraph، Heading، Footer، Divider، Preformatted، Math، Anchor، List، Table، Details، Quotes ووسائط Telegram.
-- استقبال Rich Message أو نص/وسائط وتحويلها إلى Blocks قابلة للتعديل.
-- تعديل وحذف وتحريك البلوكات مع الحفاظ على Telegram entities وCustom Emoji.
-- Mini App للمحرر مع أدوات النص والجداول والوسائط وLiquid Glass.
-- صفحات محفوظة بأسماء وأكواد، مع بحث وفرز وتنقل وربط الصفحات عبر CBD.
-- InlineKeyboardButton تحت الرسالة للروابط والنسخ وcallbacks والتنبيهات والتنقل.
-- Rich Buttons داخل محتوى البلوكات كمسار مستقل.
-- نشر إلى قنوات ومجموعات يكون المستخدم والبوت مشرفين فيها.
-- Inline/Guest delivery للصفحات المحفوظة.
-- Showcase لكل Rich Blocks عبر `/draft`.
-- توطين متعدد اللغات مع مفاتيح semantic للواجهات الجديدة.
-- PostgreSQL كمخزن أساسي مع JSON fallback وإعادة مزامنة.
-- Redis اختياري ومُوصى به لـFSM الدائم، throttling، idempotency، الأقفال الموزعة وكاش الإحصائيات.
-- Alembic لإدارة schema، وPrometheus/Sentry للمراقبة الاختيارية.
-
-## أوامر مهمة
-
-- `/editor` — فتح المحرر.
+- `/editor` — فتح محرر الرسائل.
 - `/dev` — لوحة المطور.
-- `/draft` — قالب Showcase لكل البلوكات.
+- `/draft` — إنشاء Showcase للبلوكات.
 
-## أزرار داخل النص
+## Rich Buttons داخل الرسالة
 
-Rich Buttons داخل النص لها تنسيق مستقل عن أزرار Inline تحت الرسالة:
+Rich Buttons جزء من محتوى Rich Message وليست Inline keyboard.
+
+الصيغة:
 
 ```text
 {اسم الزر:النوع القيمة#اللون}
@@ -57,9 +77,9 @@ Rich Buttons داخل النص لها تنسيق مستقل عن أزرار Inli
 {التالي:cbd a86d3132#b}
 ```
 
-الأنواع تشمل `url`، `cbd`، `callback_data`، `copy`، `user`، `web_app`، `login_url`، Inline query والزر المعطل. الألوان الاختيارية: `#r` و`#b`/`#p` و`#g`.
+الأنواع المدعومة تشمل `url` و`cbd` و`callback_data` و`copy` و`user` و`web_app` و`login_url` وأنواع Inline query والزر المعطل. الألوان الاختيارية تشمل `#r` و`#b`/`#p` و`#g`.
 
-## أزرار Inline تحت الرسالة
+## Inline Buttons تحت الرسالة
 
 قسم إضافة الأزرار في المحرر ينشئ `InlineKeyboardButton` تحت الرسالة. الإضافة تتم برسالة واحدة، مثل:
 
@@ -71,59 +91,42 @@ Rich Buttons داخل النص لها تنسيق مستقل عن أزرار Inli
 { نسخ - copy:النص }
 ```
 
-يمكن تعديل النوع واللون والترتيب وعدد الأزرار في الصف لاحقًا. `cbd` يجب أن يشير إلى صفحة محفوظة يملكها المستخدم.
+يمكن تعديل النوع واللون والترتيب وعدد الأزرار في الصف لاحقًا. زر `cbd` يجب أن يشير إلى صفحة محفوظة يملكها المستخدم.
 
 ## صفحاتي
 
-واجهة الصفحات المحفوظة تستخدم Rich Table مضغوطًا:
-- كل صفحة في صف واحد.
-- الحذف، تعديل الاسم، نسخ الكود، واسم الصفحة داخل الجدول.
-- الترقيم خارج الجدول كأزرار Inline: `⬅️ | 1/9 | ➡️`.
-- البحث والفرز والرجوع أزرار Inline عادية.
+الصفحات المحفوظة تُخزن في PostgreSQL كصف مستقل لكل صفحة داخل جدول `rich_pages` عند توفر قاعدة البيانات.
 
-يمكن استدعاء صفحة محفوظة أيضًا عبر Inline/Guest حسب إعدادات Telegram المتاحة.
+واجهة `صفحاتي` تستخدم Rich Table مضغوطًا:
+
+- كل صفحة في صف واحد.
+- الحذف، تعديل الاسم، نسخ الكود واسم الصفحة داخل الجدول.
+- الترقيم خارج الجدول كأزرار Inline بالشكل `⬅️ | 1/9 | ➡️`.
+- البحث والفرز والرجوع تبقى أزرار Inline عادية.
+
+يوجد حد 12 صفحة لكل مستخدم، والمطور مستثنى من هذا الحد.
+
+الهجرة من التخزين القديم تحافظ على `page_id` نفسه. توجد migration markers لمنع رجوع صفحات قديمة محذوفة من snapshots سابقة.
 
 ## Mini App
 
-المسار العام هو `/miniapp`. إذا استخدمت Named Mini App في BotFather فالقيمة الافتراضية لـ`MINI_APP_SHORT_NAME` هي `editor`.
-
-فحص الصحة:
+المسار العام:
 
 ```text
-/healthz
+/miniapp
 ```
 
-يعرض حالة PostgreSQL وRedis واستهلاك ذاكرة العملية. مقاييس Prometheus متوفرة على:
+إذا استخدمت Named Mini App في BotFather فالقيمة الافتراضية لـ`MINI_APP_SHORT_NAME` هي:
 
 ```text
-/metrics
+editor
 ```
 
-ولـSentry أضف `SENTRY_DSN` اختياريًا؛ التسجيل الافتراضي JSON ويخفي التوكنات ومعرفات Telegram الكاملة من الرسائل المنظمة.
+الواجهة تدعم تحرير Rich Text والجداول والوسائط، إضافة إلى Liquid Glass والوضع الداكن المحفوظ محليًا.
 
-## البنية
+## التخزين وقاعدة البيانات
 
-- `app/editor/` — نماذج البلوكات، registry، workflow، draft store وhistory.
-- `app/routers/` — Telegram handlers وcallbacks حسب الميزة.
-- `app/keyboards/` — Inline keyboard builders.
-- `app/services/parser.py` — تحويل رسائل Telegram إلى Blocks.
-- `app/services/renderer.py` — بناء Rich Message والمعاينات.
-- `app/services/buttons.py` و`inline_buttons.py` — منطق الأزرار.
-- `app/services/page_registry.py` و`page_navigation.py` و`pages_ui.py` — الصفحات المحفوظة.
-- `app/services/media.py` و`media_library.py` — الوسائط.
-- `app/services/albums.py` — تجميع media groups.
-- `app/services/showcase.py` — قالب Showcase.
-- `app/storage/hybrid.py` — PostgreSQL + JSON fallback.
-- `app/webapp/` — Backend للـMini App.
-- `app/miniapp_static/` — واجهة Mini App.
-- `app/lang/` و`app/i18n*.py` — التوطين.
-- `tests/` — اختبارات الوحدة والـregressions.
-
-للتفاصيل المعمارية راجع `docs/editor_architecture.md`.
-
-## قاعدة البيانات
-
-عند وجود `DATABASE_URL` يستخدم البوت PostgreSQL كمخزن أساسي. إذا تعذر الاتصال يستمر على JSON fallback ثم يعيد المزامنة عند عودة PostgreSQL.
+عند وجود `DATABASE_URL` يستخدم البوت PostgreSQL كمخزن أساسي. إذا تعذر الاتصال، يستمر عبر JSON fallback ثم يعيد مزامنة التغييرات عند عودة PostgreSQL.
 
 مثال Railway:
 
@@ -138,7 +141,6 @@ DATABASE_RECONNECT_INTERVAL=30
 DATABASE_CIRCUIT_FAILURES=3
 DATABASE_CIRCUIT_COOLDOWN=30
 
-# اربطه بخدمة Redis في Railway عند إضافتها.
 REDIS_URL=${{Redis.REDIS_URL}}
 REDIS_CONNECT_TIMEOUT=2
 REDIS_COMMAND_TIMEOUT=2
@@ -148,23 +150,89 @@ PAGE_SNAPSHOT_INTERVAL=21600
 RESTORE_DRILL_INTERVAL=86400
 ```
 
-عند وجود `REDIS_URL` تصبح جلسات FSM في Redis وتبقى عبر restart وتدعم أكثر من instance. إذا Redis غير متوفر عند التشغيل يرجع البوت تلقائيًا لمسار FSM الحالي المدعوم بـPostgreSQL/Memory fallback.
+عند وجود `REDIS_URL` تصبح جلسات FSM قابلة للاستمرار عبر restart وتدعم أكثر من instance. إذا لم يتوفر Redis يرجع البوت إلى المسار المدعوم بـPostgreSQL/Memory fallback.
 
-Alembic يشغّل `upgrade head` عند أول اتصال PostgreSQL، والجداول الموجودة من الإصدارات السابقة تبقى متوافقة لأن migration الأولى تستخدم إنشاءً آمنًا غير هدّام.
+Alembic يشغّل migrations الخاصة بالمشروع عند الاتصال بقاعدة PostgreSQL.
 
-Snapshot الصفحات الكامل الافتراضي كل 6 ساعات، ويُنشأ أيضًا عند Export وعند الإغلاق الطبيعي ويمكن إنشاؤه يدويًا من لوحة المطور. يوجد Restore Drill افتراضي كل 24 ساعة للتحقق أن JSON fallback قابل للقراءة ويطابق page IDs في PostgreSQL.
+Snapshot الصفحات الكامل يُنشأ دوريًا حسب `PAGE_SNAPSHOT_INTERVAL`، ويُنشأ أيضًا في مسارات الصيانة المناسبة مثل Export والإغلاق الطبيعي. يوجد Restore Drill دوري للتحقق من صلاحية fallback.
 
-تبقى متغيرات `*_STATE` مهمة لمسارات fallback. لاستمرار ملفات JSON بين Deployments على Railway استخدم Volume دائمًا.
+لا تعتمد على ملفات JSON بين Deployments في Railway بدون Volume دائم.
+
+## الإحصائيات والمراقبة
+
+لوحة المطور تحتوي إحصائيات تشغيل ومستخدمين، منها:
+
+- uptime.
+- requests في الدقيقة ومتوسط 5 دقائق.
+- متوسط وأعلى response time.
+- أخطاء handlers خلال آخر ساعة.
+- نجاح/فشل Preview.
+- نجاح/فشل Publish، بما فيه Mini App.
+- Telegram rate-limit events.
+- DB latency.
+- حجم قاعدة البيانات وجدول الصفحات.
+- عدد جلسات FSM والمحررات النشطة.
+- عدد الصفحات وأصحابها.
+- إجمالي المستخدمين المعروفين.
+- المستخدمون النشطون خلال 1h / 24h / 7d / 30d.
+- المستخدمون الجدد خلال 24h / 7d / 30d.
+- إجمالي التفاعلات.
+- أكثر اللغات استخدامًا.
+- قائمة مستخدمين مقسمة إلى صفحات داخل لوحة المطور.
+
+هذه الإحصائيات دائمة ولا تتصفر بمجرد restart، وتدخل ضمن export/import.
+
+## الصحة والمقاييس
+
+فحص الصحة:
+
+```text
+/healthz
+```
+
+يعرض حالة PostgreSQL وRedis واستهلاك ذاكرة العملية.
+
+مقاييس Prometheus:
+
+```text
+/metrics
+```
+
+يمكن تفعيل Sentry عبر `SENTRY_DSN`. التسجيل المنظم يخفي التوكنات ومعرفات Telegram الكاملة من السجلات المهيكلة.
+
+## بنية المشروع
+
+| المسار | المسؤولية |
+| --- | --- |
+| `app/editor/` | نماذج البلوكات، registry، workflow، draft store، history وحدود المحرر. |
+| `app/routers/` | أوامر Telegram والـcallbacks حسب الميزة. |
+| `app/keyboards/` | Inline keyboard builders. |
+| `app/services/parser.py` | تحويل رسائل Telegram إلى Blocks. |
+| `app/services/renderer.py` | بناء Rich Message والمعاينات. |
+| `app/services/buttons.py` و`inline_buttons.py` | منطق الأزرار. |
+| `app/services/page_registry.py` | إدارة الصفحات المحفوظة. |
+| `app/services/page_navigation.py` و`pages_ui.py` | التنقل وواجهة صفحاتي. |
+| `app/services/media.py` و`media_library.py` | الوسائط. |
+| `app/services/albums.py` | تجميع media groups. |
+| `app/services/showcase.py` | Showcase. |
+| `app/storage/` | PostgreSQL، fallback، repositories وعمليات التخزين. |
+| `app/webapp/` | Backend للـMini App. |
+| `app/miniapp_static/` | واجهة Mini App. |
+| `app/lang/` و`app/i18n*.py` | التوطين. |
+| `alembic/` | migrations قاعدة البيانات. |
+| `tests/` | اختبارات الوحدة والـregressions. |
+
+للتفاصيل المعمارية راجع `docs/editor_architecture.md`.
 
 ## لوحة المطور
 
-ضع رقم الحساب في `DEVELOPER_ID` (أو القيم التي يدعمها إعداد المشروع). الأمر `/dev` يوفر أدوات المطور، ومنها فحص قاعدة البيانات والاستيراد/التصدير وتحديث قناة المعاينة.
+ضع رقم الحساب في `DEVELOPER_ID`. الأمر `/dev` يوفر أدوات الصيانة والإحصائيات وفحص قاعدة البيانات والاستيراد/التصدير وتحديث قناة المعاينة.
 
-لا تضع Tokens أو Secrets داخل ملفات ZIP/JSON التي ترفعها للمستودع.
+لا تضع Tokens أو Secrets داخل ملفات ZIP/JSON أو داخل المستودع.
 
 ## خطأ BOT_DOMAIN_INVALID
 
-يخص `login_url`. يجب تسجيل الدومين في BotFather عبر `/setdomain` واستخدام HTTPS مطابق. إذا لا تحتاج Telegram Login استخدم زر `url` عادي.
+الخطأ يخص `login_url`. يجب تسجيل الدومين في BotFather عبر `/setdomain` واستخدام HTTPS مطابق. إذا لا تحتاج Telegram Login استخدم زر `url` عادي.
 
 ## الاختبارات
 
@@ -174,3 +242,5 @@ python -m mypy app main.py
 python -m compileall -q app main.py
 python -m pytest -q
 ```
+
+إذا فشل GitHub Actions قبل تشغيل أي Step فعليًا، فلا يعني ذلك تلقائيًا أن الكود نفسه فشل.
