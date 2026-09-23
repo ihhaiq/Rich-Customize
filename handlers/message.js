@@ -40,9 +40,10 @@ export default async function (message) {
       return;
     }
 
-    if (await handleEditorBlockMessage(message)) return;
-
-    if (!matchesCommand(command, 'start')) return;
+    if (!matchesCommand(command, 'start')) {
+      if (await handleEditorBlockMessage(message)) return;
+      return;
+    }
 
     const replyMarkup = buildWelcomeKeyboard(languageCode);
     try {
