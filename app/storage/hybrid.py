@@ -123,6 +123,18 @@ class PostgresStateDatabase:
         self._consecutive_failures = 0
         self._circuit_open_until = 0.0
         self._migrations_ready = False
+        self._pages_repository = PagesRepository(self)
+        self._pages_backup = PagesBackup(
+            self,
+            encode_json=_encode_json,
+            logger=logger,
+        )
+        self._fsm_state_repository = FSMStateRepository(
+            self,
+            encode_json=_encode_json,
+            decode_json=_decode_json,
+            logger=logger,
+        )
 
     def _url(self) -> str:
         if self._database_url is not None:
@@ -444,43 +456,43 @@ class PostgresStateDatabase:
 
 
     def register(self, repository: HybridJSONRepository) -> None:
-        FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).register(repository)
+        self._fsm_state_repository.register(repository)
 
     async def read_snapshot(self, repository: HybridJSONRepository) -> Any:
-        return await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).read_snapshot(repository)
+        return await self._fsm_state_repository.read_snapshot(repository)
 
     async def write_snapshot(
         self,
         repository: HybridJSONRepository,
         payload: Any,
     ) -> None:
-        await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).write_snapshot(repository, payload)
+        await self._fsm_state_repository.write_snapshot(repository, payload)
 
     async def mirror_local_snapshot(
         self,
         repository: HybridJSONRepository,
         payload: Any,
     ) -> None:
-        await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).mirror_local_snapshot(repository, payload)
+        await self._fsm_state_repository.mirror_local_snapshot(repository, payload)
 
     def schedule_local_snapshot(
         self,
         repository: HybridJSONRepository,
         payload: Any,
     ) -> None:
-        FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).schedule_local_snapshot(repository, payload)
+        self._fsm_state_repository.schedule_local_snapshot(repository, payload)
 
     async def sync_local_paths(self, paths: list[str]) -> None:
-        await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).sync_local_paths(paths)
+        await self._fsm_state_repository.sync_local_paths(paths)
 
     async def read_fsm(
         self,
         storage_key: str,
     ) -> tuple[bool, str | None, dict[str, Any]]:
-        return await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).read_fsm(storage_key)
+        return await self._fsm_state_repository.read_fsm(storage_key)
 
     async def cleanup_expired_editor_fsm(self, cutoff_epoch: int) -> int:
-        return await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).cleanup_expired_editor_fsm(cutoff_epoch)
+        return await self._fsm_state_repository.cleanup_expired_editor_fsm(cutoff_epoch)
 
     async def write_fsm(
         self,
@@ -488,27 +500,19 @@ class PostgresStateDatabase:
         state: str | None,
         data: Mapping[str, Any],
     ) -> bool:
-        return await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).write_fsm(storage_key, state, data)
+        return await self._fsm_state_repository.write_fsm(storage_key, state, data)
 
     @staticmethod
     def _page_record(row: Any) -> dict[str, Any]:
         return PagesRepository._page_record(row)
     async def migrate_legacy_pages(self, pages: Mapping[str, Any]) -> int:
-        return await PagesBackup(
-            self,
-            encode_json=_encode_json,
-            logger=logger,
-        ).migrate_legacy_pages(pages)
+        return await self._pages_backup.migrate_legacy_pages(pages)
     async def replace_pages_snapshot(self, pages: Mapping[str, Any]) -> bool:
-        return await PagesBackup(
-            self,
-            encode_json=_encode_json,
-            logger=logger,
-        ).replace_pages_snapshot(pages)
+        return await self._pages_backup.replace_pages_snapshot(pages)
     async def get_page(self, page_id: str) -> tuple[bool, dict[str, Any] | None]:
-        return await PagesRepository(self).get_page(page_id)
+        return await self._pages_repository.get_page(page_id)
     async def count_pages_for_user(self, owner_id: int) -> tuple[bool, int]:
-        return await PagesRepository(self).count_pages_for_user(owner_id)
+        return await self._pages_repository.count_pages_for_user(owner_id)
     async def save_page_row_limited(
         self,
         page_id: str,
@@ -523,7 +527,7 @@ class PostgresStateDatabase:
         *,
         max_pages: int | None,
     ) -> tuple[bool, str]:
-        return await PagesRepository(self).save_page_row_limited(
+        return await self._pages_repository.save_page_row_limited(
             page_id,
             owner_id,
             title,
@@ -547,7 +551,7 @@ class PostgresStateDatabase:
         created_at: int,
         updated_at: int,
     ) -> bool:
-        return await PagesRepository(self).save_page_row(
+        return await self._pages_repository.save_page_row(
             page_id,
             owner_id,
             title,
@@ -570,7 +574,7 @@ class PostgresStateDatabase:
         limit: int | None = None,
         offset: int = 0,
     ) -> tuple[bool, list[dict[str, Any]], int, int]:
-        return await PagesRepository(self).query_pages_for_user(
+        return await self._pages_repository.query_pages_for_user(
             owner_id,
             query=query,
             sort_mode=sort_mode,
@@ -581,9 +585,9 @@ class PostgresStateDatabase:
         self,
         owner_ids: list[int],
     ) -> tuple[bool, dict[int, int]]:
-        return await PagesRepository(self).count_pages_for_users(owner_ids)
+        return await self._pages_repository.count_pages_for_users(owner_ids)
     async def delete_page_row(self, page_id: str, owner_id: int) -> tuple[bool, bool]:
-        return await PagesRepository(self).delete_page_row(page_id, owner_id)
+        return await self._pages_repository.delete_page_row(page_id, owner_id)
     async def rename_page_row(
         self,
         page_id: str,
@@ -591,22 +595,18 @@ class PostgresStateDatabase:
         title: str,
         updated_at: int,
     ) -> tuple[bool, bool]:
-        return await PagesRepository(self).rename_page_row(
+        return await self._pages_repository.rename_page_row(
             page_id,
             owner_id,
             title,
             updated_at,
         )
     async def all_pages_snapshot(self) -> tuple[bool, dict[str, dict[str, Any]]]:
-        return await PagesBackup(
-            self,
-            encode_json=_encode_json,
-            logger=logger,
-        ).all_pages_snapshot()
+        return await self._pages_backup.all_pages_snapshot()
     async def page_statistics(self) -> tuple[bool, dict[str, int | None]]:
-        return await PagesRepository(self).page_statistics()
+        return await self._pages_repository.page_statistics()
     async def page_usage_history(self) -> tuple[bool, dict[int, dict[str, int]]]:
-        return await PagesRepository(self).page_usage_history()
+        return await self._pages_repository.page_usage_history()
     async def runtime_statistics(self, active_after: int) -> dict[str, int | None]:
         pool = self._pool
         if pool is None:
