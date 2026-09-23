@@ -1,3 +1,4 @@
+import asyncio
 import tempfile
 import unittest
 from pathlib import Path
@@ -105,6 +106,74 @@ class PageRegistryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(total_count, 2)
             self.assertEqual([page["page_id"] for page in pages], [alpha])
             self.assertNotIn(beta, [page["page_id"] for page in pages])
+
+
+    async def test_replay_pending_preserves_new_mutation_while_replay_is_slow(self):
+        with tempfile.TemporaryDirectory() as directory:
+            registry = PageRegistry(Path(directory) / "pages.json")
+            registry._write_pending_sync({
+                "old-page": {
+                    "op": "upsert",
+                    "owner_id": 7,
+                    "page": {
+                        "owner_id": 7,
+                        "title": "قديم",
+                        "blocks": [],
+                        "buttons": [],
+                    },
+                },
+            })
+            entered = asyncio.Event()
+            release = asyncio.Event()
+            connected = True
+
+            async def replay_save(*args, **kwargs):
+                entered.set()
+                await release.wait()
+                return True, "saved"
+
+            def connected_value():
+                return connected
+
+            blocks = [
+                {
+                    "id": "new",
+                    "type": "paragraph",
+                    "position": 0,
+                    "data": {"text": "new"},
+                },
+            ]
+
+            with patch.object(
+                type(state_database),
+                "connected",
+                new_callable=PropertyMock,
+            ) as connected_mock, patch.object(
+                type(state_database),
+                "configured",
+                new_callable=PropertyMock,
+                return_value=True,
+            ), patch.object(
+                state_database,
+                "save_page_row_limited",
+                side_effect=replay_save,
+            ):
+                connected_mock.side_effect = connected_value
+                replay_task = asyncio.create_task(registry.replay_pending())
+                await entered.wait()
+                connected = False
+                save_task = asyncio.create_task(
+                    registry.save(7, "جديد", blocks, [], 1, "center")
+                )
+                await asyncio.sleep(0)
+                release.set()
+                page_id = await save_task
+                await replay_task
+
+            pending = registry._read_pending_sync()
+            self.assertNotIn("old-page", pending)
+            self.assertEqual(pending[page_id]["op"], "upsert")
+            self.assertEqual(pending[page_id]["owner_id"], 7)
 
 
 if __name__ == "__main__":

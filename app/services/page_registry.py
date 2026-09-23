@@ -111,52 +111,53 @@ class PageRegistry:
         """Replay only offline mutations after PostgreSQL reconnects."""
         if not state_database.connected:
             return
-        pending = await asyncio.to_thread(self._read_pending_sync)
-        if not pending:
-            return
+        async with self._lock:
+            pending = await asyncio.to_thread(self._read_pending_sync)
+            if not pending:
+                return
 
-        remaining = copy.deepcopy(pending)
-        for page_id, operation in pending.items():
-            if not isinstance(operation, dict):
-                continue
-            try:
-                owner_id = int(operation.get("owner_id", 0))
-            except (TypeError, ValueError):
-                continue
-            if not owner_id:
-                continue
+            remaining = copy.deepcopy(pending)
+            for page_id, operation in pending.items():
+                if not isinstance(operation, dict):
+                    continue
+                try:
+                    owner_id = int(operation.get("owner_id", 0))
+                except (TypeError, ValueError):
+                    continue
+                if not owner_id:
+                    continue
 
-            if operation.get("op") == "delete":
-                available, _deleted = await state_database.delete_page_row(
+                if operation.get("op") == "delete":
+                    available, _deleted = await state_database.delete_page_row(
+                        page_id,
+                        owner_id,
+                    )
+                    if available:
+                        remaining.pop(page_id, None)
+                    continue
+
+                page = operation.get("page")
+                if not isinstance(page, dict):
+                    continue
+                now = int(time.time())
+                available, status = await state_database.save_page_row_limited(
                     page_id,
                     owner_id,
+                    str(page.get("title") or "صفحة بلا اسم")[:64],
+                    copy.deepcopy(page.get("blocks") or []),
+                    copy.deepcopy(page.get("buttons") or []),
+                    int(page.get("buttons_per_row") or 1),
+                    str(page.get("buttons_align") or "center"),
+                    int(page.get("created_at") or now),
+                    int(page.get("updated_at") or now),
+                    max_pages=None if owner_id in developer_ids() else MAX_SAVED_PAGES,
                 )
-                if available:
+                if available and status == "saved":
                     remaining.pop(page_id, None)
-                continue
 
-            page = operation.get("page")
-            if not isinstance(page, dict):
-                continue
-            now = int(time.time())
-            available, status = await state_database.save_page_row_limited(
-                page_id,
-                owner_id,
-                str(page.get("title") or "صفحة بلا اسم")[:64],
-                copy.deepcopy(page.get("blocks") or []),
-                copy.deepcopy(page.get("buttons") or []),
-                int(page.get("buttons_per_row") or 1),
-                str(page.get("buttons_align") or "center"),
-                int(page.get("created_at") or now),
-                int(page.get("updated_at") or now),
-                max_pages=None if owner_id in developer_ids() else MAX_SAVED_PAGES,
-            )
-            if available and status == "saved":
-                remaining.pop(page_id, None)
-
-        await asyncio.to_thread(self._write_pending_sync, remaining)
-        if not remaining and state_database.connected:
-            await self.export_snapshot()
+            await asyncio.to_thread(self._write_pending_sync, remaining)
+            if not remaining and state_database.connected:
+                await self.export_snapshot()
 
     @staticmethod
     def _page_payload(
