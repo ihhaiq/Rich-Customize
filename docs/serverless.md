@@ -1,34 +1,33 @@
-# Telegram Serverless notes for this migration
+# Telegram Serverless notes for Rich Customize
 
-Keep these two references beside the project while porting:
+Primary reference: https://core.telegram.org/bots/serverless
 
-- Official guide: https://core.telegram.org/bots/serverless
-- Scaffold SDK reference: `docs/tgcloud-sdk.md`
+Local SDK/CLI reference: `docs/tgcloud-sdk.md`
 
-The official guide is the current platform reference; the scaffold file documents the SDK/CLI conventions shipped with the local project.
+## Platform model
 
-## Runtime
+- Isolated V8 runtime.
+- Built-in persistent SQLite-backed database.
+- Root `schema.js`, `lib/**/*.js`, and one-level `handlers/*.js` are deployed.
+- Use bare imports only.
+- The Serverless SDK supplies `api`, `db`, `fetch`, `InputFile`, and `BotApiError`.
+- `api.getFileContent(file_id)` returns a `Uint8Array`; Bot API downloads are capped at 20 MB.
+- `InputFile` uploads raw bytes through Bot API methods.
+- `push` and `migrate` are separate operations.
 
-- Serverless uses an isolated V8 runtime, not the old Python process and not a normal Node server.
-- Deployable code is root `schema.js`, `lib/**/*.js`, and one-level `handlers/*.js`.
-- Handlers receive the matching Bot API update payload directly; the complete Update is available as `ctx.update`.
-- Use bare imports only: `from 'lib/welcome'`, `from 'schema'`, `from 'sdk'`, `from 'sdk/db'`.
-- The runtime has no project filesystem and deployed modules cannot resolve npm packages.
-- Use `api.<BotApiMethod>(params)`; successful responses are already unwrapped.
-- Bot API failures throw `BotApiError`.
-- Use `api.getFileContent(file_id)` or `api.getFileStream(file_id)` for Telegram files. Bot API downloads are capped at 20 MB.
-- The database is SQLite-backed and persistent between invocations.
-- No foreign keys.
-- Every database terminal call is asynchronous.
-- `push` and database migration are separate operations.
-- The platform manages the webhook from deployed handlers.
+## Current persistent tables
 
-## Rich Customize migration decisions
+- `rich_pages` — saved pages, preserving legacy IDs and payload fields.
+- `developer_states` — short-lived /dev import flow state.
+- `legacy_states` — imported old JSON namespaces not yet consumed by converted features.
+- `usage_users`, `usage_minutes`, `usage_runtime` — persistent Serverless usage/operational statistics.
+- `page_snapshots` — bounded page recovery snapshots.
+- `maintenance_locks` — prevents duplicate import/export/snapshot/refresh operations.
 
-- `rich_pages` preserves legacy `page_id`, owner, blocks, buttons, layout and timestamps.
-- A legacy import is allowed to restore more than 12 pages for one owner.
-- The 12-page limit will be enforced only when a user creates a new page. It must never prune old/imported pages.
-- The old ZIP backup remains the migration source. Only data with a Serverless destination table is imported at each stage; unported backup sections are left untouched for later migration.
+## Developer panel
 
-For Rich Message and Bot API definitions:
-https://core.telegram.org/bots/api
+The old Python /dev actions have Serverless equivalents. PostgreSQL/Redis-specific diagnostics were replaced with Serverless SQLite diagnostics rather than emulated. Editor/FSM activity is reported as not yet migrated until the editor session layer is ported.
+
+Backup import keeps legacy pages even above 12. The limit is a new-page creation rule only.
+
+The old backup format `rich-customize-json-backup-v1` remains supported so Railway exports can be moved into Serverless without rewriting page IDs.

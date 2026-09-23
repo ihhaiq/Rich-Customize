@@ -2,37 +2,37 @@
 
 Branch: `serverless-cleanup`
 
-This branch is the migration workspace for moving Rich Customize from Python/Aiogram/Railway to Telegram Serverless JavaScript.
+Rich Customize is being moved from Python/Aiogram/Railway to Telegram Serverless JavaScript.
 
-Official Serverless reference: https://core.telegram.org/bots/serverless
+Official platform guide: https://core.telegram.org/bots/serverless
 
-The local scaffold reference remains in `docs/tgcloud-sdk.md`.
+The scaffold SDK reference is kept at `docs/tgcloud-sdk.md`.
 
-## Converted so far
+## Converted
 
-- `handlers/message.js`: `/start` and `/editor`
-- `lib/welcome.js`: localized Rich Message welcome
-- `lib/editor-home.js`: first editor screen
-- `handlers/callback_query.js`: editor-entry and pages callbacks
-- `lib/pages.js`: initial `📚 صفحاتي` listing
-- `schema.js`: persistent `rich_pages` table
+- `/start` Rich Message welcome
+- `/editor` entry screen
+- initial `📚 صفحاتي` list backed by Serverless DB
+- complete developer-panel surface adapted to Serverless:
+  - import ZIP/JSON + confirmation
+  - export compatible backup ZIP
+  - Serverless DB health/size check
+  - persistent user/operational statistics
+  - paged user statistics
+  - page snapshot + restore drill
+  - showcase-channel cache refresh
 
-The remaining Python files under `app/` and `tests/` are migration reference only. tgcloud does not deploy them.
+The remaining Python files are migration references only; tgcloud does not deploy them.
 
-## Serverless layout
+## Backup compatibility
 
-```text
-schema.js
-handlers/
-  message.js
-  callback_query.js
-lib/
-  welcome.js
-  editor-home.js
-  pages.js
-```
+The old `rich-customize-json-backup-v1` format is supported. Saved pages preserve their `page_id`, owner, blocks, buttons, layout, and timestamps. Other old JSON namespaces are stored in `legacy_states` until their feature is ported.
 
-Only `schema.js`, `handlers/*.js` and JavaScript modules under `lib/` deploy.
+The 12-page rule never prunes old/imported pages. It only prevents creation of a new page when the owner is already at or above the limit.
+
+## Developer access
+
+`/dev` stays closed until numeric Telegram developer IDs are added to `lib/developer-access.js`. If the list is empty, `/dev` tells the sender their own Telegram ID so it can be configured deliberately.
 
 ## Deployment
 
@@ -44,17 +44,8 @@ npx tgcloud migrate
 npx tgcloud webhook sync
 ```
 
-Run `migrate` only when `push` reports schema changes.
+Run `migrate` only after reviewing the schema changes reported by `push`.
 
-## Saved-page compatibility
+## Next
 
-The Serverless page table keeps the old page IDs and page payload fields so the Railway backup can be imported.
-
-The 12-page limit is a creation limit, not a cleanup rule: old/imported pages are never deleted because an owner already has more than 12. Such a user simply cannot create another page until their count is below 12.
-
-## Important
-
-- Do not add `BOT_TOKEN`; the Serverless SDK provides Bot API access.
-- Do not commit `.tgcloud/` or `node_modules/`.
-- Runtime modules cannot import npm packages.
-- Project imports use bare names such as `lib/welcome`, never relative paths.
+Port the rich editor incrementally: persisted editor sessions, add-block menu, individual rich block handlers/rendering, preview, page save/update, and publishing.
