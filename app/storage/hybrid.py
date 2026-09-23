@@ -22,6 +22,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.editor.limits import EDITOR_SESSION_TTL_SECONDS
 from app.storage.migrations import run_database_migrations
+from app.storage.fsm_state_repository import FSMStateRepository
 from app.storage.pages_backup import PagesBackup
 from app.storage.pages_repository import PagesRepository
 
@@ -196,8 +197,6 @@ class PostgresStateDatabase:
             circuit_open=self._circuit_is_open(),
         )
 
-    def register(self, repository: HybridJSONRepository) -> None:
-        self._repositories[repository.namespace] = repository
 
     def register_reconnect_hook(self, hook: Callable[[], Awaitable[None]]) -> None:
         self._reconnect_hooks.append(hook)
@@ -439,106 +438,57 @@ class PostgresStateDatabase:
             await asyncio.sleep(self.reconnect_interval)
             await self.check_and_reconnect(force=False)
 
+
+
+
+
+
+    def register(self, repository: HybridJSONRepository) -> None:
+        FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).register(repository)
+
     async def read_snapshot(self, repository: HybridJSONRepository) -> Any:
-        pool = self._pool
-        if pool is None:
-            return await repository.read_local()
-        try:
-            stored = await pool.fetchval(
-                "SELECT payload FROM rich_state WHERE namespace = $1",
-                repository.namespace,
-            )
-            if stored is None:
-                payload = await repository.read_local()
-                await self._upsert_snapshot(repository.namespace, payload)
-                return payload
-            payload = _decode_json(stored)
-            await repository.refresh_local(payload)
-            return payload
-        except Exception as error:
-            await self._disconnect(error)
-            return await repository.read_local()
+        return await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).read_snapshot(repository)
 
     async def write_snapshot(
         self,
         repository: HybridJSONRepository,
         payload: Any,
     ) -> None:
-        database_saved = False
-        if self._pool is not None:
-            try:
-                await self._upsert_snapshot(repository.namespace, payload)
-                database_saved = True
-                await self._set_dirty(repository.namespace, False)
-            except Exception as error:
-                await self._disconnect(error)
-
-        try:
-            await repository.write_local(payload)
-        except OSError:
-            if not database_saved:
-                raise
-            logger.exception(
-                "PostgreSQL write succeeded but JSON mirror failed for %s",
-                repository.namespace,
-            )
-
-        if self.configured and not database_saved:
-            await self._set_dirty(repository.namespace, True)
+        await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).write_snapshot(repository, payload)
 
     async def mirror_local_snapshot(
         self,
         repository: HybridJSONRepository,
         payload: Any,
     ) -> None:
-        if self._pool is None:
-            if self.configured:
-                await self._set_dirty(repository.namespace, True)
-            return
-        try:
-            await self._upsert_snapshot(repository.namespace, payload)
-            await self._set_dirty(repository.namespace, False)
-        except Exception as error:
-            await self._disconnect(error)
-            await self._set_dirty(repository.namespace, True)
+        await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).mirror_local_snapshot(repository, payload)
 
     def schedule_local_snapshot(
         self,
         repository: HybridJSONRepository,
         payload: Any,
     ) -> None:
-        if not self.configured:
-            return
-        # Mark it before scheduling so a simultaneous manual reconnect cannot
-        # hydrate this file from an older database snapshot.
-        self._dirty_namespaces.add(repository.namespace)
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-        task = loop.create_task(
-            self.mirror_local_snapshot(repository, copy.deepcopy(payload)),
-            name=f"postgres-mirror-{repository.namespace}",
-        )
-        self._background_tasks.add(task)
-        task.add_done_callback(self._background_tasks.discard)
+        FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).schedule_local_snapshot(repository, payload)
 
     async def sync_local_paths(self, paths: list[str]) -> None:
-        selected = {str(Path(path).resolve()) for path in paths}
-        for repository in tuple(self._repositories.values()):
-            if str(repository.path.resolve()) not in selected:
-                continue
-            payload = await repository.read_local()
-            if self._pool is None:
-                if self.configured:
-                    await self._set_dirty(repository.namespace, True)
-                continue
-            try:
-                await self._upsert_snapshot(repository.namespace, payload)
-                await self._set_dirty(repository.namespace, False)
-            except Exception as error:
-                await self._disconnect(error)
-                await self._set_dirty(repository.namespace, True)
+        await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).sync_local_paths(paths)
+
+    async def read_fsm(
+        self,
+        storage_key: str,
+    ) -> tuple[bool, str | None, dict[str, Any]]:
+        return await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).read_fsm(storage_key)
+
+    async def cleanup_expired_editor_fsm(self, cutoff_epoch: int) -> int:
+        return await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).cleanup_expired_editor_fsm(cutoff_epoch)
+
+    async def write_fsm(
+        self,
+        storage_key: str,
+        state: str | None,
+        data: Mapping[str, Any],
+    ) -> bool:
+        return await FSMStateRepository(self, encode_json=_encode_json, decode_json=_decode_json, logger=logger).write_fsm(storage_key, state, data)
 
     @staticmethod
     def _page_record(row: Any) -> dict[str, Any]:
@@ -700,91 +650,8 @@ class PostgresStateDatabase:
                 "fsm_table_bytes": None,
             }
 
-    async def read_fsm(self, storage_key: str) -> tuple[bool, str | None, dict[str, Any]]:
-        pool = self._pool
-        if pool is None:
-            return False, None, {}
-        try:
-            row = await pool.fetchrow(
-                "SELECT state, data FROM rich_fsm WHERE storage_key = $1",
-                storage_key,
-            )
-            if row is None:
-                return True, None, {}
-            data = _decode_json(row["data"])
-            return True, row["state"], data if isinstance(data, dict) else {}
-        except Exception as error:
-            await self._disconnect(error)
-            return False, None, {}
 
-    async def cleanup_expired_editor_fsm(self, cutoff_epoch: int) -> int:
-        """Delete editor FSM rows whose inactivity TTL has elapsed."""
-        pool = self._pool
-        if pool is None:
-            return 0
-        try:
-            result = await pool.execute(
-                """
-                DELETE FROM rich_fsm
-                WHERE jsonb_typeof(data -> 'editor_last_activity_at') = 'number'
-                  AND (data ->> 'editor_last_activity_at')::double precision < $1
-                """,
-                float(cutoff_epoch),
-            )
-            try:
-                return int(str(result).rsplit(" ", 1)[-1])
-            except (TypeError, ValueError):
-                return 0
-        except Exception as error:
-            await self._disconnect(error)
-            return 0
 
-    async def write_fsm(
-        self,
-        storage_key: str,
-        state: str | None,
-        data: Mapping[str, Any],
-    ) -> bool:
-        pool = self._pool
-        if pool is None:
-            return False
-        try:
-            encoded_data = _encode_json(dict(data))
-        except TypeError:
-            logger.exception(
-                "FSM data is not JSON-compatible; keeping this session in memory only"
-            )
-            try:
-                await pool.execute(
-                    "DELETE FROM rich_fsm WHERE storage_key = $1", storage_key
-                )
-                return True
-            except Exception as error:
-                await self._disconnect(error)
-                return False
-        try:
-            if state is None and not data:
-                await pool.execute(
-                    "DELETE FROM rich_fsm WHERE storage_key = $1", storage_key
-                )
-            else:
-                await pool.execute(
-                    """
-                    INSERT INTO rich_fsm (storage_key, state, data, updated_at)
-                    VALUES ($1, $2, $3::jsonb, NOW())
-                    ON CONFLICT (storage_key) DO UPDATE
-                    SET state = EXCLUDED.state,
-                        data = EXCLUDED.data,
-                        updated_at = NOW()
-                    """,
-                    storage_key,
-                    state,
-                    encoded_data,
-                )
-            return True
-        except Exception as error:
-            await self._disconnect(error)
-            return False
 
     async def close(self) -> None:
         tasks = tuple(self._background_tasks)
