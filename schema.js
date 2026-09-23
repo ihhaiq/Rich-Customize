@@ -15,3 +15,14 @@ export const richPages = table('rich_pages', {
 }, (t) => ({
   ownerUpdatedIdx: index('idx_rich_pages_owner_updated').on(t.ownerId, t.updatedAt),
 }));
+
+// Serverless invocations are stateless. This table keeps the short /dev import
+// flow alive between pressing "رفع واستيراد", uploading a file and confirming it.
+export const developerStates = table('developer_states', {
+  userId: integer('user_id').primaryKey(),
+  state: text('state').notNull(),
+  fileId: text('file_id'),
+  fileName: text('file_name'),
+  createdAt: integer('created_at').notNull(),
+  summary: json('summary'),
+});

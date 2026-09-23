@@ -1,4 +1,4 @@
-// Telegram Serverless handler for /start and the first editor entry point.
+// Telegram Serverless message handler.
 // The platform passes update.message directly as the first argument.
 
 import { api } from 'sdk';
@@ -8,6 +8,7 @@ import {
   buildWelcomeRichMessage,
 } from 'lib/welcome';
 import { openEditor } from 'lib/editor-home';
+import { handleDeveloperImportDocument, openDeveloperPanel } from 'lib/developer';
 
 function commandName(text) {
   if (typeof text !== 'string') return '';
@@ -21,6 +22,15 @@ function matchesCommand(command, name) {
 export default async function (message) {
   const command = commandName(message?.text);
   const languageCode = message.from?.language_code || 'en';
+
+  if (matchesCommand(command, 'dev')) {
+    await openDeveloperPanel(message);
+    return;
+  }
+
+  if (message?.document && await handleDeveloperImportDocument(message)) {
+    return;
+  }
 
   if (matchesCommand(command, 'editor')) {
     await openEditor(message.chat.id, languageCode);

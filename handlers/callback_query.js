@@ -1,5 +1,6 @@
 import { api } from 'sdk';
 import { buildEditorHome, openEditor } from 'lib/editor-home';
+import { handleDeveloperCallback } from 'lib/developer';
 import { emptyPagesText, showPages } from 'lib/pages';
 
 function pagesIndex(data) {
@@ -33,6 +34,8 @@ async function returnToEditor(query) {
 
 export default async function (query) {
   if (!query?.id) return;
+
+  if (await handleDeveloperCallback(query)) return;
 
   const data = String(query.data || '');
 
