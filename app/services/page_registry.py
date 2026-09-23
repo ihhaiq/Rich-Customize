@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.errors import AppError
+
 import asyncio
 import copy
 import os
@@ -21,7 +23,7 @@ def _registry_path() -> Path:
     return Path(configured) if configured else Path("data") / "rich_pages.json"
 
 
-class PageLimitError(ValueError):
+class PageLimitError(AppError, ValueError):
     def __init__(self, limit: int = MAX_SAVED_PAGES) -> None:
         self.limit = limit
         super().__init__(f"saved page limit reached: {limit}")

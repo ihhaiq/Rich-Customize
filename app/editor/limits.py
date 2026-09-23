@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.errors import AppError
+
 import html
 import re
 from collections.abc import Iterable
@@ -15,7 +17,7 @@ EDITOR_SESSION_TTL_SECONDS = 2 * 60 * 60
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
-class EditorLimitError(ValueError):
+class EditorLimitError(AppError, ValueError):
     def __init__(self, code: str, limit: int, actual: int) -> None:
         self.code = code
         self.limit = limit

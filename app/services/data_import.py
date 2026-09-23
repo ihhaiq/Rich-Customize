@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.errors import AppError
+
 import io
 import os
 
@@ -25,7 +27,7 @@ _CONFIGURED_STATES = (
 )
 
 
-class DataImportError(ValueError):
+class DataImportError(AppError, ValueError):
     pass
 
 

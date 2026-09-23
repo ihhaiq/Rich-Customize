@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.errors import AppError
+
 import asyncio
 from io import BytesIO
 
@@ -14,7 +16,7 @@ MAX_IMAGE_PIXELS = 40_000_000
 TELEGRAM_DOWNLOAD_TIMEOUT = 15.0
 
 
-class UnsafeMediaError(ValueError):
+class UnsafeMediaError(AppError, ValueError):
     pass
 
 

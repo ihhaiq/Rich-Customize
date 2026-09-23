@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.errors import AppError
+
 import copy
 import html
 import logging
@@ -31,7 +33,7 @@ HTML_BLOCKS = {
 }
 
 
-class RichMessageRenderError(RuntimeError):
+class RichMessageRenderError(AppError, RuntimeError):
     """Raised when one rich message can't be built or accepted by Telegram."""
 
 
