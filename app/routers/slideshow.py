@@ -86,7 +86,7 @@ async def receive_slideshow(message: Message, state: FSMContext, bot: Bot) -> No
             if upload.get("token") == token:
                 upload["pending"] = max(0, int(upload.get("pending", 1)) - 1)
                 await state.update_data(slideshow=upload)
-        await message.answer("الوسائط كبيرة جدًا أو أبعادها غير آمنة للمعالجة.")
+        await message.answer(t("slideshow.unsafe_media"))
         return
     except BaseException:
         async with _lock(state):

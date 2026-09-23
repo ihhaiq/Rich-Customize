@@ -2,6 +2,7 @@
 
 KEYS = (
     "received", "continue", "more", "send_more", "full", "overflow", "busy",
+    "unsafe_media",
 )
 TEXTS = {
     "en": (
@@ -143,6 +144,35 @@ TEXTS = {
         "未新增的超出數量：{count}。", "正在接收目前批次，請稍候。",
     ),
 }
+UNSAFE_MEDIA_TEXTS = {
+    "en": "The media is too large or its dimensions are unsafe to process.",
+    "ar": "الوسائط كبيرة جدًا أو أبعادها غير آمنة للمعالجة.",
+    "es": "El archivo multimedia es demasiado grande o sus dimensiones no son seguras para procesarlo.",
+    "fr": "Le média est trop volumineux ou ses dimensions ne sont pas sûres pour le traitement.",
+    "de": "Die Mediendatei ist zu groß oder ihre Abmessungen sind für die Verarbeitung unsicher.",
+    "it": "Il contenuto multimediale è troppo grande o le sue dimensioni non sono sicure da elaborare.",
+    "pt": "O ficheiro multimédia é demasiado grande ou as suas dimensões não são seguras para processamento.",
+    "nl": "Het mediabestand is te groot of de afmetingen zijn onveilig om te verwerken.",
+    "pl": "Plik multimedialny jest zbyt duży lub jego wymiary są niebezpieczne do przetworzenia.",
+    "uk": "Медіафайл завеликий або його розміри небезпечні для обробки.",
+    "ru": "Медиафайл слишком большой или его размеры небезопасны для обработки.",
+    "tr": "Medya çok büyük veya boyutları işlemek için güvenli değil.",
+    "fa": "رسانه بیش از حد بزرگ است یا ابعاد آن برای پردازش امن نیست.",
+    "ku": "Medya pir mezin e an pîvanên wê ji bo pêvajoyê ne ewle ne.",
+    "ur": "میڈیا بہت بڑا ہے یا اس کے ابعاد پراسیسنگ کے لیے محفوظ نہیں ہیں۔",
+    "hi": "मीडिया बहुत बड़ा है या उसके आयाम प्रोसेसिंग के लिए सुरक्षित नहीं हैं।",
+    "id": "Media terlalu besar atau dimensinya tidak aman untuk diproses.",
+    "ja": "メディアが大きすぎるか、処理するには寸法が安全ではありません。",
+    "ko": "미디어가 너무 크거나 처리하기에 안전하지 않은 크기입니다.",
+    "vi": "Tệp media quá lớn hoặc kích thước của nó không an toàn để xử lý.",
+    "th": "สื่อมีขนาดใหญ่เกินไปหรือมิติไม่ปลอดภัยสำหรับการประมวลผล",
+    "zh-hans": "媒体文件过大，或其尺寸不适合安全处理。",
+    "zh-hant": "媒體檔案過大，或其尺寸不適合安全處理。",
+}
+
+for language, text in UNSAFE_MEDIA_TEXTS.items():
+    TEXTS[language] = (*TEXTS[language], text)
+
 SLIDESHOW_CATALOGS = {
     language: {f"slideshow.{key}": text for key, text in zip(KEYS, texts, strict=True)}
     for language, texts in TEXTS.items()
