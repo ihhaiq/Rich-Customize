@@ -1,0 +1,1 @@
+import { handleInlineQuery } from 'lib/router/delivery';\nexport default handleInlineQuery;\n

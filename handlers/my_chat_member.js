@@ -1,0 +1,1 @@
+import { handleMyChatMember } from 'lib/router/updates';\nexport default handleMyChatMember;\n

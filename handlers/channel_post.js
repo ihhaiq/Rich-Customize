@@ -1,0 +1,1 @@
+import { handleChannelPost } from 'lib/router/updates';\nexport default handleChannelPost;\n

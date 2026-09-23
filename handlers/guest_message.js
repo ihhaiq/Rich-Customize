@@ -1,0 +1,1 @@
+import { handleGuestMessage } from 'lib/router/delivery';\nexport default handleGuestMessage;\n
