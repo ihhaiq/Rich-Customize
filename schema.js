@@ -145,3 +145,20 @@ export const popupStates = table('popup_states', {
 }, (t) => ({
   updatedIdx: index('idx_popup_states_updated').on(t.updatedAt),
 }));
+
+
+export const processedUpdates = table('processed_updates', {
+  updateId: integer('update_id').primaryKey(),
+  expiresAt: integer('expires_at').notNull(),
+}, (t) => ({
+  expiresIdx: index('idx_processed_updates_expires').on(t.expiresAt),
+}));
+
+export const requestWindows = table('request_windows', {
+  key: text('key').primaryKey(),
+  timestamps: json('timestamps').notNull().default([]),
+  version: integer('version').notNull().default(0),
+  expiresAt: integer('expires_at').notNull(),
+}, (t) => ({
+  expiresIdx: index('idx_request_windows_expires').on(t.expiresAt),
+}));

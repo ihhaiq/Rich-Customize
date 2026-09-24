@@ -6,6 +6,11 @@ import { handleEditorBlockCallback } from 'lib/editor-block-flow';
 import { handlePageNavigationCallback } from 'lib/page-navigation';
 import { handleEditorPageCallback } from 'lib/editor-pages';
 import { guardEditorCallback } from 'lib/editor-guard';
+import {
+  allowCallbackRequest,
+  claimUpdate,
+  releaseUpdate,
+} from 'lib/request-guard';
 
 async function returnToEditor(query) {
   const chatId = query.message?.chat?.id;
@@ -30,11 +35,14 @@ async function returnToEditor(query) {
   }
 }
 
-export default async function (query) {
+export default async function (query, ctx = {}) {
+  const updateId = ctx?.update?.update_id;
+  if (!await claimUpdate(updateId)) return;
   const started = Date.now();
   let failed = false;
   try {
     if (!query?.id) return;
+    if (!await allowCallbackRequest(query)) return;
     if (await handleDeveloperCallback(query)) return;
     if (await handlePageNavigationCallback(query)) return;
     if (await guardEditorCallback(query)) return;
@@ -63,6 +71,7 @@ export default async function (query) {
     await api.answerCallbackQuery({ callback_query_id: query.id });
   } catch (error) {
     failed = true;
+    await releaseUpdate(updateId);
     throw error;
   } finally {
     try {

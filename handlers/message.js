@@ -18,6 +18,11 @@ import { handleEditorBlockMessage } from 'lib/editor-block-flow';
 import { handleEditorCoreMessage } from 'lib/editor-core';
 import { handleEditorPageMessage } from 'lib/editor-pages';
 import { loadEditorSession } from 'lib/editor-session';
+import {
+  allowMessageRequest,
+  claimUpdate,
+  releaseUpdate,
+} from 'lib/request-guard';
 
 function commandName(text) {
   if (typeof text !== 'string') return '';
@@ -28,10 +33,13 @@ function matchesCommand(command, name) {
   return command === '/' + name || command.startsWith('/' + name + '@');
 }
 
-export default async function (message) {
+export default async function (message, ctx = {}) {
+  const updateId = ctx?.update?.update_id;
+  if (!await claimUpdate(updateId)) return;
   const started = Date.now();
   let failed = false;
   try {
+    if (!await allowMessageRequest(message)) return;
     const command = commandName(message?.text);
     const languageCode = message.from?.language_code || 'en';
 
@@ -101,6 +109,7 @@ export default async function (message) {
     }
   } catch (error) {
     failed = true;
+    await releaseUpdate(updateId);
     throw error;
   } finally {
     try {
