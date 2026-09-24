@@ -55,14 +55,31 @@ export default async function (message) {
       const session = message?.from?.id
         ? await loadEditorSession(message.from.id)
         : null;
-      if (
-        session?.state === 'managing'
-      ) {
+      if (session?.state === 'managing') {
         await api.sendMessage({
           chat_id: message.chat.id,
           text: editorClosedHint(languageCode),
           reply_markup: buildStartEditorKeyboard(languageCode),
         });
+        return;
+      }
+
+      if (!session && String(message?.chat?.type || '') === 'private') {
+        const replyMarkup = buildWelcomeKeyboard(languageCode);
+        try {
+          await api.sendRichMessage({
+            chat_id: message.chat.id,
+            rich_message: buildWelcomeRichMessage(message.from, languageCode),
+            reply_markup: replyMarkup,
+          });
+        } catch (error) {
+          console.error('idle welcome rich message failed; using plain fallback', error);
+          await api.sendMessage({
+            chat_id: message.chat.id,
+            text: buildWelcomeFallbackText(message.from, languageCode),
+            reply_markup: replyMarkup,
+          });
+        }
       }
       return;
     }

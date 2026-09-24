@@ -6,6 +6,7 @@ import { observeRequest } from 'lib/usage-stats';
 import { handleEditorBlockCallback } from 'lib/editor-block-flow';
 import { handlePageNavigationCallback } from 'lib/page-navigation';
 import { handleEditorPageCallback } from 'lib/editor-pages';
+import { guardEditorCallback } from 'lib/editor-guard';
 
 function pagesIndex(data) {
   if (data === 'r:pages') return 0;
@@ -43,6 +44,7 @@ export default async function (query) {
     if (!query?.id) return;
     if (await handleDeveloperCallback(query)) return;
     if (await handlePageNavigationCallback(query)) return;
+    if (await guardEditorCallback(query)) return;
     if (await handleEditorPageCallback(query)) return;
     if (await handleEditorBlockCallback(query)) return;
 
@@ -74,12 +76,6 @@ export default async function (query) {
           show_alert: true,
         }),
       });
-      return;
-    }
-
-    if (data === 'r:back') {
-      await api.answerCallbackQuery({ callback_query_id: query.id });
-      await returnToEditor(query);
       return;
     }
 
