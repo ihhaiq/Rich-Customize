@@ -13,6 +13,8 @@ import {
   openEditor,
 } from 'lib/editor-home';
 import { handleDeveloperPendingMessage, openDeveloperPanel } from 'lib/developer';
+import { handleMiniAppShortcut } from 'lib/miniapp';
+import { handleShowcaseMessage } from 'lib/showcase';
 import { observeRequest } from 'lib/usage-stats';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
 import { handleEditorCoreMessage } from 'lib/editor-core';
@@ -49,6 +51,8 @@ export default async function (message, ctx = {}) {
       return;
     }
 
+    if (await handleMiniAppShortcut(message)) return;
+    if (await handleShowcaseMessage(message)) return;
     if (await handleDeveloperPendingMessage(message)) return;
 
     if (matchesCommand(command, 'editor')) {
