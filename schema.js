@@ -162,3 +162,11 @@ export const requestWindows = table('request_windows', {
 }, (t) => ({
   expiresIdx: index('idx_request_windows_expires').on(t.expiresAt),
 }));
+
+
+export const guestMessages = table('guest_messages', {
+  inlineMessageId: text('inline_message_id').primaryKey(),
+  chatId: integer('chat_id').notNull(),
+  chatType: text('chat_type').notNull().default(''),
+  createdAt: integer('created_at').notNull(),
+});
