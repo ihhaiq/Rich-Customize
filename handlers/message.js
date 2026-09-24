@@ -16,6 +16,7 @@ import { handleDeveloperPendingMessage, openDeveloperPanel } from 'lib/developer
 import { handleMiniAppShortcut } from 'lib/miniapp';
 import { handleShowcaseMessage } from 'lib/showcase';
 import { observeRequest } from 'lib/usage-stats';
+import { resolveUserLanguage } from 'lib/i18n';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
 import { handleEditorCoreMessage } from 'lib/editor-core';
 import { handleEditorPageMessage } from 'lib/editor-pages';
@@ -44,7 +45,7 @@ export default async function (message, ctx = {}) {
   try {
     if (!await allowMessageRequest(message)) return;
     const command = commandName(message?.text);
-    const languageCode = message.from?.language_code || 'en';
+    const languageCode = await resolveUserLanguage(message?.from);
 
     if (matchesCommand(command, 'dev')) {
       await openDeveloperPanel(message);
