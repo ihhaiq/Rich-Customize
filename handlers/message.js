@@ -17,6 +17,7 @@ import { observeRequest } from 'lib/usage-stats';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
 import { handleEditorCoreMessage } from 'lib/editor-core';
 import { handleEditorPageMessage } from 'lib/editor-pages';
+import { handleEditorButtonMessage } from 'lib/editor-buttons';
 import { loadEditorSession } from 'lib/editor-session';
 import {
   allowMessageRequest,
@@ -57,6 +58,7 @@ export default async function (message, ctx = {}) {
 
     if (!matchesCommand(command, 'start')) {
       if (await handleEditorBlockMessage(message)) return;
+      if (await handleEditorButtonMessage(message)) return;
       if (await handleEditorPageMessage(message)) return;
       if (await handleEditorCoreMessage(message)) return;
 

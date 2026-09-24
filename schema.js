@@ -121,6 +121,10 @@ export const editorSessions = table('editor_sessions', {
   blockPreviewMessageIds: json('block_preview_message_ids').notNull().default({}),
   pendingUserState: json('pending_user_state'),
   resumingUserButtons: integer('resuming_user_buttons').notNull().default(0),
+  buttonPreviewMessageId: integer('button_preview_message_id'),
+  postSelectedChatIds: json('post_selected_chat_ids').notNull().default([]),
+  postSilent: integer('post_silent').notNull().default(0),
+  postProtected: integer('post_protected').notNull().default(0),
   lastActivityAt: integer('last_activity_at').notNull(),
 }, (t) => ({
   activityIdx: index('idx_editor_sessions_activity').on(t.lastActivityAt),
