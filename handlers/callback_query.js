@@ -1,5 +1,5 @@
 import { api } from 'sdk';
-import { buildEditorHome, openEditor } from 'lib/editor-home';
+import { openEditor } from 'lib/editor-home';
 import { handleDeveloperCallback } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
 import { handleEditorBlockCallback } from 'lib/editor-block-flow';
@@ -12,28 +12,6 @@ import {
   releaseUpdate,
 } from 'lib/request-guard';
 
-async function returnToEditor(query) {
-  const chatId = query.message?.chat?.id;
-  const messageId = query.message?.message_id;
-  if (!chatId || !messageId) return;
-
-  const view = buildEditorHome(query.from?.language_code || 'en');
-  try {
-    await api.editMessageText({
-      chat_id: chatId,
-      message_id: messageId,
-      text: view.text,
-      reply_markup: view.reply_markup,
-    });
-  } catch (error) {
-    console.warn('Could not edit pages view back to editor', error);
-    await api.sendMessage({
-      chat_id: chatId,
-      text: view.text,
-      reply_markup: view.reply_markup,
-    });
-  }
-}
 
 export default async function (query, ctx = {}) {
   const updateId = ctx?.update?.update_id;
