@@ -4,7 +4,6 @@ import { rememberGuestMessage } from 'lib/guest-messages';
 import {
   allowMessageRequest,
   claimUpdate,
-  releaseUpdate,
 } from 'lib/request-guard';
 import { observeRequest } from 'lib/usage-stats';
 
@@ -38,10 +37,7 @@ export default async function (message, ctx = {}) {
       );
     }
   } catch (error) {
-    failed = true;
-    await releaseUpdate(updateId);
     console.error('Failed to answer guest query with a saved Rich Message', error);
-    throw error;
   } finally {
     try {
       await observeRequest(message?.from, Date.now() - started, failed);
