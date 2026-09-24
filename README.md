@@ -26,9 +26,9 @@ The remaining Python files are reference material only; tgcloud does not deploy 
 
 Current intentional exceptions:
 
-- the newer Pages rich-table redesign remains postponed
-- full localization/i18n parity is deferred to the next migration phase
-- Mini App HTTP/API/static hosting remains external because Telegram Serverless deploys update handlers/modules/database code, not arbitrary HTTP routes
+- full localization/i18n parity is the next migration phase
+- the Mini App is explicitly deferred as a separate future task; only the bot-side `/app` shortcut exists in Serverless today
+- the existing Mini App HTTP/API/static implementation under `app/webapp/` and `app/miniapp_static/` is not part of the current Serverless migration scope
 
 ## Backup compatibility
 
@@ -54,4 +54,6 @@ Run `migrate` only after reviewing the schema changes reported by `push`.
 
 ## Next
 
-Migrate the localization architecture from `main` to Serverless without mixing it with the postponed Pages redesign.
+Migrate the localization architecture from `main` to Serverless so every Telegram user receives bot UI in their resolved Telegram language. Keep semantic translation keys, preserve user-authored content verbatim, and localize the bot profile (name, descriptions and commands) separately from per-update UI text.
+
+The Mini App remains a deferred task and must not be mixed into the localization migration.
