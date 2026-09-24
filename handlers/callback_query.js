@@ -1,18 +1,11 @@
 import { api } from 'sdk';
 import { buildEditorHome, openEditor } from 'lib/editor-home';
 import { handleDeveloperCallback } from 'lib/developer';
-import { emptyPagesText, showPages } from 'lib/pages';
 import { observeRequest } from 'lib/usage-stats';
 import { handleEditorBlockCallback } from 'lib/editor-block-flow';
 import { handlePageNavigationCallback } from 'lib/page-navigation';
 import { handleEditorPageCallback } from 'lib/editor-pages';
 import { guardEditorCallback } from 'lib/editor-guard';
-
-function pagesIndex(data) {
-  if (data === 'r:pages') return 0;
-  const value = Number.parseInt(String(data).split(':').at(-1), 10);
-  return Number.isFinite(value) && value >= 0 ? value : 0;
-}
 
 async function returnToEditor(query) {
   const chatId = query.message?.chat?.id;
@@ -64,18 +57,6 @@ export default async function (query) {
           console.warn('Could not delete welcome message after opening editor', error);
         }
       }
-      return;
-    }
-
-    if (data === 'r:pages' || data.startsWith('r:pages:')) {
-      const rendered = await showPages(query, pagesIndex(data));
-      await api.answerCallbackQuery({
-        callback_query_id: query.id,
-        ...(rendered ? {} : {
-          text: emptyPagesText(query.from?.language_code || 'en'),
-          show_alert: true,
-        }),
-      });
       return;
     }
 
