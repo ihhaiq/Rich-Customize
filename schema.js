@@ -119,6 +119,7 @@ export const editorSessions = table('editor_sessions', {
   redoStack: json('redo_stack').notNull().default([]),
   previewMessageIds: json('preview_message_ids').notNull().default([]),
   blockPreviewMessageIds: json('block_preview_message_ids').notNull().default({}),
+  blockPeekMessageId: integer('block_peek_message_id'),
   pendingUserState: json('pending_user_state'),
   resumingUserButtons: integer('resuming_user_buttons').notNull().default(0),
   buttonPreviewMessageId: integer('button_preview_message_id'),
