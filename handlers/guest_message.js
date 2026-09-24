@@ -1,5 +1,5 @@
 import { api } from 'sdk';
-import { guestPageCode, savedPageQueryResult } from 'lib/page-delivery';
+import { guestPageCodes, savedPageQueryResult } from 'lib/page-delivery';
 import { rememberGuestMessage } from 'lib/guest-messages';
 import {
   allowMessageRequest,
@@ -16,13 +16,17 @@ export default async function (message, ctx = {}) {
     if (!await allowMessageRequest(message)) return;
     if (!message?.guest_query_id) return;
 
-    const pageId = guestPageCode(message);
-    if (!pageId) return;
+    const pageIds = guestPageCodes(message);
+    if (!pageIds.length) return;
 
-    const result = await savedPageQueryResult(
-      pageId,
-      message?.from?.language_code || 'en',
-    );
+    let result = null;
+    for (const pageId of pageIds) {
+      result = await savedPageQueryResult(
+        pageId,
+        message?.from?.language_code || 'en',
+      );
+      if (result) break;
+    }
     if (!result) return;
 
     const sent = await api.answerGuestQuery({
