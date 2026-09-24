@@ -51,9 +51,9 @@ export default async function (message, ctx = {}) {
       return;
     }
 
+    if (await handleDeveloperPendingMessage(message)) return;
     if (await handleMiniAppShortcut(message)) return;
     if (await handleShowcaseMessage(message)) return;
-    if (await handleDeveloperPendingMessage(message)) return;
 
     if (matchesCommand(command, 'editor')) {
       await openEditor(message.chat.id, languageCode, message.from?.id);
