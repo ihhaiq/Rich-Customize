@@ -8,6 +8,7 @@ import { handleEditorPageCallback } from 'lib/editor-pages';
 import { handleEditorButtonCallback } from 'lib/editor-buttons';
 import { handlePublishCallback } from 'lib/publish';
 import { guardEditorCallback } from 'lib/editor-guard';
+import { handleShowcaseCallback } from 'lib/showcase';
 import {
   allowCallbackRequest,
   claimUpdate,
@@ -25,6 +26,7 @@ export default async function (query, ctx = {}) {
     if (!await allowCallbackRequest(query)) return;
     if (await handleDeveloperCallback(query)) return;
     if (await handlePageNavigationCallback(query)) return;
+    if (await handleShowcaseCallback(query)) return;
     if (await guardEditorCallback(query)) return;
     if (await handleEditorPageCallback(query)) return;
     if (await handleEditorButtonCallback(query)) return;
