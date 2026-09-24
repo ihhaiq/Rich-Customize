@@ -31,3 +31,15 @@ The old Python /dev actions have Serverless equivalents. PostgreSQL/Redis-specif
 Backup import keeps legacy pages even above 12. The limit is a new-page creation rule only.
 
 The old backup format `rich-customize-json-backup-v1` remains supported so Railway exports can be moved into Serverless without rewriting page IDs.
+
+
+## Legacy published callback compatibility
+
+Published Telegram messages keep their original `callback_data`, so Serverless must continue accepting callback formats emitted by the Python bot.
+
+- `r:page:<page_id>[:source_page_id[:navigation_token]]` and `r:spage:...` remain the canonical page callbacks.
+- Legacy raw `r:cbd:...` and `r:cbds:...` callbacks are accepted as aliases for `r:page:...` and `r:spage:...`.
+- Imported `button_popups.json` is retained in `legacy_states`; missing popup tokens are restored lazily into `popup_states` when an old published button is pressed.
+- Imported `guest_messages.json` is retained in `legacy_states`; missing Guest inline-message context is restored lazily into `guest_messages`.
+- `page_navigation.json` is accepted by backup import and valid navigation sessions are restored lazily into `page_navigation_sessions` while they are still within the same 24-hour TTL used by main.
+- Expired navigation tokens are intentionally not revived.
