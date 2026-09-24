@@ -174,3 +174,25 @@ export const guestMessages = table('guest_messages', {
   chatType: text('chat_type').notNull().default(''),
   createdAt: integer('created_at').notNull(),
 });
+
+
+export const managedChats = table('managed_chats', {
+  key: text('key').primaryKey(),
+  userId: integer('user_id').notNull(),
+  chatId: integer('chat_id').notNull(),
+  title: text('title').notNull(),
+  type: text('type').notNull().default(''),
+  username: text('username'),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  userIdx: index('idx_managed_chats_user').on(t.userId),
+  chatIdx: index('idx_managed_chats_chat').on(t.chatId),
+}));
+
+export const managedPublishPanels = table('managed_publish_panels', {
+  userId: integer('user_id').primaryKey(),
+  chatId: integer('chat_id').notNull(),
+  messageId: integer('message_id').notNull(),
+  selectedChatIds: json('selected_chat_ids').notNull().default([]),
+  updatedAt: integer('updated_at').notNull(),
+});
