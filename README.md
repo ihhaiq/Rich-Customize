@@ -10,19 +10,25 @@ The scaffold SDK reference is kept at `docs/tgcloud-sdk.md`.
 
 ## Converted
 
-- `/start` Rich Message welcome
-- `/editor` entry screen
-- initial `📚 صفحاتي` list backed by Serverless DB
-- complete developer-panel surface adapted to Serverless:
-  - import ZIP/JSON + confirmation
-  - export compatible backup ZIP
-  - Serverless DB health/size check
-  - persistent user/operational statistics
-  - paged user statistics
-  - page snapshot + restore drill
-  - showcase-channel cache refresh
+- `/start` welcome and idle-private behavior
+- persisted `/editor` session/state and full editor navigation/history
+- all 21 current rich block types from `main`, including nested Details, tables, lists/checklists, quotes, media, collage/slideshow, maps, anchors and Math
+- Rich Message import/render/preview, including native media conversion and ready Rich Math input
+- message buttons, custom row layouts, popup/CBD callbacks and page navigation
+- current Pages flows used by the editor: search, sort, save/update/open, rename, delete and restore
+- guest/inline page navigation and publish-to-chat flows
+- request throttling/idempotency and persistent usage/operational statistics
+- `/draft` + `r:showcase` and showcase-channel media capture
+- developer panel with in-place callback updates, import/export, DB checks, statistics, snapshots and showcase refresh
+- developer-only `/app` shortcut to the named Mini App
 
-The remaining Python files are migration references only; tgcloud does not deploy them.
+The remaining Python files are reference material only; tgcloud does not deploy them.
+
+Current intentional exceptions:
+
+- the newer Pages rich-table redesign remains postponed
+- full localization/i18n parity is deferred to the next migration phase
+- Mini App HTTP/API/static hosting remains external because Telegram Serverless deploys update handlers/modules/database code, not arbitrary HTTP routes
 
 ## Backup compatibility
 
@@ -48,4 +54,4 @@ Run `migrate` only after reviewing the schema changes reported by `push`.
 
 ## Next
 
-Port the rich editor incrementally: persisted editor sessions, add-block menu, individual rich block handlers/rendering, preview, page save/update, and publishing.
+Migrate the localization architecture from `main` to Serverless without mixing it with the postponed Pages redesign.
