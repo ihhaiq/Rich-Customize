@@ -176,6 +176,19 @@ export const guestMessages = table('guest_messages', {
 });
 
 
+export const editorAlbumItems = table('editor_album_items', {
+  key: text('key').primaryKey(),
+  userId: integer('user_id').notNull(),
+  mediaGroupId: text('media_group_id').notNull(),
+  messageId: integer('message_id').notNull(),
+  blocks: json('blocks').notNull().default([]),
+  createdAt: integer('created_at').notNull(),
+}, (t) => ({
+  userGroupIdx: index('idx_editor_album_user_group').on(t.userId, t.mediaGroupId),
+  createdIdx: index('idx_editor_album_created').on(t.createdAt),
+}));
+
+
 export const managedChats = table('managed_chats', {
   key: text('key').primaryKey(),
   userId: integer('user_id').notNull(),
