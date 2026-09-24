@@ -30,10 +30,16 @@ The official guide is the current platform reference. The scaffold file document
 
 Converted Serverless slices:
 
-- `/start` welcome
-- initial `/editor` entry
-- initial `📚 صفحاتي` listing backed by `rich_pages`
-- complete `/dev` panel surface adapted to Serverless:
+- `/start` welcome and idle-private welcome behavior
+- `/editor` persisted one-session-per-user editor
+- all 21 current rich block types from `main`, including add/edit/preview/import/render flows
+- Details nested-block management, table controls, checklist toggles, quotes, media, collage/slideshow albums and ready Rich Math input
+- message-button editor, custom row layout, CBD/page buttons, popup/callback compatibility and button guide
+- current Pages behavior needed by the editor: list/search/sort/open/save/update/rename/delete/restore
+- undo/redo, editor expiry guards, request throttling/idempotency and persistent usage stats
+- full preview, saved-page delivery/navigation, guest/inline navigation and publishing to managed groups/channels
+- `/draft` and `r:showcase` all-block showcase plus showcase-channel media capture
+- `/dev` panel adapted to Serverless:
   - developer authorization
   - ZIP/JSON import with confirmation
   - ZIP export
@@ -41,8 +47,16 @@ Converted Serverless slices:
   - aggregate and paged user statistics
   - page snapshots + restore drill
   - showcase-channel cache refresh
+  - callback actions edit the existing developer-panel message instead of creating another panel
+- developer-only `/app` shortcut to the named Mini App (`editor`)
 
 The old `app/**/*.py` and Python tests remain reference material only and are not deployed by tgcloud.
+
+Deliberate scope exceptions:
+
+- Do not port the newer Pages rich-table redesign unless the user explicitly asks for it; keep the current Serverless Pages UX.
+- Full localization parity is deferred. Do not claim i18n parity until the Serverless language architecture is migrated.
+- Telegram Serverless deploys update handlers/modules/database code only; the existing Mini App HTTP backend/static assets under `app/webapp/` and `app/miniapp_static/` still require separate HTTPS hosting. The bot-side named Mini App shortcut is present.
 
 ## Data migration rules
 
@@ -55,4 +69,4 @@ The old `app/**/*.py` and Python tests remain reference material only and are no
 
 ## Next migration area
 
-Port the rich editor itself incrementally: editor sessions/state, add-block menu, block handlers/rendering, preview, save/update pages, and publishing. Preserve callback contracts where practical.
+Localization parity is the next planned migration area. Keep `main` as the behavior/source-text reference and preserve user content verbatim. Do not mix localization work with the intentionally postponed Pages redesign.
