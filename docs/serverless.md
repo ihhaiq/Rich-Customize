@@ -18,19 +18,23 @@ Local SDK/CLI reference: `docs/tgcloud-sdk.md`
 ## Current persistent tables
 
 - `rich_pages` — saved pages, preserving legacy IDs and payload fields.
+- `editor_sessions`, `editor_album_items` — persistent editor/FSM and album-collection state.
+- `managed_chats`, `managed_publish_panels` — publish destinations and the saved publish-management panel.
+- `guest_messages`, `page_navigation_sessions`, `popup_states` — Guest/published-message callback compatibility.
 - `developer_states` — short-lived /dev import flow state.
-- `legacy_states` — imported old JSON namespaces not yet consumed by converted features.
+- `legacy_states` — compatibility copy of imported legacy JSON namespaces; converted subsystems hydrate or lazily restore their live tables from it.
+- `processed_updates`, `request_windows` — idempotency and throttling state.
 - `usage_users`, `usage_minutes`, `usage_runtime` — persistent Serverless usage/operational statistics.
 - `page_snapshots` — bounded page recovery snapshots.
 - `maintenance_locks` — prevents duplicate import/export/snapshot/refresh operations.
 
 ## Developer panel
 
-The old Python /dev actions have Serverless equivalents. PostgreSQL/Redis-specific diagnostics were replaced with Serverless SQLite diagnostics rather than emulated. Editor/FSM activity is reported as not yet migrated until the editor session layer is ported.
+The old Python /dev actions have Serverless equivalents. PostgreSQL/Redis-specific diagnostics were replaced with Serverless SQLite diagnostics rather than emulated. Editor/FSM activity is backed by the persistent `editor_sessions` table and is part of the migrated Serverless implementation.
 
 Backup import keeps legacy pages even above 12. The limit is a new-page creation rule only.
 
-The old backup format `rich-customize-json-backup-v1` remains supported so Railway exports can be moved into Serverless without rewriting page IDs.
+The old backup format `rich-customize-json-backup-v1` remains supported so Railway exports can be moved into Serverless without rewriting page IDs. `managed_chats.json` is imported into the live publish tables, and new exports regenerate that legacy-format file from the live Serverless rows. `rich_media.json` remains compatibility metadata only because the page blocks themselves retain the Telegram media `file_id` values used for rendering.
 
 
 ## Legacy published callback compatibility
