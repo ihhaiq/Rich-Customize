@@ -7,6 +7,7 @@ import {
 } from 'lib/request-guard';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
+import { logError } from 'lib/error-log';
 
 export default async function (message, ctx = {}) {
   const updateId = ctx?.update?.update_id;
@@ -42,7 +43,13 @@ export default async function (message, ctx = {}) {
       );
     }
   } catch (error) {
+    failed = true;
     console.error('Failed to answer guest query with a saved Rich Message', error);
+    await logError('guest_message', error, {
+      updateId,
+      userId: message?.from?.id,
+      chatId: message?.chat?.id,
+    });
   } finally {
     try {
       await observeRequest(message?.from, Date.now() - started, failed);
