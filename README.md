@@ -20,8 +20,10 @@ The scaffold SDK reference is kept at `docs/tgcloud-sdk.md`.
 - request throttling/idempotency and persistent usage/operational statistics
 - `/draft` + `r:showcase` and showcase-channel media capture
 - developer panel with in-place callback updates, import/export, DB checks, statistics, snapshots and showcase refresh
+- developer-configurable error-log channel with test/disable controls, sanitized diagnostics and duplicate-error suppression
 - localized bot UI and bot profile for `ar`, `en`, `es`, `de`, `it`, `pt`, `nl`, `pl`, `uk`, `ru`, `tr`, `ur`, `hi`, `id`, `ja`, `ko`, `vi`, `th`, `zh-hans` and `zh-hant`
 - locale resolution from the current Telegram `from.language_code`, then the last stored user language, then English
+- non-English UI never silently falls back to English: exact translations are preferred, then native semantic fallback copy for any still-untranslated key
 - developer-only `/app` shortcut to the named Mini App
 
 The remaining Python files are reference material only; tgcloud does not deploy them.
