@@ -98,6 +98,11 @@ export default async function (message, ctx = {}) {
           });
         } catch (error) {
           console.error('idle welcome rich message failed; using plain fallback', error);
+          await logError('welcome.idle_rich_fallback', error, {
+            updateId,
+            userId: message?.from?.id,
+            chatId: message?.chat?.id,
+          });
           await api.sendMessage({
             chat_id: message.chat.id,
             text: buildWelcomeFallbackText(message.from, languageCode),
@@ -117,6 +122,11 @@ export default async function (message, ctx = {}) {
       });
     } catch (error) {
       console.error('sendRichMessage welcome failed; using plain fallback', error);
+      await logError('welcome.start_rich_fallback', error, {
+        updateId,
+        userId: message?.from?.id,
+        chatId: message?.chat?.id,
+      });
       await api.sendMessage({
         chat_id: message.chat.id,
         text: buildWelcomeFallbackText(message.from, languageCode),
