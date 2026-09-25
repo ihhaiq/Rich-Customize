@@ -2,6 +2,7 @@ import { api } from 'sdk';
 import { savedPageQueryResult, normalizePageCode } from 'lib/page-delivery';
 import { claimUpdate, releaseUpdate } from 'lib/request-guard';
 import { resolveUserLanguage } from 'lib/i18n';
+import { logError } from 'lib/error-log';
 
 export default async function (query, ctx = {}) {
   const updateId = ctx?.update?.update_id;
@@ -29,6 +30,11 @@ export default async function (query, ctx = {}) {
       );
     } catch (error) {
       console.error('Failed to render inline saved page', error);
+      await logError('inline_query.render', error, {
+        updateId,
+        userId: query?.from?.id,
+        extra: pageId ? 'page=' + pageId : null,
+      });
     }
     await api.answerInlineQuery({
       inline_query_id: query.id,
@@ -37,6 +43,10 @@ export default async function (query, ctx = {}) {
       is_personal: true,
     });
   } catch (error) {
+    await logError('inline_query', error, {
+      updateId,
+      userId: query?.from?.id,
+    });
     await releaseUpdate(updateId);
     throw error;
   }
