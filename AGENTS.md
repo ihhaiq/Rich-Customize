@@ -63,7 +63,7 @@ Deliberate scope exceptions:
 - Keep existing `page_id` and `owner_id`.
 - Import/retention never deletes old pages because an owner is above 12 pages.
 - The 12-page limit applies only when creating a new page. Existing pages remain editable.
-- Old non-page JSON namespaces are retained in `legacy_states` until each dependent subsystem is ported.
+- Legacy JSON payloads remain in `legacy_states` for compatibility, but converted namespaces must also hydrate their live Serverless tables. In particular, `managed_chats.json` imports into `managed_chats` and `managed_publish_panels`; popup, Guest and page-navigation state is restored lazily by its converted subsystem. `rich_media.json` is legacy metadata only because saved blocks already retain Telegram `file_id` values.
 - Import is validated and rerunnable. A page snapshot is created before applying an import. Do not describe the multi-table Serverless import as one cross-table transaction.
 - Developer access is intentionally closed until numeric Telegram IDs are entered in `lib/developer-access.js`.
 
