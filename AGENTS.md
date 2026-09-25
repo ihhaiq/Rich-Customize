@@ -55,7 +55,7 @@ The old `app/**/*.py` and Python tests remain reference material only and are no
 Deliberate scope exceptions:
 
 - Do not port the newer Pages rich-table redesign unless the user explicitly asks for it; keep the current Serverless Pages UX.
-- Full localization parity is deferred. Do not claim i18n parity until the Serverless language architecture is migrated.
+- Localization for the current Serverless bot scope is migrated. Keep `lib/lang/*.js` split per locale; do not recreate one monolithic localization bundle.
 - Telegram Serverless deploys update handlers/modules/database code only; the existing Mini App HTTP backend/static assets under `app/webapp/` and `app/miniapp_static/` still require separate HTTPS hosting. The bot-side named Mini App shortcut is present.
 
 ## Data migration rules
@@ -67,6 +67,6 @@ Deliberate scope exceptions:
 - Import is validated and rerunnable. A page snapshot is created before applying an import. Do not describe the multi-table Serverless import as one cross-table transaction.
 - Developer access is intentionally closed until numeric Telegram IDs are entered in `lib/developer-access.js`.
 
-## Next migration area
+## Localization maintenance
 
-Localization parity is the next planned migration area. Keep `main` as the behavior/source-text reference and preserve user content verbatim. Do not mix localization work with the intentionally postponed Pages redesign.
+Keep `main` as the behavior/source-text reference and preserve user-authored/imported content verbatim. Semantic UI uses `t(locale, key)`; historical source-copy compatibility uses `tr(locale, source)`. Shared key ordering lives in `lib/i18n-keys.js`, locale values live under `lib/lang/`, source-copy compatibility lives in `lib/i18n-source.js`, and bot profile copy lives in `lib/bot-profiles.js`.
