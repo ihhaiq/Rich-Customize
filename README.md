@@ -34,7 +34,7 @@ Current intentional exceptions:
 
 ## Backup compatibility
 
-The old `rich-customize-json-backup-v1` format is supported. Saved pages preserve their `page_id`, owner, blocks, buttons, layout, and timestamps. Other old JSON namespaces are stored in `legacy_states` until their feature is ported.
+The old `rich-customize-json-backup-v1` format is supported. Saved pages preserve their `page_id`, owner, blocks, buttons, layout, and timestamps. Imported `managed_chats.json` is hydrated into the live `managed_chats` / `managed_publish_panels` tables and current exports rebuild that file from those live tables. Compatibility namespaces such as old popup, Guest and page-navigation state are retained in `legacy_states` and restored lazily where required. `rich_media.json` remains legacy metadata only because reusable Telegram `file_id` values are already preserved inside page blocks.
 
 The 12-page rule never prunes old/imported pages. It only prevents creation of a new page when the owner is already at or above the limit.
 
@@ -88,6 +88,6 @@ Localization files are intentionally split into small Serverless modules:
 
 Do not rebuild one monolithic generated localization module; keep locale catalogs isolated so individual language files stay small and easy to update.
 
-## Next
+## Remaining scope
 
-The localization migration for the current Serverless bot scope is complete. The remaining work is the final pre-deployment validation and any non-localization migration cleanup. The full Mini App remains deferred and is not part of that validation scope.
+The Telegram bot-side Serverless migration is complete for the current non-Mini-App scope. The full Mini App remains deliberately deferred and still requires separate HTTPS hosting. After pulling branch changes locally, use `tgcloud diff` / `push` and run the deployment smoke checks before treating a specific Telegram Cloud revision as validated.
