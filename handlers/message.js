@@ -65,6 +65,11 @@ export default async function (message, ctx = {}) {
     }
 
     if (!matchesCommand(command, 'start')) {
+      // Ordinary editor/input messages are private-chat only.
+      // In groups/supergroups the bot must stay silent unless a supported command
+      // was handled above.
+      if (String(message?.chat?.type || '') !== 'private') return;
+
       if (await handleEditorBlockMessage(message)) return;
       if (await handleEditorButtonMessage(message)) return;
       if (await handleEditorPageMessage(message)) return;
