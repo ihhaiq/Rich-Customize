@@ -54,7 +54,7 @@ The old `app/**/*.py` and Python tests remain reference material only and are no
 
 Deliberate scope exceptions:
 
-- Do not port the newer Pages rich-table redesign unless the user explicitly asks for it; keep the current Serverless Pages UX.
+- The current Pages rich-table redesign from `main` is already ported to Serverless: four saved pages per screen, rich table rows with delete/rename/copy/open actions, search, sort, pagination, delete/restore, and in-place management-message refresh. Do not describe this redesign as deferred or missing. Keep `main` as the behavioral reference for future Pages changes.
 - Localization for the current Serverless bot scope is migrated. Keep `lib/lang/*.js` split per locale; do not recreate one monolithic localization bundle.
 - Telegram Serverless deploys update handlers/modules/database code only; the existing Mini App HTTP backend/static assets under `app/webapp/` and `app/miniapp_static/` still require separate HTTPS hosting. The bot-side named Mini App shortcut is present.
 
