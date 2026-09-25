@@ -20,13 +20,15 @@ The scaffold SDK reference is kept at `docs/tgcloud-sdk.md`.
 - request throttling/idempotency and persistent usage/operational statistics
 - `/draft` + `r:showcase` and showcase-channel media capture
 - developer panel with in-place callback updates, import/export, DB checks, statistics, snapshots and showcase refresh
+- localized bot UI and bot profile for `ar`, `en`, `es`, `de`, `it`, `pt`, `nl`, `pl`, `uk`, `ru`, `tr`, `ur`, `hi`, `id`, `ja`, `ko`, `vi`, `th`, `zh-hans` and `zh-hant`
+- locale resolution from the current Telegram `from.language_code`, then the last stored user language, then English
 - developer-only `/app` shortcut to the named Mini App
 
 The remaining Python files are reference material only; tgcloud does not deploy them.
 
 Current intentional exceptions:
 
-- full localization/i18n parity is the next migration phase
+- the developer panel remains Arabic-only by design and is outside normal user-facing localization
 - the Mini App is explicitly deferred as a separate future task; only the bot-side `/app` shortcut exists in Serverless today
 - the existing Mini App HTTP/API/static implementation under `app/webapp/` and `app/miniapp_static/` is not part of the current Serverless migration scope
 
@@ -52,8 +54,30 @@ npx tgcloud webhook sync
 
 Run `migrate` only after reviewing the schema changes reported by `push`.
 
+## Localization
+
+The current Serverless bot UI migration is locale-aware for these supported locales:
+
+`ar`, `en`, `es`, `de`, `it`, `pt`, `nl`, `pl`, `uk`, `ru`, `tr`, `ur`, `hi`, `id`, `ja`, `ko`, `vi`, `th`, `zh-hans`, `zh-hant`.
+
+Intentionally removed locales are `fr`, `fa`, `ku` and `he`.
+
+Locale resolution is:
+
+```text
+current Update from.language_code
+↓
+last language stored in usage_users
+↓
+English
+```
+
+New and migrated UI should use semantic `t(locale, key)` keys. Historical source-copy still uses `tr(locale, source)` as a compatibility path: exact source translations are preferred, then matching semantic translations, then the native compatibility fallback inherited from the migration architecture.
+
+Traditional Chinese is resolved for `zh-Hant`, Taiwan, Hong Kong and Macao language tags; other Chinese tags resolve to Simplified Chinese. User-authored text and imported message content are kept verbatim and are never translated.
+
+Bot profile localization is separate from per-update UI localization and is synchronized through `lib/bot-profile.js`.
+
 ## Next
 
-Migrate the localization architecture from `main` to Serverless so every Telegram user receives bot UI in their resolved Telegram language. Keep semantic translation keys, preserve user-authored content verbatim, and localize the bot profile (name, descriptions and commands) separately from per-update UI text.
-
-The Mini App remains a deferred task and must not be mixed into the localization migration.
+The localization migration for the current Serverless bot scope is complete. The remaining work is the final pre-deployment validation and any non-localization migration cleanup. The full Mini App remains deferred and is not part of that validation scope.
