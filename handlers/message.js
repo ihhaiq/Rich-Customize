@@ -17,6 +17,7 @@ import { handleMiniAppShortcut } from 'lib/miniapp';
 import { handleShowcaseMessage } from 'lib/showcase';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
+import { logError } from 'lib/error-log';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
 import { handleEditorCoreMessage } from 'lib/editor-core';
 import { handleEditorPageMessage } from 'lib/editor-pages';
@@ -124,6 +125,11 @@ export default async function (message, ctx = {}) {
     }
   } catch (error) {
     failed = true;
+    await logError('message', error, {
+      updateId,
+      userId: message?.from?.id,
+      chatId: message?.chat?.id,
+    });
     await releaseUpdate(updateId);
     throw error;
   } finally {
