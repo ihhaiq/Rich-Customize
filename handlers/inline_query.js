@@ -1,6 +1,7 @@
 import { api } from 'sdk';
 import { savedPageQueryResult, normalizePageCode } from 'lib/page-delivery';
 import { claimUpdate, releaseUpdate } from 'lib/request-guard';
+import { resolveUserLanguage } from 'lib/i18n';
 
 export default async function (query, ctx = {}) {
   const updateId = ctx?.update?.update_id;
@@ -24,7 +25,7 @@ export default async function (query, ctx = {}) {
     try {
       result = await savedPageQueryResult(
         pageId,
-        query?.from?.language_code || 'en',
+        await resolveUserLanguage(query?.from),
       );
     } catch (error) {
       console.error('Failed to render inline saved page', error);
