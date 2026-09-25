@@ -6,6 +6,7 @@ import {
   claimUpdate,
 } from 'lib/request-guard';
 import { observeRequest } from 'lib/usage-stats';
+import { resolveUserLanguage } from 'lib/i18n';
 
 export default async function (message, ctx = {}) {
   const updateId = ctx?.update?.update_id;
@@ -23,7 +24,7 @@ export default async function (message, ctx = {}) {
     for (const pageId of pageIds) {
       result = await savedPageQueryResult(
         pageId,
-        message?.from?.language_code || 'en',
+        await resolveUserLanguage(message?.from),
       );
       if (result) break;
     }
