@@ -46,6 +46,9 @@ export default async function (message, ctx = {}) {
     if (!await allowMessageRequest(message)) return;
     const command = commandName(message?.text);
     const languageCode = await resolveUserLanguage(message?.from);
+    if (message?.from && !message.from.language_code) {
+      message.from.language_code = languageCode;
+    }
 
     if (matchesCommand(command, 'dev')) {
       await openDeveloperPanel(message);
