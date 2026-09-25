@@ -78,6 +78,16 @@ Traditional Chinese is resolved for `zh-Hant`, Taiwan, Hong Kong and Macao langu
 
 Bot profile localization is separate from per-update UI localization and is synchronized through `lib/bot-profile.js`.
 
+Localization files are intentionally split into small Serverless modules:
+
+- `lib/i18n.js` — locale resolution plus `t()` / `tr()`
+- `lib/i18n-keys.js` — shared semantic key order and supported locale list
+- `lib/lang/*.js` — one compact value catalog per supported locale
+- `lib/i18n-source.js` — legacy source-string compatibility translations and UI fallback terms
+- `lib/bot-profiles.js` — localized Telegram bot profile text
+
+Do not rebuild one monolithic generated localization module; keep locale catalogs isolated so individual language files stay small and easy to update.
+
 ## Next
 
 The localization migration for the current Serverless bot scope is complete. The remaining work is the final pre-deployment validation and any non-localization migration cleanup. The full Mini App remains deferred and is not part of that validation scope.
