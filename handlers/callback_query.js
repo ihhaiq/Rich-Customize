@@ -3,6 +3,7 @@ import { openEditor } from 'lib/editor-home';
 import { handleDeveloperCallback } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
+import { logError } from 'lib/error-log';
 import { handleEditorBlockCallback } from 'lib/editor-block-flow';
 import { handlePageNavigationCallback } from 'lib/page-navigation';
 import { handleEditorPageCallback } from 'lib/editor-pages';
@@ -59,6 +60,12 @@ export default async function (query, ctx = {}) {
     await api.answerCallbackQuery({ callback_query_id: query.id });
   } catch (error) {
     failed = true;
+    await logError('callback_query', error, {
+      updateId,
+      userId: query?.from?.id,
+      chatId: query?.message?.chat?.id,
+      callbackData: query?.data,
+    });
     await releaseUpdate(updateId);
     throw error;
   } finally {
