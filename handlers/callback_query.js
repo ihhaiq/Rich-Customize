@@ -2,6 +2,7 @@ import { api } from 'sdk';
 import { openEditor } from 'lib/editor-home';
 import { handleDeveloperCallback } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
+import { resolveUserLanguage } from 'lib/i18n';
 import { handleEditorBlockCallback } from 'lib/editor-block-flow';
 import { handlePageNavigationCallback } from 'lib/page-navigation';
 import { handleEditorPageCallback } from 'lib/editor-pages';
@@ -24,6 +25,9 @@ export default async function (query, ctx = {}) {
   try {
     if (!query?.id) return;
     if (!await allowCallbackRequest(query)) return;
+    if (query?.from && !query.from.language_code) {
+      query.from.language_code = await resolveUserLanguage(query.from);
+    }
     if (await handleDeveloperCallback(query)) return;
     if (await handlePageNavigationCallback(query)) return;
     if (await handleShowcaseCallback(query)) return;
@@ -40,7 +44,7 @@ export default async function (query, ctx = {}) {
       const chatId = query.message?.chat?.id;
       if (!chatId) return;
 
-      await openEditor(chatId, query.from?.language_code || 'en', query.from?.id);
+      await openEditor(chatId, query.from?.language_code || await resolveUserLanguage(query.from), query.from?.id);
       const messageId = query.message?.message_id;
       if (messageId) {
         try {
