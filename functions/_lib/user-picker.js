@@ -1,7 +1,4 @@
-import {
-  findUserButtonMarkers,
-  resolveUserButtonMarker,
-} from '../../lib/rich-text.js';
+import { findUserButtonMarkers } from '../../lib/rich-text.js';
 import { HttpError } from './http.js';
 import { getPage, updatePage, validatePagePayload } from './pages.js';
 
@@ -36,6 +33,17 @@ function cleanTitle(value) {
     .replaceAll('\n', ' ')
     .trim();
   return title.slice(0, 64) || 'زر';
+}
+
+function replaceMarkerAll(value, marker, replacement) {
+  if (typeof value === 'string') return value.replaceAll(marker, replacement);
+  if (Array.isArray(value)) return value.map((item) => replaceMarkerAll(item, marker, replacement));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, replaceMarkerAll(item, marker, replacement)])
+    );
+  }
+  return value;
 }
 
 function containsMarker(value, marker) {
@@ -121,12 +129,11 @@ export async function completeUserPicker(db, ownerId, requestId, selectedUserId,
 
   if (pending.marker) {
     if (!containsMarker(block.data || {}, pending.marker)) return null;
-    block.data = resolveUserButtonMarker(
-      block.data || {},
-      pending.marker,
-      Number(selectedUserId),
-      username,
-    );
+    const color = ['r','b','p','g'].includes(String(pending.color || ''))
+      ? ' #' + String(pending.color)
+      : '';
+    const replacement = '{' + title + ':user:' + selectedUserId + color + '}';
+    block.data = replaceMarkerAll(block.data || {}, pending.marker, replacement);
   } else {
     const rich = block?.data?._rich_button;
     if (!rich || typeof rich !== 'object' || String(rich.button_type) !== 'user') return null;
