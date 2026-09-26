@@ -1,0 +1,7 @@
+# Cloudflare Pages compatibility for the existing Mini App paths.
+# Keep the legacy Python URLs working in index.html while serving this folder
+# as the Pages build output root.
+
+/miniapp/static/* /:splat 200
+/miniapp / 302
+/miniapp/ / 302
