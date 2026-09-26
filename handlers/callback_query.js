@@ -43,17 +43,15 @@ export default async function (query, ctx = {}) {
     if (data === 'r:starteditor') {
       await api.answerCallbackQuery({ callback_query_id: query.id });
       const chatId = query.message?.chat?.id;
-      if (!chatId) return;
-
-      await openEditor(chatId, query.from?.language_code || await resolveUserLanguage(query.from), query.from?.id);
       const messageId = query.message?.message_id;
-      if (messageId) {
-        try {
-          await api.deleteMessage({ chat_id: chatId, message_id: messageId });
-        } catch (error) {
-          console.warn('Could not delete welcome message after opening editor', error);
-        }
-      }
+      if (!chatId || !messageId) return;
+
+      await openEditor(
+        chatId,
+        query.from?.language_code || await resolveUserLanguage(query.from),
+        query.from?.id,
+        { reuseMessageId: messageId },
+      );
       return;
     }
 
