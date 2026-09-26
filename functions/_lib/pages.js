@@ -1,3 +1,4 @@
+import { plainRichText } from '../../lib/rich-text.js';
 import { HttpError } from './http.js';
 
 export const MAX_PAGE_BLOCKS = 30;
@@ -41,16 +42,52 @@ export function rowToPage(row) {
   };
 }
 
-function nestedBlocks(block) {
+function stripHtml(value) {
+  if (typeof value !== 'string' || !value) return '';
+  return value
+    .replace(/<[^>]+>/g, '')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', "'")
+    .replaceAll('&amp;', '&');
+}
+
+function blockChildren(block) {
   const data = block?.data;
   if (!data || typeof data !== 'object' || Array.isArray(data)) return [];
   const result = [];
-  if (Array.isArray(data.children)) result.push(...data.children);
-  if (Array.isArray(data.media_children)) result.push(...data.media_children);
+  for (const key of ['children', 'media_children']) {
+    if (!Array.isArray(data[key])) continue;
+    for (const child of data[key]) {
+      if (child && typeof child === 'object' && !Array.isArray(child)) result.push(child);
+    }
+  }
   if (Array.isArray(data.items)) {
     for (const item of data.items) {
-      if (item && typeof item === 'object' && Array.isArray(item.blocks)) {
-        result.push(...item.blocks);
+      if (!item || typeof item !== 'object' || Array.isArray(item) || !Array.isArray(item.blocks)) continue;
+      for (const child of item.blocks) {
+        if (child && typeof child === 'object' && !Array.isArray(child)) result.push(child);
+      }
+    }
+  }
+  return result;
+}
+
+function quotaChildren(block) {
+  const data = block?.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return [];
+  const result = [];
+  if (String(block?.type || '') === 'details' && Array.isArray(data.children)) {
+    for (const child of data.children) {
+      if (child && typeof child === 'object' && !Array.isArray(child)) result.push(child);
+    }
+  }
+  if (Array.isArray(data.items)) {
+    for (const item of data.items) {
+      if (!item || typeof item !== 'object' || Array.isArray(item) || !Array.isArray(item.blocks)) continue;
+      for (const child of item.blocks) {
+        if (child && typeof child === 'object' && !Array.isArray(child)) result.push(child);
       }
     }
   }
@@ -59,42 +96,124 @@ function nestedBlocks(block) {
 
 function countBlocks(blocks) {
   let count = 0;
-  for (const block of Array.isArray(blocks) ? blocks : []) {
-    if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
-    count += 1 + countBlocks(nestedBlocks(block));
-  }
+  const visit = (items) => {
+    for (const block of Array.isArray(items) ? items : []) {
+      if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
+      count += 1;
+      visit(quotaChildren(block));
+    }
+  };
+  visit(blocks);
   return count;
 }
 
-function visibleText(value, key = '') {
+function nativeVisibleText(value, key = null) {
   if (value == null) return '';
   if (typeof value === 'string') {
-    if (['file_id', 'file_unique_id', 'url', 'html', 'callback_data'].includes(key)) return '';
-    return value;
+    return new Set([
+      'text', 'summary', 'caption', 'credit',
+      'expression', 'alternative_text', 'name',
+    ]).has(key) ? value : '';
   }
-  if (Array.isArray(value)) return value.map((item) => visibleText(item, key)).join('');
+  if (Array.isArray(value)) return value.map((item) => nativeVisibleText(item, key)).join('');
   if (typeof value !== 'object') return '';
   return Object.entries(value)
-    .map(([childKey, childValue]) => visibleText(childValue, childKey))
+    .map(([childKey, item]) => nativeVisibleText(item, childKey))
     .join('');
 }
 
 function tableRows(block) {
   const data = block?.data;
   if (!data || typeof data !== 'object' || Array.isArray(data)) return [];
+  if (Array.isArray(data.rows)) return data.rows.filter((row) => Array.isArray(row));
   const native = data.native_data;
-  if (native && typeof native === 'object' && Array.isArray(native.cells)) return native.cells;
-  if (Array.isArray(data.rows)) return data.rows;
-  if (Array.isArray(data.cells)) return data.cells;
+  if (native && typeof native === 'object' && !Array.isArray(native) && Array.isArray(native.cells)) {
+    return native.cells.filter((row) => Array.isArray(row));
+  }
   return [];
 }
 
 function rowWidth(row) {
-  if (!Array.isArray(row)) return 0;
-  return row.reduce((sum, cell) => {
-    const span = cell && typeof cell === 'object' ? Number(cell.colspan || 1) : 1;
-    return sum + Math.max(1, Number.isFinite(span) ? span : 1);
-  }, 0);
+  let width = 0;
+  for (const raw of Array.isArray(row) ? row : []) {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const parsed = Number.parseInt(String(raw.colspan || 1), 10);
+      width += Math.max(1, Number.isFinite(parsed) ? parsed : 1);
+    } else {
+      width += 1;
+    }
+  }
+  return width;
+}
+
+function cellText(raw) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    if (raw.rich_text != null && raw.rich_text !== '') return plainRichText(raw.rich_text);
+    if (raw.text != null && raw.text !== '') return plainRichText(raw.text);
+    return stripHtml(raw.html);
+  }
+  return raw == null ? '' : String(raw);
+}
+
+function visibleCharacterText(blocks) {
+  return (Array.isArray(blocks) ? blocks : [])
+    .filter((block) => block && typeof block === 'object' && !Array.isArray(block))
+    .map(generatedVisibleText)
+    .join('');
+}
+
+function generatedVisibleText(block) {
+  const kind = String(block?.type || '');
+  const data = block?.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return '';
+
+  const native = data.native_data;
+  if (data.native && native && typeof native === 'object' && !Array.isArray(native)) {
+    return nativeVisibleText(native);
+  }
+  if (kind === 'list') {
+    const items = Array.isArray(data.items) ? data.items : [];
+    return items.map((item) => {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        if (Array.isArray(item.blocks)) return visibleCharacterText(item.blocks);
+        return plainRichText(item.rich_text) || plainRichText(item.text) || stripHtml(item.html);
+      }
+      return item == null ? '' : String(item);
+    }).join('');
+  }
+  if (kind === 'table') return tableRows(block).map((row) => row.map(cellText).join('')).join('');
+  if (kind === 'details') {
+    const summary = plainRichText(data.summary_rich_text)
+      || plainRichText(data.summary_text)
+      || stripHtml(data.summary_html);
+    return summary + visibleCharacterText(blockChildren(block));
+  }
+  if (kind === 'collage' || kind === 'slideshow') {
+    const caption = plainRichText(data.caption_rich_text)
+      || plainRichText(data.caption_text)
+      || stripHtml(data.caption_html);
+    return caption + visibleCharacterText(blockChildren(block));
+  }
+  if (kind === 'blockquote' || kind === 'pullquote') {
+    const quote = plainRichText(data.quote_rich_text)
+      || plainRichText(data.quote_text)
+      || stripHtml(data.quote_html)
+      || stripHtml(data.html);
+    const credit = plainRichText(data.credit_rich_text)
+      || plainRichText(data.credit_text)
+      || stripHtml(data.credit_html);
+    return quote + credit + visibleCharacterText(blockChildren(block));
+  }
+  const caption = plainRichText(data.caption_rich_text)
+    || plainRichText(data.caption_text)
+    || stripHtml(data.caption_html);
+  const credit = plainRichText(data.credit_rich_text)
+    || plainRichText(data.credit_text)
+    || stripHtml(data.credit_html);
+  const text = plainRichText(data.rich_text)
+    || plainRichText(data.text)
+    || stripHtml(data.html);
+  return text + caption + credit;
 }
 
 export function validatePagePayload(payload, current = null) {
@@ -110,7 +229,7 @@ export function validatePagePayload(payload, current = null) {
     throw new HttpError(400, 'editor limit exceeded: blocks (' + blockCount + '/' + MAX_PAGE_BLOCKS + ')');
   }
 
-  const characterCount = visibleText(blocks).length;
+  const characterCount = visibleCharacterText(blocks).length;
   if (characterCount > MAX_VISIBLE_CHARACTERS) {
     throw new HttpError(400, 'editor limit exceeded: characters (' + characterCount + '/' + MAX_VISIBLE_CHARACTERS + ')');
   }
@@ -129,7 +248,7 @@ export function validatePagePayload(payload, current = null) {
           throw new HttpError(400, 'editor limit exceeded: table_columns (' + widest + '/' + MAX_TABLE_COLUMNS + ')');
         }
       }
-      stack.push(...nestedBlocks(item));
+      stack.push(...quotaChildren(item));
     }
   }
 
