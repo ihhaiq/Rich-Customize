@@ -50,7 +50,7 @@ Converted Serverless slices:
   - callback actions edit the existing developer-panel message instead of creating another panel
 - developer-only `/app` shortcut to the named Mini App (`editor`)
 
-The old `app/**/*.py` and Python tests remain reference material only and are not deployed by tgcloud.
+The converted Python bot entrypoint, routers and keyboard modules have been removed from this branch. Python that still remains under `app/` is retained only where the deferred Mini App HTTP backend or its dependency chain still requires it; Python tests remain reference material and are not deployed by tgcloud.
 
 Deliberate scope exceptions:
 

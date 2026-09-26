@@ -26,7 +26,7 @@ The scaffold SDK reference is kept at `docs/tgcloud-sdk.md`.
 - non-English UI never silently falls back to English: exact translations are preferred, then native semantic fallback copy for any still-untranslated key
 - developer-only `/app` shortcut to the named Mini App
 
-The remaining Python files are reference material only; tgcloud does not deploy them.
+The converted Python bot entrypoint, routers and keyboard modules were removed from `serverless-cleanup`. Remaining Python is kept only for the deferred Mini App HTTP backend/dependency chain and for old reference tests; tgcloud does not deploy it.
 
 Current intentional exceptions:
 
