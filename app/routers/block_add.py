@@ -17,7 +17,11 @@ from app.keyboards import (
 )
 from app.editor.builders import container_data, map_data, new_block, text_data
 from app.editor.specs import FINAL_RICH_BLOCK_TYPES, QUOTE_TYPES
-from app.services.parser import message_to_blocks, messages_to_blocks
+from app.services.parser import (
+    message_to_blocks,
+    messages_to_blocks,
+    rich_message_text_data,
+)
 from app.services.anchors import anchor_name, anchor_targets, new_anchor_data
 from app.states import RichEditorStates
 
@@ -410,14 +414,26 @@ async def receive_added_block(
         await finish_add(message, state, bot, media_block)
         return
 
-    if not message.text:
+    rich_footer = (
+        rich_message_text_data(message)
+        if block_type == "footer" and not message.text
+        else None
+    )
+    if not message.text and rich_footer is None:
         await message.answer(tr("هذا النوع يحتاج إلى نص."))
         return
-    prepared = text_data(
-        message,
-        str(block_type),
-        payload.get("heading_size", 2),
-        str(payload.get("list_kind", "bullet")),
+    prepared = (
+        {
+            "text": rich_footer["text"],
+            "html": f'<footer>{rich_footer["html"]}</footer>',
+        }
+        if rich_footer is not None
+        else text_data(
+            message,
+            str(block_type),
+            payload.get("heading_size", 2),
+            str(payload.get("list_kind", "bullet")),
+        )
     )
     if block_type == "list" and not prepared.get("items"):
         await message.answer(t("list.empty"))
