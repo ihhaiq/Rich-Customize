@@ -111,6 +111,88 @@ def _rich_text_to_html(value: Any) -> str:
     return inner
 
 
+def _rich_text_to_plain(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "".join(_rich_text_to_plain(item) for item in value)
+    if not isinstance(value, dict):
+        return str(value)
+    if "text" in value:
+        return _rich_text_to_plain(value.get("text"))
+    if "children" in value:
+        return _rich_text_to_plain(value.get("children"))
+    return str(value.get("alternative_text", ""))
+
+
+def _native_text_fragments(block: dict[str, Any]) -> list[tuple[str, str]]:
+    fragments: list[tuple[str, str]] = []
+
+    def append(value: Any) -> None:
+        plain = _rich_text_to_plain(value)
+        if not plain:
+            return
+        fragments.append((plain, _rich_text_to_html(value)))
+
+    if block.get("text") is not None:
+        append(block.get("text"))
+
+    kind = str(block.get("type", ""))
+    if kind == "mathematical_expression":
+        expression = str(block.get("expression", ""))
+        if expression:
+            fragments.append((expression, html.escape(expression)))
+    elif kind == "details":
+        append(block.get("summary", block.get("title")))
+    elif kind == "table":
+        for row in block.get("cells", []):
+            for cell in row:
+                if isinstance(cell, dict):
+                    append(cell.get("text"))
+
+    caption = block.get("caption")
+    if isinstance(caption, dict):
+        append(caption.get("text"))
+
+    for item in block.get("items", []):
+        if not isinstance(item, dict):
+            continue
+        for child in item.get("blocks", []):
+            if isinstance(child, dict):
+                fragments.extend(_native_text_fragments(child))
+
+    for child in block.get("blocks", []):
+        if isinstance(child, dict):
+            fragments.extend(_native_text_fragments(child))
+
+    return fragments
+
+
+def rich_message_text_data(message: Message) -> dict[str, str] | None:
+    rich_message = getattr(message, "rich_message", None)
+    if rich_message is None:
+        return None
+
+    fragments: list[tuple[str, str]] = []
+    for native in getattr(rich_message, "blocks", []) or []:
+        raw = native.model_dump(mode="json", exclude_none=True)
+        if isinstance(raw, dict):
+            fragments.extend(_native_text_fragments(raw))
+
+    if not fragments:
+        return None
+
+    plain = "\n".join(part for part, _ in fragments)
+    if not plain.strip():
+        return None
+    return {
+        "text": plain,
+        "html": "\n".join(part for _, part in fragments),
+    }
+
+
 def _native_html(block: dict[str, Any]) -> str:
     kind = str(block.get("type", ""))
     text = _rich_text_to_html(block.get("text"))
@@ -328,4 +410,5 @@ __all__ = [
     "messages_to_blocks",
     "replacement_block",
     "replacement_data",
+    "rich_message_text_data",
 ]
