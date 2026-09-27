@@ -12,7 +12,12 @@ from app.i18n import t, tr
 from app.keyboards import build_heading_level_keyboard
 from app.editor.builders import map_data, quote_data, text_data
 from app.editor.specs import MEDIA_CAPTION_TYPES, QUOTE_TYPES
-from app.services.parser import message_to_blocks, messages_to_blocks, replacement_data
+from app.services.parser import (
+    message_to_blocks,
+    messages_to_blocks,
+    replacement_data,
+    rich_message_text_data,
+)
 from app.services.anchors import set_anchor_display_name
 from app.states import RichEditorStates
 
@@ -229,16 +234,25 @@ async def receive_replacement(
         "paragraph", "heading", "preformatted", "footer",
         "mathematical_expression", "list", "table",
     }:
-        replacement = (
-            text_data(
+        rich_footer = (
+            rich_message_text_data(message)
+            if expected == "footer" and not message.text
+            else None
+        )
+        if rich_footer is not None:
+            replacement = {
+                "text": rich_footer["text"],
+                "html": f'<footer>{rich_footer["html"]}</footer>',
+            }
+        elif message.text:
+            replacement = text_data(
                 message,
                 str(expected),
                 data.get("heading_size", block.get("data", {}).get("size", 2)),
                 str(block.get("data", {}).get("kind", "bullet")),
             )
-            if message.text
-            else None
-        )
+        else:
+            replacement = None
         if expected == "list" and replacement is not None and not replacement.get("items"):
             await message.answer(t("list.empty"))
             return
