@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from app.editor.models import make_block
 from app.editor.workflow import editor_workflow
@@ -11,6 +13,103 @@ from app.routers.block_management import router as block_management_router
 from app.keyboards import build_table_display_keyboard, build_table_options_keyboard
 from app.services.blocks import set_table_cell_style
 from app.services.renderer import build_input_rich_message
+
+
+class _NativeRichBlock:
+    def __init__(self, raw):
+        self.raw = raw
+
+    def model_dump(self, **_kwargs):
+        return self.raw
+
+
+def _forwarded_rich_text_message(text="Forwarded footer"):
+    return SimpleNamespace(
+        text=None,
+        rich_message=SimpleNamespace(
+            blocks=[
+                _NativeRichBlock({
+                    "type": "paragraph",
+                    "text": {"type": "bold", "text": text},
+                }),
+            ],
+        ),
+        answer=AsyncMock(),
+        media_group_id=None,
+        location=None,
+    )
+
+
+class ForwardedRichFooterTests(unittest.IsolatedAsyncioTestCase):
+    async def test_add_footer_accepts_forwarded_rich_message(self):
+        message = _forwarded_rich_text_message()
+        state = SimpleNamespace(
+            get_data=AsyncMock(return_value={
+                "pending_add_type": "footer",
+                "add_step": "content",
+                "add_payload": {},
+            }),
+        )
+        finish_add = AsyncMock()
+
+        with (
+            patch(
+                "app.routers.block_add.defer_text_for_user_buttons",
+                AsyncMock(return_value=False),
+            ),
+            patch("app.routers.block_add.finish_add", finish_add),
+        ):
+            await receive_added_block(message, state, SimpleNamespace())
+
+        footer = finish_add.await_args.args[3]
+        self.assertEqual(footer["type"], "footer")
+        self.assertEqual(footer["data"]["text"], "Forwarded footer")
+        self.assertEqual(
+            footer["data"]["html"],
+            "<footer><b>Forwarded footer</b></footer>",
+        )
+
+    async def test_edit_footer_accepts_forwarded_rich_message(self):
+        old = make_block(
+            "footer",
+            {"text": "old", "html": "<footer>old</footer>"},
+            block_id="footer-one",
+        )
+        message = _forwarded_rich_text_message("Updated footer")
+        state = SimpleNamespace(
+            get_data=AsyncMock(return_value={
+                "blocks": [old],
+                "current_block_id": old["id"],
+                "expected_type": "footer",
+                "edit_field": None,
+            }),
+            update_data=AsyncMock(),
+            set_state=AsyncMock(),
+        )
+        replace_payload = AsyncMock(return_value=old)
+
+        with (
+            patch(
+                "app.routers.block_edit.defer_text_for_user_buttons",
+                AsyncMock(return_value=False),
+            ),
+            patch("app.routers.block_edit.replace_payload", replace_payload),
+            patch("app.routers.block_edit.delete_add_step_messages", AsyncMock()),
+            patch("app.routers.block_edit.edit_saved_ui", AsyncMock()),
+            patch("app.routers.block_edit.block_page", return_value="footer"),
+            patch(
+                "app.routers.block_edit.build_managed_block_keyboard",
+                return_value=None,
+            ),
+        ):
+            await receive_replacement(message, state, SimpleNamespace())
+
+        replacement = replace_payload.await_args.args[3]
+        self.assertEqual(replacement["text"], "Updated footer")
+        self.assertEqual(
+            replacement["html"],
+            "<footer><b>Updated footer</b></footer>",
+        )
 
 
 class BlockManagementDomainTests(unittest.TestCase):
