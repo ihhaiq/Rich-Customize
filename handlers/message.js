@@ -14,6 +14,7 @@ import {
 } from 'lib/editor-home';
 import { handleDeveloperPendingMessage, openDeveloperPanel } from 'lib/developer';
 import { handleMiniAppShortcut } from 'lib/miniapp';
+import { sendPrivacyMessage, sendSupportMessage } from 'lib/legal';
 import { handleShowcaseMessage } from 'lib/showcase';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
@@ -53,6 +54,16 @@ export default async function (message, ctx = {}) {
 
     if (matchesCommand(command, 'dev')) {
       await openDeveloperPanel(message);
+      return;
+    }
+
+    if (matchesCommand(command, 'privacy')) {
+      await sendPrivacyMessage(message.chat.id, languageCode);
+      return;
+    }
+
+    if (matchesCommand(command, 'support')) {
+      await sendSupportMessage(message.chat.id, languageCode);
       return;
     }
 
