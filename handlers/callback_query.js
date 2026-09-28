@@ -9,7 +9,7 @@ import { handlePageNavigationCallback } from 'lib/page-navigation';
 import { handleEditorPageCallback } from 'lib/editor-pages';
 import { handleEditorButtonCallback } from 'lib/editor-buttons';
 import { handlePublishCallback } from 'lib/publish';
-import { guardEditorCallback } from 'lib/editor-guard';
+import { guardEditorCallback, isEditorSessionCallback } from 'lib/editor-guard';
 import { handleShowcaseCallback } from 'lib/showcase';
 import { handleLegalCallback } from 'lib/legal';
 import {
@@ -17,7 +17,20 @@ import {
   claimUpdate,
   releaseUpdate,
 } from 'lib/request-guard';
+import { withEditorMessageLock } from 'lib/editor-session';
 
+
+function isPublishEditorCallback(data) {
+  const value = String(data || '');
+  return value.startsWith('r:post') || value.startsWith('r:pt:');
+}
+
+async function routeNonPublishEditorCallback(query) {
+  if (await handleEditorPageCallback(query)) return true;
+  if (await handleEditorButtonCallback(query)) return true;
+  if (await handleEditorBlockCallback(query)) return true;
+  return false;
+}
 
 export default async function (query, ctx = {}) {
   const updateId = ctx?.update?.update_id;
@@ -35,12 +48,35 @@ export default async function (query, ctx = {}) {
     if (await handleShowcaseCallback(query)) return;
     if (await handleLegalCallback(query)) return;
     if (await guardEditorCallback(query)) return;
-    if (await handleEditorPageCallback(query)) return;
-    if (await handleEditorButtonCallback(query)) return;
-    if (await handlePublishCallback(query)) return;
-    if (await handleEditorBlockCallback(query)) return;
 
     const data = String(query.data || '');
+    const chatId = query.message?.chat?.id;
+    const messageId = query.message?.message_id;
+    if (
+      isEditorSessionCallback(data)
+      && !isPublishEditorCallback(data)
+      && chatId
+      && messageId
+    ) {
+      const locked = await withEditorMessageLock(
+        chatId,
+        messageId,
+        () => routeNonPublishEditorCallback(query),
+      );
+      if (!locked.acquired) {
+        try {
+          await api.answerCallbackQuery({ callback_query_id: query.id });
+        } catch {}
+        return;
+      }
+      if (locked.value) return;
+    } else {
+      if (await handleEditorPageCallback(query)) return;
+      if (await handleEditorButtonCallback(query)) return;
+      if (await handlePublishCallback(query)) return;
+      if (await handleEditorBlockCallback(query)) return;
+    }
+
 
     if (data === 'r:starteditor') {
       await api.answerCallbackQuery({ callback_query_id: query.id });
