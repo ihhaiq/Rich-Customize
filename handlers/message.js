@@ -19,6 +19,7 @@ import { handleShowcaseMessage } from 'lib/showcase';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
+import { handleMiniAppBridgeMessage } from 'lib/miniapp-bridge';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
 import { handleEditorCoreMessage } from 'lib/editor-core';
 import { handleEditorPageMessage } from 'lib/editor-pages';
@@ -44,7 +45,10 @@ export default async function (message, ctx = {}) {
   if (!await claimUpdate(updateId)) return;
   const started = Date.now();
   let failed = false;
+  let bridgeHandled = false;
   try {
+    bridgeHandled = await handleMiniAppBridgeMessage(message, { updateId });
+    if (bridgeHandled) return;
     if (!await allowMessageRequest(message)) return;
     const command = commandName(message?.text);
     const languageCode = await resolveUserLanguage(message?.from);
@@ -154,10 +158,12 @@ export default async function (message, ctx = {}) {
     await releaseUpdate(updateId);
     throw error;
   } finally {
-    try {
-      await observeRequest(message?.from, Date.now() - started, failed);
-    } catch (error) {
-      console.warn('Could not record message usage stats', error);
+    if (!bridgeHandled) {
+      try {
+        await observeRequest(message?.from, Date.now() - started, failed);
+      } catch (error) {
+        console.warn('Could not record message usage stats', error);
+      }
     }
   }
 }
