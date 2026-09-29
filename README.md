@@ -25,14 +25,96 @@ The scaffold SDK reference is kept at `docs/tgcloud-sdk.md`.
 - locale resolution from the current Telegram `from.language_code`, then the last stored user language, then English
 - non-English UI never silently falls back to English: exact translations are preferred, then native semantic fallback copy for any still-untranslated key
 - developer-only `/app` shortcut to the named Mini App
+- first Telegram B2B Mini App bridge slice for `@Richminiappsbot`: private bridge-group routing, request IDs, rate limiting, page list/read/create/save/delete operations, JSON document transfer, optimistic save conflicts and error-log integration
 
 The converted Python bot entrypoint, routers and keyboard modules were removed from `serverless-cleanup`. Remaining Python is kept only for the deferred Mini App HTTP backend/dependency chain and for old reference tests; tgcloud does not deploy it.
 
 Current intentional exceptions:
 
 - the developer panel remains Arabic-only by design and is outside normal user-facing localization
-- the Mini App is explicitly deferred as a separate future task; only the bot-side `/app` shortcut exists in Serverless today
-- the existing Mini App HTTP/API/static implementation under `app/webapp/` and `app/miniapp_static/` is not part of the current Serverless migration scope
+- the Mini App frontend is still hosted separately over HTTPS; Telegram Serverless remains the source of truth for saved pages
+- the B2B bridge receiver now exists on the Serverless side, while the Cloudflare-side `@Richminiappsbot` relay/webhook is the next integration step
+- the older D1-oriented Mini App API under `functions/miniapp/api/` must not be treated as the production page store during the B2B migration
+
+## Mini App B2B bridge — current integration
+
+The current Mini App plan keeps the persistent page data in Telegram Serverless. Cloudflare is only the HTTPS frontend + stateless relay for the separate Mini App bot.
+
+```text
+Mini App frontend / Cloudflare
+        ↓ HTTPS
+@Richminiappsbot relay
+        ↓ Telegram message/document
+private bridge group
+        ↓
+@RichCustomizebot / Telegram Serverless
+        ↓
+rich_pages
+```
+
+Configured Serverless bridge identity:
+
+- Mini App bot username: `@Richminiappsbot`
+- private bridge group: `-1003993506865`
+- the first valid bridge message pins the Mini App bot numeric Telegram ID in the Serverless `legacy_states` bridge config; later requests must come from that same bot ID
+- ordinary group behavior is unchanged; the bot remains silent in other groups unless another supported command flow already handles the update
+
+Bridge protocol version: `RCB1`.
+
+Supported request commands:
+
+```text
+/rcb_ping@RichCustomizebot
+/rcb_pages@RichCustomizebot
+/rcb_page@RichCustomizebot
+/rcb_create@RichCustomizebot
+/rcb_save@RichCustomizebot
+/rcb_delete@RichCustomizebot
+```
+
+Each command carries a JSON metadata object after the command. Read responses are returned as JSON documents. Create/save payloads are sent as JSON documents so page data is not constrained by normal Telegram message text length.
+
+Example page-list request:
+
+```text
+/rcb_pages@RichCustomizebot
+{"request_id":"req_01HXYZ123","user_id":123456789}
+```
+
+Example page request:
+
+```text
+/rcb_page@RichCustomizebot
+{"request_id":"req_01HXYZ124","user_id":123456789,"page_id":"a81f39"}
+```
+
+For `SAVE_PAGE`, the attached JSON must include the same `request_id`, `user_id` and `page_id` as the caption metadata plus `base_updated_at`. The Serverless update is conditional on that revision, so an older Mini App session receives `PAGE_CONFLICT` instead of overwriting newer data.
+
+Bridge safety currently includes:
+
+- exact bridge-chat restriction
+- Telegram bot sender check + configured username check + numeric bot-ID pinning
+- per-action sliding-window rate limiting
+- persistent short-lived `request_id` deduplication for safe mutation retries
+- 2 MB bridge JSON-document ceiling
+- owner checks for every page read/write/delete
+- existing editor block/resource validation before create/save
+- 12-page creation limit with developer exemption
+- mutation conflict detection using `updated_at`
+- no page payloads are written to error logs
+
+Bridge failures and security alerts use the existing developer-configured error-log channel. Dedicated scopes cover request failures, reply failures, bridge state failures, rate-limit alerts and unauthorized bridge access.
+
+Because `miniapp_bridge_requests` is a new Serverless table, deployment requires reviewing and applying the schema migration:
+
+```bash
+npx tgcloud diff
+npx tgcloud push
+npx tgcloud migrate
+npx tgcloud webhook sync
+```
+
+Bot-to-Bot Communication Mode must be enabled as required by Telegram for the participating bots. In the bridge group, the relay should address commands directly to the main bot (for example `/rcb_page@RichCustomizebot`) so delivery does not depend on broad group-message visibility.
 
 ## Backup compatibility
 
@@ -92,4 +174,4 @@ Do not rebuild one monolithic generated localization module; keep locale catalog
 
 ## Remaining scope
 
-The Telegram bot-side Serverless migration is complete for the current non-Mini-App scope. The full Mini App remains deliberately deferred and still requires separate HTTPS hosting. After pulling branch changes locally, use `tgcloud diff` / `push` and run the deployment smoke checks before treating a specific Telegram Cloud revision as validated.
+The Telegram bot-side Serverless migration is complete for the existing editor scope. Mini App integration is now in the B2B bridge phase: the Serverless receiver is implemented, while the Cloudflare relay/webhook and frontend switch away from the old D1 API remain to be completed and smoke-tested. After pulling branch changes locally, use `tgcloud diff` / `push`, apply the new schema migration, sync the webhook, and run the bridge smoke checks before treating a Telegram Cloud revision as validated.
