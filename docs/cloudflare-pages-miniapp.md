@@ -1,18 +1,42 @@
-# Cloudflare Pages deployment for the Mini App
+# Cloudflare deployment for the Mini App
 
-The Telegram Mini App frontend is deployable directly from:
+The current Mini App architecture keeps persistent page data in Telegram Serverless.
+
+Cloudflare is used only for:
+
+- the Mini App HTML/CSS/JavaScript frontend;
+- the stateless HTTP relay for `@Richminiappsbot`;
+- receiving the Mini App bot webhook and correlating short-lived request/response traffic.
+
+Cloudflare D1 is **not** the production page store. Do not copy or migrate `rich_pages` to D1.
+
+## Architecture
+
+```text
+Telegram Mini App
+      ↓ HTTPS
+Cloudflare Pages / Functions
+      ↓
+@Richminiappsbot
+      ↓ Telegram Bot-to-Bot message/document
+private bridge group (-1003993506865)
+      ↓
+@RichCustomizebot on Telegram Serverless
+      ↓
+rich_pages / Telegram Serverless DB
+```
+
+The Mini App edits a loaded page locally. Persistent writes happen only when the user presses Save.
+
+## Frontend deployment
+
+The static frontend remains deployable from:
 
 ```
 app/miniapp_static
 ```
 
-The existing Python deployment remains compatible. Do not rewrite the legacy
-`/miniapp/static/*` asset paths in `index.html`: the Pages `_redirects`
-file maps those URLs to the static output root.
-
-## Cloudflare Pages settings
-
-Use these values when importing `ihhaiq/Rich-Customize` from GitHub:
+Recommended Cloudflare Pages settings:
 
 | Setting | Value |
 | --- | --- |
@@ -22,154 +46,120 @@ Use these values when importing `ihhaiq/Rich-Customize` from GitHub:
 | Build command | `exit 0` |
 | Build output directory | `app/miniapp_static` |
 
-Cloudflare will serve `app/miniapp_static/index.html` at the project
-`*.pages.dev` root.
+The existing compatibility redirects may remain while the frontend is migrated to the B2B relay API.
 
-Optional build-watch include path:
+## B2B bridge
 
-```
-app/miniapp_static/**
-```
+Serverless implements protocol `RCB1` in `lib/miniapp-bridge.js`.
 
-## Compatibility routes
-
-`app/miniapp_static/_redirects` currently provides:
+The bridge accepts only commands from `@Richminiappsbot` in:
 
 ```
-/miniapp/static/* /:splat 200
-/miniapp / 302
-/miniapp/ / 302
+-1003993506865
 ```
 
-This means both the Pages root and the old Mini App asset URLs can load the same
-frontend without maintaining a second copy of the static files.
+The first valid bridge message pins the Mini App bot numeric Telegram ID in Serverless state. Later bridge requests must come from the same numeric bot ID.
 
-## Current migration boundary
+Supported Serverless commands:
 
-The static frontend is ready for Pages, but the Mini App HTTP API is not moved
-yet. The frontend intentionally still calls the existing same-origin routes:
-
-```
-/miniapp/api/me
-/miniapp/api/pages
-/miniapp/api/destinations
-/miniapp/api/send
-/miniapp/api/upload/*
-/miniapp/api/discard-session
-/miniapp/api/rich-buttons/user-picker
+```text
+/rcb_ping@RichCustomizebot
+/rcb_pages@RichCustomizebot
+/rcb_page@RichCustomizebot
+/rcb_create@RichCustomizebot
+/rcb_save@RichCustomizebot
+/rcb_delete@RichCustomizebot
 ```
 
-The next migration step is to implement those routes as Cloudflare Pages
-Functions/Workers in JavaScript. Keeping the same paths means the frontend will
-not need a cross-origin API URL or CORS configuration.
+Read requests use JSON metadata in the message text. Large page responses are returned as JSON documents.
 
-Do not point BotFather at the Pages URL until the API routes needed by the Mini
-App have been migrated and smoke-tested.
+Create and save requests carry the page payload as a JSON document. This avoids normal Telegram text-message length limits.
 
+## Authentication boundary
 
-## Phase 2: Pages Functions API
+The Cloudflare relay must validate Telegram Mini App `initData` before creating a bridge request.
 
-The old Python Mini App HTTP API now has a JavaScript Pages Functions implementation.
+The relay must derive `user_id` from validated Telegram data. It must never trust a `user_id` supplied by arbitrary browser JSON.
 
-Implemented public routes:
+The Telegram Serverless side then applies the second trust boundary:
 
-```
-GET  /miniapp/api/me
-GET  /miniapp/api/pages
-POST /miniapp/api/pages
-GET  /miniapp/api/pages/:page_id
-PUT   /miniapp/api/pages/:page_id
-GET  /miniapp/api/destinations
-POST /miniapp/api/send
-POST /miniapp/api/upload/:kind
-POST /miniapp/api/discard-session
-POST /miniapp/api/rich-buttons/user-picker
-```
+- exact bridge group;
+- sender must be a Telegram bot;
+- sender username must be `@Richminiappsbot`;
+- sender numeric bot ID is pinned;
+- page ownership is checked against `rich_pages.owner_id`.
 
-Internal migration/bridge routes:
+## Request flow
 
-```
-POST /internal/sync
-POST /internal/complete-user-picker
+List pages:
+
+```text
+Mini App
+  → Cloudflare relay
+  → /rcb_pages@RichCustomizebot + request metadata
+  → Telegram Serverless reads rich_pages
+  → pages_<request_id>.json
+  → Cloudflare relay
+  → Mini App
 ```
 
-Both internal routes require:
+Open one page:
 
-```
-Authorization: Bearer <SYNC_SECRET>
-```
-
-### D1 setup
-
-Create one D1 database for the Mini App, for example:
-
-```
-rich-customize-miniapp
+```text
+Mini App
+  → Cloudflare relay
+  → /rcb_page@RichCustomizebot
+  → Telegram Serverless reads the owned page
+  → page_<page_id>_<request_id>.json
+  → Cloudflare relay
+  → Mini App
 ```
 
-Apply:
+Save:
 
-```
-cloudflare/d1/schema.sql
+```text
+Mini App edits locally
+  → user presses Save
+  → Cloudflare relay sends save JSON document
+  → Telegram Serverless validates owner + limits + base_updated_at
+  → UPDATE rich_pages
+  → SAVE_PAGE_OK
+  → Cloudflare relay
+  → Mini App
 ```
 
-Example with Wrangler after logging in to Cloudflare:
+`base_updated_at` is required for saves. If the page changed after it was loaded, Serverless returns `PAGE_CONFLICT` rather than overwriting the newer version.
+
+## Reliability and observability
+
+The Serverless bridge includes:
+
+- short-lived persistent `request_id` deduplication;
+- mutation response replay for completed create/save/delete requests;
+- per-action rate limiting;
+- a 2 MB bridge JSON document ceiling;
+- existing editor resource-limit validation;
+- owner checks for all page operations;
+- the existing 12-page creation rule;
+- error and security-alert integration with the developer-configured error-log channel.
+
+The private bridge group is intentionally retained as a human-readable live trace of requests and replies.
+
+## Deployment note
+
+The bridge adds the `miniapp_bridge_requests` table, so Serverless deployment must include the schema migration:
 
 ```bash
-npx wrangler d1 execute rich-customize-miniapp --remote --file=cloudflare/d1/schema.sql
+npx tgcloud diff
+npx tgcloud push
+npx tgcloud migrate
+npx tgcloud webhook sync
 ```
 
-Then bind the D1 database to the Pages project with the binding name:
+Bot-to-Bot Communication Mode must be enabled as required by Telegram for participating bots.
 
-```
-DB
-```
+## Deprecated D1 plan
 
-Dashboard path:
+The previous plan used Cloudflare D1 as a second `rich_pages` store. That plan is no longer the target architecture.
 
-```
-Workers & Pages
-→ rich-customize-miniapp
-→ Settings
-→ Bindings
-→ Add
-→ D1 database
-```
-
-### Required secrets and variables
-
-Under Pages → Settings → Variables and Secrets, add:
-
-```
-BOT_TOKEN       Secret
-SYNC_SECRET     Secret
-DEVELOPER_IDS   Variable
-```
-
-`BOT_TOKEN` is used only server-side by Pages Functions for Bot API calls such
-as uploads and sending a saved Rich Message. Never expose it to the static
-frontend or commit it to the repository.
-
-`SYNC_SECRET` protects the internal data migration/bridge routes. Use a long
-random value and keep the same value available to the Telegram Serverless side
-during Phase 3.
-
-`DEVELOPER_IDS` is a comma-separated list of Telegram user IDs that should be
-exempt from the normal 12 saved-page limit.
-
-### D1 source-of-truth cutover
-
-Do not start writing production pages to D1 while the Telegram Serverless bot
-still treats its built-in `rich_pages` table as the source of truth.
-
-The safe cutover is:
-
-1. deploy Pages Functions and D1;
-2. migrate the existing Telegram Serverless pages and managed chats once through
-   `/internal/sync`;
-3. switch the Telegram Serverless page/chat registry to the Cloudflare API;
-4. smoke-test both the bot editor and Mini App;
-5. only then point BotFather at the Pages URL.
-
-Until step 3 is complete, the Pages Functions API should be treated as staging
-rather than the production page store.
+Existing files under `cloudflare/d1/` and D1-oriented functions may remain temporarily as migration/reference material, but they must not receive production page writes while the B2B bridge is the active plan.
