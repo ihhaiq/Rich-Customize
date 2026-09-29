@@ -49,6 +49,7 @@ Converted Serverless slices:
   - showcase-channel cache refresh
   - callback actions edit the existing developer-panel message instead of creating another panel
 - developer-only `/app` shortcut to the named Mini App (`editor`)
+- Serverless-side `RCB1` B2B Mini App bridge receiver for the private bridge group, including page list/read/create/save/delete, JSON document transfer, request-id deduplication, rate limiting, optimistic revision conflicts, and error-log integration
 
 The converted Python bot entrypoint, routers and keyboard modules have been removed from this branch. Python that still remains under `app/` is retained only where the deferred Mini App HTTP backend or its dependency chain still requires it; Python tests remain reference material and are not deployed by tgcloud.
 
@@ -56,7 +57,9 @@ Deliberate scope exceptions:
 
 - The current Pages rich-table redesign from `main` is already ported to Serverless: four saved pages per screen, rich table rows with delete/rename/copy/open actions, search, sort, pagination, delete/restore, and in-place management-message refresh. Do not describe this redesign as deferred or missing. Keep `main` as the behavioral reference for future Pages changes.
 - Localization for the current Serverless bot scope is migrated. Keep `lib/lang/*.js` split per locale; do not recreate one monolithic localization bundle.
-- Telegram Serverless deploys update handlers/modules/database code only; the existing Mini App HTTP backend/static assets under `app/webapp/` and `app/miniapp_static/` still require separate HTTPS hosting. The bot-side named Mini App shortcut is present.
+- Telegram Serverless deploys update handlers/modules/database code only; the Mini App frontend still requires separate HTTPS hosting. The current integration uses Cloudflare as a stateless frontend/relay and Telegram Serverless `rich_pages` as the page source of truth.
+- Do not migrate production page storage to Cloudflare D1. The older D1-oriented `functions/miniapp/api/` implementation is legacy/staging material while the B2B relay is being completed.
+- The bridge group is private and observable by the developer. Serverless accepts bridge commands only in chat `-1003993506865` from `@Richminiappsbot`; the first valid request pins that bot's numeric Telegram ID in Serverless state.
 
 ## Data migration rules
 
