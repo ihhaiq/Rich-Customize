@@ -169,6 +169,21 @@ export const requestWindows = table('request_windows', {
 }));
 
 
+export const miniappBridgeRequests = table('miniapp_bridge_requests', {
+  requestId: text('request_id').primaryKey(),
+  action: text('action').notNull(),
+  senderBotId: integer('sender_bot_id').notNull(),
+  userId: integer('user_id'),
+  status: text('status').notNull().default('processing'),
+  result: json('result'),
+  createdAt: integer('created_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+}, (t) => ({
+  expiresIdx: index('idx_miniapp_bridge_requests_expires').on(t.expiresAt),
+  senderIdx: index('idx_miniapp_bridge_requests_sender').on(t.senderBotId),
+}));
+
+
 export const guestMessages = table('guest_messages', {
   inlineMessageId: text('inline_message_id').primaryKey(),
   chatId: integer('chat_id').notNull(),
