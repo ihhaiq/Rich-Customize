@@ -394,12 +394,27 @@ async function boot(){
 
   try{
     await api("/miniapp/api/me");
-    newDraft();
-    waitOverlay?.hide();
   }catch(error){
     updateSaveState(mt("save.unauthorized"));
     slashInput.disabled=true;
     waitOverlay?.setMessage("تعذر التحقق من الجلسة","أعد فتح التطبيق من تليكرام.");
+    toast(error.message);
+    return;
+  }
+
+  try{
+    waitOverlay?.setMessage(mt("common.loading"),mt("pages.title"));
+    const pageData=await api("/miniapp/api/pages");
+    const pages=Array.isArray(pageData?.pages)?pageData.pages:[];
+    window.RichMiniAppPagesSnapshot=pages;
+
+    const resumeTarget=String(window.RichMiniAppResume?.initialPage||"");
+    if(!resumeTarget&&!current)newDraft();
+    waitOverlay?.hide();
+  }catch(error){
+    updateSaveState(mt("save.failed"));
+    slashInput.disabled=true;
+    waitOverlay?.setMessage(mt("save.failed"),mt("pages.title"));
     toast(error.message);
   }
 }
