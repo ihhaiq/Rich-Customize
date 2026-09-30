@@ -210,4 +210,4 @@ Rules for cleanup:
 - do not delete files whose replacement or current use is uncertain without a separate audit
 - keep `main` only as a historical behavioral reference; new work targets `serverless-cleanup`
 
-The old Python implementation under `app/**/*.py` is obsolete in this branch and is being removed during this cleanup phase.
+Obsolete Python/Aiogram files under `app/**/*.py` were removed in the cleanup pass. `app/miniapp_static/` remains the active Mini App frontend.
