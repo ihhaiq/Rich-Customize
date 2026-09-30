@@ -1,6 +1,10 @@
 import { json, handleError, HttpError } from '../_lib/http.js';
 import { requireInternalSecret } from '../_lib/internal-auth.js';
-import { bridgeTokenForSetup } from '../_lib/b2b-bridge.js';
+import {
+  bridgeTokenForSetup,
+  sendBridgePairingPing,
+  verifyRelayBotIdentity,
+} from '../_lib/b2b-bridge.js';
 
 function webhookSecret(env) {
   const value = String(env.B2B_WEBHOOK_SECRET || '').trim();
@@ -16,6 +20,7 @@ export async function onRequestPost(context) {
     const origin = new URL(context.request.url).origin;
     const webhookUrl = origin + '/miniapp/api/bridge/webhook';
     const token = bridgeTokenForSetup(context.env);
+    const relay = await verifyRelayBotIdentity(context.env);
 
     const response = await fetch('https://api.telegram.org/bot' + token + '/setWebhook', {
       method: 'POST',
@@ -35,7 +40,15 @@ export async function onRequestPost(context) {
       );
     }
 
-    return json({ ok: true, webhook_url: webhookUrl });
+    const pairingRequestId = await sendBridgePairingPing(context.env);
+
+    return json({
+      ok: true,
+      webhook_url: webhookUrl,
+      relay_bot_id: relay.id,
+      relay_bot_username: relay.username,
+      pairing_request_id: pairingRequestId,
+    });
   } catch (error) {
     return handleError(error);
   }
