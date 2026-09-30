@@ -281,9 +281,9 @@ async function loadPages(){
   }catch(error){pagesEl.innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`}
 }
 async function openPage(pageId){
+  if(dirty){toast(mt("editor.unsaved"));return}
   try{
     await withWait(async()=>{
-      await flushSave();
       const data=await api(`/miniapp/api/pages/${encodeURIComponent(pageId)}`);
       current=data.page;
       current.blocks=(current.blocks||[]).sort((a,b)=>(a.position||0)-(b.position||0));
@@ -296,7 +296,8 @@ async function openPage(pageId){
 
 async function openSendPanel(){
   if(!current?.blocks?.length){toast(mt("send.add_content"));return}
-  try{await flushSave();if(!current.page_id){toast(mt("send.save_before"));return}showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}))}
+  if(dirty){toast(mt("editor.unsaved"));return}
+  try{if(!current.page_id){toast(mt("send.save_before"));return}showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}))}
 }
 async function sendTo(dest,button){
   const old=button.innerHTML;button.disabled=true;button.textContent=mt("send.sending");try{await api("/miniapp/api/send",{method:"POST",body:JSON.stringify({page_id:current.page_id,kind:dest.kind,chat_id:dest.chat_id})});closeSheets();toast(mt("send.sent_to",{title:dest.title}))}catch(error){button.disabled=false;button.innerHTML=old;toast(mt("send.failed",{error:error.message}))}
@@ -305,13 +306,13 @@ async function sendTo(dest,button){
 pageTitle.addEventListener("input",()=>{if(!current)return;current.title=pageTitle.value;markDirty()});
 undoBtn.onclick=undo;redoBtn.onclick=redo;
 $("pagesBtn").onclick=loadPages;
-$("newPageBtn").onclick=async()=>{try{await withWait(async()=>{await flushSave();newDraft()},"جاري تجهيز صفحة جديدة")}catch(error){toast(error.message)}};
+$("newPageBtn").onclick=async()=>{if(dirty){toast(mt("editor.unsaved"));return}newDraft()};
 $("sendBtn").onclick=openSendPanel;
 backdrop.onclick=closeSheets;
 $("startWritingBtn").onclick=()=>addBlock("paragraph");
 $("startPhotoBtn").onclick=()=>addBlock("photo");
 $("allBlocksBtn").onclick=()=>openSlashMenu("");
-$("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",async()=>{hideMenus();try{await withWait(async()=>{await flushSave();newDraft()},"جاري تجهيز صفحة جديدة")}catch(error){toast(error.message)}}));blockActions.appendChild(menuButton("save",mt("page.save_now"),"",async()=>{hideMenus();try{await withWait(async()=>{dirty=true;await flushSave()},"جاري حفظ الصفحة");toast(mt("save.saved"))}catch(error){toast(error.message)}}));blockMenu.classList.remove("hidden")};
+$("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",()=>{hideMenus();if(dirty){toast(mt("editor.unsaved"));return}newDraft()}));blockActions.appendChild(menuButton("save",mt("page.save_now"),"",async()=>{hideMenus();try{await withWait(async()=>{dirty=true;await flushSave()},"جاري حفظ الصفحة");toast(mt("save.saved"))}catch(error){toast(error.message)}}));blockMenu.classList.remove("hidden")};
 
 document.querySelectorAll(".composer-toolbar [data-tool]").forEach(btn=>btn.addEventListener("click",()=>openSlashMenu("",CATEGORIES[btn.dataset.tool]||null)));
 
