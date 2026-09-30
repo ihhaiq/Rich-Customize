@@ -101,7 +101,7 @@ Supported Serverless commands:
 /rcb_delete@RichCustomizebot
 ```
 
-Read requests use JSON metadata in the message text. Large page responses are returned as JSON documents.
+Read requests use JSON metadata in the message text and every request must include `"protocol":"RCB1"`. Large page responses are returned as JSON documents.
 
 Create and save requests carry the page payload as a JSON document. This avoids normal Telegram text-message length limits.
 
