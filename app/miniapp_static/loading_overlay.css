@@ -1,0 +1,103 @@
+/* Blocking Mini App wait overlay.
+   Intentionally subtle: glass effect without heavy blur/glow. */
+
+:root{
+  --wait-glass-bg:color-mix(in srgb,var(--panel) 78%,transparent);
+  --wait-glass-line:color-mix(in srgb,var(--text) 12%,transparent);
+  --wait-overlay-bg:color-mix(in srgb,var(--bg) 54%,rgba(0,0,0,.34));
+}
+
+html.miniapp-busy,
+body.miniapp-busy{
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+  touch-action:none;
+}
+
+.miniapp-wait-overlay{
+  position:fixed;
+  inset:0;
+  z-index:2147483000;
+  display:grid;
+  place-items:center;
+  padding:
+    max(18px,env(safe-area-inset-top))
+    max(18px,env(safe-area-inset-right))
+    max(18px,env(safe-area-inset-bottom))
+    max(18px,env(safe-area-inset-left));
+  background:var(--wait-overlay-bg);
+  backdrop-filter:blur(5px) saturate(112%);
+  -webkit-backdrop-filter:blur(5px) saturate(112%);
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  transition:opacity .16s ease,visibility .16s ease;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+.miniapp-wait-overlay[hidden]{
+  display:none!important;
+}
+
+.miniapp-wait-overlay.is-leaving{
+  opacity:0;
+  visibility:hidden;
+}
+
+.miniapp-wait-card{
+  position:relative;
+  width:min(286px,calc(100vw - 44px));
+  min-height:152px;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:15px;
+  padding:28px 24px 25px;
+  border:1px solid var(--wait-glass-line);
+  border-radius:25px;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.014)),
+    var(--wait-glass-bg);
+  box-shadow:
+    0 18px 46px rgba(0,0,0,.20),
+    inset 0 1px 0 rgba(255,255,255,.075);
+  backdrop-filter:blur(13px) saturate(128%);
+  -webkit-backdrop-filter:blur(13px) saturate(128%);
+  text-align:center;
+  color:var(--text);
+}
+
+.miniapp-wait-spinner{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  border:2.5px solid color-mix(in srgb,var(--text) 15%,transparent);
+  border-top-color:var(--accent);
+  animation:miniapp-wait-spin .78s linear infinite;
+}
+
+.miniapp-wait-text{
+  margin:0;
+  font-size:17px;
+  line-height:1.45;
+  font-weight:700;
+  letter-spacing:0;
+}
+
+.miniapp-wait-subtext{
+  margin:-7px 0 0;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.45;
+}
+
+@keyframes miniapp-wait-spin{
+  to{transform:rotate(360deg)}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .miniapp-wait-overlay{transition:none}
+  .miniapp-wait-spinner{animation-duration:1.4s}
+}
