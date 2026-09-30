@@ -30,6 +30,44 @@ let saveChain = Promise.resolve();
 let history = [];
 let future = [];
 let historyTimer = null;
+const pageCache = new Map();
+
+function copySessionValue(value){
+  if(value==null)return value;
+  try{return typeof structuredClone==="function"?structuredClone(value):JSON.parse(JSON.stringify(value))}
+  catch(_){return JSON.parse(JSON.stringify(value))}
+}
+function pagesSnapshot(){
+  return Array.isArray(window.RichMiniAppPagesSnapshot)?window.RichMiniAppPagesSnapshot:null;
+}
+function setPagesSnapshot(pages){
+  const normalized=(Array.isArray(pages)?pages:[]).map(page=>({...page,page_id:String(page?.page_id||"")})).filter(page=>page.page_id);
+  window.RichMiniAppPagesSnapshot=normalized;
+  return normalized;
+}
+function cacheSavedPage(page){
+  const id=String(page?.page_id||"");
+  if(!id)return;
+  pageCache.set(id,copySessionValue(page));
+  const list=pagesSnapshot()||[];
+  const existing=list.find(item=>String(item?.page_id||"")===id)||{};
+  const summary={
+    ...existing,
+    page_id:id,
+    title:String(page?.title||existing.title||id),
+    block_count:Array.isArray(page?.blocks)?page.blocks.length:Number(existing.block_count||0),
+    created_at:Number(page?.created_at||existing.created_at||0),
+    updated_at:Number(page?.updated_at||existing.updated_at||0),
+  };
+  const next=list.filter(item=>String(item?.page_id||"")!==id);
+  next.push(summary);
+  next.sort((a,b)=>Number(b.updated_at||0)-Number(a.updated_at||0)||String(a.page_id).localeCompare(String(b.page_id)));
+  setPagesSnapshot(next);
+}
+function cachedPage(pageId){
+  const value=pageCache.get(String(pageId||""));
+  return value?copySessionValue(value):null;
+}
 
 const BLOCKS = [
   {type:"paragraph",icon:"paragraph",label:mt("block.paragraph"),desc:mt("block.text_desc"),keys:"paragraph text فقرة نص"},
@@ -198,7 +236,9 @@ async function saveNow(){
       doc.updated_at=Number(data.updated_at||0);
     }
     if(doc.page_id&&data?.updated_at)doc.updated_at=Number(data.updated_at);
-    if(current===doc){dirty=false;current.title=pageTitle.value||mt("editor.untitled");updateSaveState(mt("save.saved_at",{time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}))}
+    doc.title=pageTitle.value||mt("editor.untitled");
+    cacheSavedPage(doc);
+    if(current===doc){dirty=false;current.title=doc.title;updateSaveState(mt("save.saved_at",{time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}))}
     return doc;
   }catch(error){if(current===doc){dirty=true;updateSaveState(mt("save.failed"))};throw error}
 }
@@ -336,27 +376,54 @@ function openSlashMenu(query="",types=null){
 function closeSheets(){pagesPanel.classList.add("hidden");sendPanel.classList.add("hidden");backdrop.classList.add("hidden")}
 function showSheet(panel){closeSheets();backdrop.classList.remove("hidden");panel.classList.remove("hidden")}
 
+function renderPagesList(pages){
+  const list=Array.isArray(pages)?pages:[];
+  pagesEl.innerHTML="";
+  $("emptyPages").classList.toggle("hidden",list.length>0);
+  list.forEach(page=>{
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.className="sheet-item";
+    btn.innerHTML=`<span class="sheet-item-main"><strong>${escapeHtml(page.title)}</strong><small>${Number(page.block_count||0)} Block · ${escapeHtml(page.page_id)}</small></span><span class="sheet-next"></span>`;
+    MiniAppIcons.mount(btn.querySelector(".sheet-next"),"next");
+    btn.onclick=()=>openPage(page.page_id);
+    pagesEl.appendChild(btn);
+  });
+}
 async function loadPages(){
-  showSheet(pagesPanel);pagesEl.innerHTML=`<div class="empty">${escapeHtml(mt("common.loading"))}</div>`;
+  showSheet(pagesPanel);
+  const cachedList=pagesSnapshot();
+  if(cachedList){
+    renderPagesList(cachedList);
+    return;
+  }
+  pagesEl.innerHTML=`<div class="empty">${escapeHtml(mt("common.loading"))}</div>`;
   try{
     await withWait(async()=>{
       const data=await api("/miniapp/api/pages");
-      pagesEl.innerHTML="";
-      $("emptyPages").classList.toggle("hidden",data.pages.length>0);
-      data.pages.forEach(page=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";btn.innerHTML=`<span class="sheet-item-main"><strong>${escapeHtml(page.title)}</strong><small>${page.block_count} Block · ${page.page_id}</small></span><span class="sheet-next"></span>`;MiniAppIcons.mount(btn.querySelector(".sheet-next"),"next");btn.onclick=()=>openPage(page.page_id);pagesEl.appendChild(btn)});
+      renderPagesList(setPagesSnapshot(data.pages));
     },"جاري تجهيز صفحاتك");
   }catch(error){pagesEl.innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`}
 }
+function applyOpenedPage(page,pageId){
+  current=copySessionValue(page);
+  current.blocks=(current.blocks||[]).sort((a,b)=>(a.position||0)-(b.position||0));
+  pageTitle.value=current.title||pageId;
+  selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
+  renderBlocks();updateSaveState(mt("save.saved"));pushHistory();closeSheets();
+}
 async function openPage(pageId){
   if(dirty){toast(mt("editor.unsaved"));return}
+  const local=cachedPage(pageId);
+  if(local){
+    applyOpenedPage(local,pageId);
+    return;
+  }
   try{
     await withWait(async()=>{
       const data=await api(`/miniapp/api/pages/${encodeURIComponent(pageId)}`);
-      current=data.page;
-      current.blocks=(current.blocks||[]).sort((a,b)=>(a.position||0)-(b.position||0));
-      pageTitle.value=current.title||pageId;
-      selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
-      renderBlocks();updateSaveState(mt("save.saved"));pushHistory();closeSheets();
+      cacheSavedPage(data.page);
+      applyOpenedPage(data.page,pageId);
     },"جاري تحميل الصفحة");
   }catch(error){toast(error.message)}
 }
@@ -434,7 +501,7 @@ async function boot(){
     waitOverlay?.setMessage(mt("common.loading"),mt("pages.title"));
     const pageData=await api("/miniapp/api/pages");
     const pages=Array.isArray(pageData?.pages)?pageData.pages:[];
-    window.RichMiniAppPagesSnapshot=pages;
+    setPagesSnapshot(pages);
 
     const resumeTarget=String(window.RichMiniAppResume?.initialPage||"");
     if(!resumeTarget&&!current)newDraft();
