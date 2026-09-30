@@ -1,54 +1,41 @@
 import { json, readJson, handleError, HttpError } from '../../_lib/http.js';
 import { miniAppUser } from '../../_lib/telegram-auth.js';
-import { getPage } from '../../_lib/pages.js';
-import { canPublishToChat, listManagedChats } from '../../_lib/destinations.js';
-import { prepareMessageButtons, buildMessageButtonsKeyboard } from '../../_lib/message-buttons.js';
-import { buildInputRichMessage } from '../../_lib/rich-message.js';
-import { telegramApi } from '../../_lib/telegram-api.js';
+import { queueTextBridgeRequest } from '../../_lib/b2b-bridge.js';
 
 export async function onRequestPost(context) {
   try {
     const user = await miniAppUser(context);
     const payload = await readJson(context.request);
-    const pageId = String(payload.page_id || '');
-    const page = await getPage(context.env.DB, pageId);
-    if (!page || page.owner_id !== user.id) throw new HttpError(404, 'Page not found');
+    const pageId = String(payload.page_id || '').trim();
+    if (!pageId || pageId.length > 64 || /\s/.test(pageId)) {
+      throw new HttpError(400, 'Invalid page_id');
+    }
 
     const kind = String(payload.kind || 'private');
-    let targetChatId = user.id;
+    const extra = { kind };
+
     if (kind === 'chat') {
-      const requested = Number(payload.chat_id);
-      if (!Number.isSafeInteger(requested)) throw new HttpError(400, 'Invalid chat_id');
-      const known = new Set(
-        (await listManagedChats(context.env.DB, user.id)).map((item) => Number(item.chat_id))
-      );
-      if (!known.has(requested)) throw new HttpError(403, 'Publishing is not allowed in this chat');
-      const allowed = await canPublishToChat(context.env, requested, user.id);
-      if (!allowed) throw new HttpError(403, 'Publishing is not allowed in this chat');
-      targetChatId = requested;
+      const chatId = Number(payload.chat_id);
+      if (!Number.isSafeInteger(chatId)) throw new HttpError(400, 'Invalid chat_id');
+      extra.chat_id = chatId;
     } else if (kind !== 'private') {
       throw new HttpError(400, 'Invalid destination kind');
     }
 
-    const prepared = await prepareMessageButtons(context.env.DB, page.buttons || []);
-    const replyMarkup = prepared.length
-      ? buildMessageButtonsKeyboard(prepared, {
-          buttonsPerRow: page.buttons_per_row || 1,
-          sourcePageId: pageId,
-        })
-      : undefined;
-
-    const result = await telegramApi(context.env, 'sendRichMessage', {
-      chat_id: targetChatId,
-      rich_message: buildInputRichMessage(page.blocks || [], { sourcePageId: pageId }),
-      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    const requestId = await queueTextBridgeRequest(context, {
+      action: 'publish',
+      userId: user.id,
+      pageId,
+      extra,
     });
 
     return json({
       ok: true,
-      chat_id: targetChatId,
-      message_id: result?.message_id ?? null,
-    });
+      pending: true,
+      request_id: requestId,
+      action: 'publish',
+      beta: '0.4-b2b',
+    }, 202);
   } catch (error) {
     return handleError(error);
   }
