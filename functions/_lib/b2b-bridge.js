@@ -171,10 +171,31 @@ function command(env, action) {
     publish: 'rcb_publish',
     user_picker: 'rcb_user_picker',
     destinations: 'rcb_destinations',
+    client_error: 'rcb_client_error',
   };
   const name = map[String(action)];
   if (!name) throw new HttpError(500, 'Unknown bridge action');
   return '/' + name + '@' + targetUsername(env);
+}
+
+export async function sendOneWayBridgeEvent(context, {
+  action,
+  userId,
+  extra = null,
+}) {
+  const id = requestId();
+  const meta = envelope({ id, userId, extra });
+  try {
+    await telegramJson(context.env, 'sendMessage', {
+      chat_id: bridgeChatId(context.env),
+      text: command(context.env, action) + '\n' + JSON.stringify(meta),
+      disable_notification: true,
+    });
+  } catch (error) {
+    if (!transportOutcomeUncertain(error)) throw error;
+    console.warn('B2B one-way event outcome is uncertain', id, action);
+  }
+  return id;
 }
 
 export async function queueTextBridgeRequest(context, {
