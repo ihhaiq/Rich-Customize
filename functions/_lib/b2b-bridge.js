@@ -131,7 +131,7 @@ async function telegramMultipart(env, method, form) {
   return data.result;
 }
 
-function envelope({ id, userId, pageId = null, baseUpdatedAt = null }) {
+function envelope({ id, userId, pageId = null, baseUpdatedAt = null, extra = null }) {
   const value = {
     protocol: B2B_PROTOCOL,
     request_id: safeRequestId(id),
@@ -145,6 +145,12 @@ function envelope({ id, userId, pageId = null, baseUpdatedAt = null }) {
     }
     value.base_updated_at = revision;
   }
+  if (extra && typeof extra === 'object' && !Array.isArray(extra)) {
+    for (const [key, item] of Object.entries(extra)) {
+      if (['protocol', 'request_id', 'user_id', 'page_id', 'base_updated_at'].includes(key)) continue;
+      value[key] = item;
+    }
+  }
   return value;
 }
 
@@ -156,6 +162,7 @@ function command(env, action) {
     create: 'rcb_create',
     save: 'rcb_save',
     delete: 'rcb_delete',
+    publish: 'rcb_publish',
   };
   const name = map[String(action)];
   if (!name) throw new HttpError(500, 'Unknown bridge action');
@@ -167,9 +174,10 @@ export async function queueTextBridgeRequest(context, {
   userId,
   pageId = null,
   baseUpdatedAt = null,
+  extra = null,
 }) {
   const id = requestId();
-  const meta = envelope({ id, userId, pageId, baseUpdatedAt });
+  const meta = envelope({ id, userId, pageId, baseUpdatedAt, extra });
   await insertPending(context.env.DB, { requestId: id, userId, action, pageId });
   try {
     await telegramJson(context.env, 'sendMessage', {
