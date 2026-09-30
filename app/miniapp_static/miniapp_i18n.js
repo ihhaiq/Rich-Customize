@@ -214,7 +214,7 @@
 
   const telegramLanguage = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code;
   const language = normalize(telegramLanguage || navigator.language);
-  const rtl = ["ar","fa","ur"].includes(language);
+  const rtl = ["ar","ur"].includes(language);
 
   function t(key, vars = {}) {
     const template = dictionaries[language]?.[key] ?? dictionaries.en[key] ?? dictionaries.ar[key] ?? key;
