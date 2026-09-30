@@ -51,7 +51,7 @@ Converted Serverless slices:
 - developer-only `/app` shortcut to the named Mini App (`editor`)
 - Serverless-side `RCB1` B2B Mini App bridge receiver for the private bridge group, including page list/read/create/save/delete, destinations, publish and native user-picker flows, JSON document transfer, target/protocol checks, numeric bot pairing, request-id deduplication, global + per-user throttling, optimistic revision conflicts, shared button validation, and error-log integration
 
-The converted Python bot entrypoint, routers and keyboard modules have been removed from this branch. Python that still remains under `app/` is retained only where the deferred Mini App HTTP backend or its dependency chain still requires it; Python tests remain reference material and are not deployed by tgcloud.
+The active Telegram Serverless and Cloudflare Mini App paths are JavaScript. Python still present under `app/` is legacy/reference material from the pre-Serverless implementation and is not part of the current deployment paths; Python tests remain reference material.
 
 Deliberate scope exceptions:
 
