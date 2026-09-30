@@ -27,7 +27,8 @@ function normalizeDocumentResult(row, payload) {
   if (String(payload?.request_id || '') !== String(row.request_id)) {
     throw new HttpError(502, 'Bridge request_id mismatch');
   }
-  if (Number(payload?.user_id) !== Number(row.user_id)) {
+  const responseUserId = payload?.user_id ?? payload?.owner_id;
+  if (Number(responseUserId) !== Number(row.user_id)) {
     throw new HttpError(502, 'Bridge user_id mismatch');
   }
 
