@@ -300,7 +300,21 @@ async function openSendPanel(){
   try{if(!current.page_id){toast(mt("send.save_before"));return}showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}))}
 }
 async function sendTo(dest,button){
-  const old=button.innerHTML;button.disabled=true;button.textContent=mt("send.sending");try{await api("/miniapp/api/send",{method:"POST",body:JSON.stringify({page_id:current.page_id,kind:dest.kind,chat_id:dest.chat_id})});closeSheets();toast(mt("send.sent_to",{title:dest.title}))}catch(error){button.disabled=false;button.innerHTML=old;toast(mt("send.failed",{error:error.message}))}
+  const old=button.innerHTML;
+  button.disabled=true;
+  button.textContent=mt("send.sending");
+  try{
+    await withWait(
+      ()=>api("/miniapp/api/send",{method:"POST",body:JSON.stringify({page_id:current.page_id,kind:dest.kind,chat_id:dest.chat_id})}),
+      "جاري نشر الصفحة",
+    );
+    closeSheets();
+    toast(mt("send.sent_to",{title:dest.title}));
+  }catch(error){
+    button.disabled=false;
+    button.innerHTML=old;
+    toast(mt("send.failed",{error:error.message}));
+  }
 }
 
 pageTitle.addEventListener("input",()=>{if(!current)return;current.title=pageTitle.value;markDirty()});
