@@ -27,7 +27,7 @@ The scaffold SDK reference is kept at `docs/tgcloud-sdk.md`.
 - developer-only `/app` shortcut to the named Mini App
 - Telegram B2B Mini App bridge for `@Richminiappsbot`: private bridge-group routing, request IDs, page list/read/create/save/delete, publish destinations, publishing, native user-picker handoff, JSON document transfer, optimistic conflicts, throttling and error-log integration
 
-The converted Python bot entrypoint, routers and keyboard modules were removed from `serverless-cleanup`. Remaining Python is kept only for the deferred Mini App HTTP backend/dependency chain and for old reference tests; tgcloud does not deploy it.
+The active Telegram Serverless and Cloudflare Mini App paths are JavaScript. Remaining Python under `app/` is legacy/reference material from the pre-Serverless implementation and is not imported or deployed by the current Serverless/Cloudflare architecture.
 
 Current intentional exceptions:
 
