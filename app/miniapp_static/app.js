@@ -448,16 +448,29 @@ async function openPage(pageId){
 
 async function openSendPanel(){
   if(!current?.blocks?.length){toast(mt("send.add_content"));return}
-  if(dirty){toast(mt("editor.unsaved"));return}
-  try{if(!current.page_id){toast(mt("send.save_before"));return}showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}))}
+  try{showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}))}
 }
 async function sendTo(dest,button){
   const old=button.innerHTML;
   button.disabled=true;
   button.textContent=mt("send.sending");
   try{
+    const body={kind:dest.kind};
+    if(dest.kind==="chat")body.chat_id=dest.chat_id;
+    if(dirty||!current.page_id){
+      normalizePositions();
+      Object.assign(body,{
+        title:pageTitle.value||mt("editor.untitled"),
+        blocks:current.blocks,
+        buttons:current.buttons||[],
+        buttons_per_row:current.buttons_per_row||1,
+        buttons_align:current.buttons_align||"center",
+      });
+    }else{
+      body.page_id=current.page_id;
+    }
     await withWait(
-      ()=>api("/miniapp/api/send",{method:"POST",body:JSON.stringify({page_id:current.page_id,kind:dest.kind,chat_id:dest.chat_id})}),
+      ()=>api("/miniapp/api/send",{method:"POST",body:JSON.stringify(body)}),
       "جاري نشر الصفحة",
     );
     closeSheets();
