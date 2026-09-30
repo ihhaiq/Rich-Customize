@@ -6,8 +6,6 @@ Rich Customize is being moved from Python/Aiogram/Railway to Telegram Serverless
 
 Official platform guide: https://core.telegram.org/bots/serverless
 
-The scaffold SDK reference is kept at `docs/tgcloud-sdk.md`.
-
 ## Converted
 
 - `/start` welcome and idle-private behavior
