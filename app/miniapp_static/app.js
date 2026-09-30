@@ -30,6 +30,9 @@ let saveChain = Promise.resolve();
 let history = [];
 let future = [];
 let historyTimer = null;
+let pageOpenRunning = false;
+let lastPageOpenAt = 0;
+const PAGE_OPEN_COOLDOWN_MS = 700;
 const pageCache = new Map();
 
 function copySessionValue(value){
@@ -428,25 +431,95 @@ function applyOpenedPage(page,pageId){
   current.blocks=(current.blocks||[]).sort((a,b)=>(a.position||0)-(b.position||0));
   pageTitle.value=current.title||pageId;
   selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
+  slashInput.value="";autoGrow(slashInput);
   renderBlocks();updateSaveState(mt("save.saved"));pushHistory();closeSheets();
 }
+function hasUnsavedEditorWork(){
+  return Boolean(dirty||String(slashInput?.value||"").trim());
+}
+function confirmDiscardForPageOpen(){
+  const message=mt("pages.discard_unsaved_confirm");
+  return new Promise(resolve=>{
+    if(tg?.showConfirm){
+      try{tg.showConfirm(message,value=>resolve(Boolean(value)));return}catch(_){}
+    }
+    resolve(window.confirm(message));
+  });
+}
+function discardCurrentSessionForPageOpen(){
+  clearTimeout(historyTimer);
+  historyTimer=null;
+  dirty=false;
+  history=[];
+  future=[];
+  selectedBlockId=null;
+  insertIndex=null;
+  slashInput.value="";
+  autoGrow(slashInput);
+  try{window.RichMiniAppResume?.clear?.()}catch(_){}
+  current=null;
+  pageTitle.value=mt("editor.untitled");
+  renderBlocks();
+  syncHistory();
+  updateSaveState(mt("editor.unsaved"));
+  closeSheets();
+}
 async function openPage(pageId){
-  if(dirty){toast(mt("editor.unsaved"));return}
-  const local=cachedPage(pageId);
-  if(local){
-    applyOpenedPage(local,pageId);
-    return;
+  const id=String(pageId||"").trim();
+  if(!id)return false;
+  if(pageOpenRunning)return false;
+  const stamp=Date.now();
+  if(stamp-lastPageOpenAt<PAGE_OPEN_COOLDOWN_MS)return false;
+
+  if(hasUnsavedEditorWork()){
+    const approved=await confirmDiscardForPageOpen();
+    if(!approved)return false;
+    discardCurrentSessionForPageOpen();
   }
+
+  pageOpenRunning=true;
+  lastPageOpenAt=Date.now();
   try{
+    const local=cachedPage(id);
+    if(local){
+      applyOpenedPage(local,id);
+      return true;
+    }
     await withWait(async()=>{
-      const data=await api(`/miniapp/api/pages/${encodeURIComponent(pageId)}`);
+      const data=await api(`/miniapp/api/pages/${encodeURIComponent(id)}`);
       cacheSavedPage(data.page);
-      applyOpenedPage(data.page,pageId);
+      applyOpenedPage(data.page,id);
     },"جاري تحميل الصفحة");
-  }catch(error){toast(error.message)}
+    return true;
+  }catch(error){
+    toast(error.status===429?mt("pages.open_too_fast"):error.message);
+    return false;
+  }finally{
+    pageOpenRunning=false;
+  }
+}
+
+function commitPendingComposerText(){
+  if(!current||!slashInput)return false;
+  const raw=String(slashInput.value||"");
+  if(!raw.trim()||raw.trimStart().startsWith("/"))return false;
+  const block=defaultBlock("paragraph");
+  applyText(block,raw);
+  const index=Number.isInteger(insertIndex)?Math.max(0,Math.min(insertIndex,current.blocks.length)):current.blocks.length;
+  current.blocks.splice(index,0,block);
+  normalizePositions();
+  selectedBlockId=block.id;
+  insertIndex=index+1;
+  slashInput.value="";
+  autoGrow(slashInput);
+  renderBlocks();
+  markDirty();
+  pushHistory();
+  return true;
 }
 
 async function openSendPanel(){
+  commitPendingComposerText();
   if(!current?.blocks?.length){toast(mt("send.add_content"));return}
   try{showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}))}
 }

@@ -11,6 +11,8 @@ const DEFAULT_MIN_SEND_INTERVAL_MS = 3500;
 const DEFAULT_MAX_QUEUE_WAIT_MS = 12000;
 const DEFAULT_CIRCUIT_SECONDS = 15;
 const DEDUPE_WINDOW_SECONDS = 12;
+const PAGE_OPEN_BURST_SECONDS = 10;
+const PAGE_OPEN_BURST_LIMIT = 4;
 const RETRY_LIMIT = 2;
 
 function now() {
@@ -247,19 +249,57 @@ async function bumpMetric(db, column, amount = 1) {
 
 async function reusableBridgeRequest(db, { userId, action, pageId = null }) {
   const name = String(action || '');
-  if (!new Set(['pages', 'destinations']).has(name)) return null;
+  if (!new Set(['pages', 'destinations', 'page']).has(name)) return null;
   await ensureBridgeSchema(db);
   const owner = safeUserId(userId);
   const cutoff = now() - DEDUPE_WINDOW_SECONDS;
-  const row = await db.prepare(
-    "SELECT request_id FROM miniapp_bridge_pending "
-    + "WHERE user_id = ? AND action = ? AND status IN ('pending','ready') "
-    + "AND created_at >= ? AND expires_at > ? "
-    + "ORDER BY created_at DESC LIMIT 1"
-  ).bind(owner, name, cutoff, now()).first();
+
+  let row;
+  if (name === 'page') {
+    const id = safePageId(pageId, true);
+    row = await db.prepare(
+      "SELECT request_id FROM miniapp_bridge_pending "
+      + "WHERE user_id = ? AND action = 'page' AND page_id = ? "
+      + "AND status IN ('pending','ready') AND created_at >= ? AND expires_at > ? "
+      + "ORDER BY created_at DESC LIMIT 1"
+    ).bind(owner, id, cutoff, now()).first();
+  } else {
+    row = await db.prepare(
+      "SELECT request_id FROM miniapp_bridge_pending "
+      + "WHERE user_id = ? AND action = ? AND status IN ('pending','ready') "
+      + "AND created_at >= ? AND expires_at > ? "
+      + "ORDER BY created_at DESC LIMIT 1"
+    ).bind(owner, name, cutoff, now()).first();
+  }
   if (!row?.request_id) return null;
   await bumpMetric(db, 'deduped');
   return String(row.request_id);
+}
+
+async function guardPageOpenBurst(db, userId, pageId) {
+  await ensureBridgeSchema(db);
+  const owner = safeUserId(userId);
+  const id = safePageId(pageId, true);
+  const stamp = now();
+
+  const active = await db.prepare(
+    "SELECT page_id FROM miniapp_bridge_pending "
+    + "WHERE user_id = ? AND action = 'page' AND status = 'pending' AND expires_at > ? "
+    + "ORDER BY created_at DESC LIMIT 1"
+  ).bind(owner, stamp).first();
+  if (active?.page_id && String(active.page_id) !== id) {
+    await bumpMetric(db, 'rejected');
+    throw new HttpError(429, 'Another page-open request is already running.');
+  }
+
+  const row = await db.prepare(
+    "SELECT COUNT(*) AS count FROM miniapp_bridge_pending "
+    + "WHERE user_id = ? AND action = 'page' AND created_at >= ?"
+  ).bind(owner, stamp - PAGE_OPEN_BURST_SECONDS).first();
+  if (Number(row?.count || 0) >= PAGE_OPEN_BURST_LIMIT) {
+    await bumpMetric(db, 'rejected');
+    throw new HttpError(429, 'Too many page-open requests. Try again shortly.');
+  }
 }
 
 async function reserveBridgeSlot(db, env) {
@@ -523,6 +563,10 @@ export async function queueTextBridgeRequest(context, {
   const db = requireBridgeDb(context.env);
   const reusable = await reusableBridgeRequest(db, { userId, action, pageId });
   if (reusable) return reusable;
+
+  if (String(action) === 'page') {
+    await guardPageOpenBurst(db, userId, pageId);
+  }
 
   await reserveBridgeSlot(db, context.env);
   const id = requestId();
