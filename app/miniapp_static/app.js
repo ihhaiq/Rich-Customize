@@ -61,6 +61,8 @@ function cacheSavedPage(page){
     block_count:Array.isArray(page?.blocks)?page.blocks.length:Number(existing.block_count||0),
     created_at:Number(page?.created_at||existing.created_at||0),
     updated_at:Number(page?.updated_at||existing.updated_at||0),
+    revision:Number(page?.revision||existing.revision||1),
+    sync_seq:Number(page?.sync_seq||existing.sync_seq||0),
   };
   const next=list.filter(item=>String(item?.page_id||"")!==id);
   next.push(summary);
@@ -246,7 +248,7 @@ async function saveNow(){
   normalizePositions();
   const doc=current;
   updateSaveState(mt("save.saving"),{saving:true});
-  const body={title:pageTitle.value||mt("editor.untitled"),blocks:doc.blocks,buttons:doc.buttons||[],buttons_per_row:doc.buttons_per_row||1,buttons_align:doc.buttons_align||"center",...(doc.page_id?{base_updated_at:Number(doc.updated_at||0)}:{})};
+  const body={title:pageTitle.value||mt("editor.untitled"),blocks:doc.blocks,buttons:doc.buttons||[],buttons_per_row:doc.buttons_per_row||1,buttons_align:doc.buttons_align||"center",...(doc.page_id?{base_revision:Number(doc.revision||1),base_updated_at:Number(doc.updated_at||0)}:{})};
   try{
     let data;
     if(doc.page_id){
@@ -255,8 +257,12 @@ async function saveNow(){
       data=await api("/miniapp/api/pages",{method:"POST",body:JSON.stringify(body)});
       doc.page_id=data.page_id;
       doc.updated_at=Number(data.updated_at||0);
+      doc.revision=Number(data.revision||1);
+      doc.sync_seq=Number(data.sync_seq||0);
     }
     if(doc.page_id&&data?.updated_at)doc.updated_at=Number(data.updated_at);
+    if(doc.page_id&&data?.revision)doc.revision=Number(data.revision);
+    if(doc.page_id&&data?.sync_seq!=null)doc.sync_seq=Number(data.sync_seq||0);
     doc.title=pageTitle.value||mt("editor.untitled");
     cacheSavedPage(doc);
     if(current===doc){dirty=false;current.title=doc.title;updateSaveState(mt("save.saved_at",{time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}))}

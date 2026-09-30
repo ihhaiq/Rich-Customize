@@ -169,6 +169,8 @@ export async function releaseMirrorBootstrap(db) {
 
 export async function markMirrorBootstrapFailed(db, detail = '') {
   await setMeta(db, 'sync_status', 'failed:' + String(detail || '').slice(0, 120));
+  await db.prepare("DELETE FROM miniapp_sync_meta WHERE key = 'staging_generation'").run().catch(() => {});
+  await db.prepare("DELETE FROM miniapp_sync_locks WHERE key = 'snapshot_apply'").run().catch(() => {});
   await releaseMirrorBootstrap(db);
 }
 
@@ -254,7 +256,11 @@ function validateEvent(payload) {
   const pageId = stringValue(payload.page_id).trim();
   if (!pageId || pageId.length > 64 || /\s/.test(pageId)) throw new HttpError(502, 'Invalid sync page_id');
   const revision = safePositive(payload.revision, 'revision');
-  const syncSeq = safePositive(payload.sync_seq, 'sync_seq');
+  const rawSyncSeq = Number(payload.sync_seq);
+  const snapshotEvent = syncId.startsWith('snapshot_');
+  const syncSeq = snapshotEvent
+    ? safeNonNegative(rawSyncSeq, 'sync_seq')
+    : safePositive(rawSyncSeq, 'sync_seq');
   return { type, syncId, ownerId, pageId, revision, syncSeq };
 }
 
@@ -416,6 +422,17 @@ function snapshotPageEvent(userId, page) {
 
 export async function applyFullPageSnapshot(db, payload) {
   await ensurePageMirrorSchema(db);
+  const lockToken = randomToken();
+  const lockStamp = now();
+  const applyLock = await db.prepare(
+    "INSERT INTO miniapp_sync_locks(key,token,expires_at) VALUES('snapshot_apply', ?, ?) "
+    + 'ON CONFLICT(key) DO UPDATE SET token=excluded.token,expires_at=excluded.expires_at '
+    + 'WHERE miniapp_sync_locks.expires_at <= ? RETURNING token'
+  ).bind(lockToken, lockStamp + BOOTSTRAP_LOCK_SECONDS, lockStamp).first();
+  if (!applyLock?.token || String(applyLock.token) !== lockToken) {
+    throw new HttpError(409, 'Another full snapshot import is already running');
+  }
+  try {
   if (!payload || Array.isArray(payload) || typeof payload !== 'object') {
     throw new HttpError(502, 'Invalid full snapshot');
   }
@@ -514,4 +531,9 @@ export async function applyFullPageSnapshot(db, payload) {
     owner_count: ownerCount,
     page_count: pageCount,
   };
+  } finally {
+    await db.prepare(
+      "DELETE FROM miniapp_sync_locks WHERE key = 'snapshot_apply' AND token = ?"
+    ).bind(lockToken).run().catch(() => {});
+  }
 }
