@@ -1,4 +1,5 @@
 import { plainRichText } from '../../lib/rich-text.js';
+import { validateStoredButtons } from '../../lib/button-validation.js';
 import { HttpError } from './http.js';
 
 export const MAX_PAGE_BLOCKS = 30;
@@ -252,8 +253,15 @@ export function validatePagePayload(payload, current = null) {
     }
   }
 
-  if (!Array.isArray(buttons) || buttons.length > MAX_BUTTONS || buttons.some((button) => !button || typeof button !== 'object' || Array.isArray(button))) {
-    throw new HttpError(400, 'buttons must contain at most ' + MAX_BUTTONS + ' objects');
+  const buttonValidation = validateStoredButtons(buttons, MAX_BUTTONS);
+  if (!buttonValidation.ok) {
+    throw new HttpError(
+      400,
+      'invalid button at index '
+        + String(buttonValidation.index ?? 'n/a')
+        + ': '
+        + String(buttonValidation.code || 'unknown'),
+    );
   }
 
   const buttonsPerRow = Number.parseInt(String(payload.buttons_per_row ?? fallback.buttons_per_row ?? 1), 10);
