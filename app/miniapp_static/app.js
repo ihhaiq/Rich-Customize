@@ -469,17 +469,20 @@ async function openPage(pageId){
   if(!id)return false;
   if(pageOpenRunning)return false;
   const stamp=Date.now();
-  if(stamp-lastPageOpenAt<PAGE_OPEN_COOLDOWN_MS)return false;
-
-  if(hasUnsavedEditorWork()){
-    const approved=await confirmDiscardForPageOpen();
-    if(!approved)return false;
-    discardCurrentSessionForPageOpen();
+  if(stamp-lastPageOpenAt<PAGE_OPEN_COOLDOWN_MS){
+    toast(mt("pages.open_too_fast"));
+    return false;
   }
 
   pageOpenRunning=true;
-  lastPageOpenAt=Date.now();
   try{
+    if(hasUnsavedEditorWork()){
+      const approved=await confirmDiscardForPageOpen();
+      if(!approved)return false;
+      discardCurrentSessionForPageOpen();
+    }
+
+    lastPageOpenAt=Date.now();
     const local=cachedPage(id);
     if(local){
       applyOpenedPage(local,id);
