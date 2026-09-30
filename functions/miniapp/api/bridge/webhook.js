@@ -2,7 +2,9 @@ import { json, text } from '../../../_lib/http.js';
 import {
   bridgeChatMatches,
   bridgeWebhookSecretMatches,
+  ensureBridgeSchema,
   recordBridgeWebhookResult,
+  requireBridgeDb,
   verifyAndPinMainBotIdentity,
 } from '../../../_lib/b2b-bridge.js';
 
@@ -61,10 +63,13 @@ export async function onRequestPost(context) {
 
   const message = update?.message;
   if (!message) return json({ ok: true, ignored: 'no_message' });
+
+  const db = requireBridgeDb(context.env);
+  await ensureBridgeSchema(db);
   if (!bridgeChatMatches(context.env, message?.chat?.id)) {
     return json({ ok: true, ignored: 'wrong_chat' });
   }
-  if (!await verifyAndPinMainBotIdentity(context.env.DB, context.env, message?.from)) {
+  if (!await verifyAndPinMainBotIdentity(db, context.env, message?.from)) {
     return json({ ok: true, ignored: 'wrong_sender' });
   }
 
@@ -73,13 +78,13 @@ export async function onRequestPost(context) {
   const requestId = String(parsed.request_id || '').trim();
   if (!requestId) return json({ ok: true, ignored: 'no_request_id' });
 
-  const pending = await context.env.DB.prepare(
+  const pending = await db.prepare(
     'SELECT request_id, user_id, action, page_id, status FROM miniapp_bridge_pending WHERE request_id = ?'
   ).bind(requestId).first();
   if (!pending) return json({ ok: true, ignored: 'unknown_request' });
 
   if (/^❌\s*RCB1\s+ERROR/i.test(source)) {
-    await recordBridgeWebhookResult(context.env.DB, {
+    await recordBridgeWebhookResult(db, {
       requestId,
       status: 'error',
       errorCode: parsed.code || 'BRIDGE_ERROR',
@@ -91,7 +96,7 @@ export async function onRequestPost(context) {
   const action = responseAction(source);
   if (!action) return json({ ok: true, ignored: 'unknown_response', request_id: requestId });
   if (String(pending.action) !== action) {
-    await recordBridgeWebhookResult(context.env.DB, {
+    await recordBridgeWebhookResult(db, {
       requestId,
       status: 'error',
       errorCode: 'ACTION_MISMATCH',
@@ -105,7 +110,7 @@ export async function onRequestPost(context) {
   }
 
   if (action !== 'ping' && Number(parsed.user_id) !== Number(pending.user_id)) {
-    await recordBridgeWebhookResult(context.env.DB, {
+    await recordBridgeWebhookResult(db, {
       requestId,
       status: 'error',
       errorCode: 'USER_MISMATCH',
@@ -119,7 +124,7 @@ export async function onRequestPost(context) {
     && String(parsed.page_id || '') !== String(pending.page_id)
     && !message.document?.file_id
   ) {
-    await recordBridgeWebhookResult(context.env.DB, {
+    await recordBridgeWebhookResult(db, {
       requestId,
       status: 'error',
       errorCode: 'PAGE_MISMATCH',
@@ -129,7 +134,7 @@ export async function onRequestPost(context) {
   }
 
   if (message.document?.file_id) {
-    await recordBridgeWebhookResult(context.env.DB, {
+    await recordBridgeWebhookResult(db, {
       requestId,
       status: 'ready',
       responseKind: 'document',
@@ -138,7 +143,7 @@ export async function onRequestPost(context) {
     return json({ ok: true, request_id: requestId, status: 'ready' });
   }
 
-  await recordBridgeWebhookResult(context.env.DB, {
+  await recordBridgeWebhookResult(db, {
     requestId,
     status: 'ready',
     responseKind: 'ack',
