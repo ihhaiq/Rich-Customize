@@ -153,4 +153,4 @@ Cleanup policy:
 - after every deletion batch, verify active JS imports and deployment paths
 - do not start unrelated feature work during cleanup unless explicitly requested
 
-The obsolete `app/**/*.py` implementation is not part of the active deployment and is scheduled for removal in this cleanup phase.
+The obsolete `app/**/*.py` implementation has been removed. Do not recreate Python runtime files in this branch.
