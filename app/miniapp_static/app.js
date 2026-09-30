@@ -74,15 +74,49 @@ async function parseApiResponse(res){
   return data;
 }
 async function pollBridge(requestId){
-  const deadline=Date.now()+60000;
+  const started=Date.now();
+  const deadline=started+65000;
+  let attempt=0;
+
   while(Date.now()<deadline){
-    await new Promise(resolve=>setTimeout(resolve,500));
-    const res=await fetch(`/miniapp/api/bridge/${encodeURIComponent(requestId)}`,{headers:headers(),cache:"no-store"});
-    const data=await parseApiResponse(res);
+    const delay=Math.min(350+(attempt*180),1600);
+    await new Promise(resolve=>setTimeout(resolve,delay));
+    attempt+=1;
+
+    if(Date.now()-started>8000){
+      waitOverlay?.setMessage("انتظر شوية…","بعدنا نجهز البيانات");
+    }
+
+    let res;
+    try{
+      res=await fetch(
+        `/miniapp/api/bridge/${encodeURIComponent(requestId)}`,
+        {headers:headers(),cache:"no-store"},
+      );
+    }catch(error){
+      if(Date.now()<deadline)continue;
+      throw error;
+    }
+
+    let data;
+    try{
+      data=await parseApiResponse(res);
+    }catch(error){
+      if([502,503,504].includes(res.status)&&Date.now()<deadline)continue;
+      throw error;
+    }
+
     if(res.status===202||data?.pending)continue;
-    if(data?.ok===false)throw apiError(data,"Bridge request failed");
+    if(data?.ok===false){
+      const error=apiError(data,"Bridge request failed");
+      if(error.code==="BRIDGE_EXPIRED"){
+        error.message="انتهت صلاحية الطلب، حاول مرة ثانية.";
+      }
+      throw error;
+    }
     return data;
   }
+
   const error=new Error("انتهت مهلة تجهيز البيانات، حاول مرة ثانية.");
   error.code="BRIDGE_TIMEOUT";
   throw error;
