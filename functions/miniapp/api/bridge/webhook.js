@@ -29,6 +29,7 @@ function responseAction(source) {
   if (value.includes('CREATE_PAGE_OK')) return 'create';
   if (value.includes('SAVE_PAGE_OK')) return 'save';
   if (value.includes('DELETE_PAGE_OK')) return 'delete';
+  if (value.includes('PUBLISH_OK')) return 'publish';
   if (value.includes('PONG')) return 'ping';
   return null;
 }
@@ -39,6 +40,8 @@ function smallResult(action, parsed) {
   if (parsed.page_id) result.page_id = parsed.page_id;
   if (parsed.updated_at) result.updated_at = Number(parsed.updated_at);
   if (parsed.bridge_bot_id) result.bridge_bot_id = Number(parsed.bridge_bot_id);
+  if (parsed.chat_id) result.chat_id = Number(parsed.chat_id);
+  if (parsed.message_id) result.message_id = Number(parsed.message_id);
   return result;
 }
 
