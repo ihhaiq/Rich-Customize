@@ -315,3 +315,29 @@ export function bridgeMainBotMatches(env, from) {
 export function bridgeTokenForSetup(env) {
   return bridgeToken(env);
 }
+
+export async function verifyRelayBotIdentity(env) {
+  const me = await telegramJson(env, 'getMe');
+  const username = String(me?.username || '').replace(/^@+/, '').toLowerCase();
+  if (!me?.is_bot || username !== B2B_RELAY_BOT_USERNAME.toLowerCase()) {
+    throw new HttpError(500, 'B2B_BOT_TOKEN does not belong to @' + B2B_RELAY_BOT_USERNAME);
+  }
+  return {
+    id: Number(me.id),
+    username: String(me.username),
+  };
+}
+
+export async function sendBridgePairingPing(env) {
+  const id = 'pair_' + requestId().slice(0, 18);
+  const payload = {
+    protocol: B2B_PROTOCOL,
+    request_id: id,
+  };
+  await telegramJson(env, 'sendMessage', {
+    chat_id: bridgeChatId(env),
+    text: command(env, 'ping') + '\n' + JSON.stringify(payload),
+    disable_notification: true,
+  });
+  return id;
+}
