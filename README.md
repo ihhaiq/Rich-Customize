@@ -103,6 +103,8 @@ Bridge safety currently includes:
 - mutation conflict detection using `updated_at`
 - no page payloads are written to error logs
 
+The Mini App frontend also includes a non-dismissible blocking wait overlay in `app/miniapp_static/loading_overlay.*`. It appears immediately during boot and wraps page-list loading, page opening, explicit new-page preparation and manual save. While active, the editor and sheets are `inert`, scrolling/touch interaction is blocked, and the only visible state is a light liquid-glass card with “انتظر شوية…” plus an optional operation hint. The same controller is exposed as `window.MiniAppWait` / `window.withMiniAppWait` for the upcoming Cloudflare B2B relay calls.
+
 Bridge failures and security alerts use the existing developer-configured error-log channel. Dedicated scopes cover request failures, reply failures, bridge state failures, rate-limit alerts and unauthorized bridge access.
 
 Because `miniapp_bridge_requests` is a new Serverless table, deployment requires reviewing and applying the schema migration:
