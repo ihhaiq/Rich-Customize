@@ -184,6 +184,22 @@ export const miniappBridgeRequests = table('miniapp_bridge_requests', {
 }));
 
 
+export const miniappUserPickerRequests = table('miniapp_user_picker_requests', {
+  requestId: integer('request_id').primaryKey(),
+  ownerId: integer('owner_id').notNull(),
+  pageId: text('page_id').notNull(),
+  blockId: text('block_id').notNull(),
+  marker: text('marker'),
+  title: text('title').notNull(),
+  color: text('color'),
+  baseUpdatedAt: integer('base_updated_at').notNull(),
+  createdAt: integer('created_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+}, (t) => ({
+  ownerIdx: index('idx_miniapp_user_picker_owner').on(t.ownerId),
+  expiresIdx: index('idx_miniapp_user_picker_expires').on(t.expiresAt),
+}));
+
 export const guestMessages = table('guest_messages', {
   inlineMessageId: text('inline_message_id').primaryKey(),
   chatId: integer('chat_id').notNull(),
