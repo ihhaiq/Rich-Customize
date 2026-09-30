@@ -73,7 +73,7 @@ export async function onRequestPost(context) {
   if (!requestId) return json({ ok: true, ignored: 'no_request_id' });
 
   const pending = await context.env.DB.prepare(
-    'SELECT request_id, user_id, action FROM miniapp_bridge_pending WHERE request_id = ?'
+    'SELECT request_id, user_id, action, page_id, status FROM miniapp_bridge_pending WHERE request_id = ?'
   ).bind(requestId).first();
   if (!pending) return json({ ok: true, ignored: 'unknown_request' });
 
@@ -95,6 +95,34 @@ export async function onRequestPost(context) {
       status: 'error',
       errorCode: 'ACTION_MISMATCH',
       errorMessage: 'Bridge response action does not match pending request',
+    });
+    return json({ ok: true, request_id: requestId, status: 'error' });
+  }
+
+  if (String(pending.status) !== 'pending') {
+    return json({ ok: true, request_id: requestId, status: String(pending.status) });
+  }
+
+  if (action !== 'ping' && Number(parsed.user_id) !== Number(pending.user_id)) {
+    await recordBridgeWebhookResult(context.env.DB, {
+      requestId,
+      status: 'error',
+      errorCode: 'USER_MISMATCH',
+      errorMessage: 'Bridge response user_id does not match pending request',
+    });
+    return json({ ok: true, request_id: requestId, status: 'error' });
+  }
+
+  if (
+    pending.page_id != null
+    && String(parsed.page_id || '') !== String(pending.page_id)
+    && !message.document?.file_id
+  ) {
+    await recordBridgeWebhookResult(context.env.DB, {
+      requestId,
+      status: 'error',
+      errorCode: 'PAGE_MISMATCH',
+      errorMessage: 'Bridge response page_id does not match pending request',
     });
     return json({ ok: true, request_id: requestId, status: 'error' });
   }
