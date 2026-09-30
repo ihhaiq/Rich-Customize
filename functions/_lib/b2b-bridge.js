@@ -12,12 +12,62 @@ function now() {
   return Math.floor(Date.now() / 1000);
 }
 
-function bridgeDb(env) {
+export function requireBridgeDb(env) {
   const db = env?.DB;
   if (!db || typeof db.prepare !== 'function') {
     throw new HttpError(500, 'Cloudflare D1 binding "DB" is not configured');
   }
   return db;
+}
+
+let schemaReadyPromise = null;
+
+export async function ensureBridgeSchema(db) {
+  if (!db || typeof db.prepare !== 'function') {
+    throw new HttpError(500, 'Cloudflare D1 binding "DB" is not configured');
+  }
+  if (schemaReadyPromise) return schemaReadyPromise;
+
+  schemaReadyPromise = (async () => {
+    await db.prepare(
+      'CREATE TABLE IF NOT EXISTS miniapp_bridge_pending ('
+      + 'request_id TEXT PRIMARY KEY, '
+      + 'user_id INTEGER NOT NULL, '
+      + 'action TEXT NOT NULL, '
+      + 'page_id TEXT, '
+      + "status TEXT NOT NULL DEFAULT 'pending', "
+      + 'response_kind TEXT, '
+      + 'response_file_id TEXT, '
+      + 'response_json TEXT, '
+      + 'error_code TEXT, '
+      + 'error_message TEXT, '
+      + 'created_at INTEGER NOT NULL, '
+      + 'expires_at INTEGER NOT NULL, '
+      + 'completed_at INTEGER'
+      + ')'
+    ).run();
+    await db.prepare(
+      'CREATE INDEX IF NOT EXISTS idx_miniapp_bridge_pending_user '
+      + 'ON miniapp_bridge_pending(user_id, created_at DESC)'
+    ).run();
+    await db.prepare(
+      'CREATE INDEX IF NOT EXISTS idx_miniapp_bridge_pending_expires '
+      + 'ON miniapp_bridge_pending(expires_at)'
+    ).run();
+    await db.prepare(
+      'CREATE TABLE IF NOT EXISTS miniapp_bridge_identity ('
+      + 'key TEXT PRIMARY KEY, '
+      + 'value TEXT NOT NULL, '
+      + 'updated_at INTEGER NOT NULL'
+      + ')'
+    ).run();
+    return true;
+  })().catch((error) => {
+    schemaReadyPromise = null;
+    throw bridgeDbError(error);
+  });
+
+  return schemaReadyPromise;
 }
 
 function bridgeDbError(error) {
@@ -86,6 +136,7 @@ async function cleanup(db) {
 
 async function insertPending(db, { requestId: id, userId, action, pageId = null }) {
   try {
+    await ensureBridgeSchema(db);
     await cleanup(db);
     const stamp = now();
     await db.prepare(
@@ -230,7 +281,8 @@ export async function queueTextBridgeRequest(context, {
 }) {
   const id = requestId();
   const meta = envelope({ id, userId, pageId, baseUpdatedAt, extra });
-  await insertPending(bridgeDb(context.env), { requestId: id, userId, action, pageId });
+  const db = requireBridgeDb(context.env);
+  await insertPending(db, { requestId: id, userId, action, pageId });
   try {
     await telegramJson(context.env, 'sendMessage', {
       chat_id: bridgeChatId(context.env),
@@ -242,7 +294,7 @@ export async function queueTextBridgeRequest(context, {
       console.warn('B2B text send outcome is uncertain; keeping request pending', id, action);
       return id;
     }
-    await markQueueFailure(context.env.DB, id, error);
+    await markQueueFailure(db, id, error);
     throw error;
   }
   return id;
@@ -261,12 +313,13 @@ export async function queueDocumentBridgeRequest(context, {
     ...(payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {}),
     ...meta,
   };
-  await insertPending(bridgeDb(context.env), { requestId: id, userId, action, pageId });
+  const db = requireBridgeDb(context.env);
+  await insertPending(db, { requestId: id, userId, action, pageId });
 
   const serialized = JSON.stringify(body);
   const bytes = new TextEncoder().encode(serialized);
   if (bytes.length > 2 * 1024 * 1024) {
-    await markQueueFailure(context.env.DB, id, new Error('Bridge JSON document exceeds 2 MB'));
+    await markQueueFailure(db, id, new Error('Bridge JSON document exceeds 2 MB'));
     throw new HttpError(413, 'Bridge JSON document exceeds 2 MB');
   }
 
@@ -287,13 +340,14 @@ export async function queueDocumentBridgeRequest(context, {
       console.warn('B2B document send outcome is uncertain; keeping request pending', id, action);
       return id;
     }
-    await markQueueFailure(context.env.DB, id, error);
+    await markQueueFailure(db, id, error);
     throw error;
   }
   return id;
 }
 
 export async function bridgeRequestRow(db, id, userId) {
+  await ensureBridgeSchema(db);
   const request = safeRequestId(id);
   const owner = safeUserId(userId);
   const row = await db.prepare(
@@ -350,6 +404,7 @@ export async function recordBridgeWebhookResult(db, {
   errorCode = null,
   errorMessage = null,
 }) {
+  await ensureBridgeSchema(db);
   const request = safeRequestId(id);
   const stamp = now();
   await db.prepare(
@@ -396,6 +451,7 @@ export function bridgeMainBotMatches(env, from) {
 }
 
 export async function verifyAndPinMainBotIdentity(db, env, from) {
+  await ensureBridgeSchema(db);
   if (!bridgeMainBotMatches(env, from)) return false;
 
   const incomingId = Number(from?.id);
