@@ -4,7 +4,15 @@ import { validatePagePayload } from '../../../_lib/pages.js';
 import {
   queueDocumentBridgeRequest,
   queueTextBridgeRequest,
+  queueFullSyncBridgeRequest,
+  requireBridgeDb,
 } from '../../../_lib/b2b-bridge.js';
+import {
+  claimMirrorBootstrap,
+  listMirrorPages,
+  pageMirrorReady,
+  markMirrorBootstrapFailed,
+} from '../../../_lib/page-mirror.js';
 
 function pending(requestId, action) {
   return json({
@@ -19,6 +27,24 @@ function pending(requestId, action) {
 export async function onRequestGet(context) {
   try {
     const user = await miniAppUser(context);
+    const db = requireBridgeDb(context.env);
+    if (await pageMirrorReady(db)) {
+      return json({
+        ok: true,
+        beta: '0.5-mirror',
+        pages: await listMirrorPages(db, user.id),
+      });
+    }
+
+    const bootstrap = await claimMirrorBootstrap(db);
+    if (bootstrap.acquired) {
+      try {
+        await queueFullSyncBridgeRequest(context);
+      } catch (error) {
+        await markMirrorBootstrapFailed(db, error?.message || error);
+      }
+    }
+
     const requestId = await queueTextBridgeRequest(context, {
       action: 'pages',
       userId: user.id,

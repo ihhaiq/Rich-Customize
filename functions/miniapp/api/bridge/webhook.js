@@ -6,7 +6,16 @@ import {
   recordBridgeWebhookResult,
   requireBridgeDb,
   verifyAndPinMainBotIdentity,
+  downloadBridgeJson,
+  reactBridgeMessageSuccess,
+  sendBridgeSyncAck,
+  sendBridgeSyncFailure,
 } from '../../../_lib/b2b-bridge.js';
+import {
+  applyFullPageSnapshot,
+  applyPageMirrorSync,
+  markMirrorBootstrapFailed,
+} from '../../../_lib/page-mirror.js';
 
 function responseText(message) {
   return String(message?.text || message?.caption || '').trim();
@@ -26,6 +35,7 @@ function fields(source) {
 
 function responseAction(source) {
   const value = String(source || '').toUpperCase();
+  if (value.includes('FULL_SYNC_OK')) return 'full_sync';
   if (value.includes('GET_PAGES_OK')) return 'pages';
   if (value.includes('GET_PAGE_OK')) return 'page';
   if (value.includes('GET_DESTINATIONS_OK')) return 'destinations';
@@ -75,6 +85,94 @@ export async function onRequestPost(context) {
 
   const source = responseText(message);
   const parsed = fields(source);
+
+  if (message.document?.file_id) {
+    let syncPayload = null;
+    try {
+      syncPayload = await downloadBridgeJson(context.env, message.document.file_id);
+    } catch (error) {
+      await sendBridgeSyncFailure(context.env, error, {
+        syncId: parsed.sync_id,
+        userId: parsed.user_id,
+        pageId: parsed.page_id,
+      }, message).catch(() => {});
+      return json({ ok: true, status: 'sync_download_failed' });
+    }
+
+    const syncType = String(syncPayload?.type || '');
+    if (['full_snapshot', 'page_upsert', 'page_delete'].includes(syncType)) {
+      const syncRequestId = String(syncPayload?.request_id || parsed.request_id || '').trim();
+      try {
+        let applied;
+        if (syncType === 'full_snapshot') {
+          applied = await applyFullPageSnapshot(db, syncPayload);
+        } else {
+          applied = await applyPageMirrorSync(db, syncPayload);
+        }
+
+        await reactBridgeMessageSuccess(context.env, message);
+        await sendBridgeSyncAck(context.env, syncPayload, message);
+
+        if (syncRequestId) {
+          const pendingSync = await db.prepare(
+            'SELECT request_id, user_id, action, page_id, status FROM miniapp_bridge_pending WHERE request_id = ?'
+          ).bind(syncRequestId).first();
+          if (pendingSync && String(pendingSync.status) === 'pending') {
+            const response = syncType === 'full_snapshot'
+              ? {
+                  status: 'ok',
+                  action: 'full_sync',
+                  snapshot_id: applied.snapshot_id,
+                  owner_count: applied.owner_count,
+                  page_count: applied.page_count,
+                  baseline_seq: applied.baseline_seq,
+                }
+              : {
+                  status: syncType === 'page_delete' ? 'deleted' : 'saved',
+                  action: String(pendingSync.action || ''),
+                  user_id: Number(syncPayload.user_id),
+                  page_id: String(syncPayload.page_id),
+                  updated_at: Number(syncPayload.page?.updated_at || syncPayload.deleted_at || 0),
+                  revision: Number(syncPayload.revision || 1),
+                  sync_seq: Number(syncPayload.sync_seq || 0),
+                };
+            await recordBridgeWebhookResult(db, {
+              requestId: syncRequestId,
+              status: 'ready',
+              responseKind: 'ack',
+              responseJson: response,
+            });
+          }
+        }
+
+        return json({
+          ok: true,
+          status: 'synced',
+          type: syncType,
+          sync_id: String(syncPayload.sync_id || ''),
+        });
+      } catch (error) {
+        if (syncType === 'full_snapshot') {
+          await markMirrorBootstrapFailed(db, error?.message || error).catch(() => {});
+        }
+        if (syncRequestId) {
+          await recordBridgeWebhookResult(db, {
+            requestId: syncRequestId,
+            status: 'error',
+            errorCode: String(error?.code || 'SYNC_FAILED'),
+            errorMessage: String(error?.message || error || 'Sync failed'),
+          }).catch(() => {});
+        }
+        await sendBridgeSyncFailure(context.env, error, {
+          syncId: syncPayload?.sync_id,
+          userId: syncPayload?.user_id,
+          pageId: syncPayload?.page_id,
+        }, message).catch(() => {});
+        return json({ ok: true, status: 'sync_failed' });
+      }
+    }
+  }
+
   const requestId = String(parsed.request_id || '').trim();
   if (!requestId) return json({ ok: true, ignored: 'no_request_id' });
 

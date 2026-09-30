@@ -521,6 +521,7 @@ function command(env, action) {
     user_picker: 'rcb_user_picker',
     destinations: 'rcb_destinations',
     client_error: 'rcb_err',
+    full_sync: 'rcb_full_sync',
   };
   const name = map[String(action)];
   if (!name) throw new HttpError(500, 'Unknown bridge action');
@@ -549,6 +550,42 @@ export async function sendOneWayBridgeEvent(context, {
     }
     if (!transportOutcomeUncertain(error)) throw error;
     console.warn('B2B one-way event outcome is uncertain', id, action);
+  }
+  return id;
+}
+
+export async function queueFullSyncBridgeRequest(context) {
+  const db = requireBridgeDb(context.env);
+  await ensureBridgeSchema(db);
+  const existing = await db.prepare(
+    "SELECT request_id FROM miniapp_bridge_pending "
+    + "WHERE action = 'full_sync' AND status = 'pending' AND expires_at > ? "
+    + "ORDER BY created_at DESC LIMIT 1"
+  ).bind(now()).first();
+  if (existing?.request_id) return String(existing.request_id);
+
+  await reserveBridgeSlot(db, context.env);
+  const id = requestId();
+  const stamp = now();
+  await db.prepare(
+    'INSERT INTO miniapp_bridge_pending '
+    + '(request_id,user_id,action,page_id,status,created_at,expires_at) '
+    + "VALUES(?,0,'full_sync',NULL,'pending',?,?)"
+  ).bind(id, stamp, stamp + REQUEST_TTL_SECONDS).run();
+  const meta = {
+    protocol: B2B_PROTOCOL,
+    request_id: id,
+  };
+  try {
+    await sendTelegramWithRetry(db, context.env, 'full_sync', () => telegramJson(context.env, 'sendMessage', {
+      chat_id: bridgeChatId(context.env),
+      text: command(context.env, 'full_sync') + '\n' + JSON.stringify(meta),
+      disable_notification: true,
+    }));
+  } catch (error) {
+    if (transportOutcomeUncertain(error)) return id;
+    await markQueueFailure(db, id, error);
+    throw error;
   }
   return id;
 }
@@ -660,6 +697,72 @@ export async function bridgeRequestRow(db, id, userId) {
 
   await cleanup(db);
   return row;
+}
+
+export async function reactBridgeMessageSuccess(env, message) {
+  const chatId = Number(message?.chat?.id || 0);
+  const messageId = Number(message?.message_id || 0);
+  if (!chatId || !messageId) return false;
+  try {
+    await telegramJson(env, 'setMessageReaction', {
+      chat_id: chatId,
+      message_id: messageId,
+      reaction: [{ type: 'emoji', emoji: '✅' }],
+      is_big: false,
+    });
+    return true;
+  } catch (error) {
+    console.warn('Could not react to sync message', error);
+    return false;
+  }
+}
+
+function syncMentionText(text, env) {
+  const developerId = Number(env?.B2B_DEVELOPER_USER_ID || 8997225441);
+  const label = 'المطور';
+  const output = String(text) + '\n\n' + label;
+  return {
+    text: output,
+    entities: developerId > 0 ? [{
+      type: 'text_link',
+      offset: output.length - label.length,
+      length: label.length,
+      url: 'tg://user?id=' + developerId,
+    }] : undefined,
+  };
+}
+
+export async function sendBridgeSyncAck(env, payload, replyMessage = null) {
+  const syncId = String(payload?.sync_id || '').trim();
+  if (!syncId) return null;
+  const replyId = Number(replyMessage?.message_id || 0);
+  return telegramJson(env, 'sendMessage', {
+    chat_id: bridgeChatId(env),
+    text: '✅ ' + B2B_PROTOCOL + ' SYNC_OK\n'
+      + 'sync_id: ' + syncId + '\n'
+      + 'sync_seq: ' + String(payload?.sync_seq || payload?.baseline_seq || 0),
+    disable_notification: true,
+    ...(replyId ? { reply_parameters: { message_id: replyId } } : {}),
+  });
+}
+
+export async function sendBridgeSyncFailure(env, error, meta = {}, replyMessage = null) {
+  const body = syncMentionText(
+    '❌ ' + B2B_PROTOCOL + ' SYNC_FAILED\n'
+    + 'sync_id: ' + String(meta.syncId || '—') + '\n'
+    + 'user_id: ' + String(meta.userId || '—') + '\n'
+    + 'page_id: ' + String(meta.pageId || '—') + '\n'
+    + 'code: ' + String(error?.code || 'SYNC_FAILED') + '\n'
+    + 'detail: ' + String(error?.message || error || 'Unknown sync error').slice(0, 700),
+    env,
+  );
+  const replyId = Number(replyMessage?.message_id || 0);
+  return telegramJson(env, 'sendMessage', {
+    chat_id: bridgeChatId(env),
+    ...body,
+    disable_notification: false,
+    ...(replyId ? { reply_parameters: { message_id: replyId } } : {}),
+  });
 }
 
 export async function downloadBridgeJson(env, fileId) {
