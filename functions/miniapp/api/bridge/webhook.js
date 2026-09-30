@@ -1,9 +1,9 @@
 import { json, text } from '../../../_lib/http.js';
 import {
   bridgeChatMatches,
-  bridgeMainBotMatches,
   bridgeWebhookSecretMatches,
   recordBridgeWebhookResult,
+  verifyAndPinMainBotIdentity,
 } from '../../../_lib/b2b-bridge.js';
 
 function responseText(message) {
@@ -58,7 +58,7 @@ export async function onRequestPost(context) {
   if (!bridgeChatMatches(context.env, message?.chat?.id)) {
     return json({ ok: true, ignored: 'wrong_chat' });
   }
-  if (!bridgeMainBotMatches(context.env, message?.from)) {
+  if (!await verifyAndPinMainBotIdentity(context.env.DB, context.env, message?.from)) {
     return json({ ok: true, ignored: 'wrong_sender' });
   }
 
