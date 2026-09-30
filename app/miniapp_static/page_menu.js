@@ -53,6 +53,10 @@
     }));
     list.appendChild(menuButton("save",mt("page.save_now"),"",async() => {
       close();
+      if (!hasSavablePageContent()) {
+        toast(mt("send.add_content"));
+        return;
+      }
       try {
         await withWait(async() => {
           dirty = true;
