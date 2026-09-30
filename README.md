@@ -122,7 +122,7 @@ Cloudflare B2B runtime variables:
 - existing `BOT_TOKEN` remains the Mini App initData/auth token for the current named Mini App
 - existing `SYNC_SECRET` protects `/internal/setup-b2b-webhook`
 
-Cloudflare D1 uses the single canonical `cloudflare/d1/schema.sql`. It contains only short-lived `miniapp_bridge_pending` correlation rows and `miniapp_bridge_identity`; no `rich_pages`, managed chats, popup/page content or user-picker page state exists in D1.
+Cloudflare D1 uses the single canonical `cloudflare/d1/schema.sql`. It contains only short-lived `miniapp_bridge_pending` correlation rows and `miniapp_bridge_identity`; no `rich_pages`, managed chats, popup/page content or user-picker page state exists in D1. If reusing an older D1 database, `cloudflare/d1/cleanup-legacy.sql` is the explicit one-time cleanup for obsolete external tables; run it only after verifying the Telegram Serverless cutover.
 
 After deploying Cloudflare, POST to `/internal/setup-b2b-webhook` with `Authorization: Bearer <SYNC_SECRET>` once. The endpoint verifies that `B2B_BOT_TOKEN` belongs to `@Richminiappsbot`, configures the webhook, and sends the mandatory pairing PING. The Serverless side pins the relay numeric bot ID from that PING; Cloudflare pins the main bot numeric ID from the first verified response unless `B2B_MAIN_BOT_ID` is explicitly configured.
 
