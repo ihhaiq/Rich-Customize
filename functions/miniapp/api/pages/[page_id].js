@@ -78,11 +78,14 @@ export async function onRequestDelete(context) {
     const pageId = requestedPageId(context);
     const url = new URL(context.request.url);
     const baseUpdatedAt = Number(url.searchParams.get('base_updated_at') || 0);
+    if (!Number.isSafeInteger(baseUpdatedAt) || baseUpdatedAt <= 0) {
+      throw new HttpError(400, 'base_updated_at is required');
+    }
     const requestId = await queueTextBridgeRequest(context, {
       action: 'delete',
       userId: user.id,
       pageId,
-      ...(baseUpdatedAt > 0 ? { baseUpdatedAt } : {}),
+      baseUpdatedAt,
     });
     return pending(requestId, 'delete');
   } catch (error) {
