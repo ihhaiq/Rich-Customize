@@ -101,3 +101,30 @@ body.miniapp-busy{
   .miniapp-wait-overlay{transition:none}
   .miniapp-wait-spinner{animation-duration:1.4s}
 }
+
+
+/* Error state: replace the busy spinner with a clear X. */
+.miniapp-wait-overlay.is-error .miniapp-wait-spinner{
+  position:relative;
+  animation:none;
+  border-color:color-mix(in srgb,var(--text) 22%,transparent);
+  border-top-color:color-mix(in srgb,var(--text) 22%,transparent);
+}
+.miniapp-wait-overlay.is-error .miniapp-wait-spinner::before,
+.miniapp-wait-overlay.is-error .miniapp-wait-spinner::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:17px;
+  height:2px;
+  border-radius:2px;
+  background:currentColor;
+  transform-origin:center;
+}
+.miniapp-wait-overlay.is-error .miniapp-wait-spinner::before{
+  transform:translate(-50%,-50%) rotate(45deg);
+}
+.miniapp-wait-overlay.is-error .miniapp-wait-spinner::after{
+  transform:translate(-50%,-50%) rotate(-45deg);
+}
