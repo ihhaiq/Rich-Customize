@@ -25,6 +25,7 @@ Local SDK/CLI reference: `docs/tgcloud-sdk.md`
 - `legacy_states` — compatibility copy of imported legacy JSON namespaces; converted subsystems hydrate or lazily restore their live tables from it.
 - `processed_updates`, `request_windows` — idempotency and throttling state.
 - `miniapp_bridge_requests` — short-lived RCB1 Mini App bridge request IDs/status for deduplication and mutation-response replay.
+- `miniapp_user_picker_requests` — short-lived native Mini App `request_users` state, bound to owner/page/block/revision.
 - `usage_users`, `usage_minutes`, `usage_runtime` — persistent Serverless usage/operational statistics.
 - `page_snapshots` — bounded page recovery snapshots.
 - `maintenance_locks` — prevents duplicate import/export/snapshot/refresh operations.
@@ -40,11 +41,11 @@ The old backup format `rich-customize-json-backup-v1` remains supported so Railw
 
 ## Mini App B2B bridge
 
-The active Mini App integration plan keeps `rich_pages` in Telegram Serverless as the only persistent page store. Cloudflare hosts the frontend and a stateless relay for `@Richminiappsbot`.
+The active Mini App integration keeps pages, managed publish destinations and native user-picker mutations in Telegram Serverless. Cloudflare hosts the frontend and B2B relay only; D1 keeps short-lived request correlation/identity metadata.
 
-Serverless bridge commands are accepted only from `@Richminiappsbot` in private bridge chat `-1003993506865`. The first valid request pins the sender's numeric bot ID in `legacy_states`.
+Serverless bridge commands are accepted only from `@Richminiappsbot` in private bridge chat `-1003993506865`, addressed to `@RichCustomizebot` with protocol `RCB1`. Numeric relay identity is paired only by the initial PING.
 
-The `RCB1` bridge supports page list/read/create/save/delete. Read payloads and page bodies are transferred as JSON documents where appropriate. Save operations require `base_updated_at` and use a conditional update so stale Mini App sessions cannot overwrite newer page revisions.
+The bridge supports page list/read/create/save/delete, destination discovery, publishing and native user-picker preparation. Page/destination reads use JSON documents where appropriate. SAVE and DELETE require revision tokens. PUBLISH and USER_PICKER are never stale-retried because they create external side effects.
 
 Bridge errors, transport failures, rate-limit alerts and unauthorized access attempts are sent through the existing error-log subsystem when its developer-configured channel is enabled.
 
