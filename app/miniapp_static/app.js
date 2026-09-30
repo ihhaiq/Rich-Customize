@@ -106,10 +106,13 @@ function headers(){return {"X-Telegram-Init-Data":tg?.initData||"","Content-Type
 function apiError(data,fallback){const error=new Error(data?.error?.message||fallback||"Request failed");if(data?.error?.code)error.code=data.error.code;return error}
 function shouldReportApiError(error){
   const status=Number(error?.status||0);
-  if(status>=400&&status<500&&status!==429)return false;
+  if(status>=400&&status<500)return false;
+  if(status===503&&/B2B bridge is busy/i.test(String(error?.message||"")))return false;
   const code=String(error?.code||"").toUpperCase();
-  if(/^HTTP_4\d\d$/.test(code)&&code!=="HTTP_429")return false;
-  if(/^(INVALID_|EMPTY_|PAGE_(NOT_FOUND|CONFLICT|LIMIT|BUSY)|BASE_REVISION_REQUIRED|DOCUMENT_REQUIRED|DOCUMENT_TOO_LARGE|USER_MISMATCH|PAGE_MISMATCH)$/.test(code))return false;
+  if(/^HTTP_4\d\d$/.test(code))return false;
+  if(/^(INVALID_|EMPTY_)/.test(code))return false;
+  if(/^PAGE_(NOT_FOUND|CONFLICT|LIMIT|BUSY)$/.test(code))return false;
+  if(/^(BASE_REVISION_REQUIRED|DOCUMENT_REQUIRED|DOCUMENT_TOO_LARGE|USER_MISMATCH|PAGE_MISMATCH)$/.test(code))return false;
   return true;
 }
 async function parseApiResponse(res){
