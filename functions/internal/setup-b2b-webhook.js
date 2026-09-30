@@ -2,6 +2,8 @@ import { json, handleError, HttpError } from '../_lib/http.js';
 import { requireInternalSecret } from '../_lib/internal-auth.js';
 import {
   bridgeTokenForSetup,
+  ensureBridgeSchema,
+  requireBridgeDb,
   sendBridgePairingPing,
   verifyRelayBotIdentity,
 } from '../_lib/b2b-bridge.js';
@@ -17,6 +19,9 @@ function webhookSecret(env) {
 export async function onRequestPost(context) {
   try {
     requireInternalSecret(context);
+    const db = requireBridgeDb(context.env);
+    await ensureBridgeSchema(db);
+
     const origin = new URL(context.request.url).origin;
     const webhookUrl = origin + '/miniapp/api/bridge/webhook';
     const token = bridgeTokenForSetup(context.env);
