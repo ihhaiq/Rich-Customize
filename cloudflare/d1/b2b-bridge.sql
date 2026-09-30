@@ -22,3 +22,10 @@ CREATE INDEX IF NOT EXISTS idx_miniapp_bridge_pending_user
 
 CREATE INDEX IF NOT EXISTS idx_miniapp_bridge_pending_expires
   ON miniapp_bridge_pending(expires_at);
+
+
+CREATE TABLE IF NOT EXISTS miniapp_bridge_identity (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
