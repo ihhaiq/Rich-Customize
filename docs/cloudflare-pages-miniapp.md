@@ -5,10 +5,10 @@ The current Mini App architecture keeps persistent page data in Telegram Serverl
 Cloudflare is used only for:
 
 - the Mini App HTML/CSS/JavaScript frontend;
-- the stateless HTTP relay for `@Richminiappsbot`;
-- receiving the Mini App bot webhook and correlating short-lived request/response traffic.
+- the HTTP relay for `@Richminiappsbot`;
+- receiving the relay bot webhook and correlating short-lived request/response traffic.
 
-Cloudflare D1 is **not** the production page store. Do not copy or migrate `rich_pages` to D1.
+Cloudflare D1 is **not** the production page store. `miniapp_bridge_pending` stores only request metadata, status, Telegram `file_id` and small ACK/error fields. Page blocks/buttons/content are never persisted there.
 
 ## Architecture
 
@@ -48,6 +48,36 @@ Recommended Cloudflare Pages settings:
 
 The existing compatibility redirects may remain while the frontend is migrated to the B2B relay API.
 
+## Cloudflare variables
+
+Required:
+
+```text
+BOT_TOKEN=<token that signs the current Mini App initData>
+B2B_BOT_TOKEN=<@Richminiappsbot token>
+B2B_WEBHOOK_SECRET=<random 16-256 char A-Z/a-z/0-9/_/- secret>
+SYNC_SECRET=<existing internal endpoint secret>
+```
+
+Optional hardening/overrides:
+
+```text
+B2B_BRIDGE_CHAT_ID=-1003993506865
+B2B_TARGET_BOT_USERNAME=RichCustomizebot
+B2B_MAIN_BOT_ID=<numeric main-bot id>
+```
+
+Apply `cloudflare/d1/schema.sql` before enabling the bridge so the transient `miniapp_bridge_pending` table exists.
+
+After the Cloudflare deployment, configure the relay-bot webhook by POSTing to:
+
+```text
+/internal/setup-b2b-webhook
+Authorization: Bearer <SYNC_SECRET>
+```
+
+That endpoint calls Telegram `setWebhook` for `@Richminiappsbot`, points it at `/miniapp/api/bridge/webhook`, and configures `B2B_WEBHOOK_SECRET` as Telegram's webhook secret token.
+
 ## B2B bridge
 
 Serverless implements protocol `RCB1` in `lib/miniapp-bridge.js`.
@@ -77,7 +107,7 @@ Create and save requests carry the page payload as a JSON document. This avoids 
 
 ## Authentication boundary
 
-The Cloudflare relay must validate Telegram Mini App `initData` before creating a bridge request.
+The Cloudflare relay validates Telegram Mini App `initData` before creating a bridge request. It derives `user_id` from that verified data and never accepts browser-supplied ownership.
 
 The relay must derive `user_id` from validated Telegram data. It must never trust a `user_id` supplied by arbitrary browser JSON.
 
@@ -95,11 +125,15 @@ List pages:
 
 ```text
 Mini App
-  → Cloudflare relay
+  → GET /miniapp/api/pages
+  → Cloudflare creates short-lived request_id
   → /rcb_pages@RichCustomizebot + request metadata
+  → endpoint returns HTTP 202 + request_id
+  → Mini App polls /miniapp/api/bridge/<request_id>
   → Telegram Serverless reads rich_pages
-  → pages_<request_id>.json
-  → Cloudflare relay
+  → pages_<request_id>.json in the bridge group
+  → @Richminiappsbot webhook stores only Telegram file_id/status
+  → status endpoint downloads the Telegram JSON on demand
   → Mini App
 ```
 
@@ -143,7 +177,7 @@ The Serverless bridge includes:
 - the existing 12-page creation rule;
 - error and security-alert integration with the developer-configured error-log channel.
 
-The private bridge group is intentionally retained as a human-readable live trace of requests and replies.
+The private bridge group is intentionally retained as a human-readable live trace of requests and replies. The frontend no longer autosaves page edits; `CREATE_PAGE`/`SAVE_PAGE` are emitted only from an explicit user save flow.
 
 ## Deployment note
 
