@@ -85,9 +85,18 @@
   }
 
   window.addEventListener("error", event => {
-    report(event.error || event.message || "Window error", {
+    const filename = compact(event.filename || "", 160);
+    const message = compact(event.message || "", 900);
+    const hasUsefulError = Boolean(event.error || filename || Number(event.lineno || 0) || Number(event.colno || 0));
+
+    // Browsers/WebViews emit the opaque cross-origin message "Script error."
+    // without filename/line/stack. It is not actionable and only pollutes the
+    // developer error channel, so ignore that exact empty diagnostic.
+    if (!hasUsefulError && /^script error\.?$/i.test(message)) return;
+
+    report(event.error || message || "Window error", {
       source: "window.error",
-      file: compact(event.filename || "", 160),
+      file: filename,
       line: Number(event.lineno || 0),
       column: Number(event.colno || 0),
     });
