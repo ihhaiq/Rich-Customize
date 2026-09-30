@@ -1,13 +1,6 @@
 -- Cloudflare D1 schema for Mini App relay/support state only.
 -- Saved page bodies live exclusively in Telegram Serverless rich_pages.
 
-CREATE TABLE IF NOT EXISTS miniapp_meta (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
-
 CREATE TABLE IF NOT EXISTS managed_chats (
   key TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL,
@@ -23,15 +16,6 @@ CREATE INDEX IF NOT EXISTS idx_managed_chats_user
 
 CREATE INDEX IF NOT EXISTS idx_managed_chats_chat
   ON managed_chats(chat_id);
-
-CREATE TABLE IF NOT EXISTS popup_states (
-  token TEXT PRIMARY KEY,
-  text TEXT NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_popup_states_updated
-  ON popup_states(updated_at);
 
 -- Short-lived correlation state for the Telegram B2B Mini App relay.
 -- This table never stores page blocks/buttons/content.
