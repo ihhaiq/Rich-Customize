@@ -425,7 +425,7 @@ async function boot(){
   }catch(error){
     updateSaveState(mt("save.failed"));
     slashInput.disabled=true;
-    waitOverlay?.setMessage(mt("save.failed"),mt("pages.title"));
+    waitOverlay?.setError?.("صار حادث","حاول فدشوية");
     toast(error.message);
   }
 }
