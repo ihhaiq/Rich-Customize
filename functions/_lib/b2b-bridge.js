@@ -245,7 +245,7 @@ function command(env, action) {
     publish: 'rcb_publish',
     user_picker: 'rcb_user_picker',
     destinations: 'rcb_destinations',
-    client_error: 'rcb_client_error',
+    client_error: 'rcb_err',
   };
   const name = map[String(action)];
   if (!name) throw new HttpError(500, 'Unknown bridge action');
