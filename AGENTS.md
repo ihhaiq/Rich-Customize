@@ -4,12 +4,10 @@ This branch migrates Rich Customize from Python/Aiogram to Telegram Serverless J
 
 ## References
 
-Keep both references beside every Serverless change:
+Use the official Telegram references for Serverless and Bot API behavior:
 
-1. Official Telegram Serverless guide: https://core.telegram.org/bots/serverless
-2. Local scaffold SDK/CLI reference: `docs/tgcloud-sdk.md`
-
-The official guide is the current platform reference. The scaffold file documents the SDK/CLI conventions shipped with the local project. Bot API reference: https://core.telegram.org/bots/api
+1. https://core.telegram.org/bots/serverless
+2. https://core.telegram.org/bots/api
 
 ## Runtime rules
 
