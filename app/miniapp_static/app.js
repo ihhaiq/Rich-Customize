@@ -149,7 +149,6 @@ async function withWait(task,detail=""){if(!waitOverlay)return task();return wai
 window.withMiniAppWait=withWait;
 function escapeHtml(s){return String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]))}
 function stripHtml(s){return String(s??"").replace(/<[^>]*>/g,"").trim()}
-function clone(v){return JSON.parse(JSON.stringify(v))}
 function uid(){return (crypto?.randomUUID?.()||`${Date.now()}${Math.random()}`).replaceAll("-","").slice(0,12)}
 function info(type){return BLOCKS.find(x=>x.type===type)||{type,icon:"generic",label:type,desc:"Block"}}
 function normalizePositions(){current?.blocks?.forEach((b,i)=>b.position=i)}
