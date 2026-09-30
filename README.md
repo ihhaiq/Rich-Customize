@@ -78,14 +78,14 @@ Example page-list request:
 
 ```text
 /rcb_pages@RichCustomizebot
-{"request_id":"req_01HXYZ123","user_id":123456789}
+{"protocol":"RCB1","request_id":"req_01HXYZ123","user_id":123456789}
 ```
 
 Example page request:
 
 ```text
 /rcb_page@RichCustomizebot
-{"request_id":"req_01HXYZ124","user_id":123456789,"page_id":"a81f39"}
+{"protocol":"RCB1","request_id":"req_01HXYZ124","user_id":123456789,"page_id":"a81f39"}
 ```
 
 For `SAVE_PAGE`, the attached JSON must include the same `request_id`, `user_id` and `page_id` as the caption metadata plus `base_updated_at`. The Serverless update is conditional on that revision, so an older Mini App session receives `PAGE_CONFLICT` instead of overwriting newer data.
