@@ -26,7 +26,6 @@ let current = null;
 let selectedBlockId = null;
 let insertIndex = null;
 let dirty = false;
-let saveTimer = null;
 let saveChain = Promise.resolve();
 let history = [];
 let future = [];
@@ -170,12 +169,12 @@ function emptyPageSaveError(){
   error.code="EMPTY_PAGE";
   return error;
 }
-function markDirty(){dirty=true;updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));clearTimeout(saveTimer);scheduleHistory()}
+function markDirty(){dirty=true;updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));scheduleHistory()}
 function snapshot(){return current?JSON.stringify({title:pageTitle.value,blocks:current.blocks}):null}
 function pushHistory(){if(!current)return;const raw=snapshot();if(history[history.length-1]===raw)return;history.push(raw);if(history.length>60)history.shift();future=[];syncHistory()}
 function scheduleHistory(){clearTimeout(historyTimer);historyTimer=setTimeout(pushHistory,260)}
 function syncHistory(){undoBtn.disabled=history.length<2;redoBtn.disabled=!future.length}
-function restoreSnapshot(raw){if(!raw||!current)return;const data=JSON.parse(raw);pageTitle.value=data.title||mt("editor.untitled");current.title=pageTitle.value;current.blocks=data.blocks||[];normalizePositions();selectedBlockId=null;renderBlocks();dirty=true;updateSaveState(mt("editor.unsaved"));clearTimeout(saveTimer);syncHistory()}
+function restoreSnapshot(raw){if(!raw||!current)return;const data=JSON.parse(raw);pageTitle.value=data.title||mt("editor.untitled");current.title=pageTitle.value;current.blocks=data.blocks||[];normalizePositions();selectedBlockId=null;renderBlocks();dirty=true;updateSaveState(mt("editor.unsaved"));syncHistory()}
 function undo(){if(history.length<2)return;const now=history.pop();future.push(now);restoreSnapshot(history[history.length-1])}
 function redo(){if(!future.length)return;const next=future.pop();history.push(next);restoreSnapshot(next)}
 
@@ -204,12 +203,12 @@ async function saveNow(){
   }catch(error){if(current===doc){dirty=true;updateSaveState(mt("save.failed"))};throw error}
 }
 function queueSave(){
-  clearTimeout(saveTimer);
+  
   const run=saveChain.then(()=>saveNow());
   saveChain=run.catch(()=>{});
   return run;
 }
-async function flushSave(){clearTimeout(saveTimer);if(dirty)await queueSave();return current}
+async function flushSave(){if(dirty)await queueSave();return current}
 
 function defaultBlock(type){
   const block={id:uid(),type,position:0,data:{}};const d=block.data;
@@ -394,7 +393,7 @@ backdrop.onclick=closeSheets;
 $("startWritingBtn").onclick=()=>addBlock("paragraph");
 $("startPhotoBtn").onclick=()=>addBlock("photo");
 $("allBlocksBtn").onclick=()=>openSlashMenu("");
-$("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",()=>{hideMenus();if(dirty){toast(mt("editor.unsaved"));return}newDraft()}));blockActions.appendChild(menuButton("save",mt("page.save_now"),"",async()=>{hideMenus();if(!hasSavablePageContent()){toast(mt("send.add_content"));return}try{await withWait(async()=>{dirty=true;await flushSave()},"جاري حفظ الصفحة");toast(mt("save.saved"))}catch(error){toast(error.message)}}));blockMenu.classList.remove("hidden")};
+$("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",()=>{hideMenus();if(dirty){toast(mt("editor.unsaved"));return}newDraft()}));blockActions.appendChild(menuButton("save",mt("page.save_now"),"",async()=>{hideMenus();if(!hasSavablePageContent()){toast(mt("send.add_content"));return}try{dirty=true;await flushSave();toast(mt("save.saved"))}catch(error){toast(error.message)}}));blockMenu.classList.remove("hidden")};
 
 document.querySelectorAll(".composer-toolbar [data-tool]").forEach(btn=>btn.addEventListener("click",()=>openSlashMenu("",CATEGORIES[btn.dataset.tool]||null)));
 
