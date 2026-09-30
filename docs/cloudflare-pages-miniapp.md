@@ -67,7 +67,7 @@ B2B_TARGET_BOT_USERNAME=RichCustomizebot
 B2B_MAIN_BOT_ID=<numeric main-bot id>
 ```
 
-Apply `cloudflare/d1/schema.sql` before enabling the bridge so the transient `miniapp_bridge_pending` table exists.
+Apply `cloudflare/d1/b2b-bridge.sql` before enabling the bridge so the transient `miniapp_bridge_pending` table exists. Do not use the old full `cloudflare/d1/schema.sql` for the B2B page path because it contains the deprecated external `rich_pages` table.
 
 After the Cloudflare deployment, configure the relay-bot webhook by POSTing to:
 
