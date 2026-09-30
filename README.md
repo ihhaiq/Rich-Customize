@@ -115,7 +115,7 @@ Cloudflare B2B runtime variables:
 - existing `BOT_TOKEN` remains the Mini App initData/auth token for the current named Mini App
 - existing `SYNC_SECRET` protects `/internal/setup-b2b-webhook`
 
-Cloudflare D1 must apply `cloudflare/d1/schema.sql` so `miniapp_bridge_pending` exists. That table contains correlation metadata only and expires requests after a few minutes.
+Cloudflare D1 must apply only `cloudflare/d1/b2b-bridge.sql` for the new bridge path so `miniapp_bridge_pending` exists. The old `cloudflare/d1/schema.sql` is legacy and still contains the deprecated external `rich_pages` table. That table contains correlation metadata only and expires requests after a few minutes.
 
 After deploying Cloudflare, POST to `/internal/setup-b2b-webhook` with `Authorization: Bearer <SYNC_SECRET>` once to configure the relay bot webhook with Telegram's webhook secret header.
 
