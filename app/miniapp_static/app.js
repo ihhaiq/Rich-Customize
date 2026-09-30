@@ -388,17 +388,19 @@ async function boot(){
   if(!tg?.initData){
     updateSaveState(mt("save.open_in_telegram"));
     slashInput.disabled=true;
-    waitOverlay?.hide();
+    waitOverlay?.setMessage("افتح التطبيق من تليكرام","هذا المحرر يعمل فقط من داخل تليكرام.");
     return;
   }
+
   try{
     await api("/miniapp/api/me");
     newDraft();
+    waitOverlay?.hide();
   }catch(error){
     updateSaveState(mt("save.unauthorized"));
+    slashInput.disabled=true;
+    waitOverlay?.setMessage("تعذر التحقق من الجلسة","أعد فتح التطبيق من تليكرام.");
     toast(error.message);
-  }finally{
-    waitOverlay?.hide();
   }
 }
 boot();
