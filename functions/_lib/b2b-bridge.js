@@ -163,6 +163,7 @@ function command(env, action) {
     save: 'rcb_save',
     delete: 'rcb_delete',
     publish: 'rcb_publish',
+    user_picker: 'rcb_user_picker',
   };
   const name = map[String(action)];
   if (!name) throw new HttpError(500, 'Unknown bridge action');
