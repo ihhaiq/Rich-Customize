@@ -49,7 +49,7 @@ Converted Serverless slices:
   - showcase-channel cache refresh
   - callback actions edit the existing developer-panel message instead of creating another panel
 - developer-only `/app` shortcut to the named Mini App (`editor`)
-- Serverless-side `RCB1` B2B Mini App bridge receiver for the private bridge group, including page list/read/create/save/delete/publish, JSON document transfer, target/protocol checks, numeric bot pairing, request-id deduplication, global + per-user throttling, optimistic revision conflicts, shared button validation, and error-log integration
+- Serverless-side `RCB1` B2B Mini App bridge receiver for the private bridge group, including page list/read/create/save/delete, destinations, publish and native user-picker flows, JSON document transfer, target/protocol checks, numeric bot pairing, request-id deduplication, global + per-user throttling, optimistic revision conflicts, shared button validation, and error-log integration
 
 The converted Python bot entrypoint, routers and keyboard modules have been removed from this branch. Python that still remains under `app/` is retained only where the deferred Mini App HTTP backend or its dependency chain still requires it; Python tests remain reference material and are not deployed by tgcloud.
 
@@ -57,9 +57,9 @@ Deliberate scope exceptions:
 
 - The current Pages rich-table redesign from `main` is already ported to Serverless: four saved pages per screen, rich table rows with delete/rename/copy/open actions, search, sort, pagination, delete/restore, and in-place management-message refresh. Do not describe this redesign as deferred or missing. Keep `main` as the behavioral reference for future Pages changes.
 - Localization for the current Serverless bot scope is migrated. Keep `lib/lang/*.js` split per locale; do not recreate one monolithic localization bundle.
-- Telegram Serverless deploys update handlers/modules/database code only; the Mini App frontend still requires separate HTTPS hosting. The current integration uses Cloudflare as the frontend/relay and Telegram Serverless `rich_pages` as the page source of truth. Cloudflare D1 may hold only short-lived B2B correlation metadata, never page blocks/buttons/content.
-- Do not migrate production page storage to Cloudflare D1. `/miniapp/api/pages` now routes page CRUD through the B2B relay; the old D1 `rich_pages` schema/helper remains legacy material only. Page sync into D1 is disabled.
-- The bridge group is private and observable by the developer. Serverless accepts bridge commands only in chat `-1003993506865` from `@Richminiappsbot`, addressed explicitly to `@RichCustomizebot`, using protocol `RCB1`. Numeric relay pairing is permitted only via the initial PING.
+- Telegram Serverless deploys update handlers/modules/database code only; the Mini App frontend still requires separate HTTPS hosting. Cloudflare is frontend/relay only. Telegram Serverless is authoritative for pages, managed publish destinations and native user-picker state.
+- Cloudflare D1 is correlation-only: `miniapp_bridge_pending` + `miniapp_bridge_identity`. Do not add `rich_pages`, `managed_chats`, popup/page bodies or user-picker mutation state back to D1.
+- The bridge group is private and observable by the developer. Serverless accepts bridge commands only in chat `-1003993506865` from `@Richminiappsbot`, addressed explicitly to `@RichCustomizebot`, using protocol `RCB1`. Numeric relay pairing is permitted only via the initial PING. PUBLISH and USER_PICKER are side-effecting operations and must never be stale-retried.
 
 ## Data migration rules
 
