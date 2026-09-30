@@ -97,6 +97,12 @@ async function markQueueFailure(db, id, error) {
   } catch {}
 }
 
+function transportOutcomeUncertain(error) {
+  if (!(error instanceof HttpError)) return true;
+  const status = Number(error.status || 0);
+  return status >= 500 || status === 0;
+}
+
 async function telegramJson(env, method, payload = {}) {
   const response = await fetch(
     'https://api.telegram.org/bot' + bridgeToken(env) + '/' + method,
@@ -188,6 +194,10 @@ export async function queueTextBridgeRequest(context, {
       disable_notification: true,
     });
   } catch (error) {
+    if (transportOutcomeUncertain(error)) {
+      console.warn('B2B text send outcome is uncertain; keeping request pending', id, action);
+      return id;
+    }
     await markQueueFailure(context.env.DB, id, error);
     throw error;
   }
@@ -229,6 +239,10 @@ export async function queueDocumentBridgeRequest(context, {
   try {
     await telegramMultipart(context.env, 'sendDocument', form);
   } catch (error) {
+    if (transportOutcomeUncertain(error)) {
+      console.warn('B2B document send outcome is uncertain; keeping request pending', id, action);
+      return id;
+    }
     await markQueueFailure(context.env.DB, id, error);
     throw error;
   }
