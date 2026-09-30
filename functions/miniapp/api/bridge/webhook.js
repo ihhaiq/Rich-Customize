@@ -26,6 +26,7 @@ function responseAction(source) {
   const value = String(source || '').toUpperCase();
   if (value.includes('GET_PAGES_OK')) return 'pages';
   if (value.includes('GET_PAGE_OK')) return 'page';
+  if (value.includes('GET_DESTINATIONS_OK')) return 'destinations';
   if (value.includes('CREATE_PAGE_OK')) return 'create';
   if (value.includes('SAVE_PAGE_OK')) return 'save';
   if (value.includes('DELETE_PAGE_OK')) return 'delete';
