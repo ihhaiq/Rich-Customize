@@ -169,14 +169,5 @@
   window.visualViewport?.addEventListener("scroll", repositionOpenPopup, {passive:true});
   window.addEventListener("resize", repositionOpenPopup, {passive:true});
 
-  const SAVE_DELAY = mobilePerformance ? 1600 : 1000;
-  if (typeof markDirty === "function") {
-    markDirty = function() {
-      dirty = true;
-      updateSaveState(current?.page_id ? mt("save.saving") : mt("save.new_draft"));
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => queueSave(), SAVE_DELAY);
-      scheduleHistory();
-    };
-  }
+  // Saving is intentionally manual. Performance tuning must never schedule writes.
 })();
