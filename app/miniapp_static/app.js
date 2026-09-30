@@ -335,7 +335,7 @@ async function boot(){
   if(!tg?.initData){
     updateSaveState(mt("save.open_in_telegram"));
     slashInput.disabled=true;
-    waitOverlay?.hide({force:true});
+    waitOverlay?.hide();
     return;
   }
   try{
@@ -345,7 +345,7 @@ async function boot(){
     updateSaveState(mt("save.unauthorized"));
     toast(error.message);
   }finally{
-    waitOverlay?.hide({force:true});
+    waitOverlay?.hide();
   }
 }
 boot();
