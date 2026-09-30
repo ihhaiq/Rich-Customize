@@ -58,10 +58,8 @@
         return;
       }
       try {
-        await withWait(async() => {
-          dirty = true;
-          await flushSave();
-        }, "جاري حفظ الصفحة");
+        dirty = true;
+        await flushSave();
         toast(mt("save.saved"));
       } catch (error) {
         toast(error.message);
