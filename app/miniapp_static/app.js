@@ -122,16 +122,27 @@ async function pollBridge(requestId){
   throw error;
 }
 async function api(path,options={}){
-  const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})},cache:"no-store"});
-  const data=await parseApiResponse(res);
-  if(res.status===202&&data?.request_id){
-    const autoLock=Boolean(waitOverlay&&!waitOverlay.isActive());
-    if(autoLock)waitOverlay.show("انتظر شوية…","جاري تجهيز البيانات");
-    try{return await pollBridge(data.request_id)}
-    finally{if(autoLock)waitOverlay.hide()}
+  try{
+    const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})},cache:"no-store"});
+    const data=await parseApiResponse(res);
+    if(res.status===202&&data?.request_id){
+      const autoLock=Boolean(waitOverlay&&!waitOverlay.isActive());
+      if(autoLock)waitOverlay.show("انتظر شوية…","جاري تجهيز البيانات");
+      try{return await pollBridge(data.request_id)}
+      finally{if(autoLock)waitOverlay.hide()}
+    }
+    if(data?.ok===false)throw apiError(data,"Request failed");
+    return data;
+  }catch(error){
+    try{
+      window.RichMiniAppErrors?.report?.(error,{
+        source:"api",
+        endpoint:String(path||"").split("?")[0],
+        method:String(options?.method||"GET").toUpperCase(),
+      });
+    }catch(_){}
+    throw error;
   }
-  if(data?.ok===false)throw apiError(data,"Request failed");
-  return data;
 }
 const waitOverlay=window.MiniAppWait;
 async function withWait(task,detail=""){if(!waitOverlay)return task();return waitOverlay.run(task,{message:"انتظر شوية…",detail})}
