@@ -119,9 +119,15 @@
     list.innerHTML = "";
     status.textContent = tr("button.loading_pages", "Loading your saved pages…");
     try {
-      const data = await api("/miniapp/api/pages");
+      let pages = Array.isArray(window.RichMiniAppPagesSnapshot)
+        ? window.RichMiniAppPagesSnapshot
+        : null;
+      if (!pages) {
+        const data = await api("/miniapp/api/pages");
+        pages = Array.isArray(data?.pages) ? data.pages : [];
+        window.RichMiniAppPagesSnapshot = pages;
+      }
       if (!card.isConnected) return;
-      const pages = Array.isArray(data?.pages) ? data.pages : [];
       card.dataset.pagesLoaded = "1";
       status.textContent = pages.length
         ? tr("button.choose_page", "Choose the page opened by the button")
