@@ -199,13 +199,20 @@ export async function queueDocumentBridgeRequest(context, {
   };
   await insertPending(context.env.DB, { requestId: id, userId, action, pageId });
 
+  const serialized = JSON.stringify(body);
+  const bytes = new TextEncoder().encode(serialized);
+  if (bytes.length > 2 * 1024 * 1024) {
+    await markQueueFailure(context.env.DB, id, new Error('Bridge JSON document exceeds 2 MB'));
+    throw new HttpError(413, 'Bridge JSON document exceeds 2 MB');
+  }
+
   const form = new FormData();
   form.append('chat_id', String(bridgeChatId(context.env)));
   form.append('caption', command(context.env, action) + '\n' + JSON.stringify(meta));
   form.append('disable_notification', 'true');
   form.append(
     'document',
-    new Blob([JSON.stringify(body)], { type: 'application/json' }),
+    new Blob([bytes], { type: 'application/json' }),
     action + '_' + id + '.json',
   );
 
