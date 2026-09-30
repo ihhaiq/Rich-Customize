@@ -104,10 +104,23 @@ const CATEGORIES = {
 function toast(text){const el=$("toast");el.textContent=text;el.classList.add("show");clearTimeout(el._timer);el._timer=setTimeout(()=>el.classList.remove("show"),1900)}
 function headers(){return {"X-Telegram-Init-Data":tg?.initData||"","Content-Type":"application/json"}}
 function apiError(data,fallback){const error=new Error(data?.error?.message||fallback||"Request failed");if(data?.error?.code)error.code=data.error.code;return error}
+function shouldReportApiError(error){
+  const status=Number(error?.status||0);
+  if(status>=400&&status<500&&status!==429)return false;
+  const code=String(error?.code||"").toUpperCase();
+  if(/^HTTP_4\d\d$/.test(code)&&code!=="HTTP_429")return false;
+  if(/^(INVALID_|EMPTY_|PAGE_(NOT_FOUND|CONFLICT|LIMIT|BUSY)|BASE_REVISION_REQUIRED|DOCUMENT_REQUIRED|DOCUMENT_TOO_LARGE|USER_MISMATCH|PAGE_MISMATCH)$/.test(code))return false;
+  return true;
+}
 async function parseApiResponse(res){
   const type=String(res.headers.get("content-type")||"");
   const data=type.includes("application/json")?await res.json().catch(()=>null):null;
-  if(!res.ok)throw new Error(data?.error?.message||(data?JSON.stringify(data):await res.text())||`HTTP ${res.status}`);
+  if(!res.ok){
+    const error=new Error(data?.error?.message||(data?JSON.stringify(data):await res.text())||`HTTP ${res.status}`);
+    error.status=Number(res.status||0);
+    error.code=data?.error?.code||`HTTP_${res.status}`;
+    throw error;
+  }
   return data;
 }
 async function pollBridge(requestId){
@@ -171,13 +184,15 @@ async function api(path,options={}){
     if(data?.ok===false)throw apiError(data,"Request failed");
     return data;
   }catch(error){
-    try{
-      window.RichMiniAppErrors?.report?.(error,{
-        source:"api",
-        endpoint:String(path||"").split("?")[0],
-        method:String(options?.method||"GET").toUpperCase(),
-      });
-    }catch(_){}
+    if(shouldReportApiError(error)){
+      try{
+        window.RichMiniAppErrors?.report?.(error,{
+          source:"api",
+          endpoint:String(path||"").split("?")[0],
+          method:String(options?.method||"GET").toUpperCase(),
+        });
+      }catch(_){}
+    }
     throw error;
   }
 }
