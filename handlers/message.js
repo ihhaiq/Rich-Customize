@@ -20,6 +20,7 @@ import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import { handleMiniAppBridgeMessage } from 'lib/miniapp-bridge';
+import { handleMiniAppUserPickerShared } from 'lib/miniapp-user-picker';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
 import { handleEditorCoreMessage } from 'lib/editor-core';
 import { handleEditorPageMessage } from 'lib/editor-pages';
@@ -81,6 +82,8 @@ export default async function (message, ctx = {}) {
     }
 
     if (!matchesCommand(command, 'start')) {
+      if (await handleMiniAppUserPickerShared(message)) return;
+
       // Ordinary editor/input messages are private-chat only.
       // In groups/supergroups the bot must stay silent unless a supported command
       // was handled above.
