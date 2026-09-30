@@ -71,9 +71,9 @@
     return response;
   };
 
+  const initialPage = directLinkPage() || queryPage() || localPage();
   window.RichMiniAppResume = {remember, clear, initialPage};
 
-  const initialPage = directLinkPage() || queryPage() || localPage();
   const baseNewDraft = typeof newDraft === "function" ? newDraft : null;
   let blockingBootDraft = Boolean(initialPage && baseNewDraft);
 
@@ -98,7 +98,8 @@
         try { toast(mt("session.restored")); } catch (_) {}
       }
       return success;
-    } catch (_) {
+    } catch (error) {
+      try { window.RichMiniAppErrors?.report?.(error, {source:"resume.open", page_id:id}); } catch (_) {}
       return false;
     }
   }
