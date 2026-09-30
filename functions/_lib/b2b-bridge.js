@@ -312,6 +312,32 @@ export function bridgeMainBotMatches(env, from) {
   return true;
 }
 
+export async function verifyAndPinMainBotIdentity(db, env, from) {
+  if (!bridgeMainBotMatches(env, from)) return false;
+
+  const incomingId = Number(from?.id);
+  if (!Number.isSafeInteger(incomingId) || incomingId <= 0) return false;
+
+  const configuredId = Number(env.B2B_MAIN_BOT_ID || 0);
+  if (configuredId) return incomingId === configuredId;
+
+  const row = await db.prepare(
+    "SELECT value FROM miniapp_bridge_identity WHERE key = 'main_bot_id'"
+  ).first();
+
+  if (row?.value) return Number(row.value) === incomingId;
+
+  await db.prepare(
+    "INSERT INTO miniapp_bridge_identity(key, value, updated_at) VALUES('main_bot_id', ?, ?) "
+    + "ON CONFLICT(key) DO NOTHING"
+  ).bind(String(incomingId), now()).run();
+
+  const pinned = await db.prepare(
+    "SELECT value FROM miniapp_bridge_identity WHERE key = 'main_bot_id'"
+  ).first();
+  return Number(pinned?.value || 0) === incomingId;
+}
+
 export function bridgeTokenForSetup(env) {
   return bridgeToken(env);
 }
