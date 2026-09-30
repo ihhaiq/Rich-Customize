@@ -10,6 +10,8 @@ export const richPages = table('rich_pages', {
   buttonsAlign: text('buttons_align').notNull().default('center'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
+  revision: integer('revision').notNull().default(1),
+  syncSeq: integer('sync_seq').notNull().default(0),
 }, (t) => ({
   ownerUpdatedIdx: index('idx_rich_pages_owner_updated').on(t.ownerId, t.updatedAt),
 }));
@@ -168,6 +170,31 @@ export const requestWindows = table('request_windows', {
   expiresIdx: index('idx_request_windows_expires').on(t.expiresAt),
 }));
 
+
+export const miniappSyncState = table('miniapp_sync_state', {
+  id: integer('id').primaryKey(),
+  seq: integer('seq').notNull().default(0),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const miniappSyncOutbox = table('miniapp_sync_outbox', {
+  outboxKey: text('outbox_key').primaryKey(),
+  eventType: text('event_type').notNull(),
+  syncId: text('sync_id').notNull(),
+  ownerId: integer('owner_id').notNull(),
+  pageId: text('page_id').notNull(),
+  revision: integer('revision').notNull(),
+  syncSeq: integer('sync_seq').notNull(),
+  payload: json('payload').notNull().default({}),
+  status: text('status').notNull().default('pending'),
+  attempts: integer('attempts').notNull().default(0),
+  nextAttemptAt: integer('next_attempt_at').notNull().default(0),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  dueIdx: index('idx_miniapp_sync_outbox_due').on(t.status, t.nextAttemptAt),
+  syncIdx: index('idx_miniapp_sync_outbox_sync').on(t.syncId),
+}));
 
 export const miniappBridgeRequests = table('miniapp_bridge_requests', {
   requestId: text('request_id').primaryKey(),
