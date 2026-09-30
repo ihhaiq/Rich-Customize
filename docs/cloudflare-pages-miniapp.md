@@ -88,7 +88,7 @@ The bridge accepts only commands from `@Richminiappsbot` in:
 -1003993506865
 ```
 
-The first valid bridge message pins the Mini App bot numeric Telegram ID in Serverless state. Later bridge requests must come from the same numeric bot ID.
+The relay numeric bot ID is paired only by an `RCB1 PING`. `/internal/setup-b2b-webhook` verifies the relay token, sets its webhook and sends that PING. Later requests must come from the same numeric bot ID. Cloudflare likewise pins the main bot numeric ID from the first verified bridge response unless `B2B_MAIN_BOT_ID` is configured.
 
 Supported Serverless commands:
 
@@ -170,14 +170,19 @@ The Serverless bridge includes:
 
 - short-lived persistent `request_id` deduplication;
 - mutation response replay for completed create/save/delete requests;
-- per-action rate limiting;
+- global relay + per-user/per-action rate limiting;
 - a 2 MB bridge JSON document ceiling;
 - existing editor resource-limit validation;
-- owner checks for all page operations;
+- exact target-bot and `RCB1` protocol checks;
+- owner checks for all page operations and page-button targets;
 - the existing 12-page creation rule;
+- shared stored-button validation on both relay and Serverless boundaries;
+- mandatory revision tokens for SAVE and DELETE;
+- recoverable stale CREATE/SAVE/DELETE requests without duplicate creates; PUBLISH is never stale-retried;
+- 2 MB request and response document ceilings;
 - error and security-alert integration with the developer-configured error-log channel.
 
-The private bridge group is intentionally retained as a human-readable live trace of requests and replies. The frontend no longer autosaves page edits; `CREATE_PAGE`/`SAVE_PAGE` are emitted only from an explicit user save flow.
+The private bridge group is intentionally retained as a human-readable live trace of requests and replies. The frontend no longer autosaves page edits; `CREATE_PAGE`/`SAVE_PAGE` are emitted only from an explicit user save flow. Mini App publishing is also routed through `RCB1 PUBLISH`, so Cloudflare does not read page bodies from D1.
 
 ## Deployment note
 
