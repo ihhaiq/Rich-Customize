@@ -3,6 +3,7 @@
   const more = document.getElementById("moreBtn");
   if (!more) return;
   let menu = null;
+  let manualSaveRunning = false;
 
   function close() {
     menu?.remove();
@@ -51,20 +52,26 @@
       }
       newDraft();
     }));
-    list.appendChild(menuButton("save",mt("page.save_now"),"",async() => {
+    const saveButton = menuButton("save",mt("page.save_now"),"",async() => {
+      if (manualSaveRunning) return;
       close();
       if (!hasSavablePageContent()) {
         toast(mt("send.add_content"));
         return;
       }
+      manualSaveRunning = true;
       try {
         dirty = true;
         await flushSave();
         toast(mt("save.saved"));
       } catch (error) {
         toast(error.message);
+      } finally {
+        manualSaveRunning = false;
       }
-    }));
+    });
+    saveButton.disabled = manualSaveRunning;
+    list.appendChild(saveButton);
     menu.appendChild(list);
     document.body.appendChild(menu);
     requestAnimationFrame(place);
