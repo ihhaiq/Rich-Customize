@@ -50,6 +50,14 @@ function normalizeDocumentResult(row, payload) {
     return { ok: true, beta: '0.4-b2b', page };
   }
 
+  if (row.action === 'destinations') {
+    return {
+      ok: true,
+      beta: '0.4-b2b',
+      destinations: Array.isArray(payload.destinations) ? payload.destinations : [],
+    };
+  }
+
   throw new HttpError(502, 'Unexpected bridge document response');
 }
 
