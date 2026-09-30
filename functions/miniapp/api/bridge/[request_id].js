@@ -68,6 +68,18 @@ export async function onRequestGet(context) {
       }, 202);
     }
 
+    if (row.status === 'expired') {
+      return json({
+        ok: false,
+        pending: false,
+        request_id: row.request_id,
+        error: {
+          code: 'BRIDGE_EXPIRED',
+          message: 'Bridge request expired before a response was received',
+        },
+      });
+    }
+
     if (row.status === 'error') {
       return json({
         ok: false,
