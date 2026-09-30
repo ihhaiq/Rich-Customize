@@ -2,8 +2,6 @@
 
 Primary reference: https://core.telegram.org/bots/serverless
 
-Local SDK/CLI reference: `docs/tgcloud-sdk.md`
-
 ## Platform model
 
 - Isolated V8 runtime.
