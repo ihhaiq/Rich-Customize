@@ -1,14 +1,16 @@
 # Cloudflare deployment for the Mini App
 
-The current Mini App architecture keeps persistent page data in Telegram Serverless.
+The current architecture keeps persistent bot/application state in Telegram Serverless.
 
-Cloudflare is used only for:
+Cloudflare is responsible only for:
 
-- the Mini App HTML/CSS/JavaScript frontend;
-- the HTTP relay for `@Richminiappsbot`;
-- receiving the relay bot webhook and correlating short-lived request/response traffic.
+- hosting the Mini App frontend;
+- validating Telegram Mini App `initData`;
+- relaying requests through `@Richminiappsbot`;
+- receiving the relay-bot webhook;
+- storing short-lived B2B correlation/identity metadata.
 
-Cloudflare D1 is **not** the production page store. `miniapp_bridge_pending` stores only request metadata, status, Telegram `file_id` and small ACK/error fields. Page blocks/buttons/content are never persisted there.
+Cloudflare D1 is **not** a page database and is not a managed-chat database.
 
 ## Architecture
 
@@ -18,21 +20,43 @@ Telegram Mini App
 Cloudflare Pages / Functions
       ↓
 @Richminiappsbot
-      ↓ Telegram Bot-to-Bot message/document
+      ↓ Telegram Bot-to-Bot
 private bridge group (-1003993506865)
       ↓
-@RichCustomizebot on Telegram Serverless
+@RichCustomizebot / Telegram Serverless
       ↓
-rich_pages / Telegram Serverless DB
+rich_pages + managed_chats + Mini App picker state
 ```
 
-The Mini App edits a loaded page locally. Persistent writes happen only when the user presses Save.
+Persistent page edits happen only after an explicit Save. Unsaved editor changes remain local in the WebView.
+
+## Cloudflare D1
+
+The single canonical schema is:
+
+```text
+cloudflare/d1/schema.sql
+```
+
+It creates only:
+
+- `miniapp_bridge_pending` — short-lived request correlation/status;
+- `miniapp_bridge_identity` — pinned numeric main-bot identity.
+
+It does **not** create:
+
+- `rich_pages`;
+- `managed_chats`;
+- popup/page-body storage;
+- user-picker page mutation state.
+
+Page bodies, publish destinations and native user-picker state stay in Telegram Serverless.
 
 ## Frontend deployment
 
-The static frontend remains deployable from:
+Static frontend:
 
-```
+```text
 app/miniapp_static
 ```
 
@@ -46,17 +70,15 @@ Recommended Cloudflare Pages settings:
 | Build command | `exit 0` |
 | Build output directory | `app/miniapp_static` |
 
-The existing compatibility redirects may remain while the frontend is migrated to the B2B relay API.
-
 ## Cloudflare variables
 
 Required:
 
 ```text
 BOT_TOKEN=<token that signs the current Mini App initData>
-B2B_BOT_TOKEN=<@Richminiappsbot token>
+B2B_BOT_TOKEN=<token for @Richminiappsbot>
 B2B_WEBHOOK_SECRET=<random 16-256 char A-Z/a-z/0-9/_/- secret>
-SYNC_SECRET=<existing internal endpoint secret>
+SYNC_SECRET=<secret for the internal webhook-setup endpoint>
 ```
 
 Optional hardening/overrides:
@@ -67,30 +89,27 @@ B2B_TARGET_BOT_USERNAME=RichCustomizebot
 B2B_MAIN_BOT_ID=<numeric main-bot id>
 ```
 
-Apply `cloudflare/d1/b2b-bridge.sql` before enabling the bridge so the transient `miniapp_bridge_pending` table exists. Do not use the old full `cloudflare/d1/schema.sql` for the B2B page path because it contains the deprecated external `rich_pages` table.
+## Initial setup
 
-After the Cloudflare deployment, configure the relay-bot webhook by POSTing to:
+1. Apply `cloudflare/d1/schema.sql`.
+2. Deploy Cloudflare Pages / Functions.
+3. POST once to:
 
 ```text
 /internal/setup-b2b-webhook
 Authorization: Bearer <SYNC_SECRET>
 ```
 
-That endpoint calls Telegram `setWebhook` for `@Richminiappsbot`, points it at `/miniapp/api/bridge/webhook`, and configures `B2B_WEBHOOK_SECRET` as Telegram's webhook secret token.
+That endpoint:
 
-## B2B bridge
+- verifies that `B2B_BOT_TOKEN` belongs to `@Richminiappsbot`;
+- configures Telegram `setWebhook` to `/miniapp/api/bridge/webhook`;
+- installs `B2B_WEBHOOK_SECRET` as Telegram's webhook secret;
+- sends the mandatory `RCB1 PING` pairing request.
 
-Serverless implements protocol `RCB1` in `lib/miniapp-bridge.js`.
+Serverless accepts numeric relay pairing only through that PING. Cloudflare pins the numeric main-bot ID from the first verified bridge response unless `B2B_MAIN_BOT_ID` is configured explicitly.
 
-The bridge accepts only commands from `@Richminiappsbot` in:
-
-```
--1003993506865
-```
-
-The relay numeric bot ID is paired only by an `RCB1 PING`. `/internal/setup-b2b-webhook` verifies the relay token, sets its webhook and sends that PING. Later requests must come from the same numeric bot ID. Cloudflare likewise pins the main bot numeric ID from the first verified bridge response unless `B2B_MAIN_BOT_ID` is configured.
-
-Supported Serverless commands:
+## RCB1 commands
 
 ```text
 /rcb_ping@RichCustomizebot
@@ -99,94 +118,101 @@ Supported Serverless commands:
 /rcb_create@RichCustomizebot
 /rcb_save@RichCustomizebot
 /rcb_delete@RichCustomizebot
+/rcb_destinations@RichCustomizebot
+/rcb_publish@RichCustomizebot
+/rcb_user_picker@RichCustomizebot
 ```
 
-Read requests use JSON metadata in the message text and every request must include `"protocol":"RCB1"`. Large page responses are returned as JSON documents.
+Every request contains:
 
-Create and save requests carry the page payload as a JSON document. This avoids normal Telegram text-message length limits.
+```json
+{"protocol":"RCB1","request_id":"...","user_id":123456789}
+```
 
-## Authentication boundary
+Operations that address a saved page also include `page_id`. SAVE and DELETE require `base_updated_at`.
 
-The Cloudflare relay validates Telegram Mini App `initData` before creating a bridge request. It derives `user_id` from that verified data and never accepts browser-supplied ownership.
+## Request/response flow
 
-The relay must derive `user_id` from validated Telegram data. It must never trust a `user_id` supplied by arbitrary browser JSON.
+Cloudflare page/destination endpoints enqueue a Telegram B2B request and return HTTP `202` with `request_id`.
 
-The Telegram Serverless side then applies the second trust boundary:
+The Mini App then polls:
 
-- exact bridge group;
-- sender must be a Telegram bot;
-- sender username must be `@Richminiappsbot`;
-- sender numeric bot ID is pinned;
-- page ownership is checked against `rich_pages.owner_id`.
+```text
+/miniapp/api/bridge/<request_id>
+```
 
-## Request flow
+while the blocking **«انتظر شوية…»** overlay keeps the editor inert.
 
-List pages:
+Large reads such as page bodies, page lists and destination lists return as Telegram JSON documents. The Cloudflare webhook stores only the Telegram `file_id` and request status; the status endpoint downloads and validates the document on demand.
+
+Small mutation results use ACK responses.
+
+## Source-of-truth rules
+
+Telegram Serverless is authoritative for:
+
+- `rich_pages`;
+- `managed_chats`;
+- publishing permission checks;
+- user-picker pending state and `users_shared` handling;
+- page ownership and revision checks.
+
+Cloudflare must never reconstruct a parallel copy of those tables.
+
+The old server-side discard rollback was removed after autosave was removed. The trash/close flow now discards only unsaved local WebView changes; an explicit Save is never silently undone.
+
+## Security and reliability
+
+Current safeguards include:
+
+- verified Telegram `initData`;
+- exact private bridge chat;
+- exact relay username plus pinned numeric relay ID;
+- exact target `@RichCustomizebot`;
+- mandatory `RCB1` protocol;
+- pinned numeric main-bot identity on webhook responses;
+- global relay + per-user/per-action rate limits;
+- request-ID deduplication;
+- optimistic revisions for SAVE and DELETE;
+- deterministic CREATE retry recovery;
+- no stale retries for PUBLISH or USER_PICKER side effects;
+- shared page/button validation on relay and Serverless boundaries;
+- authoritative page-button ownership validation in Serverless;
+- 2 MB B2B request/response document limits;
+- immutable completed Cloudflare correlation rows;
+- explicit request expiry;
+- polling backoff and transient 502/503/504 retries;
+- non-dismissible UI locking during asynchronous B2B work;
+- editor remains locked if opened outside Telegram or if `initData` verification fails;
+- Serverless error/security alert integration with the configured developer error channel.
+
+## Native user picker
+
+The Mini App user picker no longer mutates D1.
+
+The page must already be saved and clean. The flow is:
 
 ```text
 Mini App
-  → GET /miniapp/api/pages
-  → Cloudflare creates short-lived request_id
-  → /rcb_pages@RichCustomizebot + request metadata
-  → endpoint returns HTTP 202 + request_id
-  → Mini App polls /miniapp/api/bridge/<request_id>
-  → Telegram Serverless reads rich_pages
-  → pages_<request_id>.json in the bridge group
-  → @Richminiappsbot webhook stores only Telegram file_id/status
-  → status endpoint downloads the Telegram JSON on demand
-  → Mini App
+  → RCB1 USER_PICKER
+  → Serverless validates owner/page/block/marker
+  → Serverless stores short-lived picker request
+  → @RichCustomizebot sends request_users keyboard
+  → Telegram sends users_shared
+  → Serverless conditionally updates rich_pages
+  → bot sends a resume link back to the same page
 ```
 
-Open one page:
-
-```text
-Mini App
-  → Cloudflare relay
-  → /rcb_page@RichCustomizebot
-  → Telegram Serverless reads the owned page
-  → page_<page_id>_<request_id>.json
-  → Cloudflare relay
-  → Mini App
-```
-
-Save:
-
-```text
-Mini App edits locally
-  → user presses Save
-  → Cloudflare relay sends save JSON document
-  → Telegram Serverless validates owner + limits + base_updated_at
-  → UPDATE rich_pages
-  → SAVE_PAGE_OK
-  → Cloudflare relay
-  → Mini App
-```
-
-`base_updated_at` is required for saves. If the page changed after it was loaded, Serverless returns `PAGE_CONFLICT` rather than overwriting the newer version.
-
-## Reliability and observability
-
-The Serverless bridge includes:
-
-- short-lived persistent `request_id` deduplication;
-- mutation response replay for completed create/save/delete requests;
-- global relay + per-user/per-action rate limiting;
-- a 2 MB bridge JSON document ceiling;
-- existing editor resource-limit validation;
-- exact target-bot and `RCB1` protocol checks;
-- owner checks for all page operations and page-button targets;
-- the existing 12-page creation rule;
-- shared stored-button validation on both relay and Serverless boundaries;
-- mandatory revision tokens for SAVE and DELETE;
-- recoverable stale CREATE/SAVE/DELETE requests without duplicate creates; PUBLISH is never stale-retried;
-- 2 MB request and response document ceilings;
-- error and security-alert integration with the developer-configured error-log channel.
-
-The private bridge group is intentionally retained as a human-readable live trace of requests and replies. The frontend no longer autosaves page edits; `CREATE_PAGE`/`SAVE_PAGE` are emitted only from an explicit user save flow. Mini App publishing is also routed through `RCB1 PUBLISH`, so Cloudflare does not read page bodies from D1.
+If the page revision changed while the picker was open, the selection is not applied.
 
 ## Deployment note
 
-The bridge adds the `miniapp_bridge_requests` table, so Serverless deployment must include the schema migration:
+Telegram Serverless schema changes include both:
+
+- `miniapp_bridge_requests`;
+- `miniapp_user_picker_requests`.
+
+Review/apply them with:
 
 ```bash
 npx tgcloud diff
@@ -195,10 +221,4 @@ npx tgcloud migrate
 npx tgcloud webhook sync
 ```
 
-Bot-to-Bot Communication Mode must be enabled as required by Telegram for participating bots.
-
-## Deprecated D1 plan
-
-The previous plan used Cloudflare D1 as a second `rich_pages` store. That plan is no longer the target architecture.
-
-Existing files under `cloudflare/d1/` and D1-oriented functions may remain temporarily as migration/reference material, but they must not receive production page writes while the B2B bridge is the active plan.
+Bot-to-Bot Communication Mode must be enabled for both bots before smoke testing.
