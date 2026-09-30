@@ -161,6 +161,12 @@ function newDraft(){
 }
 
 function updateSaveState(text){saveState.textContent=text}
+function hasSavablePageContent(){return Array.isArray(current?.blocks)&&current.blocks.length>0}
+function emptyPageSaveError(){
+  const error=new Error(mt("send.add_content"));
+  error.code="EMPTY_PAGE";
+  return error;
+}
 function markDirty(){dirty=true;updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));clearTimeout(saveTimer);scheduleHistory()}
 function snapshot(){return current?JSON.stringify({title:pageTitle.value,blocks:current.blocks}):null}
 function pushHistory(){if(!current)return;const raw=snapshot();if(history[history.length-1]===raw)return;history.push(raw);if(history.length>60)history.shift();future=[];syncHistory()}
@@ -172,6 +178,10 @@ function redo(){if(!future.length)return;const next=future.pop();history.push(ne
 
 async function saveNow(){
   if(!current||!dirty)return current;
+  if(!hasSavablePageContent()){
+    updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));
+    throw emptyPageSaveError();
+  }
   normalizePositions();
   const doc=current;
   const body={title:pageTitle.value||mt("editor.untitled"),blocks:doc.blocks,buttons:doc.buttons||[],buttons_per_row:doc.buttons_per_row||1,buttons_align:doc.buttons_align||"center",...(doc.page_id?{base_updated_at:Number(doc.updated_at||0)}:{})};
@@ -189,7 +199,12 @@ async function saveNow(){
     return doc;
   }catch(error){if(current===doc){dirty=true;updateSaveState(mt("save.failed"))};throw error}
 }
-function queueSave(){clearTimeout(saveTimer);saveChain=saveChain.then(()=>saveNow()).catch(error=>toast(mt("save.error",{error:error.message})));return saveChain}
+function queueSave(){
+  clearTimeout(saveTimer);
+  const run=saveChain.then(()=>saveNow());
+  saveChain=run.catch(()=>{});
+  return run;
+}
 async function flushSave(){clearTimeout(saveTimer);if(dirty)await queueSave();return current}
 
 function defaultBlock(type){
@@ -375,7 +390,7 @@ backdrop.onclick=closeSheets;
 $("startWritingBtn").onclick=()=>addBlock("paragraph");
 $("startPhotoBtn").onclick=()=>addBlock("photo");
 $("allBlocksBtn").onclick=()=>openSlashMenu("");
-$("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",()=>{hideMenus();if(dirty){toast(mt("editor.unsaved"));return}newDraft()}));blockActions.appendChild(menuButton("save",mt("page.save_now"),"",async()=>{hideMenus();try{await withWait(async()=>{dirty=true;await flushSave()},"جاري حفظ الصفحة");toast(mt("save.saved"))}catch(error){toast(error.message)}}));blockMenu.classList.remove("hidden")};
+$("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",()=>{hideMenus();if(dirty){toast(mt("editor.unsaved"));return}newDraft()}));blockActions.appendChild(menuButton("save",mt("page.save_now"),"",async()=>{hideMenus();if(!hasSavablePageContent()){toast(mt("send.add_content"));return}try{await withWait(async()=>{dirty=true;await flushSave()},"جاري حفظ الصفحة");toast(mt("save.saved"))}catch(error){toast(error.message)}}));blockMenu.classList.remove("hidden")};
 
 document.querySelectorAll(".composer-toolbar [data-tool]").forEach(btn=>btn.addEventListener("click",()=>openSlashMenu("",CATEGORIES[btn.dataset.tool]||null)));
 
