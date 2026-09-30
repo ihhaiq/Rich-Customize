@@ -908,16 +908,22 @@
     const editor = tokenEditor(token);
     const block = blockForEditor(editor);
     if (!info || !editor || !block) return;
+
+    if (!current?.page_id || dirty) {
+      toast(tr("button.save_page_failed", "Save the page first, then choose the user"));
+      return;
+    }
+
     try {
-      updateToken(token,{value:""});
-      await flushSave();
-      if (!current?.page_id) throw new Error(tr("button.save_page_failed", "Could not save the page"));
       const marker = token.dataset.marker;
+      await withWait(
+        () => api("/miniapp/api/rich-buttons/user-picker", {
+          method:"POST",
+          body:JSON.stringify({page_id:current.page_id,block_id:block.id,marker}),
+        }),
+        tr("button.loading_pages", "Preparing user picker…"),
+      );
       window.RichMiniAppResume?.remember?.(current.page_id);
-      await api("/miniapp/api/rich-buttons/user-picker", {
-        method:"POST",
-        body:JSON.stringify({page_id:current.page_id,block_id:block.id,marker}),
-      });
       toast(tr("button.pick_user_in_chat", "Choose the user in the bot chat"));
       setTimeout(() => {try { tg?.close?.(); } catch (_) {}}, 650);
     } catch (error) {
