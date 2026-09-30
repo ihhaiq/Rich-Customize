@@ -93,14 +93,18 @@ For `SAVE_PAGE`, the attached JSON must include the same `request_id`, `user_id`
 Bridge safety currently includes:
 
 - exact bridge-chat restriction
-- Telegram bot sender check + configured username check + numeric bot-ID pinning
-- per-action sliding-window rate limiting
+- Telegram bot sender check + configured username check + numeric bot-ID pinning; first pairing is allowed only through `RCB1 PING`
+- exact command target validation (`@RichCustomizebot`) and `RCB1` protocol validation for metadata and attached JSON
+- two-layer bridge throttling: a global relay limit plus per-user/per-action limits
 - persistent short-lived `request_id` deduplication for safe mutation retries
 - 2 MB bridge JSON-document ceiling
 - owner checks for every page read/write/delete
 - existing editor block/resource validation before create/save
 - 12-page creation limit with developer exemption
-- mutation conflict detection using `updated_at`
+- mutation conflict detection using `updated_at`; both SAVE and DELETE require a revision token
+- stale processing recovery for CREATE/SAVE/DELETE with deterministic CREATE IDs and safe replay detection; PUBLISH is deliberately never stale-retried to avoid duplicate posts
+- shared stored-button validation on Cloudflare and Serverless, plus authoritative page-button ownership checks in Serverless
+- 2 MB response ceiling as well as the 2 MB request-document ceiling
 - no page payloads are written to error logs
 
 The Mini App frontend also includes a non-dismissible blocking wait overlay in `app/miniapp_static/loading_overlay.*`. It appears immediately during boot and wraps B2B page-list loading, page opening and manual save. While active, the editor and sheets are `inert`, scrolling/touch interaction is blocked, and the only visible state is a light liquid-glass card with “انتظر شوية…” plus an optional operation hint. The page editor no longer autosaves: edits stay local until an explicit Save. Cloudflare page endpoints return `202 + request_id`; the frontend polls the authenticated bridge-status endpoint until the Telegram reply arrives.
@@ -117,7 +121,7 @@ Cloudflare B2B runtime variables:
 
 Cloudflare D1 must apply only `cloudflare/d1/b2b-bridge.sql` for the new bridge path so `miniapp_bridge_pending` exists. The old `cloudflare/d1/schema.sql` is legacy and still contains the deprecated external `rich_pages` table. That table contains correlation metadata only and expires requests after a few minutes.
 
-After deploying Cloudflare, POST to `/internal/setup-b2b-webhook` with `Authorization: Bearer <SYNC_SECRET>` once to configure the relay bot webhook with Telegram's webhook secret header.
+After deploying Cloudflare, POST to `/internal/setup-b2b-webhook` with `Authorization: Bearer <SYNC_SECRET>` once. The endpoint verifies that `B2B_BOT_TOKEN` belongs to `@Richminiappsbot`, configures the webhook, and sends the mandatory pairing PING. The Serverless side pins the relay numeric bot ID from that PING; Cloudflare pins the main bot numeric ID from the first verified response unless `B2B_MAIN_BOT_ID` is explicitly configured.
 
 Bridge failures and security alerts use the existing developer-configured error-log channel. Dedicated scopes cover request failures, reply failures, bridge state failures, rate-limit alerts and unauthorized bridge access.
 
@@ -190,4 +194,4 @@ Do not rebuild one monolithic generated localization module; keep locale catalog
 
 ## Remaining scope
 
-The Telegram bot-side Serverless migration is complete for the existing editor scope. Mini App page CRUD is now wired through the B2B bridge on both Serverless and Cloudflare; the old D1 page API is no longer used by `/miniapp/api/pages`. Remaining work includes production env/schema deployment, B2B smoke tests, and migration of ancillary Mini App flows that still read legacy D1 page data (notably publishing). After pulling branch changes locally, use `tgcloud diff` / `push`, apply the new schema migration, sync the webhook, and run the bridge smoke checks before treating a Telegram Cloud revision as validated.
+The Telegram bot-side Serverless migration is complete for the existing editor scope. Mini App page CRUD is now wired through the B2B bridge on both Serverless and Cloudflare; the old D1 page API is no longer used by `/miniapp/api/pages`. Page CRUD and Mini App publishing now use the B2B bridge; Cloudflare no longer reads `rich_pages` for publishing. Remaining work is production env/schema deployment and end-to-end B2B smoke testing. After pulling branch changes locally, use `tgcloud diff` / `push`, apply the new schema migration, sync the webhook, and run the bridge smoke checks before treating a Telegram Cloud revision as validated.
