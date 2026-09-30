@@ -43,20 +43,21 @@
     menu.setAttribute("aria-label", mt("page.options"));
     const list = document.createElement("div");
     list.className = "menu-list";
-    list.appendChild(menuButton("add",mt("page.new"),"",async() => {
+    list.appendChild(menuButton("add",mt("page.new"),"",() => {
       close();
-      try {
-        await flushSave();
-        newDraft();
-      } catch (error) {
-        toast(error.message);
+      if (dirty) {
+        toast(mt("editor.unsaved"));
+        return;
       }
+      newDraft();
     }));
     list.appendChild(menuButton("save",mt("page.save_now"),"",async() => {
       close();
       try {
-        dirty = true;
-        await flushSave();
+        await withWait(async() => {
+          dirty = true;
+          await flushSave();
+        }, "جاري حفظ الصفحة");
         toast(mt("save.saved"));
       } catch (error) {
         toast(error.message);
