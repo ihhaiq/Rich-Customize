@@ -11,7 +11,6 @@
     const button = document.getElementById("deleteSelectedBtn");
     if (button) button.disabled = true;
 
-    clearTimeout(saveTimer);
     clearTimeout(historyTimer);
     dirty = false;
     updateSaveState(mt("session.discarded"));
