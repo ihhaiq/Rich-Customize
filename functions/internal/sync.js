@@ -11,43 +11,12 @@ export async function onRequestPost(context) {
     const payload = await readJson(context.request);
     const pages = asArray(payload.pages);
     const chats = asArray(payload.managed_chats);
-    if (pages.length > 5000 || chats.length > 10000) throw new HttpError(413, 'sync_too_large');
-
-    let pageCount = 0;
-    for (const page of pages) {
-      if (!page || typeof page !== 'object') continue;
-      const pageId = String(page.page_id ?? page.pageId ?? '');
-      const ownerId = Number(page.owner_id ?? page.ownerId);
-      if (!pageId || !Number.isSafeInteger(ownerId)) continue;
-      const stamp = Number(page.updated_at ?? page.updatedAt ?? Math.floor(Date.now()/1000));
-      const created = Number(page.created_at ?? page.createdAt ?? stamp);
-      await context.env.DB.prepare(
-        `INSERT INTO rich_pages
-        (page_id, owner_id, title, blocks, buttons, buttons_per_row, buttons_align, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(page_id) DO UPDATE SET
-          owner_id=excluded.owner_id,
-          title=excluded.title,
-          blocks=excluded.blocks,
-          buttons=excluded.buttons,
-          buttons_per_row=excluded.buttons_per_row,
-          buttons_align=excluded.buttons_align,
-          created_at=excluded.created_at,
-          updated_at=excluded.updated_at`
-      ).bind(
-        pageId,
-        ownerId,
-        String(page.title || pageId),
-        JSON.stringify(page.blocks || []),
-        JSON.stringify(page.buttons || []),
-        Number(page.buttons_per_row ?? page.buttonsPerRow ?? 1),
-        String(page.buttons_align ?? page.buttonsAlign ?? 'center'),
-        created,
-        stamp,
-      ).run();
-      pageCount += 1;
+    if (pages.length) {
+      throw new HttpError(410, 'Cloudflare page sync is disabled; rich_pages stays in Telegram Serverless');
     }
+    if (chats.length > 10000) throw new HttpError(413, 'sync_too_large');
 
+    const pageCount = 0;
     let chatCount = 0;
     for (const chat of chats) {
       if (!chat || typeof chat !== 'object') continue;
