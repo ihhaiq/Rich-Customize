@@ -160,7 +160,10 @@ function newDraft(){
   renderBlocks();updateSaveState(mt("editor.unsaved"));pushHistory();hideMenus();closeSheets();
 }
 
-function updateSaveState(text){saveState.textContent=text}
+function updateSaveState(text,{saving=false}={}){
+  saveState.textContent=text;
+  saveState.classList.toggle("is-saving",Boolean(saving));
+}
 function hasSavablePageContent(){return Array.isArray(current?.blocks)&&current.blocks.length>0}
 function emptyPageSaveError(){
   const error=new Error(mt("send.add_content"));
@@ -184,6 +187,7 @@ async function saveNow(){
   }
   normalizePositions();
   const doc=current;
+  updateSaveState(mt("save.saving"),{saving:true});
   const body={title:pageTitle.value||mt("editor.untitled"),blocks:doc.blocks,buttons:doc.buttons||[],buttons_per_row:doc.buttons_per_row||1,buttons_align:doc.buttons_align||"center",...(doc.page_id?{base_updated_at:Number(doc.updated_at||0)}:{})};
   try{
     let data;
