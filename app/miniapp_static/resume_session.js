@@ -71,7 +71,7 @@
     return response;
   };
 
-  window.RichMiniAppResume = {remember, clear};
+  window.RichMiniAppResume = {remember, clear, initialPage};
 
   const initialPage = directLinkPage() || queryPage() || localPage();
   const baseNewDraft = typeof newDraft === "function" ? newDraft : null;
