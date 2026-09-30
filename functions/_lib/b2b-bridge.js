@@ -235,13 +235,28 @@ export async function queueDocumentBridgeRequest(context, {
 }
 
 export async function bridgeRequestRow(db, id, userId) {
-  await cleanup(db);
-  return db.prepare(
+  const request = safeRequestId(id);
+  const owner = safeUserId(userId);
+  const row = await db.prepare(
     'SELECT request_id, user_id, action, page_id, status, '
     + 'response_kind, response_file_id, response_json, '
     + 'error_code, error_message, created_at, expires_at, completed_at '
     + 'FROM miniapp_bridge_pending WHERE request_id = ? AND user_id = ?'
-  ).bind(safeRequestId(id), safeUserId(userId)).first();
+  ).bind(request, owner).first();
+
+  if (!row) {
+    await cleanup(db);
+    return null;
+  }
+
+  if (Number(row.expires_at || 0) < now()) {
+    await db.prepare('DELETE FROM miniapp_bridge_pending WHERE request_id = ?')
+      .bind(request).run();
+    return { ...row, status: 'expired' };
+  }
+
+  await cleanup(db);
+  return row;
 }
 
 export async function downloadBridgeJson(env, fileId) {
@@ -282,7 +297,7 @@ export async function recordBridgeWebhookResult(db, {
     'UPDATE miniapp_bridge_pending SET '
     + 'status = ?, response_kind = ?, response_file_id = ?, response_json = ?, '
     + 'error_code = ?, error_message = ?, completed_at = ?, expires_at = ? '
-    + 'WHERE request_id = ?'
+    + "WHERE request_id = ? AND status = 'pending'"
   ).bind(
     String(status),
     responseKind == null ? null : String(responseKind),
