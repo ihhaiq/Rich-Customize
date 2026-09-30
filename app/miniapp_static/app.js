@@ -66,7 +66,34 @@ const CATEGORIES = {
 
 function toast(text){const el=$("toast");el.textContent=text;el.classList.add("show");clearTimeout(el._timer);el._timer=setTimeout(()=>el.classList.remove("show"),1900)}
 function headers(){return {"X-Telegram-Init-Data":tg?.initData||"","Content-Type":"application/json"}}
-async function api(path,options={}){const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})}});if(!res.ok)throw new Error((await res.text())||`HTTP ${res.status}`);return res.json()}
+function apiError(data,fallback){const error=new Error(data?.error?.message||fallback||"Request failed");if(data?.error?.code)error.code=data.error.code;return error}
+async function parseApiResponse(res){
+  const type=String(res.headers.get("content-type")||"");
+  const data=type.includes("application/json")?await res.json().catch(()=>null):null;
+  if(!res.ok)throw new Error(data?.error?.message||(data?JSON.stringify(data):await res.text())||`HTTP ${res.status}`);
+  return data;
+}
+async function pollBridge(requestId){
+  const deadline=Date.now()+60000;
+  while(Date.now()<deadline){
+    await new Promise(resolve=>setTimeout(resolve,500));
+    const res=await fetch(`/miniapp/api/bridge/${encodeURIComponent(requestId)}`,{headers:headers(),cache:"no-store"});
+    const data=await parseApiResponse(res);
+    if(res.status===202||data?.pending)continue;
+    if(data?.ok===false)throw apiError(data,"Bridge request failed");
+    return data;
+  }
+  const error=new Error("انتهت مهلة تجهيز البيانات، حاول مرة ثانية.");
+  error.code="BRIDGE_TIMEOUT";
+  throw error;
+}
+async function api(path,options={}){
+  const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})},cache:"no-store"});
+  const data=await parseApiResponse(res);
+  if(res.status===202&&data?.request_id)return pollBridge(data.request_id);
+  if(data?.ok===false)throw apiError(data,"Request failed");
+  return data;
+}
 const waitOverlay=window.MiniAppWait;
 async function withWait(task,detail=""){if(!waitOverlay)return task();return waitOverlay.run(task,{message:"انتظر شوية…",detail})}
 window.withMiniAppWait=withWait;
@@ -85,12 +112,12 @@ function newDraft(){
 }
 
 function updateSaveState(text){saveState.textContent=text}
-function markDirty(){dirty=true;updateSaveState(current?.page_id?mt("save.saving"):mt("save.new_draft"));clearTimeout(saveTimer);saveTimer=setTimeout(()=>queueSave(),850);scheduleHistory()}
+function markDirty(){dirty=true;updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));clearTimeout(saveTimer);scheduleHistory()}
 function snapshot(){return current?JSON.stringify({title:pageTitle.value,blocks:current.blocks}):null}
 function pushHistory(){if(!current)return;const raw=snapshot();if(history[history.length-1]===raw)return;history.push(raw);if(history.length>60)history.shift();future=[];syncHistory()}
 function scheduleHistory(){clearTimeout(historyTimer);historyTimer=setTimeout(pushHistory,260)}
 function syncHistory(){undoBtn.disabled=history.length<2;redoBtn.disabled=!future.length}
-function restoreSnapshot(raw){if(!raw||!current)return;const data=JSON.parse(raw);pageTitle.value=data.title||mt("editor.untitled");current.title=pageTitle.value;current.blocks=data.blocks||[];normalizePositions();selectedBlockId=null;renderBlocks();dirty=true;updateSaveState(mt("save.saving"));clearTimeout(saveTimer);saveTimer=setTimeout(()=>queueSave(),500);syncHistory()}
+function restoreSnapshot(raw){if(!raw||!current)return;const data=JSON.parse(raw);pageTitle.value=data.title||mt("editor.untitled");current.title=pageTitle.value;current.blocks=data.blocks||[];normalizePositions();selectedBlockId=null;renderBlocks();dirty=true;updateSaveState(mt("editor.unsaved"));clearTimeout(saveTimer);syncHistory()}
 function undo(){if(history.length<2)return;const now=history.pop();future.push(now);restoreSnapshot(history[history.length-1])}
 function redo(){if(!future.length)return;const next=future.pop();history.push(next);restoreSnapshot(next)}
 
@@ -98,7 +125,7 @@ async function saveNow(){
   if(!current||!dirty)return current;
   normalizePositions();
   const doc=current;
-  const body={title:pageTitle.value||mt("editor.untitled"),blocks:doc.blocks,buttons:doc.buttons||[],buttons_per_row:doc.buttons_per_row||1,buttons_align:doc.buttons_align||"center"};
+  const body={title:pageTitle.value||mt("editor.untitled"),blocks:doc.blocks,buttons:doc.buttons||[],buttons_per_row:doc.buttons_per_row||1,buttons_align:doc.buttons_align||"center",...(doc.page_id?{base_updated_at:Number(doc.updated_at||0)}:{})};
   try{
     let data;
     if(doc.page_id){
@@ -106,7 +133,9 @@ async function saveNow(){
     }else{
       data=await api("/miniapp/api/pages",{method:"POST",body:JSON.stringify(body)});
       doc.page_id=data.page_id;
+      doc.updated_at=Number(data.updated_at||0);
     }
+    if(doc.page_id&&data?.updated_at)doc.updated_at=Number(data.updated_at);
     if(current===doc){dirty=false;current.title=pageTitle.value||mt("editor.untitled");updateSaveState(mt("save.saved_at",{time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}))}
     return doc;
   }catch(error){if(current===doc){dirty=true;updateSaveState(mt("save.failed"))};throw error}
