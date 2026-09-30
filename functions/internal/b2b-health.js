@@ -4,13 +4,15 @@ import {
   bridgeHealthSnapshot,
   requireBridgeDb,
 } from '../_lib/b2b-bridge.js';
+import { pageMirrorStatus } from '../_lib/page-mirror.js';
 
 export async function onRequestGet(context) {
   try {
     requireInternalSecret(context);
     const db = requireBridgeDb(context.env);
     const health = await bridgeHealthSnapshot(db, context.env);
-    return json({ ok: true, bridge: health });
+    const mirror = await pageMirrorStatus(db);
+    return json({ ok: true, bridge: health, page_mirror: mirror });
   } catch (error) {
     return handleError(error);
   }

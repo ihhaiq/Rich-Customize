@@ -45,6 +45,15 @@ function pagesSnapshot(){
 }
 function setPagesSnapshot(pages){
   const normalized=(Array.isArray(pages)?pages:[]).map(page=>({...page,page_id:String(page?.page_id||"")})).filter(page=>page.page_id);
+  for(const summary of normalized){
+    const id=String(summary.page_id||"");
+    const cached=pageCache.get(id);
+    if(cached&&Number(summary.revision||1)!==Number(cached.revision||1))pageCache.delete(id);
+  }
+  const incomingIds=new Set(normalized.map(page=>String(page.page_id)));
+  for(const id of pageCache.keys()){
+    if(!incomingIds.has(String(id)))pageCache.delete(String(id));
+  }
   window.RichMiniAppPagesSnapshot=normalized;
   return normalized;
 }
@@ -420,17 +429,19 @@ function renderPagesList(pages){
 async function loadPages(){
   showSheet(pagesPanel);
   const cachedList=pagesSnapshot();
-  if(cachedList){
-    renderPagesList(cachedList);
-    return;
-  }
-  pagesEl.innerHTML=`<div class="empty">${escapeHtml(mt("common.loading"))}</div>`;
+  if(cachedList)renderPagesList(cachedList);
+  else pagesEl.innerHTML=`<div class="empty">${escapeHtml(mt("common.loading"))}</div>`;
   try{
-    await withWait(async()=>{
+    const refresh=async()=>{
       const data=await api("/miniapp/api/pages");
       renderPagesList(setPagesSnapshot(data.pages));
-    },"جاري تجهيز صفحاتك");
-  }catch(error){pagesEl.innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`}
+    };
+    if(cachedList)await refresh();
+    else await withWait(refresh,"جاري تجهيز صفحاتك");
+  }catch(error){
+    if(!cachedList)pagesEl.innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`;
+    else toast(error.message);
+  }
 }
 function applyOpenedPage(page,pageId){
   current=copySessionValue(page);

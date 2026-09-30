@@ -476,9 +476,12 @@ export async function applyFullPageSnapshot(db, payload) {
 
   await executeStatements(db, statements);
 
+  // Replay the retained journal unconditionally. Per-page sync_seq checks make
+  // older events harmless, while this closes the race where a sequence is
+  // allocated just before the snapshot but the page write completes afterward.
   const journal = await db.prepare(
-    'SELECT payload_json FROM miniapp_sync_events WHERE sync_seq > ? ORDER BY sync_seq ASC'
-  ).bind(baselineSeq).all();
+    'SELECT payload_json FROM miniapp_sync_events ORDER BY sync_seq ASC'
+  ).all();
   for (const row of journal?.results || []) {
     let event;
     try {

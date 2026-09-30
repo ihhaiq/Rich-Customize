@@ -181,13 +181,19 @@ export async function onRequestPost(context) {
   ).bind(requestId).first();
   if (!pending) return json({ ok: true, ignored: 'unknown_request' });
 
-  if (/^❌\s*RCB1\s+ERROR/i.test(source)) {
+  if (/^❌\s*RCB1\s+(?:ERROR|SYNC_FAILED)/i.test(source)) {
     await recordBridgeWebhookResult(db, {
       requestId,
       status: 'error',
       errorCode: parsed.code || 'BRIDGE_ERROR',
       errorMessage: parsed.detail || 'Telegram Serverless bridge request failed',
     });
+    if (String(pending.action) === 'full_sync') {
+      await markMirrorBootstrapFailed(
+        db,
+        parsed.detail || parsed.code || 'Full sync failed',
+      ).catch(() => {});
+    }
     return json({ ok: true, request_id: requestId, status: 'error' });
   }
 
