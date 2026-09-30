@@ -12,6 +12,25 @@ function now() {
   return Math.floor(Date.now() / 1000);
 }
 
+function bridgeDb(env) {
+  const db = env?.DB;
+  if (!db || typeof db.prepare !== 'function') {
+    throw new HttpError(500, 'Cloudflare D1 binding "DB" is not configured');
+  }
+  return db;
+}
+
+function bridgeDbError(error) {
+  const detail = String(error?.message || error || '');
+  if (/no such table:\s*miniapp_bridge_pending/i.test(detail)) {
+    return new HttpError(
+      500,
+      'Cloudflare D1 schema is not initialized: miniapp_bridge_pending is missing',
+    );
+  }
+  return error;
+}
+
 function bridgeToken(env) {
   const token = String(env.B2B_BOT_TOKEN || '').trim();
   if (!token) throw new HttpError(500, 'B2B_BOT_TOKEN is not configured');
@@ -66,20 +85,24 @@ async function cleanup(db) {
 }
 
 async function insertPending(db, { requestId: id, userId, action, pageId = null }) {
-  await cleanup(db);
-  const stamp = now();
-  await db.prepare(
-    'INSERT INTO miniapp_bridge_pending '
-    + '(request_id, user_id, action, page_id, status, created_at, expires_at) '
-    + "VALUES (?, ?, ?, ?, 'pending', ?, ?)"
-  ).bind(
-    safeRequestId(id),
-    safeUserId(userId),
-    String(action),
-    safePageId(pageId, false),
-    stamp,
-    stamp + REQUEST_TTL_SECONDS,
-  ).run();
+  try {
+    await cleanup(db);
+    const stamp = now();
+    await db.prepare(
+      'INSERT INTO miniapp_bridge_pending '
+      + '(request_id, user_id, action, page_id, status, created_at, expires_at) '
+      + "VALUES (?, ?, ?, ?, 'pending', ?, ?)"
+    ).bind(
+      safeRequestId(id),
+      safeUserId(userId),
+      String(action),
+      safePageId(pageId, false),
+      stamp,
+      stamp + REQUEST_TTL_SECONDS,
+    ).run();
+  } catch (error) {
+    throw bridgeDbError(error);
+  }
 }
 
 async function markQueueFailure(db, id, error) {
@@ -207,7 +230,7 @@ export async function queueTextBridgeRequest(context, {
 }) {
   const id = requestId();
   const meta = envelope({ id, userId, pageId, baseUpdatedAt, extra });
-  await insertPending(context.env.DB, { requestId: id, userId, action, pageId });
+  await insertPending(bridgeDb(context.env), { requestId: id, userId, action, pageId });
   try {
     await telegramJson(context.env, 'sendMessage', {
       chat_id: bridgeChatId(context.env),
@@ -238,7 +261,7 @@ export async function queueDocumentBridgeRequest(context, {
     ...(payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {}),
     ...meta,
   };
-  await insertPending(context.env.DB, { requestId: id, userId, action, pageId });
+  await insertPending(bridgeDb(context.env), { requestId: id, userId, action, pageId });
 
   const serialized = JSON.stringify(body);
   const bytes = new TextEncoder().encode(serialized);
