@@ -50,6 +50,7 @@ export default async function (message, ctx = {}) {
   try {
     bridgeHandled = await handleMiniAppBridgeMessage(message, { updateId });
     if (bridgeHandled) return;
+    if (await handleMiniAppUserPickerShared(message)) return;
     if (!await allowMessageRequest(message)) return;
     const command = commandName(message?.text);
     const languageCode = await resolveUserLanguage(message?.from);
@@ -82,8 +83,6 @@ export default async function (message, ctx = {}) {
     }
 
     if (!matchesCommand(command, 'start')) {
-      if (await handleMiniAppUserPickerShared(message)) return;
-
       // Ordinary editor/input messages are private-chat only.
       // In groups/supergroups the bot must stay silent unless a supported command
       // was handled above.
