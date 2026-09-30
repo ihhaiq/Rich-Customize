@@ -67,6 +67,9 @@ const CATEGORIES = {
 function toast(text){const el=$("toast");el.textContent=text;el.classList.add("show");clearTimeout(el._timer);el._timer=setTimeout(()=>el.classList.remove("show"),1900)}
 function headers(){return {"X-Telegram-Init-Data":tg?.initData||"","Content-Type":"application/json"}}
 async function api(path,options={}){const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})}});if(!res.ok)throw new Error((await res.text())||`HTTP ${res.status}`);return res.json()}
+const waitOverlay=window.MiniAppWait;
+async function withWait(task,detail=""){if(!waitOverlay)return task();return waitOverlay.run(task,{message:"انتظر شوية…",detail})}
+window.withMiniAppWait=withWait;
 function escapeHtml(s){return String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]))}
 function stripHtml(s){return String(s??"").replace(/<[^>]*>/g,"").trim()}
 function clone(v){return JSON.parse(JSON.stringify(v))}
@@ -239,10 +242,27 @@ function showSheet(panel){closeSheets();backdrop.classList.remove("hidden");pane
 
 async function loadPages(){
   showSheet(pagesPanel);pagesEl.innerHTML=`<div class="empty">${escapeHtml(mt("common.loading"))}</div>`;
-  try{const data=await api("/miniapp/api/pages");pagesEl.innerHTML="";$("emptyPages").classList.toggle("hidden",data.pages.length>0);data.pages.forEach(page=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";btn.innerHTML=`<span class="sheet-item-main"><strong>${escapeHtml(page.title)}</strong><small>${page.block_count} Block · ${page.page_id}</small></span><span class="sheet-next"></span>`;MiniAppIcons.mount(btn.querySelector(".sheet-next"),"next");btn.onclick=()=>openPage(page.page_id);pagesEl.appendChild(btn)})}catch(error){pagesEl.innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`}
+  try{
+    await withWait(async()=>{
+      const data=await api("/miniapp/api/pages");
+      pagesEl.innerHTML="";
+      $("emptyPages").classList.toggle("hidden",data.pages.length>0);
+      data.pages.forEach(page=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";btn.innerHTML=`<span class="sheet-item-main"><strong>${escapeHtml(page.title)}</strong><small>${page.block_count} Block · ${page.page_id}</small></span><span class="sheet-next"></span>`;MiniAppIcons.mount(btn.querySelector(".sheet-next"),"next");btn.onclick=()=>openPage(page.page_id);pagesEl.appendChild(btn)});
+    },"جاري تجهيز صفحاتك");
+  }catch(error){pagesEl.innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`}
 }
 async function openPage(pageId){
-  try{await flushSave();const data=await api(`/miniapp/api/pages/${encodeURIComponent(pageId)}`);current=data.page;current.blocks=(current.blocks||[]).sort((a,b)=>(a.position||0)-(b.position||0));pageTitle.value=current.title||pageId;selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];renderBlocks();updateSaveState(mt("save.saved"));pushHistory();closeSheets()}catch(error){toast(error.message)}
+  try{
+    await withWait(async()=>{
+      await flushSave();
+      const data=await api(`/miniapp/api/pages/${encodeURIComponent(pageId)}`);
+      current=data.page;
+      current.blocks=(current.blocks||[]).sort((a,b)=>(a.position||0)-(b.position||0));
+      pageTitle.value=current.title||pageId;
+      selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
+      renderBlocks();updateSaveState(mt("save.saved"));pushHistory();closeSheets();
+    },"جاري تحميل الصفحة");
+  }catch(error){toast(error.message)}
 }
 
 async function openSendPanel(){
@@ -256,13 +276,13 @@ async function sendTo(dest,button){
 pageTitle.addEventListener("input",()=>{if(!current)return;current.title=pageTitle.value;markDirty()});
 undoBtn.onclick=undo;redoBtn.onclick=redo;
 $("pagesBtn").onclick=loadPages;
-$("newPageBtn").onclick=async()=>{try{await flushSave();newDraft()}catch(error){toast(error.message)}};
+$("newPageBtn").onclick=async()=>{try{await withWait(async()=>{await flushSave();newDraft()},"جاري تجهيز صفحة جديدة")}catch(error){toast(error.message)}};
 $("sendBtn").onclick=openSendPanel;
 backdrop.onclick=closeSheets;
 $("startWritingBtn").onclick=()=>addBlock("paragraph");
 $("startPhotoBtn").onclick=()=>addBlock("photo");
 $("allBlocksBtn").onclick=()=>openSlashMenu("");
-$("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",async()=>{hideMenus();try{await flushSave();newDraft()}catch(error){toast(error.message)}}));blockActions.appendChild(menuButton("save",mt("page.save_now"),"",async()=>{hideMenus();try{dirty=true;await flushSave();toast(mt("save.saved"))}catch(error){toast(error.message)}}));blockMenu.classList.remove("hidden")};
+$("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",async()=>{hideMenus();try{await withWait(async()=>{await flushSave();newDraft()},"جاري تجهيز صفحة جديدة")}catch(error){toast(error.message)}}));blockActions.appendChild(menuButton("save",mt("page.save_now"),"",async()=>{hideMenus();try{await withWait(async()=>{dirty=true;await flushSave()},"جاري حفظ الصفحة");toast(mt("save.saved"))}catch(error){toast(error.message)}}));blockMenu.classList.remove("hidden")};
 
 document.querySelectorAll(".composer-toolbar [data-tool]").forEach(btn=>btn.addEventListener("click",()=>openSlashMenu("",CATEGORIES[btn.dataset.tool]||null)));
 
@@ -281,7 +301,21 @@ slashInput.addEventListener("keydown",event=>{
 document.addEventListener("click",event=>{if(!slashMenu.contains(event.target)&&event.target!==slashInput&&!event.target.closest(".composer-toolbar"))slashMenu.classList.add("hidden");if(!blockMenu.contains(event.target)&&!event.target.closest(".mini-btn")&&event.target!==$("moreBtn"))blockMenu.classList.add("hidden")});
 
 async function boot(){
-  if(!tg?.initData){updateSaveState(mt("save.open_in_telegram"));slashInput.disabled=true;return}
-  try{await api("/miniapp/api/me");newDraft()}catch(error){updateSaveState(mt("save.unauthorized"));toast(error.message)}
+  waitOverlay?.setMessage("انتظر شوية…","جاري تجهيز المحرر");
+  if(!tg?.initData){
+    updateSaveState(mt("save.open_in_telegram"));
+    slashInput.disabled=true;
+    waitOverlay?.hide({force:true});
+    return;
+  }
+  try{
+    await api("/miniapp/api/me");
+    newDraft();
+  }catch(error){
+    updateSaveState(mt("save.unauthorized"));
+    toast(error.message);
+  }finally{
+    waitOverlay?.hide({force:true});
+  }
 }
 boot();
