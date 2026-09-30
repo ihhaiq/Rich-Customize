@@ -10,6 +10,7 @@ import {
   reactBridgeMessageSuccess,
   sendBridgeSyncAck,
   sendBridgeSyncFailure,
+  sendBridgeFullSyncNotice,
 } from '../../../_lib/b2b-bridge.js';
 import {
   applyFullPageSnapshot,
@@ -113,6 +114,15 @@ export async function onRequestPost(context) {
         await reactBridgeMessageSuccess(context.env, message);
         await sendBridgeSyncAck(context.env, syncPayload, message);
 
+        if (
+          syncType === 'full_snapshot'
+          && String(syncPayload?.reason || '') === 'developer_resync'
+        ) {
+          await sendBridgeFullSyncNotice(context.env, {
+            alreadySynced: Boolean(applied?.already_synced),
+          }, message);
+        }
+
         if (syncRequestId) {
           const pendingSync = await db.prepare(
             'SELECT request_id, user_id, action, page_id, status FROM miniapp_bridge_pending WHERE request_id = ?'
@@ -126,6 +136,7 @@ export async function onRequestPost(context) {
                   owner_count: applied.owner_count,
                   page_count: applied.page_count,
                   baseline_seq: applied.baseline_seq,
+                  already_synced: Boolean(applied.already_synced),
                 }
               : {
                   status: syncType === 'page_delete' ? 'deleted' : 'saved',

@@ -746,6 +746,20 @@ export async function sendBridgeSyncAck(env, payload, replyMessage = null) {
   });
 }
 
+export async function sendBridgeFullSyncNotice(env, {
+  alreadySynced = false,
+} = {}, replyMessage = null) {
+  const replyId = Number(replyMessage?.message_id || 0);
+  return telegramJson(env, 'sendMessage', {
+    chat_id: bridgeChatId(env),
+    text: alreadySynced
+      ? '✅ كلشي متزامن أصلًا.'
+      : '✅ كل الصفحات تم مزامنتها.',
+    disable_notification: false,
+    ...(replyId ? { reply_parameters: { message_id: replyId } } : {}),
+  });
+}
+
 export async function sendBridgeSyncFailure(env, error, meta = {}, replyMessage = null) {
   const body = syncMentionText(
     '❌ ' + B2B_PROTOCOL + ' SYNC_FAILED\n'

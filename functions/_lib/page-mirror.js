@@ -397,6 +397,75 @@ export async function applyPageMirrorSync(db, payload) {
   return { duplicate: false, ...event };
 }
 
+function snapshotPageComparable(userId, page) {
+  const ownerId = safePositive(userId, 'snapshot user_id');
+  if (!page || Array.isArray(page) || typeof page !== 'object') {
+    throw new HttpError(502, 'Invalid page in full snapshot');
+  }
+  const pageId = stringValue(page.page_id).trim();
+  if (!pageId || Number(page.owner_id) !== ownerId) {
+    throw new HttpError(502, 'Full snapshot page owner mismatch');
+  }
+  const buttons = page.buttons == null ? [] : page.buttons;
+  if (!Array.isArray(page.blocks) || !Array.isArray(buttons)) {
+    throw new HttpError(502, 'Invalid page arrays in full snapshot');
+  }
+  return {
+    owner_id: ownerId,
+    page_id: pageId,
+    title: stringValue(page.title || pageId).trim().slice(0, 64) || pageId,
+    blocks_json: JSON.stringify(page.blocks),
+    buttons_json: JSON.stringify(buttons),
+    buttons_per_row: Math.max(1, Math.min(8, Number(page.buttons_per_row || 1))),
+    buttons_align: ['left', 'center', 'right'].includes(String(page.buttons_align || 'center'))
+      ? String(page.buttons_align || 'center')
+      : 'center',
+    revision: safePositive(page.revision || 1, 'snapshot revision'),
+    sync_seq: safeNonNegative(page.sync_seq || 0, 'snapshot sync_seq'),
+    created_at: safeNonNegative(page.created_at || 0, 'snapshot created_at'),
+    updated_at: safeNonNegative(page.updated_at || 0, 'snapshot updated_at'),
+  };
+}
+
+async function mirrorMatchesSnapshot(db, generation, comparablePages) {
+  if (!generation) return false;
+  const rows = await db.prepare(
+    'SELECT owner_id,page_id,title,blocks_json,buttons_json,buttons_per_row,buttons_align,'
+    + 'revision,sync_seq,created_at,updated_at '
+    + 'FROM miniapp_pages_mirror '
+    + 'WHERE generation = ? AND deleted = 0 '
+    + 'ORDER BY owner_id ASC, page_id ASC'
+  ).bind(String(generation)).all();
+  const current = rows?.results || [];
+  if (current.length !== comparablePages.length) return false;
+
+  const incoming = [...comparablePages].sort((a, b) => (
+    Number(a.owner_id) - Number(b.owner_id)
+    || String(a.page_id).localeCompare(String(b.page_id))
+  ));
+
+  for (let index = 0; index < current.length; index += 1) {
+    const left = current[index];
+    const right = incoming[index];
+    if (
+      Number(left.owner_id) !== Number(right.owner_id)
+      || String(left.page_id) !== String(right.page_id)
+      || String(left.title || '') !== String(right.title || '')
+      || String(left.blocks_json || '[]') !== String(right.blocks_json || '[]')
+      || String(left.buttons_json || '[]') !== String(right.buttons_json || '[]')
+      || Number(left.buttons_per_row || 1) !== Number(right.buttons_per_row || 1)
+      || String(left.buttons_align || 'center') !== String(right.buttons_align || 'center')
+      || Number(left.revision || 1) !== Number(right.revision || 1)
+      || Number(left.sync_seq || 0) !== Number(right.sync_seq || 0)
+      || Number(left.created_at || 0) !== Number(right.created_at || 0)
+      || Number(left.updated_at || 0) !== Number(right.updated_at || 0)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function snapshotPageEvent(userId, page) {
   const ownerId = safePositive(userId, 'snapshot user_id');
   if (!page || Array.isArray(page) || typeof page !== 'object') {
@@ -446,11 +515,10 @@ export async function applyFullPageSnapshot(db, payload) {
   if (!users) throw new HttpError(502, 'Full snapshot users must be an array');
 
   const generation = snapshotId;
-  await setMeta(db, 'sync_status', 'importing');
-  await setMeta(db, 'staging_generation', generation);
-  await db.prepare('DELETE FROM miniapp_pages_mirror WHERE generation = ?').bind(generation).run();
+  const previousGeneration = await activeGeneration(db);
 
   const statements = [];
+  const comparablePages = [];
   let ownerCount = 0;
   let pageCount = 0;
   const seenOwners = new Set();
@@ -462,6 +530,7 @@ export async function applyFullPageSnapshot(db, payload) {
     const pages = Array.isArray(user?.pages) ? user.pages : null;
     if (!pages) throw new HttpError(502, 'Snapshot user pages must be an array');
     for (const page of pages) {
+      comparablePages.push(snapshotPageComparable(ownerId, page));
       const event = snapshotPageEvent(ownerId, page);
       statements.push(upsertStatement(db, generation, event, snapshotId));
       pageCount += 1;
@@ -473,6 +542,32 @@ export async function applyFullPageSnapshot(db, payload) {
   if (Number(payload.page_count ?? pageCount) !== pageCount) {
     throw new HttpError(502, 'Full snapshot page_count mismatch');
   }
+
+  const alreadySynced = await mirrorMatchesSnapshot(
+    db,
+    previousGeneration,
+    comparablePages,
+  );
+  if (alreadySynced) {
+    const stamp = now();
+    await setMeta(db, 'sync_status', 'ready');
+    await setMeta(db, 'last_snapshot_id', snapshotId);
+    await setMeta(db, 'baseline_seq', String(baselineSeq));
+    await releaseMirrorBootstrap(db);
+    await cleanupEventJournal(db);
+    return {
+      snapshot_id: snapshotId,
+      generation: previousGeneration,
+      baseline_seq: baselineSeq,
+      owner_count: ownerCount,
+      page_count: pageCount,
+      already_synced: true,
+    };
+  }
+
+  await setMeta(db, 'sync_status', 'importing');
+  await setMeta(db, 'staging_generation', generation);
+  await db.prepare('DELETE FROM miniapp_pages_mirror WHERE generation = ?').bind(generation).run();
 
   await executeStatements(db, statements);
 
@@ -533,6 +628,7 @@ export async function applyFullPageSnapshot(db, payload) {
     baseline_seq: baselineSeq,
     owner_count: ownerCount,
     page_count: pageCount,
+    already_synced: false,
   };
   } finally {
     await db.prepare(
