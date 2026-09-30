@@ -1,4 +1,7 @@
 const mediaPreviewUrls = new Map();
+const telegramPreviewUrls = new Map();
+const telegramPreviewLoads = new Map();
+const TELEGRAM_PREVIEW_MAX_BYTES = 20 * 1024 * 1024;
 
 function createMediaIcon(kind) {
   const icon = document.createElement("span");
@@ -78,6 +81,124 @@ function rememberPreview(key, file) {
   return url;
 }
 
+function previewMode(block, config) {
+  if (!config) return "file";
+  if (config.preview !== "animation") return config.preview;
+  const mime = String(block?.data?.file?.mime_type || block?.data?._local_content_type || "").toLowerCase();
+  return mime.startsWith("image/") ? "image" : "video";
+}
+
+function appendPreviewElement(box, block, config, url, {compact=false}={}) {
+  const mode = previewMode(block, config);
+  if (mode === "image") {
+    const image = document.createElement("img");
+    image.className = compact ? "media-container-preview" : "media-live-preview";
+    image.src = url;
+    image.alt = block.data?._local_preview_name || config.label;
+    image.loading = "lazy";
+    box.appendChild(image);
+    return true;
+  }
+  if (mode === "video") {
+    const video = document.createElement("video");
+    video.className = compact ? "media-container-preview" : "media-live-preview";
+    video.src = url;
+    video.controls = !compact;
+    video.muted = compact;
+    video.playsInline = true;
+    video.preload = "metadata";
+    box.appendChild(video);
+    return true;
+  }
+  if (mode === "audio" && !compact) {
+    const audio = document.createElement("audio");
+    audio.className = "audio-live-preview";
+    audio.src = url;
+    audio.controls = true;
+    audio.preload = "metadata";
+    box.appendChild(audio);
+    return true;
+  }
+  return false;
+}
+
+async function telegramPreviewUrl(fileId) {
+  const id = String(fileId || "").trim();
+  if (!id) return null;
+  if (telegramPreviewUrls.has(id)) return telegramPreviewUrls.get(id);
+  if (telegramPreviewLoads.has(id)) return telegramPreviewLoads.get(id);
+
+  const load = (async () => {
+    const response = await fetch(`/miniapp/api/media/${encodeURIComponent(id)}`, {
+      method: "GET",
+      headers: {"X-Telegram-Init-Data": tg?.initData || ""},
+      cache: "force-cache",
+    });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (!blob.size) return null;
+    const url = URL.createObjectURL(blob);
+    telegramPreviewUrls.set(id, url);
+    return url;
+  })().finally(() => telegramPreviewLoads.delete(id));
+
+  telegramPreviewLoads.set(id, load);
+  return load;
+}
+
+function appendStoredPreview(box, block, config, options = {}) {
+  const file = block?.data?.file || {};
+  const fileId = String(file.file_id || "").trim();
+  if (!fileId || config?.preview === "file") return false;
+  const fileSize = Number(file.file_size || 0);
+  if (fileSize > TELEGRAM_PREVIEW_MAX_BYTES) return false;
+
+  const holder = document.createElement("div");
+  holder.className = options.compact ? "media-container-preview-loading" : "media-preview-loading";
+  box.appendChild(holder);
+
+  telegramPreviewUrl(fileId).then(url => {
+    if (!holder.isConnected) return;
+    if (!url) {
+      holder.remove();
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    const staging = document.createElement("div");
+    if (!appendPreviewElement(staging, block, config, url, options)) {
+      holder.remove();
+      return;
+    }
+    while (staging.firstChild) fragment.appendChild(staging.firstChild);
+    holder.replaceWith(fragment);
+  }).catch(() => holder.remove());
+  return true;
+}
+
+function appendContainerPreviews(box, block) {
+  const children = Array.isArray(block?.data?.children) ? block.data.children : [];
+  if (!children.length) return;
+  const grid = document.createElement("div");
+  grid.className = "media-container-previews";
+  const visible = children.slice(0, 8);
+  visible.forEach(child => {
+    const config = mediaConfig(child?.type);
+    if (!config) return;
+    const tile = document.createElement("div");
+    tile.className = "media-container-preview-tile";
+    const local = appendLocalPreview(tile, child, config, {compact:true});
+    if (!local) appendStoredPreview(tile, child, config, {compact:true});
+    grid.appendChild(tile);
+  });
+  if (children.length > visible.length) {
+    const more = document.createElement("div");
+    more.className = "media-container-more";
+    more.textContent = `+${children.length - visible.length}`;
+    grid.appendChild(more);
+  }
+  box.appendChild(grid);
+}
+
 function mediaFileData(data, file) {
   return {
     file_id: data.file_id,
@@ -145,38 +266,10 @@ async function uploadMediaToTelegram(file, block) {
   }
 }
 
-function appendLocalPreview(box, block, config) {
+function appendLocalPreview(box, block, config, options = {}) {
   const url = mediaPreviewUrls.get(block.id);
-  if (!url) return;
-
-  if (config.preview === "image" || (config.preview === "animation" && block.data?._local_content_type?.startsWith("image/"))) {
-    const image = document.createElement("img");
-    image.className = "media-live-preview";
-    image.src = url;
-    image.alt = block.data?._local_preview_name || config.label;
-    box.appendChild(image);
-    return;
-  }
-
-  if (config.preview === "video" || config.preview === "animation") {
-    const video = document.createElement("video");
-    video.className = "media-live-preview";
-    video.src = url;
-    video.controls = true;
-    video.playsInline = true;
-    video.preload = "metadata";
-    box.appendChild(video);
-    return;
-  }
-
-  if (config.preview === "audio") {
-    const audio = document.createElement("audio");
-    audio.className = "audio-live-preview";
-    audio.src = url;
-    audio.controls = true;
-    audio.preload = "metadata";
-    box.appendChild(audio);
-  }
+  if (!url) return false;
+  return appendPreviewElement(box, block, config, url, options);
 }
 
 function pickerMediaEditor(block) {
@@ -185,7 +278,9 @@ function pickerMediaEditor(block) {
   const box = document.createElement("div");
   box.className = `media-placeholder media-picker-card${d.file?.file_id ? "" : " invalid"}`;
 
-  appendLocalPreview(box, block, config);
+  if (!appendLocalPreview(box, block, config)) {
+    appendStoredPreview(box, block, config);
+  }
 
   const header = document.createElement("div");
   header.className = "media-picker-head";
@@ -268,6 +363,8 @@ function containerMediaEditor(block) {
   const d = block.data || (block.data = {});
   const box = document.createElement("div");
   box.className = `media-placeholder media-picker-card${(d.children || []).length ? "" : " invalid"}`;
+
+  appendContainerPreviews(box, block);
 
   const header = document.createElement("div");
   header.className = "media-picker-head";
