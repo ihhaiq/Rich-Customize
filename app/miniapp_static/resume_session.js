@@ -51,9 +51,9 @@
     catch (_) { return ""; }
   }
 
-  // Intercept only the successful native user-picker request. requestUser() saves
-  // the page before this endpoint is called, so storing its page_id here means
-  // closing Telegram cannot send the editor back to a blank draft on next open.
+  // Intercept only a successful native user-picker request. The picker now
+  // requires an already-saved, clean page; storing its page_id lets the Mini App
+  // reopen that exact Serverless page after Telegram closes the WebView.
   const nativeFetch = window.fetch.bind(window);
   window.fetch = async function(input, init = {}) {
     const response = await nativeFetch(input, init);
