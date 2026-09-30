@@ -124,7 +124,12 @@ async function pollBridge(requestId){
 async function api(path,options={}){
   const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})},cache:"no-store"});
   const data=await parseApiResponse(res);
-  if(res.status===202&&data?.request_id)return pollBridge(data.request_id);
+  if(res.status===202&&data?.request_id){
+    const autoLock=Boolean(waitOverlay&&!waitOverlay.isActive());
+    if(autoLock)waitOverlay.show("انتظر شوية…","جاري تجهيز البيانات");
+    try{return await pollBridge(data.request_id)}
+    finally{if(autoLock)waitOverlay.hide()}
+  }
   if(data?.ok===false)throw apiError(data,"Request failed");
   return data;
 }
