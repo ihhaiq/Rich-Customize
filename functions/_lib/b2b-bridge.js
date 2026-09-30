@@ -7,6 +7,11 @@ export const B2B_RELAY_BOT_USERNAME = 'Richminiappsbot';
 
 const REQUEST_TTL_SECONDS = 5 * 60;
 const REQUEST_ID_RE = /^[A-Za-z0-9_-]{8,80}$/;
+const DEFAULT_MIN_SEND_INTERVAL_MS = 3500;
+const DEFAULT_MAX_QUEUE_WAIT_MS = 12000;
+const DEFAULT_CIRCUIT_SECONDS = 15;
+const DEDUPE_WINDOW_SECONDS = 12;
+const RETRY_LIMIT = 2;
 
 function now() {
   return Math.floor(Date.now() / 1000);
@@ -59,6 +64,28 @@ export async function ensureBridgeSchema(db) {
       + 'key TEXT PRIMARY KEY, '
       + 'value TEXT NOT NULL, '
       + 'updated_at INTEGER NOT NULL'
+      + ')'
+    ).run();
+    await db.prepare(
+      'CREATE TABLE IF NOT EXISTS miniapp_bridge_gate ('
+      + 'key TEXT PRIMARY KEY, '
+      + 'next_send_at_ms INTEGER NOT NULL DEFAULT 0, '
+      + 'open_until_ms INTEGER NOT NULL DEFAULT 0, '
+      + 'consecutive_failures INTEGER NOT NULL DEFAULT 0, '
+      + 'minute_bucket INTEGER NOT NULL DEFAULT 0, '
+      + 'minute_count INTEGER NOT NULL DEFAULT 0, '
+      + 'updated_at_ms INTEGER NOT NULL DEFAULT 0'
+      + ')'
+    ).run();
+    await db.prepare(
+      'CREATE TABLE IF NOT EXISTS miniapp_bridge_metrics ('
+      + 'minute INTEGER PRIMARY KEY, '
+      + 'queued INTEGER NOT NULL DEFAULT 0, '
+      + 'sent INTEGER NOT NULL DEFAULT 0, '
+      + 'deduped INTEGER NOT NULL DEFAULT 0, '
+      + 'rate_limited INTEGER NOT NULL DEFAULT 0, '
+      + 'rejected INTEGER NOT NULL DEFAULT 0, '
+      + 'failed INTEGER NOT NULL DEFAULT 0'
       + ')'
     ).run();
     return true;
@@ -177,6 +204,220 @@ function transportOutcomeUncertain(error) {
   return status >= 500 || status === 0;
 }
 
+function envInteger(env, name, fallback, min, max) {
+  const raw = Number(env?.[name]);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(raw)));
+}
+
+function minSendIntervalMs(env) {
+  return envInteger(env, 'B2B_MIN_SEND_INTERVAL_MS', DEFAULT_MIN_SEND_INTERVAL_MS, 1000, 15000);
+}
+
+function maxQueueWaitMs(env) {
+  return envInteger(env, 'B2B_MAX_QUEUE_WAIT_MS', DEFAULT_MAX_QUEUE_WAIT_MS, 1000, 60000);
+}
+
+function circuitSeconds(env) {
+  return envInteger(env, 'B2B_CIRCUIT_SECONDS', DEFAULT_CIRCUIT_SECONDS, 5, 120);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
+const METRIC_COLUMNS = new Set(['queued', 'sent', 'deduped', 'rate_limited', 'rejected', 'failed']);
+
+async function bumpMetric(db, column, amount = 1) {
+  if (!METRIC_COLUMNS.has(column)) return;
+  const minute = Math.floor(Date.now() / 60000);
+  try {
+    await db.prepare(
+      'INSERT INTO miniapp_bridge_metrics(minute, ' + column + ') VALUES(?, ?) '
+      + 'ON CONFLICT(minute) DO UPDATE SET ' + column + ' = ' + column + ' + excluded.' + column
+    ).bind(minute, Math.max(1, Number(amount) || 1)).run();
+    if (minute % 60 === 0) {
+      await db.prepare('DELETE FROM miniapp_bridge_metrics WHERE minute < ?')
+        .bind(minute - (24 * 60)).run();
+    }
+  } catch (error) {
+    console.warn('Could not update B2B metric', column, error);
+  }
+}
+
+async function reusableBridgeRequest(db, { userId, action, pageId = null }) {
+  const name = String(action || '');
+  if (!new Set(['pages', 'destinations']).has(name)) return null;
+  await ensureBridgeSchema(db);
+  const owner = safeUserId(userId);
+  const cutoff = now() - DEDUPE_WINDOW_SECONDS;
+  const row = await db.prepare(
+    "SELECT request_id FROM miniapp_bridge_pending "
+    + "WHERE user_id = ? AND action = ? AND status IN ('pending','ready') "
+    + "AND created_at >= ? AND expires_at > ? "
+    + "ORDER BY created_at DESC LIMIT 1"
+  ).bind(owner, name, cutoff, now()).first();
+  if (!row?.request_id) return null;
+  await bumpMetric(db, 'deduped');
+  return String(row.request_id);
+}
+
+async function reserveBridgeSlot(db, env) {
+  await ensureBridgeSchema(db);
+  const currentMs = Date.now();
+  const interval = minSendIntervalMs(env);
+  const maxWait = maxQueueWaitMs(env);
+  const minute = Math.floor(currentMs / 60000);
+  const row = await db.prepare(
+    "INSERT INTO miniapp_bridge_gate("
+    + "key,next_send_at_ms,open_until_ms,consecutive_failures,minute_bucket,minute_count,updated_at_ms"
+    + ") VALUES('global', ?, 0, 0, ?, 1, ?) "
+    + "ON CONFLICT(key) DO UPDATE SET "
+    + "next_send_at_ms = CASE "
+    + "WHEN miniapp_bridge_gate.next_send_at_ms > excluded.updated_at_ms "
+    + "THEN miniapp_bridge_gate.next_send_at_ms + ? "
+    + "ELSE excluded.updated_at_ms + ? END, "
+    + "minute_bucket = excluded.minute_bucket, "
+    + "minute_count = CASE "
+    + "WHEN miniapp_bridge_gate.minute_bucket = excluded.minute_bucket "
+    + "THEN miniapp_bridge_gate.minute_count + 1 ELSE 1 END, "
+    + "updated_at_ms = excluded.updated_at_ms "
+    + "WHERE miniapp_bridge_gate.open_until_ms <= excluded.updated_at_ms "
+    + "AND miniapp_bridge_gate.next_send_at_ms <= excluded.updated_at_ms + ? "
+    + "RETURNING next_send_at_ms, open_until_ms, minute_bucket, minute_count"
+  ).bind(
+    currentMs + interval,
+    minute,
+    currentMs,
+    interval,
+    interval,
+    maxWait,
+  ).first();
+
+  if (!row) {
+    await bumpMetric(db, 'rejected');
+    throw new HttpError(503, 'B2B bridge is busy; retry shortly');
+  }
+
+  await bumpMetric(db, 'queued');
+  const sendAt = Number(row.next_send_at_ms || currentMs + interval) - interval;
+  const waitMs = Math.max(0, sendAt - Date.now());
+  if (waitMs > 0) await sleep(waitMs);
+  return {
+    waitMs,
+    minuteCount: Number(row.minute_count || 0),
+  };
+}
+
+async function openBridgeCircuit(db, env, seconds) {
+  const currentMs = Date.now();
+  const durationMs = Math.max(1000, Number(seconds || circuitSeconds(env)) * 1000);
+  await ensureBridgeSchema(db);
+  await db.prepare(
+    "INSERT INTO miniapp_bridge_gate("
+    + "key,next_send_at_ms,open_until_ms,consecutive_failures,minute_bucket,minute_count,updated_at_ms"
+    + ") VALUES('global', 0, ?, 1, 0, 0, ?) "
+    + "ON CONFLICT(key) DO UPDATE SET "
+    + "open_until_ms = MAX(miniapp_bridge_gate.open_until_ms, excluded.open_until_ms), "
+    + "consecutive_failures = miniapp_bridge_gate.consecutive_failures + 1, "
+    + "updated_at_ms = excluded.updated_at_ms"
+  ).bind(currentMs + durationMs, currentMs).run();
+}
+
+async function noteBridgeSuccess(db) {
+  try {
+    await db.prepare(
+      "UPDATE miniapp_bridge_gate SET consecutive_failures = 0, open_until_ms = 0, updated_at_ms = ? WHERE key = 'global'"
+    ).bind(Date.now()).run();
+  } catch {}
+}
+
+async function noteBridgeFailure(db, env) {
+  const currentMs = Date.now();
+  const openMs = currentMs + (circuitSeconds(env) * 1000);
+  try {
+    await db.prepare(
+      "UPDATE miniapp_bridge_gate SET "
+      + "consecutive_failures = consecutive_failures + 1, "
+      + "open_until_ms = CASE WHEN consecutive_failures + 1 >= 3 "
+      + "THEN MAX(open_until_ms, ?) ELSE open_until_ms END, "
+      + "updated_at_ms = ? WHERE key = 'global'"
+    ).bind(openMs, currentMs).run();
+  } catch {}
+  await bumpMetric(db, 'failed');
+}
+
+function telegramError(response, data) {
+  const error = new HttpError(
+    Number(data?.error_code || response.status || 502),
+    data?.description || ('Telegram bridge API HTTP ' + response.status),
+  );
+  const retryAfter = Number(data?.parameters?.retry_after || 0);
+  if (Number.isFinite(retryAfter) && retryAfter > 0) error.retryAfter = retryAfter;
+  return error;
+}
+
+async function sendTelegramWithRetry(db, env, action, send) {
+  let attempt = 0;
+  while (true) {
+    try {
+      const result = await send();
+      await noteBridgeSuccess(db);
+      await bumpMetric(db, 'sent');
+      return result;
+    } catch (error) {
+      const status = Number(error?.status || 0);
+      const retryAfter = Math.max(0, Number(error?.retryAfter || 0));
+      if (status === 429 && retryAfter > 0) {
+        await bumpMetric(db, 'rate_limited');
+        await openBridgeCircuit(db, env, retryAfter);
+        if (attempt < RETRY_LIMIT) {
+          attempt += 1;
+          await sleep((retryAfter * 1000) + 150);
+          await reserveBridgeSlot(db, env);
+          continue;
+        }
+      }
+      await noteBridgeFailure(db, env);
+      throw error;
+    }
+  }
+}
+
+export async function bridgeHealthSnapshot(db, env) {
+  await ensureBridgeSchema(db);
+  const currentMs = Date.now();
+  const minute = Math.floor(currentMs / 60000);
+  const gate = await db.prepare(
+    "SELECT next_send_at_ms, open_until_ms, consecutive_failures, minute_bucket, minute_count "
+    + "FROM miniapp_bridge_gate WHERE key = 'global'"
+  ).first();
+  const metrics = await db.prepare(
+    'SELECT queued, sent, deduped, rate_limited, rejected, failed '
+    + 'FROM miniapp_bridge_metrics WHERE minute = ?'
+  ).bind(minute).first();
+  const interval = minSendIntervalMs(env);
+  return {
+    minute,
+    configured_interval_ms: interval,
+    configured_capacity_per_minute: Math.floor(60000 / interval),
+    max_queue_wait_ms: maxQueueWaitMs(env),
+    queue_delay_ms: Math.max(0, Number(gate?.next_send_at_ms || 0) - currentMs),
+    circuit_open: Number(gate?.open_until_ms || 0) > currentMs,
+    circuit_open_until_ms: Number(gate?.open_until_ms || 0),
+    consecutive_failures: Number(gate?.consecutive_failures || 0),
+    reserved_this_minute: Number(gate?.minute_bucket) === minute ? Number(gate?.minute_count || 0) : 0,
+    metrics: {
+      queued: Number(metrics?.queued || 0),
+      sent: Number(metrics?.sent || 0),
+      deduped: Number(metrics?.deduped || 0),
+      rate_limited: Number(metrics?.rate_limited || 0),
+      rejected: Number(metrics?.rejected || 0),
+      failed: Number(metrics?.failed || 0),
+    },
+  };
+}
+
 async function telegramJson(env, method, payload = {}) {
   const response = await fetch(
     'https://api.telegram.org/bot' + bridgeToken(env) + '/' + method,
@@ -188,10 +429,7 @@ async function telegramJson(env, method, payload = {}) {
   );
   const data = await response.json().catch(() => null);
   if (!response.ok || !data?.ok) {
-    throw new HttpError(
-      Number(data?.error_code || response.status || 502),
-      data?.description || ('Telegram bridge API HTTP ' + response.status),
-    );
+    throw telegramError(response, data);
   }
   return data.result;
 }
@@ -203,10 +441,7 @@ async function telegramMultipart(env, method, form) {
   );
   const data = await response.json().catch(() => null);
   if (!response.ok || !data?.ok) {
-    throw new HttpError(
-      Number(data?.error_code || response.status || 502),
-      data?.description || ('Telegram bridge API HTTP ' + response.status),
-    );
+    throw telegramError(response, data);
   }
   return data.result;
 }
@@ -259,13 +494,19 @@ export async function sendOneWayBridgeEvent(context, {
 }) {
   const id = requestId();
   const meta = envelope({ id, userId, extra });
+  const db = requireBridgeDb(context.env);
   try {
-    await telegramJson(context.env, 'sendMessage', {
+    await reserveBridgeSlot(db, context.env);
+    await sendTelegramWithRetry(db, context.env, action, () => telegramJson(context.env, 'sendMessage', {
       chat_id: bridgeChatId(context.env),
       text: command(context.env, action) + '\n' + JSON.stringify(meta),
       disable_notification: true,
-    });
+    }));
   } catch (error) {
+    if (Number(error?.status || 0) === 503 && action === 'client_error') {
+      console.warn('Dropping client error while B2B bridge is busy', id);
+      return id;
+    }
     if (!transportOutcomeUncertain(error)) throw error;
     console.warn('B2B one-way event outcome is uncertain', id, action);
   }
@@ -279,16 +520,20 @@ export async function queueTextBridgeRequest(context, {
   baseUpdatedAt = null,
   extra = null,
 }) {
+  const db = requireBridgeDb(context.env);
+  const reusable = await reusableBridgeRequest(db, { userId, action, pageId });
+  if (reusable) return reusable;
+
+  await reserveBridgeSlot(db, context.env);
   const id = requestId();
   const meta = envelope({ id, userId, pageId, baseUpdatedAt, extra });
-  const db = requireBridgeDb(context.env);
   await insertPending(db, { requestId: id, userId, action, pageId });
   try {
-    await telegramJson(context.env, 'sendMessage', {
+    await sendTelegramWithRetry(db, context.env, action, () => telegramJson(context.env, 'sendMessage', {
       chat_id: bridgeChatId(context.env),
       text: command(context.env, action) + '\n' + JSON.stringify(meta),
       disable_notification: true,
-    });
+    }));
   } catch (error) {
     if (transportOutcomeUncertain(error)) {
       console.warn('B2B text send outcome is uncertain; keeping request pending', id, action);
@@ -307,13 +552,14 @@ export async function queueDocumentBridgeRequest(context, {
   baseUpdatedAt = null,
   payload,
 }) {
+  const db = requireBridgeDb(context.env);
+  await reserveBridgeSlot(db, context.env);
   const id = requestId();
   const meta = envelope({ id, userId, pageId, baseUpdatedAt });
   const body = {
     ...(payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {}),
     ...meta,
   };
-  const db = requireBridgeDb(context.env);
   await insertPending(db, { requestId: id, userId, action, pageId });
 
   const serialized = JSON.stringify(body);
@@ -334,7 +580,7 @@ export async function queueDocumentBridgeRequest(context, {
   );
 
   try {
-    await telegramMultipart(context.env, 'sendDocument', form);
+    await sendTelegramWithRetry(db, context.env, action, () => telegramMultipart(context.env, 'sendDocument', form));
   } catch (error) {
     if (transportOutcomeUncertain(error)) {
       console.warn('B2B document send outcome is uncertain; keeping request pending', id, action);
