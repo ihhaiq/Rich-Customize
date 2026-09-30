@@ -50,6 +50,8 @@ It does **not** create:
 - popup/page-body storage;
 - user-picker page mutation state.
 
+If an older D1 database already contains those deprecated tables, use `cloudflare/d1/cleanup-legacy.sql` only after verifying the Telegram Serverless cutover. The cleanup script is intentionally separate and destructive.
+
 Page bodies, publish destinations and native user-picker state stay in Telegram Serverless.
 
 ## Frontend deployment
