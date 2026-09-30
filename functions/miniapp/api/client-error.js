@@ -12,7 +12,7 @@ function clean(value, limit) {
 function expectedClientError(source, code, message) {
   if (String(source) !== 'api') return false;
   const normalizedCode = String(code || '').toUpperCase();
-  if (/^HTTP_4\d\d$/.test(normalizedCode) && normalizedCode !== 'HTTP_429') return true;
+  if (/^HTTP_4\d\d$/.test(normalizedCode)) return true;
   if (/^(INVALID_|EMPTY_|PAGE_(NOT_FOUND|CONFLICT|LIMIT|BUSY)|BASE_REVISION_REQUIRED|DOCUMENT_REQUIRED|DOCUMENT_TOO_LARGE)/.test(normalizedCode)) return true;
   return /page must contain at least one block|invalid .+| is required|not found|does not belong to this user/i.test(String(message || ''));
 }
