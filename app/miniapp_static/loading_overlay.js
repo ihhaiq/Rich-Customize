@@ -4,7 +4,12 @@
   const overlay = document.getElementById("miniappWaitOverlay");
   const text = document.getElementById("miniappWaitText");
   const subtext = document.getElementById("miniappWaitSubtext");
-  const editor = document.getElementById("editorView");
+  const lockTargets = [
+    document.getElementById("editorView"),
+    document.getElementById("backdrop"),
+    document.getElementById("pagesPanel"),
+    document.getElementById("sendPanel"),
+  ].filter(Boolean);
   if (!overlay || !text) return;
 
   let depth = 0;
@@ -22,7 +27,7 @@
     overlay.setAttribute("aria-hidden", "false");
     document.documentElement.classList.add("miniapp-busy");
     document.body.classList.add("miniapp-busy");
-    if (editor) editor.setAttribute("inert", "");
+    for (const target of lockTargets) target.setAttribute("inert", "");
     previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (previousFocus && previousFocus !== document.body) {
       try { previousFocus.blur(); } catch {}
@@ -34,7 +39,7 @@
     overlay.setAttribute("aria-hidden", "true");
     document.documentElement.classList.remove("miniapp-busy");
     document.body.classList.remove("miniapp-busy");
-    if (editor) editor.removeAttribute("inert");
+    for (const target of lockTargets) target.removeAttribute("inert");
 
     leaveTimer = setTimeout(() => {
       if (depth > 0) return;
