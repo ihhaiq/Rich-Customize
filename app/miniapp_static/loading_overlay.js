@@ -52,7 +52,12 @@
     }, 170);
   }
 
+  function clearErrorState(){
+    overlay.classList.remove("is-error");
+  }
+
   function show(message = defaultText(), detail = ""){
+    clearErrorState();
     depth += 1;
     text.textContent = String(message || defaultText());
     if (subtext) {
@@ -82,11 +87,22 @@
   }
 
   function setMessage(message, detail = ""){
+    clearErrorState();
     text.textContent = String(message || defaultText());
     if (subtext) {
       subtext.textContent = String(detail || "");
       subtext.hidden = !detail;
     }
+  }
+
+  function setError(message = "صار حادث", detail = "حاول فدشوية"){
+    overlay.classList.add("is-error");
+    text.textContent = String(message || "صار حادث");
+    if (subtext) {
+      subtext.textContent = String(detail || "حاول فدشوية");
+      subtext.hidden = false;
+    }
+    lockInterface();
   }
 
   // The overlay is visible in HTML before app.js runs, preventing taps while boot/auth starts.
@@ -99,6 +115,7 @@
     hide,
     run,
     setMessage,
+    setError,
     isActive: () => depth > 0,
   });
 })();
