@@ -8,6 +8,7 @@ Cloudflare is responsible only for:
 - validating Telegram Mini App `initData`;
 - relaying requests through `@Richminiappsbot`;
 - receiving the relay-bot webhook;
+- forwarding Mini App media uploads to Telegram to obtain reusable `file_id` values;
 - storing short-lived B2B correlation/identity metadata.
 
 Cloudflare D1 is **not** a page database and is not a managed-chat database.
@@ -31,6 +32,8 @@ rich_pages + managed_chats + Mini App picker state
 Persistent page edits happen only after an explicit Save. Unsaved editor changes remain local in the WebView.
 
 ## Cloudflare D1
+
+Bind the D1 database to Pages Functions with the exact binding name `DB`.
 
 The single canonical schema is:
 
@@ -77,7 +80,7 @@ Recommended Cloudflare Pages settings:
 Required:
 
 ```text
-BOT_TOKEN=<token that signs the current Mini App initData>
+BOT_TOKEN=<@RichCustomizebot token; used for initData verification and Telegram media upload forwarding>
 B2B_BOT_TOKEN=<token for @Richminiappsbot>
 B2B_WEBHOOK_SECRET=<random 16-256 char A-Z/a-z/0-9/_/- secret>
 SYNC_SECRET=<secret for the internal webhook-setup endpoint>
