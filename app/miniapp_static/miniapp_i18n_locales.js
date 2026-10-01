@@ -32,8 +32,8 @@
   Object.entries(semantic).forEach(([language, translations]) => Object.assign(overrides[language] ||= {}, translations));
 
   const emojiSearch = {
-    ar:{"emoji.search":"بحث عن إيموجي","emoji.search_placeholder":"اكتب اسم الإيموجي…","emoji.search_empty":"ماكو إيموجي مطابق"},
-    en:{"emoji.search":"Search emoji","emoji.search_placeholder":"Search emoji…","emoji.search_empty":"No matching emoji"},
+    ar:{"emoji.search":"بحث عن إيموجي","emoji.search_placeholder":"اكتب اسم الإيموجي…","emoji.search_empty":"ماكو إيموجي مطابق","emoji.normal":"الرموز والناس","emoji.custom_placeholder":"إيموجي مميز"},
+    en:{"emoji.search":"Search emoji","emoji.search_placeholder":"Search emoji…","emoji.search_empty":"No matching emoji","emoji.normal":"Emoji & people","emoji.custom_placeholder":"Custom emoji"},
     es:{"emoji.search":"Buscar emoji","emoji.search_placeholder":"Buscar emoji…","emoji.search_empty":"No hay emojis coincidentes"},
     de:{"emoji.search":"Emoji suchen","emoji.search_placeholder":"Emoji suchen…","emoji.search_empty":"Kein passendes Emoji"},
     it:{"emoji.search":"Cerca emoji","emoji.search_placeholder":"Cerca emoji…","emoji.search_empty":"Nessuna emoji corrispondente"},

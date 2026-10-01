@@ -1,4 +1,4 @@
-// Beta 0.3.64 — Apple emoji picker with always-visible multilingual search.
+// Beta 0.3.65 — Telegram-like emoji rail, recents and mood search filters.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -19,6 +19,13 @@
   ];
   const RECENT_KEY = "rich_customize_apple_recent_emoji";
   const SEARCH_LIMIT = 180;
+  const CUSTOM_EMOJI_FALLBACK_ID = "6046274330164203359";
+  const SEARCH_PRESETS = [
+    {key:"love", icon:"❤️", emojis:["❤️","🩷","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❤️‍🔥","❤️‍🩹","❣️","💕","💞","💓","💗","💖","💘","💝","😍","🥰","😘","💋"]},
+    {key:"positive", icon:"👍", emojis:["👍","👌","👏","🙌","🫶","✅","☑️","✔️","💯","😀","😃","😄","😁","😊","🤩"]},
+    {key:"negative", icon:"👎", emojis:["👎","❌","❎","😒","😞","😔","😟","😕","🙁","☹️","😣","😖","😫","😩","😠","😡","🤬"]},
+    {key:"celebrate", icon:"🎉", emojis:["🎉","🎊","🥳","🎂","🎁","🎈","✨","🌟","🔥","🏆","🥇","👏","🙌"]},
+  ];
 
   // Local aliases extend the datasource names so one emoji can be found with
   // several natural Arabic words, similar to Telegram's keyword search.
@@ -99,7 +106,7 @@
   const CATEGORY_ORDER = ["smileys","people","nature","food","activity","travel","objects","symbols","flags"];
 
   let panel = null;
-  let activeCategory = "smileys";
+  let activeCategory = "normal";
   let activeTarget = null;
   let savedRange = null;
   let savedInputSelection = null;
@@ -353,7 +360,7 @@
       });
     }
     try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.(); } catch (_) {}
-    if (panel?.dataset.category === "recent") renderCategory("recent");
+    if (panel?.dataset.mode === "recent" && panel?.dataset.view !== "search") renderMode("recent");
   }
 
   function makeAppleImage(item, className = "") {
@@ -400,44 +407,85 @@
     grid.appendChild(button);
   }
 
-  function renderItems(items, emptyText) {
-    if (!panel) return;
-    const grid = panel.querySelector(".apple-emoji-grid");
-    if (!grid) return;
-    grid.innerHTML = "";
-    if (!items.length) {
-      const empty = document.createElement("div");
-      empty.className = "apple-emoji-empty";
-      empty.textContent = emptyText;
-      grid.appendChild(empty);
-    } else {
-      items.forEach(item => appendEmojiButton(grid, item));
-    }
-    grid.scrollTop = 0;
+  function animateGrid(grid) {
+    if (!grid || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+    grid.classList.remove("apple-emoji-grid-switch");
+    void grid.offsetWidth;
+    grid.classList.add("apple-emoji-grid-switch");
+    window.setTimeout(() => grid?.classList?.remove("apple-emoji-grid-switch"), 190);
   }
 
-  function renderCategory(category) {
-    if (!panel || !catalog) return;
-    panel.dataset.category = category;
-    activeCategory = category;
-    const title = panel.querySelector(".apple-emoji-category-title");
+  function appendSectionTitle(grid, text, {divider=false} = {}) {
+    const heading = document.createElement("div");
+    heading.className = "apple-emoji-section-title";
+    if (divider) heading.classList.add("with-divider");
+    heading.dir = "auto";
+    heading.textContent = text;
+    grid.appendChild(heading);
+  }
 
-    let items = [];
-    let emptyText = mt("emoji.recent_empty");
-    if (category === "recent") {
-      items = loadRecent().map(saved => catalog.byUnified.get(saved.unified) || catalog.byEmoji.get(saved.emoji)).filter(Boolean);
-      if (title) title.textContent = mt("emoji.recent");
-    } else {
-      items = catalog.groups[category] || [];
+  function appendEmpty(grid, text, compact=false) {
+    const empty = document.createElement("div");
+    empty.className = "apple-emoji-empty";
+    if (compact) empty.classList.add("compact");
+    empty.textContent = text;
+    grid.appendChild(empty);
+  }
+
+  function appendItems(grid, items) {
+    items.forEach(item => appendEmojiButton(grid, item));
+  }
+
+  function appendNormalSections(grid, {dividerFirst=false} = {}) {
+    let first = true;
+    CATEGORY_ORDER.forEach(category => {
+      const items = catalog.groups[category] || [];
+      if (!items.length) return;
       const meta = Object.values(CATEGORY_META).find(item => item.key === category);
-      if (title) title.textContent = meta?.labelKey ? mt(meta.labelKey) : mt("top.emoji");
-      emptyText = mt("emoji.search_empty");
+      appendSectionTitle(
+        grid,
+        meta?.labelKey ? mt(meta.labelKey) : mt("emoji.normal"),
+        {divider: dividerFirst ? first : !first},
+      );
+      appendItems(grid, items);
+      first = false;
+    });
+  }
+
+  function setRailActive(mode) {
+    panel?.querySelectorAll(".apple-emoji-tab[data-mode]").forEach(button => {
+      button.classList.toggle("active", button.dataset.mode === mode);
+    });
+  }
+
+  function renderMode(mode) {
+    if (!panel || !catalog) return;
+    activeCategory = mode === "recent" ? "recent" : "normal";
+    panel.dataset.mode = activeCategory;
+    panel.dataset.view = activeCategory;
+
+    const grid = panel.querySelector(".apple-emoji-grid");
+    const title = panel.querySelector(".apple-emoji-category-title");
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    if (activeCategory === "recent") {
+      if (title) title.textContent = mt("emoji.recent");
+      const recent = loadRecent()
+        .map(saved => catalog.byUnified.get(saved.unified) || catalog.byEmoji.get(saved.emoji))
+        .filter(Boolean);
+      if (recent.length) appendItems(grid, recent);
+      else appendEmpty(grid, mt("emoji.recent_empty"), true);
+      appendNormalSections(grid, {dividerFirst:true});
+    } else {
+      if (title) title.textContent = mt("emoji.normal");
+      appendNormalSections(grid);
     }
 
-    panel.querySelectorAll(".apple-emoji-tab").forEach(button => {
-      button.classList.toggle("active", button.dataset.category === category);
-    });
-    renderItems(items, emptyText);
+    setRailActive(activeCategory);
+    panel.querySelectorAll(".apple-emoji-search-preset").forEach(button => button.classList.remove("active"));
+    grid.scrollTop = 0;
+    animateGrid(grid);
   }
 
   function searchCatalog(query) {
@@ -466,40 +514,78 @@
       .map(entry => entry.item);
   }
 
+  function renderSearchItems(items) {
+    if (!panel) return;
+    panel.dataset.view = "search";
+    const grid = panel.querySelector(".apple-emoji-grid");
+    const title = panel.querySelector(".apple-emoji-category-title");
+    if (!grid) return;
+    if (title) title.textContent = mt("emoji.search");
+    grid.innerHTML = "";
+    if (!items.length) appendEmpty(grid, mt("emoji.search_empty"));
+    else appendItems(grid, items);
+    grid.scrollTop = 0;
+    animateGrid(grid);
+  }
+
   function renderSearch(query) {
     if (!panel || !catalog) return;
     const value = String(query || "").trim();
+    panel.querySelectorAll(".apple-emoji-search-preset").forEach(button => button.classList.remove("active"));
     if (!value) {
-      renderCategory(activeCategory);
+      renderMode(activeCategory);
       return;
     }
-    panel.dataset.category = "search";
-    const title = panel.querySelector(".apple-emoji-category-title");
-    if (title) title.textContent = mt("emoji.search");
-    panel.querySelectorAll(".apple-emoji-tab").forEach(button => button.classList.remove("active"));
-    renderItems(searchCatalog(value), mt("emoji.search_empty"));
+    renderSearchItems(searchCatalog(value));
+  }
+
+  function renderPreset(key) {
+    if (!panel || !catalog) return;
+    const preset = SEARCH_PRESETS.find(item => item.key === key);
+    if (!preset) return;
+    const items = preset.emojis.map(emoji => catalog.byEmoji.get(emoji)).filter(Boolean);
+    panel.querySelectorAll(".apple-emoji-search-preset").forEach(button => {
+      button.classList.toggle("active", button.dataset.preset === key);
+    });
+    renderSearchItems(items);
   }
 
   function resetSearchUI() {
     if (!panel) return;
     const input = panel.querySelector(".apple-emoji-search-input");
     if (input) input.value = "";
+    panel.querySelectorAll(".apple-emoji-search-preset").forEach(button => button.classList.remove("active"));
   }
 
-  function makeRecentTab() {
+  function makeRailButton(mode, icon, label) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "apple-emoji-tab apple-emoji-recent-tab";
-    button.dataset.category = "recent";
-    button.setAttribute("aria-label", mt("emoji.recent"));
-    MiniAppIcons.mount(button,"recent");
+    button.className = "apple-emoji-tab";
+    button.dataset.mode = mode;
+    button.setAttribute("aria-label", label);
+    if (icon === "recent" || icon === "smileys") MiniAppIcons.mount(button, icon);
+    else button.textContent = icon;
     return button;
   }
 
-  function representativeItem(category) {
-    const meta = Object.values(CATEGORY_META).find(item => item.key === category);
-    if (!meta) return catalog.groups[category]?.[0] || null;
-    return catalog.byEmoji.get(meta.fallback) || catalog.groups[category]?.[0] || null;
+  function makeCustomPlaceholderTab() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "apple-emoji-tab apple-emoji-custom-placeholder";
+    button.dataset.customEmojiId = CUSTOM_EMOJI_FALLBACK_ID;
+    button.setAttribute("aria-label", mt("emoji.custom_placeholder"));
+    button.setAttribute("aria-disabled", "true");
+    button.tabIndex = -1;
+    const bubble = document.createElement("span");
+    bubble.className = "apple-emoji-custom-bubble";
+    bubble.textContent = "👤";
+    bubble.dataset.customEmojiId = CUSTOM_EMOJI_FALLBACK_ID;
+    button.appendChild(bubble);
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    return button;
   }
 
   function buildPanel() {
@@ -514,11 +600,10 @@
     headMain.className = "apple-emoji-head-main";
     const title = document.createElement("strong");
     title.className = "apple-emoji-category-title";
-    title.textContent = mt("emoji.smileys");
+    title.textContent = mt("emoji.normal");
     const badge = document.createElement("small");
     badge.textContent = mt("emoji.apple");
     headMain.append(title, badge);
-
     head.append(headMain);
 
     const searchWrap = document.createElement("div");
@@ -533,12 +618,32 @@
     searchInput.placeholder = mt("emoji.search_placeholder");
     searchInput.setAttribute("aria-label", mt("emoji.search"));
 
+    const presets = document.createElement("div");
+    presets.className = "apple-emoji-search-presets";
+    SEARCH_PRESETS.forEach(preset => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "apple-emoji-search-preset";
+      button.dataset.preset = preset.key;
+      button.textContent = preset.icon;
+      button.setAttribute("aria-label", preset.icon);
+      button.addEventListener("pointerdown", event => event.preventDefault());
+      button.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        searchInput.value = "";
+        renderPreset(preset.key);
+        requestAnimationFrame(placePanel);
+      });
+      presets.appendChild(button);
+    });
+
     const clearSearch = document.createElement("button");
     clearSearch.type = "button";
     clearSearch.className = "apple-emoji-search-clear";
     clearSearch.setAttribute("aria-label", mt("common.cancel"));
     clearSearch.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>';
-    searchWrap.append(searchInput, clearSearch);
+    searchWrap.append(searchInput, presets, clearSearch);
 
     let searchFrame = 0;
     const runSearch = () => {
@@ -553,9 +658,9 @@
     searchInput.addEventListener("keydown", event => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      if (searchInput.value) {
-        searchInput.value = "";
-        renderCategory(activeCategory);
+      if (searchInput.value || root.querySelector(".apple-emoji-search-preset.active")) {
+        resetSearchUI();
+        renderMode(activeCategory);
       } else {
         searchInput.blur();
       }
@@ -565,8 +670,8 @@
     clearSearch.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
-      searchInput.value = "";
-      renderCategory(activeCategory);
+      resetSearchUI();
+      renderMode(activeCategory);
       searchInput.focus({preventScroll:true});
       requestAnimationFrame(placePanel);
     });
@@ -576,36 +681,31 @@
 
     const tabs = document.createElement("div");
     tabs.className = "apple-emoji-tabs";
-    const recent = makeRecentTab();
-    tabs.appendChild(recent);
-    recent.onclick = event => {
+
+    const recent = makeRailButton("recent","recent",mt("emoji.recent"));
+    recent.classList.add("apple-emoji-recent-tab");
+    recent.addEventListener("pointerdown", event => event.preventDefault());
+    recent.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
       resetSearchUI();
-      renderCategory("recent");
+      renderMode("recent");
       requestAnimationFrame(placePanel);
-    };
-
-    CATEGORY_ORDER.forEach(category => {
-      const representative = representativeItem(category);
-      if (!representative) return;
-      const meta = Object.values(CATEGORY_META).find(item => item.key === category);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "apple-emoji-tab";
-      button.dataset.category = category;
-      button.setAttribute("aria-label", meta?.labelKey ? mt(meta.labelKey) : category);
-      MiniAppIcons.mount(button,category);
-      button.addEventListener("pointerdown", event => event.preventDefault());
-      button.onclick = event => {
-        event.preventDefault();
-        event.stopPropagation();
-        resetSearchUI();
-        renderCategory(category);
-        requestAnimationFrame(placePanel);
-      };
-      tabs.appendChild(button);
     });
+
+    const normal = makeRailButton("normal","smileys",mt("emoji.normal"));
+    normal.classList.add("apple-emoji-normal-tab");
+    normal.addEventListener("pointerdown", event => event.preventDefault());
+    normal.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetSearchUI();
+      renderMode("normal");
+      requestAnimationFrame(placePanel);
+    });
+
+    const custom = makeCustomPlaceholderTab();
+    tabs.append(recent, normal, custom);
 
     root.append(head, searchWrap, grid, tabs);
     return root;
@@ -632,7 +732,7 @@
       panel.replaceWith(nextPanel);
       panel = nextPanel;
       const recent = loadRecent();
-      renderCategory(recent.length ? "recent" : activeCategory);
+      renderMode(recent.length ? "recent" : "normal");
       requestAnimationFrame(placePanel);
     } catch (error) {
       closePanel();

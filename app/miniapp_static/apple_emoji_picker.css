@@ -1,4 +1,4 @@
-/* Beta 0.3.64 — Apple PNG emoji picker with always-visible search. */
+/* Beta 0.3.65 — Telegram-like Apple emoji picker rail, recents and search filters. */
 .apple-emoji-picker-pop{
   position:fixed!important;
   z-index:3400!important;
@@ -51,10 +51,37 @@
   min-height:43px;
   padding:5px 7px 6px;
   display:grid;
-  grid-template-columns:minmax(0,1fr) 30px;
+  grid-template-columns:minmax(112px,1fr) auto 30px;
   align-items:center;
   gap:4px;
   border-bottom:1px solid color-mix(in srgb,var(--text) 7%,transparent);
+}
+.apple-emoji-search-presets{
+  direction:ltr;
+  display:flex;
+  align-items:center;
+  gap:1px;
+  min-width:0;
+}
+.apple-emoji-search-preset{
+  width:29px;
+  height:29px;
+  min-width:29px;
+  padding:0;
+  border:1px solid transparent;
+  border-radius:9px;
+  display:grid;
+  place-items:center;
+  background:transparent;
+  box-shadow:none;
+  font-size:17px;
+  line-height:1;
+  transition:transform .1s ease,background .12s ease,border-color .12s ease;
+}
+.apple-emoji-search-preset:active{transform:scale(.92)}
+.apple-emoji-search-preset.active{
+  background:color-mix(in srgb,var(--accent) 14%,rgba(255,255,255,.025));
+  border-color:color-mix(in srgb,var(--accent) 18%,transparent);
 }
 .apple-emoji-search-input{
   width:100%;
@@ -113,6 +140,28 @@
   padding:5px 1px 4px;
 }
 .apple-emoji-grid::-webkit-scrollbar{display:none}
+.apple-emoji-grid-switch{animation:appleEmojiGridIn .18s cubic-bezier(.2,.8,.2,1)}
+@keyframes appleEmojiGridIn{
+  from{opacity:.35;transform:translateY(5px)}
+  to{opacity:1;transform:none}
+}
+.apple-emoji-section-title{
+  grid-column:1/-1;
+  min-height:31px;
+  display:flex;
+  align-items:flex-end;
+  padding:5px 5px 4px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:650;
+  text-align:start;
+  direction:inherit;
+}
+.apple-emoji-section-title.with-divider{
+  border-top:1px solid color-mix(in srgb,var(--text) 8%,transparent);
+  margin-top:4px;
+  padding-top:7px;
+}
 
 .apple-emoji-item{
   width:100%;
@@ -148,12 +197,12 @@
 .apple-emoji-tabs{
   direction:ltr;
   flex:0 0 auto;
-  min-height:36px;
+  min-height:38px;
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  gap:1px;
-  padding:4px 1px 0;
+  justify-content:flex-start;
+  gap:4px;
+  padding:4px 4px 0;
   border-top:1px solid color-mix(in srgb,var(--text) 8%,transparent);
   overflow-x:auto;
   scrollbar-width:none;
@@ -162,10 +211,10 @@
 .apple-emoji-tab{
   flex:0 0 auto;
   width:34px;
-  height:31px;
+  height:32px;
   padding:3px;
-  border:0;
-  border-radius:9px;
+  border:1px solid transparent;
+  border-radius:50%;
   display:grid;
   place-items:center;
   background:transparent!important;
@@ -183,17 +232,34 @@
   object-fit:contain;
   pointer-events:none;
 }
-.apple-emoji-recent-tab svg{
+.apple-emoji-recent-tab svg,
+.apple-emoji-normal-tab svg{
   width:20px!important;
   height:20px!important;
   fill:none;
   stroke:currentColor;
   stroke-width:1.65;
 }
+.apple-emoji-custom-placeholder{
+  opacity:.92;
+  cursor:default;
+}
+.apple-emoji-custom-bubble{
+  width:25px;
+  height:25px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  border:1px solid color-mix(in srgb,var(--text) 10%,transparent);
+  background:rgba(255,255,255,.045);
+  font-size:16px;
+  line-height:1;
+  overflow:hidden;
+}
 
 .apple-emoji-empty{
   grid-column:1/-1;
-  direction:rtl;
+  direction:auto;
   min-height:140px;
   display:grid;
   place-items:center;
@@ -201,6 +267,11 @@
   color:var(--muted);
   text-align:center;
   font-size:13px;
+}
+.apple-emoji-empty.compact{
+  min-height:54px;
+  padding:12px 10px 10px;
+  border-bottom:1px solid color-mix(in srgb,var(--text) 7%,transparent);
 }
 
 .apple-emoji-loading{
@@ -228,6 +299,13 @@ html.mobile-performance .apple-emoji-picker-pop{
 }
 
 @media(max-width:420px){
+  .apple-emoji-search-wrap{
+    grid-template-columns:minmax(104px,1fr) auto 28px;
+    gap:2px;
+    padding-inline:4px;
+  }
+  .apple-emoji-search-preset{width:27px;height:27px;min-width:27px;font-size:16px}
+  .apple-emoji-search-clear{width:28px;height:28px}
   .apple-emoji-picker-pop{
     width:calc(100vw - 8px)!important;
     max-width:none!important;
@@ -246,4 +324,9 @@ html.mobile-performance .apple-emoji-picker-pop{
 @media(max-width:350px){
   .apple-emoji-grid{grid-template-columns:repeat(8,minmax(0,1fr))}
   .apple-emoji-img{width:31px;height:31px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .apple-emoji-grid-switch{animation:none!important}
+  .apple-emoji-search-preset{transition:none!important}
 }
