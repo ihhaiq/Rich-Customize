@@ -92,6 +92,7 @@ export const editorSessions = table('editor_sessions', {
   pendingAddType: text('pending_add_type'),
   addStep: text('add_step'),
   addPayload: json('add_payload').notNull().default({}),
+  premiumEmojiPack: json('premium_emoji_pack'),
   expectedType: text('expected_type'),
   editField: text('edit_field'),
   headingSize: integer('heading_size'),

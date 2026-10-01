@@ -54,9 +54,12 @@ into monospace. Malformed tags stay text. No arbitrary HTML execution is added.
 
 Insertion updates the existing block storage fields. Imported native blocks
 retain their native structure; editable derived fields are refreshed as well,
-including nested child IDs. No database migration is needed. The temporary
-workflow lives in `editor_sessions.addPayload` and expires with the normal
-2-hour editor session. It is not included in saved pages.
+including nested child IDs. The last successfully loaded pack is cached in
+`editor_sessions.premium_emoji_pack`, so reopening Premium Emoji in the same
+editor session starts at the picker without asking for the link again. The
+cache is cleared when a new `/editor` session is created and expires with the
+normal 2-hour editor session; it is not included in saved pages. The temporary
+workflow itself remains in `editor_sessions.addPayload`.
 
 Callbacks validate private chat, current management message, session user, page
 ownership, workflow stage and a rotating token. Per-user mutation locks reject
@@ -99,14 +102,17 @@ npm install
 npm run test:emoji
 npx tgcloud status
 npx tgcloud diff
+npx tgcloud migrate
 npx tgcloud push
 npx tgcloud webhook sync
 ```
 
-No `tgcloud migrate` is needed for this feature. Do not run `tgcloud fetch` after
-pulling these code changes and before pushing: it can replace local code with the
-currently deployed snapshot. Do not use a forced Git update to discard local
-changes. Keep `.tgcloud/` and credentials out of commits.
+The schema change adds the nullable `editor_sessions.premium_emoji_pack` column,
+so run `npx tgcloud migrate` before the first deploy of this revision. Do not
+run `tgcloud fetch` after pulling these code changes and before pushing: it can
+replace local code with the currently deployed snapshot. Do not use a forced
+Git update to discard local changes. Keep `.tgcloud/` and credentials out of
+commits.
 
 After deploy, test a real pack with more than nine entries, select emoji from
 both tables, paste copied HTML into Arabic/English formatted text, move on two

@@ -170,6 +170,12 @@ test('complete selection, toggle, positioning, cancel, confirm, undo/redo and st
   assert.equal(h.get().undoStack.length, 1);
   await h.session.undoEditorState(1); assert.deepEqual(h.get().blocks, original);
   await h.session.redoEditorState(1); assert.deepEqual(h.get().blocks, committed);
+  assert.equal(h.get().premiumEmojiPack.emojis.length, 60);
+  const packLoads = h.calls.filter((call) => call.method === 'getStickerSet').length;
+  await h.flow.handlePremiumEmojiCallback(h.query('r:emoji:open'));
+  assert.equal(h.get().addPayload.premiumEmoji.stage, 'pack');
+  assert.equal(h.calls.filter((call) => call.method === 'getStickerSet').length, packLoads);
+  await h.press('back');
   const serialized = JSON.parse(JSON.stringify(committed));
   h.blocks.normalizeBlocks(serialized);
   assert.match(JSON.stringify(h.renderer.buildInputRichMessage(serialized)), /custom_emoji/);
