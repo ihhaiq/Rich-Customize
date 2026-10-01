@@ -410,6 +410,11 @@ renderBlocks = function() {
     const scope=document.createElement("div");scope.className="table-scope-switch";
     [["cell","الخلية"],["row","الصف"],["column","العمود"]].forEach(([value,label])=>{const btn=document.createElement("button");btn.type="button";btn.textContent=label;btn.classList.toggle("active",state.scope===value);btn.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();if(state.scope===value)return;state.scope=value;refreshScopeVisuals();haptic();buildMenu({preserve:true});});scope.appendChild(btn);});
     menu.appendChild(scope);
+    const compactLabel=d.is_compact
+      ? (typeof mt==="function"?mt("table.uncompact"):"إلغاء الوضع المضغوط")
+      : (typeof mt==="function"?mt("table.compact"):"وضع مضغوط");
+    menu.appendChild(actionRow(icons.compact,compactLabel,()=>toggleTableFlag("is_compact")));
+    const compactSep=document.createElement("div");compactSep.className="table-tool-sep";menu.appendChild(compactSep);
     const title=document.createElement("div");title.className="table-tool-title";title.textContent="المحاذاة";menu.appendChild(title);
     const representative=state.scope==="row"?cellObject(rows[state.row]?.[0]):state.scope==="column"?cellObject(rows.find(row=>row?.[state.col]!==undefined)?.[state.col]):cell;
     const align=document.createElement("div");align.className="table-align-grid";align.append(
@@ -427,7 +432,6 @@ renderBlocks = function() {
     sep();
     menu.appendChild(actionRow(icons.border,d.is_bordered===false?"إظهار حدود الجدول":"إخفاء حدود الجدول",()=>toggleTableFlag("is_bordered")));
     menu.appendChild(actionRow(icons.stripe,d.is_striped?"إلغاء الصفوف المخططة":"صفوف مخططة",()=>toggleTableFlag("is_striped")));
-    menu.appendChild(actionRow(icons.compact,d.is_compact?"إلغاء الوضع المضغوط":"وضع مضغوط",()=>toggleTableFlag("is_compact")));
     document.body.appendChild(menu);state.menu=menu;positionMenu(pin?{left:pin.left,top:pin.top}:null);requestAnimationFrame(()=>menu.classList.add("show"));
   }
 
