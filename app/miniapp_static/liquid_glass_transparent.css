@@ -1,0 +1,291 @@
+/* Beta 0.3.61 — transparent Liquid Glass refinement.
+   This layer intentionally leaves editor/message content unstyled and applies
+   glass only to navigation chrome, popovers, sheets and interactive controls. */
+
+:root{
+  --liquid-glass-tint:rgba(7,17,31,.24);
+  --liquid-glass-tint-strong:rgba(6,15,28,.34);
+  --liquid-glass-control:rgba(13,27,46,.16);
+  --liquid-glass-control-pressed:rgba(255,255,255,.075);
+  --liquid-glass-line:rgba(225,239,255,.14);
+  --liquid-glass-line-soft:rgba(225,239,255,.075);
+  --liquid-glass-highlight:rgba(255,255,255,.10);
+  --liquid-glass-lowlight:rgba(0,0,0,.12);
+  --liquid-glass-shadow:0 12px 30px rgba(0,0,0,.18),inset 0 1px 0 var(--liquid-glass-highlight),inset 0 -1px 0 var(--liquid-glass-lowlight);
+  --liquid-glass-blur:10px;
+  --liquid-glass-saturation:132%;
+  --liquid-glass-radius:20px;
+  --liquid-glass-transition:140ms cubic-bezier(.2,.8,.2,1);
+}
+
+/* Reusable primitives for future Mini App chrome. Keep content on a separate
+   layer: these classes never change opacity on the element itself. */
+.liquid-glass-surface{
+  border:1px solid var(--liquid-glass-line);
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.010) 38%,rgba(255,255,255,.020) 76%,transparent),
+    var(--liquid-glass-tint);
+  box-shadow:var(--liquid-glass-shadow);
+  backdrop-filter:blur(var(--liquid-glass-blur)) saturate(var(--liquid-glass-saturation)) brightness(1.03);
+  -webkit-backdrop-filter:blur(var(--liquid-glass-blur)) saturate(var(--liquid-glass-saturation)) brightness(1.03);
+  background-clip:padding-box;
+}
+.liquid-glass-panel{background-color:var(--liquid-glass-tint-strong)}
+.liquid-glass-control{
+  border:1px solid var(--liquid-glass-line-soft);
+  background:var(--liquid-glass-control);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045),inset 0 -1px 0 rgba(0,0,0,.08);
+}
+
+/* Primary chrome surfaces. The low-alpha navy tint keeps real content visible
+   through them; blur is intentionally modest for Telegram WebViews. */
+html:root :is(
+  .editor-topbar,
+  .toolbar-bubble,
+  .popup-menu,
+  .text-toolbar-menu,
+  .text-heading-submenu,
+  .text-button-submenu,
+  .table-cell-menu,
+  .telegram-math-editor,
+  .multi-select-bar,
+  .rich-button-dialog,
+  .apple-emoji-picker-pop,
+  .emoji-picker-pop
+){
+  border:1px solid var(--liquid-glass-line)!important;
+  background:
+    linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.010) 38%,rgba(255,255,255,.020) 76%,transparent),
+    var(--liquid-glass-tint)!important;
+  box-shadow:var(--liquid-glass-shadow)!important;
+  backdrop-filter:blur(var(--liquid-glass-blur)) saturate(var(--liquid-glass-saturation)) brightness(1.03)!important;
+  -webkit-backdrop-filter:blur(var(--liquid-glass-blur)) saturate(var(--liquid-glass-saturation)) brightness(1.03)!important;
+  background-clip:padding-box!important;
+}
+
+/* Sheets need a little more body because they can cover most of the screen,
+   while remaining translucent enough to read the underlying page silhouette. */
+html:root .sheet{
+  border-color:var(--liquid-glass-line)!important;
+  background:
+    linear-gradient(155deg,rgba(255,255,255,.035),transparent 36%,rgba(255,255,255,.014)),
+    var(--liquid-glass-tint-strong)!important;
+  box-shadow:0 -10px 28px rgba(0,0,0,.16),inset 0 1px 0 var(--liquid-glass-highlight)!important;
+  backdrop-filter:blur(11px) saturate(130%) brightness(1.02)!important;
+  -webkit-backdrop-filter:blur(11px) saturate(130%) brightness(1.02)!important;
+}
+
+/* Do not make every editor object a glass card. */
+html:root :is(.starter-card,.details-box,.media-placeholder,.table-preview,.sheet-item,.media-picker-card){
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  box-shadow:none!important;
+}
+html:root :is(.starter-card,.details-box,.media-placeholder,.table-preview,.media-picker-card){
+  background:color-mix(in srgb,var(--panel) 68%,transparent)!important;
+  border-color:color-mix(in srgb,var(--text) 8%,transparent)!important;
+}
+html:root .sheet-item{
+  background:rgba(255,255,255,.025)!important;
+  border-color:var(--liquid-glass-line-soft)!important;
+}
+
+/* Header and editor region stay calm. No decorative fake content behind glass. */
+html:root body,
+html:root .editor-head{
+  background-image:none!important;
+}
+html:root .editor-head{
+  background:color-mix(in srgb,var(--bg) 34%,transparent)!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+html:root .editor-topbar{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden!important;
+  border-radius:20px!important;
+}
+
+/* Controls are shallow lenses; the icon/text remains a separate crisp layer. */
+html:root .icon-btn,
+html:root .composer-toolbar.floating-toolbar .toolbar-bubble button,
+html:root :is(.mini-btn,.soft-btn,.fab-ghost,.multi-actions button,.button-style-pill){
+  border:1px solid var(--liquid-glass-line-soft)!important;
+  background:var(--liquid-glass-control)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045),inset 0 -1px 0 rgba(0,0,0,.075)!important;
+  backdrop-filter:blur(5px) saturate(120%)!important;
+  -webkit-backdrop-filter:blur(5px) saturate(120%)!important;
+  color:var(--text);
+  transition:transform var(--liquid-glass-transition),background-color var(--liquid-glass-transition),border-color var(--liquid-glass-transition),box-shadow var(--liquid-glass-transition)!important;
+}
+
+html:root .composer-toolbar.floating-toolbar .toolbar-bubble button{
+  border-color:rgba(225,239,255,.055)!important;
+  background:rgba(10,23,40,.10)!important;
+}
+
+html:root :is(.icon-btn,.composer-toolbar.floating-toolbar .toolbar-bubble button,.mini-btn,.soft-btn,.fab-ghost):active,
+html:root :is(.icon-btn,.composer-toolbar.floating-toolbar .toolbar-bubble button,.mini-btn,.soft-btn,.fab-ghost).is-pressed{
+  background:var(--liquid-glass-control-pressed)!important;
+  border-color:rgba(235,245,255,.16)!important;
+  transform:scale(.96) translateZ(0)!important;
+  filter:none!important;
+}
+
+/* Clear selected state without a neon/glow treatment. */
+html:root .composer-toolbar.floating-toolbar .toolbar-bubble button.active,
+html:root :is(.emoji-picker-tab,.apple-emoji-tab,.text-menu-row,.table-tool-icon,#moreBtn).active{
+  color:var(--accent)!important;
+  background:color-mix(in srgb,var(--accent) 13%,rgba(255,255,255,.035))!important;
+  border-color:color-mix(in srgb,var(--accent) 28%,var(--liquid-glass-line-soft))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 0 0 1px color-mix(in srgb,var(--accent) 7%,transparent)!important;
+}
+
+html:root :is(.icon-btn,.composer-toolbar button,.soft-btn,.fab,.menu-item,.sheet-item):disabled{
+  opacity:.34!important;
+  filter:saturate(.55)!important;
+}
+
+/* Restore an accessible focus signal after the fullscreen reset. */
+html:root :is(button,.menu-item,.sheet-item,.soft-btn,.primary-soft):focus-visible{
+  outline:2px solid color-mix(in srgb,var(--accent) 58%,rgba(255,255,255,.12))!important;
+  outline-offset:2px!important;
+}
+
+/* Popup/list rows remain mostly clear so the panel reads as one sheet of glass,
+   not a stack of frosted cards. */
+html:root :is(.menu-item,.text-menu-row,.table-tool-row){
+  border:1px solid transparent!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+html:root :is(.menu-item,.text-menu-row,.table-tool-row):hover,
+html:root :is(.menu-item,.text-menu-row,.table-tool-row):active{
+  background:rgba(255,255,255,.045)!important;
+  border-color:rgba(255,255,255,.035)!important;
+}
+
+/* Emoji picker: one translucent panel, regular grid, crisp glyphs/images. */
+html:root :is(.emoji-picker-pop,.apple-emoji-picker-pop){
+  max-height:min(446px,calc(var(--visible-vh,100dvh) - 12px))!important;
+  overflow:hidden!important;
+}
+html:root :is(.emoji-picker-grid,.apple-emoji-grid){
+  gap:1px 0!important;
+  padding:6px 3px 5px!important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+html:root :is(.emoji-picker-item,.apple-emoji-item){
+  overflow:visible!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+html:root .emoji-picker-item{font-size:28px!important}
+html:root .apple-emoji-img{width:32px!important;height:32px!important;max-width:100%!important}
+html:root :is(.emoji-picker-tabs,.apple-emoji-tabs){
+  background:rgba(4,12,23,.10)!important;
+  border-top-color:var(--liquid-glass-line-soft)!important;
+}
+html:root :is(.emoji-picker-tab,.apple-emoji-tab){
+  border:1px solid transparent!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  transition:transform var(--liquid-glass-transition),background-color var(--liquid-glass-transition),border-color var(--liquid-glass-transition)!important;
+}
+html:root :is(.emoji-picker-tab,.apple-emoji-tab):active{transform:scale(.94)}
+
+/* Keep the page genuinely visible behind bottom sheets instead of blurring the
+   entire document first. */
+html:root .backdrop{
+  background:rgba(2,7,14,.14)!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+/* The interaction layer previously used a strong 0.90 scale. Keep feedback
+   short and restrained on phone-size controls. */
+html:root button.press-surface.is-pressed,
+html:root .fab.press-surface.is-pressed,
+html:root .icon-btn.press-surface.is-pressed{
+  transform:scale(.96) translateZ(0)!important;
+  filter:none!important;
+}
+html:root :is(.menu-item,.sheet-item,.soft-btn,.primary-soft,.media-picker-card,.starter-card).press-surface.is-pressed{
+  transform:scale(.988) translateY(.5px) translateZ(0)!important;
+  filter:none!important;
+}
+
+/* Telegram Android/iOS performance class: preserve transparency and edge depth,
+   but reduce the sampled blur area. */
+html.mobile-performance:root :is(
+  .editor-topbar,
+  .toolbar-bubble,
+  .popup-menu,
+  .text-toolbar-menu,
+  .text-heading-submenu,
+  .text-button-submenu,
+  .table-cell-menu,
+  .telegram-math-editor,
+  .multi-select-bar,
+  .rich-button-dialog,
+  .apple-emoji-picker-pop,
+  .emoji-picker-pop,
+  .sheet
+){
+  backdrop-filter:blur(6px) saturate(118%)!important;
+  -webkit-backdrop-filter:blur(6px) saturate(118%)!important;
+  box-shadow:0 8px 22px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.075),inset 0 -1px 0 rgba(0,0,0,.10)!important;
+}
+html.mobile-performance:root .icon-btn,
+html.mobile-performance:root .composer-toolbar.floating-toolbar .toolbar-bubble button,
+html.mobile-performance:root :is(.mini-btn,.soft-btn,.fab-ghost){
+  backdrop-filter:blur(3px) saturate(112%)!important;
+  -webkit-backdrop-filter:blur(3px) saturate(112%)!important;
+}
+
+/* Readable fallback for WebViews without backdrop-filter. It is intentionally
+   more opaque because true behind-content sampling is unavailable. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  html:root :is(
+    .editor-topbar,
+    .toolbar-bubble,
+    .popup-menu,
+    .text-toolbar-menu,
+    .text-heading-submenu,
+    .text-button-submenu,
+    .table-cell-menu,
+    .telegram-math-editor,
+    .multi-select-bar,
+    .rich-button-dialog,
+    .apple-emoji-picker-pop,
+    .emoji-picker-pop
+  ){
+    background:rgba(8,18,31,.86)!important;
+  }
+  html:root .sheet{background:rgba(7,16,29,.90)!important}
+  html:root .icon-btn,
+  html:root .composer-toolbar.floating-toolbar .toolbar-bubble button,
+  html:root :is(.mini-btn,.soft-btn,.fab-ghost){background:rgba(18,32,50,.86)!important}
+}
+
+@media(max-width:420px){
+  html:root :is(.emoji-picker-grid,.apple-emoji-grid){grid-template-columns:repeat(9,minmax(0,1fr))!important}
+  html:root :is(.emoji-picker-item,.apple-emoji-item){min-height:38px!important}
+  html:root .apple-emoji-img{width:31px!important;height:31px!important}
+}
+@media(max-width:350px){
+  html:root :is(.emoji-picker-grid,.apple-emoji-grid){grid-template-columns:repeat(8,minmax(0,1fr))!important}
+}
+
+@media(prefers-reduced-motion:reduce){
+  html:root .icon-btn,
+  html:root .composer-toolbar.floating-toolbar .toolbar-bubble button,
+  html:root :is(.mini-btn,.soft-btn,.fab-ghost,.emoji-picker-tab,.apple-emoji-tab){transition:none!important}
+}
