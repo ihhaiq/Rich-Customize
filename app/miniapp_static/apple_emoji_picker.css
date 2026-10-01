@@ -1,4 +1,4 @@
-/* Beta 0.3.17 — fixed Apple PNG emoji picker. */
+/* Beta 0.3.63 — Apple PNG emoji picker with compact search. */
 .apple-emoji-picker-pop{
   position:fixed!important;
   z-index:3400!important;
@@ -32,6 +32,109 @@
   font-size:10px;
   opacity:.55;
   direction:ltr;
+}
+.apple-emoji-head-main{
+  min-width:0;
+  display:flex;
+  align-items:baseline;
+  gap:7px;
+  overflow:hidden;
+}
+.apple-emoji-head-main strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.apple-emoji-head-actions{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  gap:2px;
+  direction:ltr;
+}
+.apple-emoji-search-toggle{
+  width:30px;
+  height:30px;
+  padding:0;
+  border:1px solid transparent;
+  border-radius:10px;
+  display:grid;
+  place-items:center;
+  background:transparent;
+  color:var(--text);
+  transition:background .12s ease,transform .1s ease,border-color .12s ease;
+}
+.apple-emoji-search-toggle svg{
+  width:18px!important;
+  height:18px!important;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.apple-emoji-search-toggle[aria-pressed="true"]{
+  background:color-mix(in srgb,var(--accent) 12%,rgba(255,255,255,.025));
+  border-color:color-mix(in srgb,var(--accent) 18%,transparent);
+  color:var(--accent);
+}
+.apple-emoji-search-toggle:active{transform:scale(.94)}
+
+.apple-emoji-search-wrap{
+  flex:0 0 auto;
+  min-height:43px;
+  padding:5px 7px 6px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 30px;
+  align-items:center;
+  gap:4px;
+  border-bottom:1px solid color-mix(in srgb,var(--text) 7%,transparent);
+  animation:appleEmojiSearchIn .14s ease-out;
+}
+.apple-emoji-search-wrap[hidden]{display:none!important}
+.apple-emoji-search-input{
+  width:100%;
+  min-width:0;
+  height:32px;
+  padding:5px 10px;
+  border:1px solid color-mix(in srgb,var(--text) 9%,transparent);
+  border-radius:11px;
+  outline:0;
+  background:rgba(255,255,255,.035);
+  color:var(--text);
+  caret-color:var(--accent);
+  font-size:13px;
+  line-height:1;
+}
+.apple-emoji-search-input::placeholder{color:var(--muted)}
+.apple-emoji-search-input:focus{
+  border-color:color-mix(in srgb,var(--accent) 30%,rgba(255,255,255,.08));
+  background:rgba(255,255,255,.045);
+}
+.apple-emoji-search-clear{
+  width:30px;
+  height:30px;
+  padding:0;
+  border:0;
+  border-radius:9px;
+  display:grid;
+  place-items:center;
+  background:transparent;
+  color:var(--muted);
+}
+.apple-emoji-search-clear:active{background:rgba(255,255,255,.05)}
+.apple-emoji-search-clear svg{
+  width:17px;
+  height:17px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+}
+@keyframes appleEmojiSearchIn{
+  from{opacity:0;transform:translateY(-3px)}
+  to{opacity:1;transform:none}
 }
 
 .apple-emoji-grid{
