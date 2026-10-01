@@ -103,6 +103,36 @@ function tableRows(block) {
   return [];
 }
 
+function normalizeNativeTableFlags(blocks) {
+  const copied = clone(blocks);
+
+  const visit = (items) => {
+    for (const block of Array.isArray(items) ? items : []) {
+      if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
+      const data = block.data;
+      if (
+        String(block.type || '') === 'table'
+        && data
+        && typeof data === 'object'
+        && !Array.isArray(data)
+        && data.native
+        && data.native_data
+        && typeof data.native_data === 'object'
+        && !Array.isArray(data.native_data)
+      ) {
+        const own = (key) => Object.prototype.hasOwnProperty.call(data, key);
+        if (own('is_bordered')) data.native_data.is_bordered = data.is_bordered !== false;
+        if (own('is_striped')) data.native_data.is_striped = Boolean(data.is_striped);
+        if (own('is_compact')) data.native_data.is_compact = Boolean(data.is_compact);
+      }
+      visit(blockChildren(block));
+    }
+  };
+
+  visit(copied);
+  return copied;
+}
+
 function rowWidth(row) {
   let width = 0;
   for (const raw of Array.isArray(row) ? row : []) {
@@ -259,7 +289,7 @@ export function validatePagePayload(payload, current = null) {
   }
 
   return {
-    blocks: clone(blocks),
+    blocks: normalizeNativeTableFlags(blocks),
     buttons: clone(buttons),
     buttonsPerRow,
     buttonsAlign,
