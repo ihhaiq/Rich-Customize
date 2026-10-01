@@ -24,16 +24,20 @@ Finish Choosing lists the current page blocks. Blocks with multiple text fields
 anchor, code and math content are not rich-text insertion targets. Code blocks
 remain literal. Text fields and native media captions are supported.
 
-The selected emoji are inserted as a group at the end of the first Enter-delimited
-line in a temporary block preview. Arrow presses move the group at grapheme
-boundaries, preserve RichText wrappers/links and treat existing custom emoji and
-other atomic nodes as indivisible. Vertical movement uses explicit newlines only.
+The selected emoji initially appear at the end of the first Enter-delimited line
+in a temporary block preview. A numbered emoji selector with ‹ / › chooses the
+active emoji. Each emoji has its own independent position; the four direction
+arrows move only the active emoji. Horizontal presses cross whole words, never
+individual letters. Other selected emoji keep their word/line positions, even
+when the active emoji crosses them. RichText wrappers, links and atomic emoji
+remain intact. Vertical movement uses explicit newlines and word positions.
 Horizontal movement uses the explicit page direction, or the line's first strong
 letter when no direction was set. It follows logical text positions in that
 base direction; it does not attempt to reconstruct Telegram's pixel-level bidi
-layout for mixed-script runs. `Intl.Segmenter` is preferred; V8 without ICU uses
-a conservative fallback that moves non-ASCII runs intact rather than splitting
-compound sequences.
+layout for mixed-script runs. `Intl.Segmenter` supplies word boundaries, checked against safe grapheme
+boundaries. V8 without ICU uses whitespace-delimited words and conservative
+grapheme boundaries so compound sequences are not split. Punctuation and
+whitespace do not require separate arrow presses.
 
 Cancel leaves the draft untouched. Confirm commits the block and one undo
 snapshot in the same session update. Redo is cleared. The ordinary Save button
@@ -73,7 +77,8 @@ localization, session TTL and undo/redo modules; Telegram API and DB I/O are moc
 Tests cover valid/invalid/unavailable packs, 300-emoji pagination, exact table
 shape and callback lengths, copied HTML and Telegram entity offsets, Arabic and
 English movement, combining marks/ZWJ/flags, native imported tables and Details,
-media captions, multi-selection, field selection, cancellation, confirmation,
+media captions, multi-selection, independent emoji positions, word movement, active-emoji switching,
+field selection, cancellation, confirmation,
 JSON storage/reopen rendering, undo/redo, limits, expired/foreign/stale callbacks,
 concurrent clicks and rendering failures. All 20 locale catalogs are checked.
 

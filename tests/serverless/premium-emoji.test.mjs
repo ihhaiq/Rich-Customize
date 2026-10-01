@@ -73,14 +73,14 @@ test('grapheme-safe movement preserves RichText, links, Arabic marks and Enter l
   assert.equal(pos.column, initial.column - 1); // RTL visual-right moves toward logical start.
   let inserted = m.insertEmojiAt(value, [emoji], pos);
   assert.equal(text.plainRichText(inserted).replace('👍👍','👍'), text.plainRichText(value));
-  for (const [lineIndex, line] of m.emojiLines(value).entries()) for (let column = 0; column < line.boundaries.length; column++) {
+  for (const [lineIndex, line] of m.emojiWordLines(value).entries()) for (let column = 0; column < line.boundaries.length; column++) {
     const result = m.insertEmojiAt(value, [emoji], { line: lineIndex, column });
     assert.doesNotThrow(() => JSON.stringify(result));
   }
   pos = m.moveEmojiPosition(value, initial, 'down');
   assert.equal(pos.line, 1);
   pos = m.moveEmojiPosition(value, pos, 'left', false);
-  assert.equal(pos.column, 6);
+  assert.equal(pos.column, 0); // Cross the whole English word.
   const family = '👨‍👩‍👧‍👦';
   assert.equal(m.emojiLines('a' + family + 'b')[0].boundaries.length, 4);
   assert.equal(m.emojiLines(['e', { type: 'bold', text: '\u0301' }])[0].boundaries.length, 2);
@@ -228,7 +228,7 @@ test('table field selection inserts into the chosen cell without losing merge or
   assert.equal(saved.data.rows[0][0].colspan, 2);
   assert.equal(saved.data.rows[0][0].html, '<b>أول</b>');
   assert.equal(saved.data.rows[0][1].align, 'center');
-  assert.equal(h.text.plainRichText(saved.data.rows[0][1].rich_text), 'secon👍d');
+  assert.equal(h.text.plainRichText(saved.data.rows[0][1].rich_text), '👍second');
   assert.equal(saved.data.is_compact, true);
 });
 
@@ -263,4 +263,147 @@ test('all generated text containers and native media keep emoji through normaliz
     h.blocks.normalizeBlocks(reopened);
     assert.match(JSON.stringify(h.renderer.buildInputRichMessage(reopened)), /custom_emoji/);
   }
+});
+
+test('horizontal arrows cross whole Arabic/English words and keep punctuation with the word', async () => {
+  const h = await harness();
+  for (const [source, rtl, backward, forward, expected] of [
+    ['one two three', false, 'left', 'right', [0, 3, 7, 13]],
+    ['مرحبا يا حسين', true, 'right', 'left', [0, 5, 8, 13]],
+    ['hello,   world!  ', false, 'left', 'right', [0, 6, 17]],
+  ]) {
+    assert.deepEqual(h.clone(h.movement.emojiWordLines(source)[0].boundaries), expected);
+    let position = h.movement.initialEmojiPosition(source);
+    for (let i = expected.length - 2; i >= 0; i--) {
+      position = h.movement.moveEmojiPosition(source, position, backward, rtl);
+      assert.equal(position.column, i);
+      const result = h.movement.insertEmojiAt(source, [emoji], position);
+      assert.equal(h.text.plainRichText(result), source.slice(0, expected[i]) + '👍' + source.slice(expected[i]));
+    }
+    position = h.movement.moveEmojiPosition(source, position, forward, rtl);
+    assert.equal(position.column, 1);
+  }
+});
+
+test('two selected emoji move independently across words and lines, switching keeps both positions', async () => {
+  const h = await setup();
+  const block = h.blocks.makeBlock('paragraph', { html: '<b>one two</b> <a href="https://example.com">three</a>\nfour five six' });
+  await h.session.updateEditorSession(1, { blocks: [block] });
+  await h.open(); await h.press('select', 0); await h.press('select', 1);
+  await h.press('finish'); await h.press('block', 0);
+  const flow = () => h.get().addPayload.premiumEmoji;
+  const original = h.clone(h.get().blocks);
+  assert.equal(flow().activeEmoji, 0);
+  assert.deepEqual(flow().positions.map(({ line, column }) => ({ line, column })), [{ line: 0, column: 3 }, { line: 0, column: 3 }]);
+  await h.press('move', 'left');
+  assert.deepEqual(flow().positions.map(({ line, column }) => ({ line, column })), [{ line: 0, column: 2 }, { line: 0, column: 3 }]);
+  const oldMove = h.query('r:emoji:' + flow().token + ':move:left');
+  await h.press('active', 1);
+  await h.flow.handlePremiumEmojiCallback(oldMove); // A stale press must not move the newly active emoji.
+  assert.deepEqual(flow().positions.map(({ line, column }) => ({ line, column })), [{ line: 0, column: 2 }, { line: 0, column: 3 }]);
+  await h.press('move', 'down'); await h.press('move', 'left');
+  assert.deepEqual(flow().positions.map(({ line, column }) => ({ line, column })), [{ line: 0, column: 2 }, { line: 1, column: 2 }]);
+  await h.press('active', 0); await h.press('move', 'left');
+  assert.deepEqual(flow().positions.map(({ line, column }) => ({ line, column })), [{ line: 0, column: 1 }, { line: 1, column: 2 }]);
+  assert.deepEqual(h.get().blocks, original);
+  const view = h.flow.premiumEmojiView(h.get(), 'ar');
+  const selectors = view.blocks.filter(b => b.type === 'table' && b.cells.length === 1);
+  assert.equal(selectors.length, 1);
+  assert.match(JSON.stringify(selectors[0]), /1\/2/);
+  await h.press('confirm');
+  const rendered = h.renderer.buildInputRichMessage(h.get().blocks);
+  assert.equal(h.text.plainRichText(rendered.blocks[0].text), 'one👍 two three\nfour five👨‍👩‍👧‍👦 six');
+  assert.match(JSON.stringify(rendered), /https:\/\/example.com/);
+  assert.equal(h.get().undoStack.length, 1);
+  await h.session.undoEditorState(1); assert.deepEqual(h.get().blocks, original);
+  await h.session.redoEditorState(1);
+  assert.equal(h.text.plainRichText(h.renderer.buildInputRichMessage(h.get().blocks).blocks[0].text), 'one👍 two three\nfour five👨‍👩‍👧‍👦 six');
+});
+
+test('independent emoji may cross without moving stationary emoji or duplicating text', async () => {
+  const h = await harness();
+  const second = { ...emoji, custom_emoji_id: '123', alternative_text: '🙂' };
+  const source = [{ type: 'italic', text: 'alpha beta gamma' }];
+  const value = h.movement.insertPositionedEmojis(source, [
+    { emoji, position: { line: 0, column: 3 } },
+    { emoji: second, position: { line: 0, column: 1 } },
+  ]);
+  assert.equal(h.text.plainRichText(value), 'alpha🙂 beta gamma👍');
+  const tied = h.movement.insertPositionedEmojis(source, [
+    { emoji, position: { line: 0, column: 1 } },
+    { emoji: second, position: { line: 0, column: 1 } },
+  ]);
+  assert.equal(h.text.plainRichText(tied), 'alpha👍🙂 beta gamma');
+});
+
+test('word fallback without Intl and in-flight legacy previews keep safe independent positions', async () => {
+  const fallback = await harness({ intl: {} });
+  const value = 'عَرَبِي 👨‍👩‍👧‍👦 English';
+  const position = fallback.movement.moveEmojiPosition(value, fallback.movement.initialEmojiPosition(value), 'left', false);
+  assert.equal(fallback.text.plainRichText(fallback.movement.insertEmojiAt(value, [emoji], position)), 'عَرَبِي 👨‍👩‍👧‍👦👍 English');
+  const h = await setup();
+  await h.open(); await h.press('select', 0); await h.press('select', 1);
+  await h.press('finish'); await h.press('block', 0);
+  delete h.get().addPayload.premiumEmoji.positions;
+  delete h.get().addPayload.premiumEmoji.activeEmoji;
+  h.get().addPayload.premiumEmoji.position = { line: 0, column: 900 }; // Old character index.
+  await h.press('move', 'right');
+  const flow = h.get().addPayload.premiumEmoji;
+  assert.equal(flow.positions.length, 2);
+  assert.equal(flow.activeEmoji, 0);
+  assert.equal(flow.position, undefined);
+  assert.notEqual(flow.positions[0].column, flow.positions[1].column);
+  await h.press('cancel');
+  assert.equal(h.get().undoStack.length, 0);
+});
+
+test('block management preview exposes Reorder emoji and reorders one existing emoji independently', async () => {
+  const h = await setup();
+  const second = { ...emoji, custom_emoji_id: '123', alternative_text: '🙂' };
+  const rich = ['one ', emoji, ' two ', second, ' three'];
+  const block = h.blocks.makeBlock('paragraph', {
+    text: h.text.plainRichText(rich),
+    rich_text: rich,
+    html: h.text.richTextToHtml(rich),
+  });
+  await h.session.updateEditorSession(1, { blocks: [block] });
+  const keyboard = h.ui.buildBlockEditorKeyboard(block, [block], 'ar');
+  const reorderButton = keyboard.inline_keyboard.flat().find((button) => button.callback_data?.startsWith('r:emoji:reorder:'));
+  assert.ok(reorderButton);
+  assert.equal(reorderButton.text, 'إعادة ترتيب الإيموجي');
+  await h.flow.handlePremiumEmojiCallback(h.query(reorderButton.callback_data));
+  let flow = h.get().addPayload.premiumEmoji;
+  assert.equal(flow.stage, 'reorder');
+  assert.equal(flow.reorderEntries.length, 2);
+  assert.equal(flow.reorderActive, 0);
+  const previewBefore = JSON.stringify(h.flow.premiumEmojiView(h.get(), 'ar'));
+  await h.press('reorder_move', 'left');
+  flow = h.get().addPayload.premiumEmoji;
+  assert.equal(flow.reorderActive, 0);
+  assert.notDeepEqual(flow.reorderPositions[0], flow.reorderPositions[1]);
+  const previewAfter = JSON.stringify(h.flow.premiumEmojiView(h.get(), 'ar'));
+  assert.notEqual(previewAfter, previewBefore);
+  await h.press('reselect', 1);
+  assert.equal(h.get().addPayload.premiumEmoji.reorderActive, 1);
+  const firstPosition = h.clone(h.get().addPayload.premiumEmoji.reorderPositions[0]);
+  await h.press('reorder_move', 'down');
+  assert.deepEqual(h.get().addPayload.premiumEmoji.reorderPositions[0], firstPosition);
+  await h.press('reorder_cancel');
+  assert.deepEqual(h.clone(h.get().blocks), h.clone([block]));
+  assert.equal(h.get().undoStack.length, 0);
+
+  await h.flow.handlePremiumEmojiCallback(h.query(reorderButton.callback_data));
+  await h.press('reselect', 0);
+  await h.press('reorder_move', 'left');
+  await h.press('reorder_confirm');
+  const committed = h.get().blocks[0];
+  assert.equal(h.get().state, 'managing');
+  assert.equal(h.get().undoStack.length, 1);
+  assert.match(h.text.richTextToHtml(committed.data.rich_text), /custom-emoji|tg-emoji/);
+  assert.equal(h.text.plainRichText(committed.data.rich_text).split('👍').length - 1, 1);
+  assert.equal(h.text.plainRichText(committed.data.rich_text).split('🙂').length - 1, 1);
+  await h.session.undoEditorState(1);
+  assert.deepEqual(h.clone(h.get().blocks), h.clone([block]));
+  await h.session.redoEditorState(1);
+  assert.equal(h.text.plainRichText(h.get().blocks[0].data.rich_text).split('👍').length - 1, 1);
 });

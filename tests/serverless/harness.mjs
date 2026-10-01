@@ -4,9 +4,9 @@ import vm from 'node:vm';
 
 // Dependency-free isolated V8 harness. Only Telegram API and DB I/O are mocked;
 // editor, rendering, localization, session TTL and undo/redo run real modules.
-export async function harness() {
+export async function harness({ intl = Intl } = {}) {
   const root = path.resolve(import.meta.dirname, '../..');
-  const context = vm.createContext({ console, Intl, Date, Math, JSON, setTimeout, clearTimeout, crypto: globalThis.crypto });
+  const context = vm.createContext({ console, Intl: intl, Date, Math, JSON, setTimeout, clearTimeout, crypto: globalThis.crypto });
   const records = {};
   const calls = [];
   const tables = {};
@@ -76,8 +76,9 @@ export async function harness() {
     import * as text from 'lib/rich-text'; import * as movement from 'lib/premium-emoji-text';
     import * as targets from 'lib/editor-emoji-targets'; import * as blocks from 'lib/editor-blocks';
     import * as renderer from 'lib/editor-renderer'; import * as session from 'lib/editor-session';
+    import * as ui from 'lib/editor-block-ui';
     import * as i18n from 'lib/i18n'; import * as guard from 'lib/editor-guard';
-    export { flow, text, movement, targets, blocks, renderer, session, i18n, guard };`, { context });
+    export { flow, text, movement, targets, blocks, renderer, session, ui, i18n, guard };`, { context });
   await entry.link((name) => load(name));
   await entry.evaluate();
   return { ...entry.namespace, records, calls, apiState, clone };
