@@ -1,4 +1,4 @@
-// Beta 0.3.65 — Telegram-like emoji rail, recents and mood search filters.
+// Beta 0.3.66 — reliable emoji rail switching + Telegram custom emoji preview.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -333,6 +333,10 @@
   }
 
   function closePanel() {
+    const objectUrl = panel?.querySelector?.(".apple-emoji-custom-bubble")?.dataset?.objectUrl;
+    if (objectUrl) {
+      try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+    }
     panel?.remove?.();
     panel = null;
     emojiBtn.classList.remove("active");
@@ -557,6 +561,44 @@
     panel.querySelectorAll(".apple-emoji-search-preset").forEach(button => button.classList.remove("active"));
   }
 
+  async function hydrateCustomEmojiPreview(button) {
+    const bubble = button?.querySelector?.(".apple-emoji-custom-bubble");
+    if (!bubble || bubble.dataset.loaded === "1") return;
+
+    const initData = String(window.Telegram?.WebApp?.initData || "");
+    if (!initData) return;
+
+    try {
+      const response = await fetch(`/miniapp/api/custom-emoji/${encodeURIComponent(CUSTOM_EMOJI_FALLBACK_ID)}`, {
+        method:"GET",
+        headers:{"X-Telegram-Init-Data":initData},
+        cache:"force-cache",
+        credentials:"same-origin",
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      if (!blob.size) throw new Error("empty_custom_emoji_preview");
+
+      const url = URL.createObjectURL(blob);
+      const img = document.createElement("img");
+      img.className = "apple-emoji-custom-img";
+      img.alt = "👤";
+      img.decoding = "async";
+      img.draggable = false;
+      img.addEventListener("load", () => {
+        const previous = bubble.dataset.objectUrl;
+        bubble.replaceChildren(img);
+        bubble.dataset.loaded = "1";
+        bubble.dataset.objectUrl = url;
+        if (previous) URL.revokeObjectURL(previous);
+      }, {once:true});
+      img.addEventListener("error", () => URL.revokeObjectURL(url), {once:true});
+      img.src = url;
+    } catch (_) {
+      // Keep the regular 👤 fallback when Telegram cannot return the preview.
+    }
+  }
+
   function makeRailButton(mode, icon, label) {
     const button = document.createElement("button");
     button.type = "button";
@@ -574,17 +616,11 @@
     button.className = "apple-emoji-tab apple-emoji-custom-placeholder";
     button.dataset.customEmojiId = CUSTOM_EMOJI_FALLBACK_ID;
     button.setAttribute("aria-label", mt("emoji.custom_placeholder"));
-    button.setAttribute("aria-disabled", "true");
-    button.tabIndex = -1;
     const bubble = document.createElement("span");
     bubble.className = "apple-emoji-custom-bubble";
     bubble.textContent = "👤";
     bubble.dataset.customEmojiId = CUSTOM_EMOJI_FALLBACK_ID;
     button.appendChild(bubble);
-    button.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-    });
     return button;
   }
 
@@ -682,30 +718,31 @@
     const tabs = document.createElement("div");
     tabs.className = "apple-emoji-tabs";
 
+    const activateMode = (mode, event) => {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      resetSearchUI();
+      renderMode(mode);
+      requestAnimationFrame(placePanel);
+    };
+
     const recent = makeRailButton("recent","recent",mt("emoji.recent"));
     recent.classList.add("apple-emoji-recent-tab");
-    recent.addEventListener("pointerdown", event => event.preventDefault());
-    recent.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-      resetSearchUI();
-      renderMode("recent");
-      requestAnimationFrame(placePanel);
-    });
+    recent.addEventListener("click", event => activateMode("recent", event));
 
     const normal = makeRailButton("normal","smileys",mt("emoji.normal"));
     normal.classList.add("apple-emoji-normal-tab");
-    normal.addEventListener("pointerdown", event => event.preventDefault());
-    normal.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-      resetSearchUI();
-      renderMode("normal");
-      requestAnimationFrame(placePanel);
-    });
+    normal.addEventListener("click", event => activateMode("normal", event));
 
     const custom = makeCustomPlaceholderTab();
+    custom.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      hydrateCustomEmojiPreview(custom);
+    });
+
     tabs.append(recent, normal, custom);
+    requestAnimationFrame(() => hydrateCustomEmojiPreview(custom));
 
     root.append(head, searchWrap, grid, tabs);
     return root;
