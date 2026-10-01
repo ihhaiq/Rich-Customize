@@ -1,4 +1,4 @@
-/* Beta 0.3.63 — Apple PNG emoji picker with compact search. */
+/* Beta 0.3.64 — Apple PNG emoji picker with always-visible search. */
 .apple-emoji-picker-pop{
   position:fixed!important;
   z-index:3400!important;
@@ -46,41 +46,6 @@
   text-overflow:ellipsis;
   white-space:nowrap;
 }
-.apple-emoji-head-actions{
-  flex:0 0 auto;
-  display:flex;
-  align-items:center;
-  gap:2px;
-  direction:ltr;
-}
-.apple-emoji-search-toggle{
-  width:30px;
-  height:30px;
-  padding:0;
-  border:1px solid transparent;
-  border-radius:10px;
-  display:grid;
-  place-items:center;
-  background:transparent;
-  color:var(--text);
-  transition:background .12s ease,transform .1s ease,border-color .12s ease;
-}
-.apple-emoji-search-toggle svg{
-  width:18px!important;
-  height:18px!important;
-  fill:none;
-  stroke:currentColor;
-  stroke-width:1.8;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-}
-.apple-emoji-search-toggle[aria-pressed="true"]{
-  background:color-mix(in srgb,var(--accent) 12%,rgba(255,255,255,.025));
-  border-color:color-mix(in srgb,var(--accent) 18%,transparent);
-  color:var(--accent);
-}
-.apple-emoji-search-toggle:active{transform:scale(.94)}
-
 .apple-emoji-search-wrap{
   flex:0 0 auto;
   min-height:43px;
@@ -90,9 +55,7 @@
   align-items:center;
   gap:4px;
   border-bottom:1px solid color-mix(in srgb,var(--text) 7%,transparent);
-  animation:appleEmojiSearchIn .14s ease-out;
 }
-.apple-emoji-search-wrap[hidden]{display:none!important}
 .apple-emoji-search-input{
   width:100%;
   min-width:0;
@@ -131,10 +94,6 @@
   stroke:currentColor;
   stroke-width:1.8;
   stroke-linecap:round;
-}
-@keyframes appleEmojiSearchIn{
-  from{opacity:0;transform:translateY(-3px)}
-  to{opacity:1;transform:none}
 }
 
 .apple-emoji-grid{

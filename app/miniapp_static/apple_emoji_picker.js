@@ -1,4 +1,4 @@
-// Beta 0.3.63 — Apple emoji picker with local multilingual keyword search.
+// Beta 0.3.64 — Apple emoji picker with always-visible multilingual search.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -480,14 +480,10 @@
     renderItems(searchCatalog(value), mt("emoji.search_empty"));
   }
 
-  function resetSearchUI({hide=true} = {}) {
+  function resetSearchUI() {
     if (!panel) return;
-    const wrap = panel.querySelector(".apple-emoji-search-wrap");
     const input = panel.querySelector(".apple-emoji-search-input");
-    const toggle = panel.querySelector(".apple-emoji-search-toggle");
     if (input) input.value = "";
-    if (wrap && hide) wrap.hidden = true;
-    toggle?.setAttribute("aria-pressed", hide ? "false" : "true");
   }
 
   function makeRecentTab() {
@@ -523,21 +519,10 @@
     badge.textContent = mt("emoji.apple");
     headMain.append(title, badge);
 
-    const headActions = document.createElement("div");
-    headActions.className = "apple-emoji-head-actions";
-    const searchToggle = document.createElement("button");
-    searchToggle.type = "button";
-    searchToggle.className = "apple-emoji-search-toggle";
-    searchToggle.setAttribute("aria-label", mt("emoji.search"));
-    searchToggle.setAttribute("title", mt("emoji.search"));
-    searchToggle.setAttribute("aria-pressed", "false");
-    MiniAppIcons.mount(searchToggle, "search");
-    headActions.appendChild(searchToggle);
-    head.append(headMain, headActions);
+    head.append(headMain);
 
     const searchWrap = document.createElement("div");
     searchWrap.className = "apple-emoji-search-wrap";
-    searchWrap.hidden = true;
 
     const searchInput = document.createElement("input");
     searchInput.type = "search";
@@ -564,25 +549,6 @@
       });
     };
 
-    searchToggle.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-      const opening = searchWrap.hidden;
-      searchWrap.hidden = !opening;
-      searchToggle.setAttribute("aria-pressed", opening ? "true" : "false");
-      if (opening) {
-        requestAnimationFrame(() => {
-          searchInput.focus({preventScroll:true});
-          searchInput.select();
-          placePanel();
-        });
-      } else {
-        searchInput.value = "";
-        renderCategory(activeCategory);
-        requestAnimationFrame(placePanel);
-      }
-    });
-
     searchInput.addEventListener("input", runSearch);
     searchInput.addEventListener("keydown", event => {
       if (event.key !== "Escape") return;
@@ -591,8 +557,7 @@
         searchInput.value = "";
         renderCategory(activeCategory);
       } else {
-        searchWrap.hidden = true;
-        searchToggle.setAttribute("aria-pressed", "false");
+        searchInput.blur();
       }
       requestAnimationFrame(placePanel);
     });
