@@ -1,4 +1,5 @@
 import { api } from 'sdk';
+import { handlePremiumEmojiCallback } from 'lib/editor-premium-emoji';
 import { openEditor } from 'lib/editor-home';
 import { handleDeveloperCallback } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
@@ -26,6 +27,7 @@ function isPublishEditorCallback(data) {
 }
 
 async function routeNonPublishEditorCallback(query) {
+  if (await handlePremiumEmojiCallback(query)) return true;
   if (await handleEditorPageCallback(query)) return true;
   if (await handleEditorButtonCallback(query)) return true;
   if (await handleEditorBlockCallback(query)) return true;
@@ -71,6 +73,7 @@ export default async function (query, ctx = {}) {
       }
       if (locked.value) return;
     } else {
+      if (await handlePremiumEmojiCallback(query)) return;
       if (await handleEditorPageCallback(query)) return;
       if (await handleEditorButtonCallback(query)) return;
       if (await handlePublishCallback(query)) return;

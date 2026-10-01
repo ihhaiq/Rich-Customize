@@ -22,6 +22,7 @@ import { logError } from 'lib/error-log';
 import { handleMiniAppBridgeMessage } from 'lib/miniapp-bridge';
 import { handleMiniAppUserPickerShared } from 'lib/miniapp-user-picker';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
+import { handlePremiumEmojiMessage } from 'lib/editor-premium-emoji';
 import { handleEditorCoreMessage } from 'lib/editor-core';
 import { handleEditorPageMessage } from 'lib/editor-pages';
 import { handleEditorButtonMessage } from 'lib/editor-buttons';
@@ -88,6 +89,7 @@ export default async function (message, ctx = {}) {
       // was handled above.
       if (String(message?.chat?.type || '') !== 'private') return;
 
+      if (await handlePremiumEmojiMessage(message)) return;
       if (await handleEditorBlockMessage(message)) return;
       if (await handleEditorButtonMessage(message)) return;
       if (await handleEditorPageMessage(message)) return;

@@ -7,6 +7,7 @@
     "@tgcloud/cli": "^0.1.2"
   },
   "scripts": {
+    "test:emoji": "node --experimental-vm-modules --test tests/serverless/premium-emoji.test.mjs",
     "status": "tgcloud status",
     "deploy": "tgcloud push",
     "run": "tgcloud run",
