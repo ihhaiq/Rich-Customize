@@ -172,8 +172,11 @@ html:root :is(.emoji-picker-pop,.apple-emoji-picker-pop){
   overflow:hidden!important;
 }
 html:root :is(.emoji-picker-grid,.apple-emoji-grid){
+  width:100%!important;
+  min-width:0!important;
   gap:1px 0!important;
   padding:6px 3px 5px!important;
+  overflow-x:hidden!important;
   overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;
 }
