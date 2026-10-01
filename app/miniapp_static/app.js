@@ -140,6 +140,43 @@ async function parseApiResponse(res){
   }
   return data;
 }
+async function apiFetch(path,options={}){
+  const method=String(options?.method||"GET").toUpperCase();
+  const retryable=method==="GET"||method==="HEAD";
+  const attempts=retryable?3:1;
+  let lastError=null;
+
+  for(let attempt=0;attempt<attempts;attempt+=1){
+    try{
+      const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})},cache:"no-store"});
+      if(retryable&&[502,503,504].includes(Number(res.status||0))&&attempt<attempts-1){
+        await new Promise(resolve=>setTimeout(resolve,350*(2**attempt)));
+        continue;
+      }
+      return res;
+    }catch(error){
+      lastError=error;
+      const message=String(error?.message||"");
+      const transient=error?.name==="TypeError"
+        || error?.name==="AbortError"
+        || /failed to fetch|network(?:error| request failed)|load failed/i.test(message);
+      if(!retryable||!transient||attempt>=attempts-1)break;
+      await new Promise(resolve=>setTimeout(resolve,350*(2**attempt)));
+    }
+  }
+
+  if(lastError&&typeof lastError==="object"){
+    try{
+      if(!lastError.code)lastError.code="NETWORK_FETCH_FAILED";
+      lastError.api_attempts=attempts;
+    }catch(_){}
+    throw lastError;
+  }
+  const error=new Error("Network request failed");
+  error.code="NETWORK_FETCH_FAILED";
+  error.api_attempts=attempts;
+  throw error;
+}
 async function pollBridge(requestId){
   const started=Date.now();
   const deadline=started+65000;
@@ -190,7 +227,7 @@ async function pollBridge(requestId){
 }
 async function api(path,options={}){
   try{
-    const res=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})},cache:"no-store"});
+    const res=await apiFetch(path,options);
     const data=await parseApiResponse(res);
     if(res.status===202&&data?.request_id){
       const autoLock=Boolean(waitOverlay&&!waitOverlay.isActive());
@@ -207,6 +244,7 @@ async function api(path,options={}){
           source:"api",
           endpoint:String(path||"").split("?")[0],
           method:String(options?.method||"GET").toUpperCase(),
+          attempts:Number(error?.api_attempts||1),
         });
       }catch(_){}
     }
