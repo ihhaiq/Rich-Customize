@@ -699,7 +699,7 @@ export async function bridgeRequestRow(db, id, userId) {
   return row;
 }
 
-export async function reactBridgeMessageSuccess(env, message) {
+export async function reactBridgeMessage(env, message, emoji = '✅') {
   const chatId = Number(message?.chat?.id || 0);
   const messageId = Number(message?.message_id || 0);
   if (!chatId || !messageId) return false;
@@ -707,14 +707,22 @@ export async function reactBridgeMessageSuccess(env, message) {
     await telegramJson(env, 'setMessageReaction', {
       chat_id: chatId,
       message_id: messageId,
-      reaction: [{ type: 'emoji', emoji: '✅' }],
+      reaction: [{ type: 'emoji', emoji: String(emoji || '✅') }],
       is_big: false,
     });
     return true;
   } catch (error) {
-    console.warn('Could not react to sync message', error);
+    console.warn('Could not react to bridge message', emoji, error);
     return false;
   }
+}
+
+export async function reactBridgeMessageSuccess(env, message) {
+  return reactBridgeMessage(env, message, '✅');
+}
+
+export async function reactBridgeMessageFailure(env, message) {
+  return reactBridgeMessage(env, message, '❌');
 }
 
 function syncMentionText(text, env) {
