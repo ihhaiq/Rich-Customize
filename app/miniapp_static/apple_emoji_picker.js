@@ -1,4 +1,4 @@
-// Beta 0.3.70 — Telegram-like pack rail motion and compact picker transitions.
+// Beta 0.3.71 — Telegram-like full emoji category rail + packs.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -113,6 +113,8 @@
 
   let panel = null;
   let activeCategory = "normal";
+  let activeNormalCategory = "smileys";
+  let categoryScrollFrame = 0;
   let activeTarget = null;
   let savedRange = null;
   let savedInputSelection = null;
@@ -760,10 +762,11 @@
     window.setTimeout(() => button?.classList?.remove("apple-emoji-tab-pop"), 220);
   }
 
-  function appendSectionTitle(grid, text, {divider=false} = {}) {
+  function appendSectionTitle(grid, text, {divider=false, category=""} = {}) {
     const heading = document.createElement("div");
     heading.className = "apple-emoji-section-title";
     if (divider) heading.classList.add("with-divider");
+    if (category) heading.dataset.category = category;
     heading.dir = "auto";
     heading.textContent = text;
     grid.appendChild(heading);
@@ -790,22 +793,26 @@
       appendSectionTitle(
         grid,
         meta?.labelKey ? mt(meta.labelKey) : mt("emoji.normal"),
-        {divider: dividerFirst ? first : !first},
+        {divider: dividerFirst ? first : !first, category},
       );
       appendItems(grid, items);
       first = false;
     });
   }
 
-  function setRailActive(mode) {
+  function setRailActive(mode, {animate=true} = {}) {
     if (!panel) return;
     let activeButton = null;
     let changed = false;
 
     panel.querySelectorAll(".apple-emoji-tab").forEach(button => {
-      const matchesMode = button.dataset.mode && button.dataset.mode === mode;
+      const matchesRecent = button.dataset.mode === "recent" && mode === "recent";
+      const matchesCategory = button.dataset.category
+        && mode === "normal"
+        && button.dataset.category === activeNormalCategory;
       const matchesPack = button.dataset.pack && mode === "pack:" + button.dataset.pack;
-      const next = Boolean(matchesMode || matchesPack);
+      const matchesAdd = button.dataset.mode === "add-pack" && mode === "add-pack";
+      const next = Boolean(matchesRecent || matchesCategory || matchesPack || matchesAdd);
       if (next && !button.classList.contains("active")) changed = true;
       button.classList.toggle("active", next);
       if (next) activeButton = button;
@@ -814,7 +821,47 @@
     if (!activeButton) return;
     requestAnimationFrame(() => {
       centerRailTab(activeButton);
-      if (changed) animateRailSelection(activeButton);
+      if (animate && changed) animateRailSelection(activeButton);
+    });
+  }
+
+  function scrollToNormalCategory(category, {smooth=true} = {}) {
+    if (!panel || !CATEGORY_ORDER.includes(category)) return;
+    activeNormalCategory = category;
+
+    const grid = panel.querySelector(".apple-emoji-grid");
+    const heading = grid?.querySelector?.(`.apple-emoji-section-title[data-category="${category}"]`);
+    if (!grid || !heading) {
+      setRailActive("normal");
+      return;
+    }
+
+    const top = Math.max(0, heading.offsetTop - 2);
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    try {
+      grid.scrollTo({top, behavior:smooth && !reduced ? "smooth" : "auto"});
+    } catch (_) {
+      grid.scrollTop = top;
+    }
+    setRailActive("normal");
+  }
+
+  function syncCategoryFromScroll() {
+    if (!panel || panel.dataset.mode !== "normal" || panel.dataset.view !== "normal") return;
+    const grid = panel.querySelector(".apple-emoji-grid");
+    if (!grid) return;
+
+    cancelAnimationFrame(categoryScrollFrame);
+    categoryScrollFrame = requestAnimationFrame(() => {
+      const threshold = grid.scrollTop + 18;
+      let category = CATEGORY_ORDER[0];
+      grid.querySelectorAll(".apple-emoji-section-title[data-category]").forEach(heading => {
+        if (heading.offsetTop <= threshold) category = heading.dataset.category || category;
+      });
+      if (category && category !== activeNormalCategory) {
+        activeNormalCategory = category;
+        setRailActive("normal", {animate:false});
+      }
     });
   }
 
@@ -858,6 +905,7 @@
     } else {
       if (title) title.textContent = mt("emoji.normal");
       appendNormalSections(grid);
+      activeNormalCategory = activeNormalCategory || "smileys";
     }
 
     setRailActive(activeCategory);
@@ -1076,10 +1124,35 @@
     const button = document.createElement("button");
     button.type = "button";
     button.className = "apple-emoji-tab";
-    button.dataset.mode = mode;
+    if (mode) button.dataset.mode = mode;
     button.setAttribute("aria-label", label);
-    if (icon === "recent" || icon === "smileys") MiniAppIcons.mount(button, icon);
-    else button.textContent = icon;
+    try {
+      MiniAppIcons.mount(button, icon);
+    } catch (_) {
+      button.textContent = "•";
+    }
+    return button;
+  }
+
+  function makeCategoryRailButton(category) {
+    const meta = Object.values(CATEGORY_META).find(item => item.key === category);
+    const button = makeRailButton("", category, meta?.labelKey ? mt(meta.labelKey) : category);
+    button.classList.add("apple-emoji-category-tab");
+    button.dataset.category = category;
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetSearchUI();
+
+      if (panel?.dataset.mode !== "normal" || panel?.dataset.view !== "normal") {
+        activeNormalCategory = category;
+        renderMode("normal");
+        requestAnimationFrame(() => scrollToNormalCategory(category, {smooth:false}));
+      } else {
+        scrollToNormalCategory(category, {smooth:true});
+      }
+      requestAnimationFrame(placePanel);
+    });
     return button;
   }
 
@@ -1242,9 +1315,7 @@
     recent.classList.add("apple-emoji-recent-tab");
     recent.addEventListener("click", event => activateMode("recent", event));
 
-    const normal = makeRailButton("normal","smileys",mt("emoji.normal"));
-    normal.classList.add("apple-emoji-normal-tab");
-    normal.addEventListener("click", event => activateMode("normal", event));
+    const categoryButtons = CATEGORY_ORDER.map(category => makeCategoryRailButton(category));
 
     const custom = makeCustomPlaceholderTab();
     custom.addEventListener("click", event => {
@@ -1255,7 +1326,8 @@
       requestAnimationFrame(placePanel);
     });
 
-    tabs.append(recent, normal, custom);
+    tabs.append(recent, ...categoryButtons, custom);
+    grid.addEventListener("scroll", syncCategoryFromScroll, {passive:true});
     root.append(head, searchWrap, grid, tabs);
 
     requestAnimationFrame(() => {
