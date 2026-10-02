@@ -1,4 +1,4 @@
-/* Beta 0.3.62 — clear iOS-like Liquid Glass.
+/* Beta 0.3.69 — clear iOS-like Liquid Glass + optional lightweight no-glass mode.
    Glass stays on UI chrome only. Text, emoji and editor content remain fully
    opaque and sharp; the translucent surface is provided by the container. */
 
@@ -351,4 +351,96 @@ html.mobile-performance:root .composer-toolbar.floating-toolbar .toolbar-bubble 
   html:root :is(.mini-btn,.soft-btn,.fab-ghost,.emoji-picker-tab,.apple-emoji-tab){
     transition:none!important;
   }
+}
+
+
+/* ⚡ Lightweight mode: intentionally simple and cheap to composite.
+   Classic mode keeps the existing Liquid Glass unchanged. */
+html.miniapp-lite-ui:root body{
+  background:var(--bg)!important;
+  background-image:none!important;
+  background-attachment:scroll!important;
+}
+html.miniapp-lite-ui:root :is(
+  .editor-head,
+  .editor-topbar,
+  .toolbar-bubble,
+  .popup-menu,
+  .sheet,
+  .starter-card,
+  .sheet-item,
+  .soft-btn,
+  .primary-soft,
+  .fab,
+  .media-picker-card,
+  .details-box,
+  .media-placeholder,
+  .table-preview,
+  .icon-btn,
+  .composer-toolbar.floating-toolbar .toolbar-bubble button,
+  .mini-btn,
+  .destination-icon,
+  .media-picker-icon,
+  .fab-ghost,
+  .text-toolbar-menu,
+  .text-heading-submenu,
+  .text-button-submenu,
+  .table-cell-menu,
+  .telegram-math-editor,
+  .multi-select-bar,
+  .rich-button-dialog,
+  .apple-emoji-picker-pop,
+  .emoji-picker-pop
+){
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  box-shadow:none!important;
+  filter:none!important;
+}
+html.miniapp-lite-ui:root :is(
+  .editor-topbar,
+  .toolbar-bubble,
+  .popup-menu,
+  .sheet,
+  .starter-card,
+  .media-picker-card,
+  .details-box,
+  .media-placeholder,
+  .table-preview,
+  .apple-emoji-picker-pop,
+  .emoji-picker-pop
+){
+  background:var(--panel)!important;
+  border-color:var(--line)!important;
+}
+html.miniapp-lite-ui:root :is(
+  .sheet-item,
+  .soft-btn,
+  .icon-btn,
+  .mini-btn,
+  .fab-ghost,
+  .destination-icon,
+  .media-picker-icon,
+  .composer-toolbar.floating-toolbar .toolbar-bubble button
+){
+  background:transparent!important;
+  border-color:var(--line)!important;
+}
+html.miniapp-lite-ui:root .primary-soft{
+  background:var(--accent)!important;
+  color:var(--accentText)!important;
+}
+html.miniapp-lite-ui:root .editor-head{
+  background:var(--bg)!important;
+}
+html.miniapp-lite-ui:root :is(.toolbar-bubble:before,.toolbar-bubble:after,.editor-topbar:after,.liquid-glass-toggle:before){
+  display:none!important;
+}
+html.miniapp-lite-ui:root .backdrop{
+  background:rgba(0,0,0,.28)!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+html.miniapp-lite-ui:root .apple-emoji-picker-pop{
+  background:var(--panel)!important;
 }
