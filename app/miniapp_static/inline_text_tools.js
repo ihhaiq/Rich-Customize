@@ -336,7 +336,6 @@
 
   function restoreSelection() {
     if (!savedRange || !activeEditor?.isConnected) return false;
-    activeEditor.focus({preventScroll:true});
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(savedRange.cloneRange());
@@ -573,7 +572,6 @@
       const href = targetPicker?.value || normalizeLink(input.value);
       if (!href) {
         toast(tr("inline.invalid_link", "Enter a valid link beginning with https:// or tg://"));
-        input.focus();
         return;
       }
       closeFloatingMenu();
@@ -593,9 +591,6 @@
     if (targetPicker) menu.append(targetPicker);
     menu.append(input,actions);
     placeNearRect(menu, selectionRect, false);
-    requestAnimationFrame(() => (
-      targetPicker?.value ? targetPicker : input
-    ).focus({preventScroll:true}));
   }
 
   function makeSelectionToolbar() {
@@ -857,7 +852,6 @@
     actions.append(cancel,save);
     menu.append(input,actions);
     placeNearRect(menu, rect, false);
-    requestAnimationFrame(() => input.focus());
   }
 
   function openTitleEditor(token) {
@@ -879,7 +873,6 @@
     actions.append(save);
     menu.append(input,actions);
     placeNearRect(menu, rect, false);
-    requestAnimationFrame(() => {input.focus();input.select();});
   }
 
   async function choosePageForToken(token) {
