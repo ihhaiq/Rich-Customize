@@ -361,7 +361,7 @@ function addBlock(type,at=insertIndex,initialText=""){
   const block=defaultBlock(type);if(initialText&&["paragraph","heading","footer","preformatted","blockquote","pullquote","mathematical_expression"].includes(type))applyText(block,initialText);
   const index=Number.isInteger(at)?Math.max(0,Math.min(at,current.blocks.length)):current.blocks.length;
   current.blocks.splice(index,0,block);normalizePositions();selectedBlockId=block.id;insertIndex=index+1;slashInput.value="";hideMenus();renderBlocks();markDirty();pushHistory();
-  requestAnimationFrame(()=>{const target=blocksEl.querySelector(`[data-id="${block.id}"] textarea,[data-id="${block.id}"] input`);target?.focus();target?.scrollIntoView({block:"center",behavior:"smooth"})});
+  requestAnimationFrame(()=>{const target=blocksEl.querySelector(`[data-id="${block.id}"] textarea,[data-id="${block.id}"] input,[data-id="${block.id}"] [contenteditable="true"]`);target?.scrollIntoView({block:"center",behavior:"smooth"})});
 }
 function deleteBlock(id){const i=current.blocks.findIndex(b=>b.id===id);if(i<0)return;current.blocks.splice(i,1);normalizePositions();selectedBlockId=null;renderBlocks();hideMenus();markDirty();pushHistory()}
 function moveBlock(id,delta){const i=current.blocks.findIndex(b=>b.id===id),j=i+delta;if(i<0||j<0||j>=current.blocks.length)return;[current.blocks[i],current.blocks[j]]=[current.blocks[j],current.blocks[i]];normalizePositions();renderBlocks();markDirty();pushHistory()}
