@@ -115,7 +115,7 @@ const CATEGORIES = {
   media:["photo","video","animation","audio","voice","document","collage","slideshow","map"]
 };
 
-function toast(text){const el=$("toast");el.textContent=text;el.classList.add("show");clearTimeout(el._timer);el._timer=setTimeout(()=>el.classList.remove("show"),1900)}
+function toast(text,duration=1900){const el=$("toast");el.textContent=text;el.classList.add("show");clearTimeout(el._timer);const ms=Math.max(1200,Number(duration)||1900);el._timer=setTimeout(()=>el.classList.remove("show"),ms)}
 function headers(){return {"X-Telegram-Init-Data":tg?.initData||"","Content-Type":"application/json"}}
 function apiError(data,fallback){const error=new Error(data?.error?.message||fallback||"Request failed");if(data?.error?.code)error.code=data.error.code;return error}
 function shouldReportApiError(error){
@@ -126,6 +126,7 @@ function shouldReportApiError(error){
   if(/^HTTP_4\d\d$/.test(code))return false;
   if(/^(INVALID_|EMPTY_)/.test(code))return false;
   if(/^PAGE_(NOT_FOUND|CONFLICT|LIMIT|BUSY)$/.test(code))return false;
+  if(/^PUBLISH_(CHAT_UNAVAILABLE|CHAT_MIGRATED|PRIVATE_UNAVAILABLE|BOT_BLOCKED|RIGHTS_MISSING|RATE_LIMITED|CONTENT_TOO_LARGE|MEDIA_INVALID|BUTTON_INVALID|CONTENT_INVALID|FORBIDDEN)$/.test(code))return false;
   if(/^(BASE_REVISION_REQUIRED|DOCUMENT_REQUIRED|DOCUMENT_TOO_LARGE|USER_MISMATCH|PAGE_MISMATCH)$/.test(code))return false;
   return true;
 }
@@ -598,6 +599,34 @@ function commitPendingComposerText(){
   return true;
 }
 
+function publishErrorMessage(error){
+  const code=String(error?.code||"").toUpperCase();
+  const detail=String(error?.message||"");
+  const retryMatch=detail.match(/retry after\s+(\d+)/i);
+  const seconds=retryMatch?Math.max(1,Number(retryMatch[1])||1):null;
+
+  if(code==="EMPTY_PAGE")return mt("send.add_content");
+  if(code==="PAGE_NOT_FOUND")return mt("send.error_page_not_found");
+  if(code==="PUBLISH_CHAT_UNAVAILABLE")return mt("send.error_chat_unavailable");
+  if(code==="PUBLISH_CHAT_MIGRATED")return mt("send.error_chat_migrated");
+  if(code==="PUBLISH_RIGHTS_MISSING"||code==="PUBLISH_FORBIDDEN")return mt("send.error_rights_missing");
+  if(code==="PUBLISH_PRIVATE_UNAVAILABLE")return mt("send.error_private_unavailable");
+  if(code==="PUBLISH_BOT_BLOCKED")return mt("send.error_bot_blocked");
+  if(code==="PUBLISH_RATE_LIMITED")return mt("send.error_rate_limited",{seconds:seconds||mt("common.shortly")});
+  if(code==="PUBLISH_CONTENT_TOO_LARGE")return mt("send.error_content_too_large");
+  if(code==="PUBLISH_MEDIA_INVALID")return mt("send.error_media_invalid");
+  if(code==="PUBLISH_BUTTON_INVALID")return mt("send.error_button_invalid");
+  if(code==="PUBLISH_CONTENT_INVALID")return mt("send.error_content_invalid");
+  if(code==="BRIDGE_TIMEOUT"||code==="BRIDGE_EXPIRED")return mt("send.error_bridge_retry");
+  if(code==="RATE_LIMITED")return mt("send.error_bridge_busy");
+  return mt("send.error_generic");
+}
+
+function destinationShouldDisappear(error){
+  const code=String(error?.code||"").toUpperCase();
+  return /^(PUBLISH_CHAT_UNAVAILABLE|PUBLISH_CHAT_MIGRATED|PUBLISH_RIGHTS_MISSING|PUBLISH_FORBIDDEN)$/.test(code);
+}
+
 async function openSendPanel(){
   commitPendingComposerText();
   if(!current?.blocks?.length){toast(mt("send.add_content"));return}
@@ -629,9 +658,17 @@ async function sendTo(dest,button){
     closeSheets();
     toast(mt("send.sent_to",{title:dest.title}));
   }catch(error){
-    button.disabled=false;
-    button.innerHTML=old;
-    toast(mt("send.failed",{error:error.message}));
+    const message=publishErrorMessage(error);
+    if(dest.kind==="chat"&&destinationShouldDisappear(error)){
+      button.remove();
+      if(!destinationsEl.querySelector(".sheet-item")){
+        closeSheets();
+      }
+    }else{
+      button.disabled=false;
+      button.innerHTML=old;
+    }
+    toast(message,4300);
   }
 }
 
