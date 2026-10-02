@@ -219,7 +219,6 @@
     pushHistory();
     requestAnimationFrame(() => {
       const target = blocksEl.querySelector(`[data-id="${block.id}"] [contenteditable="true"]`);
-      target?.focus();
       target?.scrollIntoView({block:"center", behavior:"smooth"});
     });
   }
@@ -245,8 +244,6 @@
     pushHistory();
     requestAnimationFrame(() => {
       const target = blocksEl.querySelector(`[data-id="${block.id}"] .details-title-input`);
-      target?.focus();
-      target?.select?.();
       target?.scrollIntoView({block:"center", behavior:"smooth"});
     });
   }
