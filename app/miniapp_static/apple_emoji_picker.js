@@ -1,4 +1,4 @@
-// Beta 0.3.71 — Telegram-like full emoji category rail + packs.
+// Beta 0.3.72 — Telegram-like collapsible emoji wallet: smile opens, recent closes.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -115,6 +115,7 @@
   let activeCategory = "normal";
   let activeNormalCategory = "smileys";
   let categoryScrollFrame = 0;
+  let walletOpen = false;
   let activeTarget = null;
   let savedRange = null;
   let savedInputSelection = null;
@@ -800,6 +801,25 @@
     });
   }
 
+  function setWalletOpen(open, {animate=true} = {}) {
+    if (!panel) return;
+    walletOpen = Boolean(open);
+    const tabs = panel.querySelector(".apple-emoji-tabs");
+    const wallet = panel.querySelector(".apple-emoji-wallet");
+    if (!tabs || !wallet) return;
+
+    tabs.classList.toggle("wallet-open", walletOpen);
+    tabs.classList.toggle("wallet-closed", !walletOpen);
+    wallet.classList.toggle("open", walletOpen);
+    wallet.classList.toggle("closed", !walletOpen);
+    wallet.setAttribute("aria-hidden", walletOpen ? "false" : "true");
+
+    if (!animate || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+      wallet.classList.add("no-motion");
+      requestAnimationFrame(() => wallet?.classList?.remove("no-motion"));
+    }
+  }
+
   function setRailActive(mode, {animate=true} = {}) {
     if (!panel) return;
     let activeButton = null;
@@ -820,7 +840,9 @@
 
     if (!activeButton) return;
     requestAnimationFrame(() => {
-      centerRailTab(activeButton);
+      if (walletOpen || activeButton.classList.contains("apple-emoji-recent-tab") || activeButton.classList.contains("apple-emoji-laughing-tab")) {
+        centerRailTab(activeButton);
+      }
       if (animate && changed) animateRailSelection(activeButton);
     });
   }
@@ -887,6 +909,7 @@
     grid.innerHTML = "";
 
     if (activeCategory === "recent") {
+      setWalletOpen(false);
       if (title) title.textContent = mt("emoji.recent");
       const recent = loadRecent()
         .map(saved => saved.custom_emoji_id
@@ -903,6 +926,7 @@
       else appendEmpty(grid, mt("emoji.recent_empty"), true);
       appendNormalSections(grid, {dividerFirst:true});
     } else {
+      setWalletOpen(true);
       if (title) title.textContent = mt("emoji.normal");
       appendNormalSections(grid);
       activeNormalCategory = activeNormalCategory || "smileys";
@@ -924,6 +948,7 @@
     activeCategory = "pack:" + pack.name;
     panel.dataset.mode = activeCategory;
     panel.dataset.view = "custom-pack";
+    setWalletOpen(true);
     showSearchBar(true);
 
     const grid = panel.querySelector(".apple-emoji-grid");
@@ -944,6 +969,7 @@
   function renderAddPackView() {
     if (!panel) return;
     panel.dataset.view = "add-pack";
+    setWalletOpen(true);
     showSearchBar(false);
     const grid = panel.querySelector(".apple-emoji-grid");
     const title = panel.querySelector(".apple-emoji-category-title");
@@ -1199,12 +1225,12 @@
 
   function syncCustomPackTabs() {
     if (!panel) return;
-    const tabs = panel.querySelector(".apple-emoji-tabs");
-    const addButton = tabs?.querySelector?.(".apple-emoji-custom-placeholder");
-    if (!tabs || !addButton) return;
+    const wallet = panel.querySelector(".apple-emoji-wallet");
+    const addButton = wallet?.querySelector?.(".apple-emoji-custom-placeholder");
+    if (!wallet || !addButton) return;
 
-    tabs.querySelectorAll(".apple-emoji-pack-tab").forEach(button => button.remove());
-    customPacks.forEach(pack => tabs.insertBefore(makeCustomPackTab(pack), addButton));
+    wallet.querySelectorAll(".apple-emoji-pack-tab").forEach(button => button.remove());
+    customPacks.forEach(pack => wallet.insertBefore(makeCustomPackTab(pack), addButton));
 
     const mode = String(panel.dataset.mode || activeCategory || "normal");
     requestAnimationFrame(() => setRailActive(mode));
@@ -1313,26 +1339,63 @@
 
     const recent = makeRailButton("recent","recent",mt("emoji.recent"));
     recent.classList.add("apple-emoji-recent-tab");
-    recent.addEventListener("click", event => activateMode("recent", event));
+    recent.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetSearchUI();
+      setWalletOpen(false);
+      renderMode("recent");
+      requestAnimationFrame(placePanel);
+    });
 
-    const categoryButtons = CATEGORY_ORDER.map(category => makeCategoryRailButton(category));
+    // "Laughing" is the permanent normal-emoji launcher. It opens the wallet
+    // and returns to the Smileys section, matching Telegram's two-stage rail.
+    const laughing = makeCategoryRailButton("smileys");
+    laughing.classList.add("apple-emoji-laughing-tab");
+    laughing.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetSearchUI();
+      setWalletOpen(true);
+      activeNormalCategory = "smileys";
+      if (panel?.dataset.mode !== "normal" || panel?.dataset.view !== "normal") {
+        renderMode("normal");
+        requestAnimationFrame(() => scrollToNormalCategory("smileys", {smooth:false}));
+      } else {
+        scrollToNormalCategory("smileys", {smooth:true});
+      }
+      requestAnimationFrame(placePanel);
+    });
+
+    const wallet = document.createElement("div");
+    wallet.className = "apple-emoji-wallet closed";
+    wallet.setAttribute("aria-hidden","true");
+
+    // Smileys is represented by the permanent laughing button, so the wallet
+    // contains the remaining categories, custom packs and the add-pack button.
+    const categoryButtons = CATEGORY_ORDER
+      .filter(category => category !== "smileys")
+      .map(category => makeCategoryRailButton(category));
 
     const custom = makeCustomPlaceholderTab();
     custom.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
       resetSearchUI();
+      setWalletOpen(true);
       renderAddPackView();
       requestAnimationFrame(placePanel);
     });
 
-    tabs.append(recent, ...categoryButtons, custom);
+    wallet.append(...categoryButtons, custom);
+    tabs.append(recent, laughing, wallet);
     grid.addEventListener("scroll", syncCategoryFromScroll, {passive:true});
     root.append(head, searchWrap, grid, tabs);
 
     requestAnimationFrame(() => {
       hydrateCustomEmojiPreview(custom);
       syncCustomPackTabs();
+      setWalletOpen(panel?.dataset.mode !== "recent", {animate:false});
     });
     return root;
   }
