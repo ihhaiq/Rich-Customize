@@ -1,4 +1,4 @@
-// Beta 0.3.66 — reliable emoji rail switching + Telegram custom emoji preview.
+// Beta 0.3.67 — custom emoji pack loader inside the Telegram-like emoji rail.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -18,7 +18,9 @@
     "https://unpkg.com/emoji-datasource-apple@16.0.0/img/apple/64/",
   ];
   const RECENT_KEY = "rich_customize_apple_recent_emoji";
+  const CUSTOM_PACKS_KEY = "rich_customize_custom_emoji_packs";
   const SEARCH_LIMIT = 180;
+  const CUSTOM_PACK_LIMIT = 20;
   const CUSTOM_EMOJI_FALLBACK_ID = "6046274330164203359";
   const SEARCH_PRESETS = [
     {key:"love", icon:"❤️", emojis:["❤️","🩷","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❤️‍🔥","❤️‍🩹","❣️","💕","💞","💓","💗","💖","💘","💝","😍","🥰","😘","💋"]},
@@ -112,6 +114,9 @@
   let savedInputSelection = null;
   let catalogPromise = null;
   let catalog = null;
+  let customPacks = loadCustomPacks();
+  const customPreviewBlobs = new Map();
+  let customPreviewObserver = null;
 
   function unicodeFromUnified(unified) {
     try {
@@ -241,9 +246,42 @@
   }
 
   function addRecent(item) {
-    const recent = loadRecent().filter(entry => entry.unified !== item.unified);
-    recent.unshift({unified:item.unified, image:item.image, emoji:item.emoji});
+    const customId = String(item?.custom_emoji_id || "");
+    const recent = loadRecent().filter(entry => customId
+      ? String(entry.custom_emoji_id || "") !== customId
+      : String(entry.unified || "") !== String(item.unified || ""));
+    recent.unshift(customId
+      ? {custom_emoji_id:customId, emoji:String(item.emoji || "▫️"), pack_name:String(item.pack_name || "")}
+      : {unified:item.unified, image:item.image, emoji:item.emoji});
     try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, 36))); } catch (_) {}
+  }
+
+  function loadCustomPacks() {
+    try {
+      const value = JSON.parse(localStorage.getItem(CUSTOM_PACKS_KEY) || "[]");
+      if (!Array.isArray(value)) return [];
+      return value
+        .filter(pack => pack && /^[A-Za-z0-9_]{1,64}$/.test(String(pack.name || "")) && Array.isArray(pack.emojis))
+        .slice(0, CUSTOM_PACK_LIMIT);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveCustomPacks() {
+    try {
+      localStorage.setItem(CUSTOM_PACKS_KEY, JSON.stringify(customPacks.slice(0, CUSTOM_PACK_LIMIT)));
+    } catch (_) {}
+  }
+
+  function rememberCustomPack(pack) {
+    if (!pack?.name || !Array.isArray(pack.emojis) || !pack.emojis.length) return;
+    customPacks = [pack, ...customPacks.filter(item => item.name !== pack.name)].slice(0, CUSTOM_PACK_LIMIT);
+    saveCustomPacks();
+  }
+
+  function customPack(name) {
+    return customPacks.find(pack => pack.name === name) || null;
   }
 
   async function fetchCatalogData() {
@@ -333,10 +371,14 @@
   }
 
   function closePanel() {
-    const objectUrl = panel?.querySelector?.(".apple-emoji-custom-bubble")?.dataset?.objectUrl;
-    if (objectUrl) {
-      try { URL.revokeObjectURL(objectUrl); } catch (_) {}
-    }
+    panel?.querySelectorAll?.("[data-object-url]").forEach(node => {
+      const objectUrl = node.dataset.objectUrl;
+      if (objectUrl) {
+        try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+      }
+    });
+    try { customPreviewObserver?.disconnect?.(); } catch (_) {}
+    customPreviewObserver = null;
     panel?.remove?.();
     panel = null;
     emojiBtn.classList.remove("active");
@@ -360,6 +402,62 @@
           activeTarget = editor;
           savedRange = null;
           insertIntoContentEditable(editor, emoji);
+        }
+      });
+    }
+    try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.(); } catch (_) {}
+    if (panel?.dataset.mode === "recent" && panel?.dataset.view !== "search") renderMode("recent");
+  }
+
+  function insertCustomEmojiIntoEditor(editor, item) {
+    if (!editor || !item?.custom_emoji_id) return;
+    editor.focus({preventScroll:true});
+    const sel = window.getSelection();
+    let range = savedRange?.cloneRange?.();
+    if (!range || !editor.contains(range.commonAncestorContainer)) {
+      range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+    }
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    const token = document.createElement("tg-emoji");
+    token.setAttribute("emoji-id", String(item.custom_emoji_id));
+    token.textContent = String(item.emoji || "▫️");
+    token.contentEditable = "false";
+
+    range.deleteContents();
+    range.insertNode(token);
+    const caret = document.createRange();
+    caret.setStartAfter(token);
+    caret.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caret);
+    savedRange = caret.cloneRange();
+    dispatchInput(editor, String(item.emoji || "▫️"));
+  }
+
+  function insertCustomEmoji(item) {
+    addRecent(item);
+    const target = activeTarget;
+    if (target?.isConnected && target.isContentEditable) {
+      insertCustomEmojiIntoEditor(target, item);
+    } else {
+      try {
+        if (target === document.getElementById("slashInput") && typeof commitPendingComposerText === "function") {
+          commitPendingComposerText();
+        }
+      } catch (_) {}
+      if (typeof addBlock === "function" && (!selectedBlockId || !blocksEl?.querySelector?.(`.block[data-id="${selectedBlockId}"] [contenteditable='true']`))) {
+        addBlock("paragraph");
+      }
+      requestAnimationFrame(() => {
+        const editor = blocksEl?.querySelector?.(`.block[data-id="${selectedBlockId}"] .rich-inline-editor,.block[data-id="${selectedBlockId}"] [contenteditable='true']`);
+        if (editor) {
+          activeTarget = editor;
+          savedRange = null;
+          insertCustomEmojiIntoEditor(editor, item);
         }
       });
     }
@@ -395,18 +493,117 @@
     return img;
   }
 
+  function customPreviewBlob(emojiId) {
+    const id = String(emojiId || "");
+    if (!id) return Promise.reject(new Error("missing_custom_emoji_id"));
+    if (!customPreviewBlobs.has(id)) {
+      const initData = String(window.Telegram?.WebApp?.initData || "");
+      if (!initData) return Promise.reject(new Error("missing_init_data"));
+      customPreviewBlobs.set(id, fetch(`/miniapp/api/custom-emoji/${encodeURIComponent(id)}`, {
+        method:"GET",
+        headers:{"X-Telegram-Init-Data":initData},
+        cache:"force-cache",
+        credentials:"same-origin",
+      }).then(async response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (!blob.size) throw new Error("empty_custom_emoji_preview");
+        return blob;
+      }).catch(error => {
+        customPreviewBlobs.delete(id);
+        throw error;
+      }));
+    }
+    return customPreviewBlobs.get(id);
+  }
+
+  async function hydrateCustomPreviewNode(node) {
+    if (!node || node.dataset.loaded === "1" || node.dataset.loading === "1") return;
+    const emojiId = String(node.dataset.customEmojiId || "");
+    if (!emojiId) return;
+    node.dataset.loading = "1";
+    try {
+      const blob = await customPreviewBlob(emojiId);
+      if (!node.isConnected) return;
+      const url = URL.createObjectURL(blob);
+      const img = document.createElement("img");
+      img.className = node.classList.contains("apple-emoji-custom-bubble")
+        ? "apple-emoji-custom-img"
+        : "apple-emoji-pack-img";
+      img.alt = node.dataset.fallback || "▫️";
+      img.decoding = "async";
+      img.draggable = false;
+      img.addEventListener("load", () => {
+        if (!node.isConnected) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        const previous = node.dataset.objectUrl;
+        node.replaceChildren(img);
+        node.dataset.loaded = "1";
+        node.dataset.objectUrl = url;
+        delete node.dataset.loading;
+        if (previous) URL.revokeObjectURL(previous);
+      }, {once:true});
+      img.addEventListener("error", () => {
+        delete node.dataset.loading;
+        URL.revokeObjectURL(url);
+      }, {once:true});
+      img.src = url;
+    } catch (_) {
+      delete node.dataset.loading;
+    }
+  }
+
+  function observeCustomPreview(node) {
+    if (!node) return;
+    if (!("IntersectionObserver" in window)) {
+      hydrateCustomPreviewNode(node);
+      return;
+    }
+    if (!customPreviewObserver) {
+      customPreviewObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          customPreviewObserver?.unobserve(entry.target);
+          hydrateCustomPreviewNode(entry.target);
+        });
+      }, {root:null, rootMargin:"80px"});
+    }
+    customPreviewObserver.observe(node);
+  }
+
+  function makeCustomPreviewNode(item, className = "apple-emoji-pack-preview") {
+    const node = document.createElement("span");
+    node.className = className;
+    node.dataset.customEmojiId = String(item.custom_emoji_id || "");
+    node.dataset.fallback = String(item.emoji || "▫️");
+    node.textContent = String(item.emoji || "▫️");
+    observeCustomPreview(node);
+    return node;
+  }
+
   function appendEmojiButton(grid, item) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "apple-emoji-item";
     button.setAttribute("aria-label", item.name || item.emoji);
     button.title = item.emoji;
-    button.appendChild(makeAppleImage(item, "apple-emoji-img"));
+
+    if (item.custom_emoji_id) {
+      button.classList.add("apple-emoji-custom-item");
+      button.dataset.customEmojiId = String(item.custom_emoji_id);
+      button.appendChild(makeCustomPreviewNode(item));
+    } else {
+      button.appendChild(makeAppleImage(item, "apple-emoji-img"));
+    }
+
     button.addEventListener("pointerdown", event => event.preventDefault());
     button.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
-      insertEmoji(item);
+      if (item.custom_emoji_id) insertCustomEmoji(item);
+      else insertEmoji(item);
     });
     grid.appendChild(button);
   }
@@ -457,16 +654,28 @@
   }
 
   function setRailActive(mode) {
-    panel?.querySelectorAll(".apple-emoji-tab[data-mode]").forEach(button => {
-      button.classList.toggle("active", button.dataset.mode === mode);
+    panel?.querySelectorAll(".apple-emoji-tab").forEach(button => {
+      const matchesMode = button.dataset.mode && button.dataset.mode === mode;
+      const matchesPack = button.dataset.pack && mode === "pack:" + button.dataset.pack;
+      button.classList.toggle("active", Boolean(matchesMode || matchesPack));
     });
   }
 
+  function showSearchBar(show=true) {
+    const wrap = panel?.querySelector?.(".apple-emoji-search-wrap");
+    if (wrap) wrap.hidden = !show;
+  }
+
   function renderMode(mode) {
+    if (String(mode || "").startsWith("pack:")) {
+      renderCustomPack(String(mode).slice(5));
+      return;
+    }
     if (!panel || !catalog) return;
     activeCategory = mode === "recent" ? "recent" : "normal";
     panel.dataset.mode = activeCategory;
     panel.dataset.view = activeCategory;
+    showSearchBar(true);
 
     const grid = panel.querySelector(".apple-emoji-grid");
     const title = panel.querySelector(".apple-emoji-category-title");
@@ -476,7 +685,14 @@
     if (activeCategory === "recent") {
       if (title) title.textContent = mt("emoji.recent");
       const recent = loadRecent()
-        .map(saved => catalog.byUnified.get(saved.unified) || catalog.byEmoji.get(saved.emoji))
+        .map(saved => saved.custom_emoji_id
+          ? {
+              custom_emoji_id:String(saved.custom_emoji_id),
+              emoji:String(saved.emoji || "▫️"),
+              pack_name:String(saved.pack_name || ""),
+              name:String(saved.emoji || "▫️"),
+            }
+          : (catalog.byUnified.get(saved.unified) || catalog.byEmoji.get(saved.emoji)))
         .filter(Boolean);
       if (recent.length) appendItems(grid, recent);
       else appendEmpty(grid, mt("emoji.recent_empty"), true);
@@ -490,6 +706,138 @@
     panel.querySelectorAll(".apple-emoji-search-preset").forEach(button => button.classList.remove("active"));
     grid.scrollTop = 0;
     animateGrid(grid);
+  }
+
+  function renderCustomPack(name) {
+    if (!panel) return;
+    const pack = customPack(name);
+    if (!pack) {
+      renderAddPackView();
+      return;
+    }
+    activeCategory = "pack:" + pack.name;
+    panel.dataset.mode = activeCategory;
+    panel.dataset.view = "custom-pack";
+    showSearchBar(true);
+
+    const grid = panel.querySelector(".apple-emoji-grid");
+    const title = panel.querySelector(".apple-emoji-category-title");
+    if (!grid) return;
+    if (title) title.textContent = pack.title || pack.name;
+    grid.innerHTML = "";
+    appendItems(grid, pack.emojis.map(item => ({
+      ...item,
+      pack_name:pack.name,
+      name:item.emoji || pack.title || pack.name,
+    })));
+    setRailActive(activeCategory);
+    grid.scrollTop = 0;
+    animateGrid(grid);
+  }
+
+  function renderAddPackView() {
+    if (!panel) return;
+    panel.dataset.view = "add-pack";
+    showSearchBar(false);
+    const grid = panel.querySelector(".apple-emoji-grid");
+    const title = panel.querySelector(".apple-emoji-category-title");
+    if (!grid) return;
+    if (title) title.textContent = mt("emoji.pack_add_title");
+    grid.innerHTML = "";
+    setRailActive("add-pack");
+
+    const card = document.createElement("form");
+    card.className = "apple-emoji-pack-form";
+    card.setAttribute("novalidate", "");
+
+    const intro = document.createElement("div");
+    intro.className = "apple-emoji-pack-form-copy";
+    const strong = document.createElement("strong");
+    strong.textContent = mt("emoji.pack_add_title");
+    const hint = document.createElement("span");
+    hint.textContent = mt("emoji.pack_add_hint");
+    intro.append(strong, hint);
+
+    const input = document.createElement("input");
+    input.type = "url";
+    input.inputMode = "url";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.dir = "ltr";
+    input.className = "apple-emoji-pack-link";
+    input.placeholder = mt("emoji.pack_link_placeholder");
+    input.setAttribute("aria-label", mt("emoji.pack_link_placeholder"));
+
+    const submit = document.createElement("button");
+    submit.type = "submit";
+    submit.className = "apple-emoji-pack-submit";
+    submit.textContent = mt("emoji.pack_add");
+
+    const status = document.createElement("div");
+    status.className = "apple-emoji-pack-status";
+    status.setAttribute("role", "status");
+
+    card.append(intro, input, submit, status);
+    grid.appendChild(card);
+    grid.scrollTop = 0;
+    animateGrid(grid);
+
+    card.addEventListener("submit", async event => {
+      event.preventDefault();
+      const value = String(input.value || "").trim();
+      if (!value) {
+        status.textContent = mt("emoji.pack_link_required");
+        input.focus({preventScroll:true});
+        return;
+      }
+      const initData = String(window.Telegram?.WebApp?.initData || "");
+      if (!initData) {
+        status.textContent = mt("emoji.pack_load_failed");
+        return;
+      }
+
+      input.disabled = true;
+      submit.disabled = true;
+      submit.textContent = mt("emoji.pack_loading");
+      status.textContent = "";
+
+      try {
+        const response = await fetch("/miniapp/api/custom-emoji/pack?set=" + encodeURIComponent(value), {
+          method:"GET",
+          headers:{"X-Telegram-Init-Data":initData},
+          cache:"no-store",
+          credentials:"same-origin",
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.ok || !data?.pack) {
+          throw new Error(data?.error || data?.message || "pack_load_failed");
+        }
+        const pack = {
+          name:String(data.pack.name || ""),
+          title:String(data.pack.title || data.pack.name || ""),
+          emojis:(Array.isArray(data.pack.emojis) ? data.pack.emojis : [])
+            .map(item => ({
+              custom_emoji_id:String(item.custom_emoji_id || ""),
+              emoji:String(item.emoji || "▫️"),
+            }))
+            .filter(item => /^\d{5,32}$/.test(item.custom_emoji_id)),
+        };
+        if (!pack.name || !pack.emojis.length) throw new Error("empty_custom_emoji_pack");
+
+        rememberCustomPack(pack);
+        syncCustomPackTabs();
+        resetSearchUI();
+        renderCustomPack(pack.name);
+        try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("success"); } catch (_) {}
+      } catch (_) {
+        status.textContent = mt("emoji.pack_load_failed");
+        input.disabled = false;
+        submit.disabled = false;
+        submit.textContent = mt("emoji.pack_add");
+      }
+    });
+
+    requestAnimationFrame(() => input.focus({preventScroll:true}));
   }
 
   function searchCatalog(query) {
@@ -521,6 +869,7 @@
   function renderSearchItems(items) {
     if (!panel) return;
     panel.dataset.view = "search";
+    showSearchBar(true);
     const grid = panel.querySelector(".apple-emoji-grid");
     const title = panel.querySelector(".apple-emoji-category-title");
     if (!grid) return;
@@ -561,42 +910,9 @@
     panel.querySelectorAll(".apple-emoji-search-preset").forEach(button => button.classList.remove("active"));
   }
 
-  async function hydrateCustomEmojiPreview(button) {
+  function hydrateCustomEmojiPreview(button) {
     const bubble = button?.querySelector?.(".apple-emoji-custom-bubble");
-    if (!bubble || bubble.dataset.loaded === "1") return;
-
-    const initData = String(window.Telegram?.WebApp?.initData || "");
-    if (!initData) return;
-
-    try {
-      const response = await fetch(`/miniapp/api/custom-emoji/${encodeURIComponent(CUSTOM_EMOJI_FALLBACK_ID)}`, {
-        method:"GET",
-        headers:{"X-Telegram-Init-Data":initData},
-        cache:"force-cache",
-        credentials:"same-origin",
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const blob = await response.blob();
-      if (!blob.size) throw new Error("empty_custom_emoji_preview");
-
-      const url = URL.createObjectURL(blob);
-      const img = document.createElement("img");
-      img.className = "apple-emoji-custom-img";
-      img.alt = "👤";
-      img.decoding = "async";
-      img.draggable = false;
-      img.addEventListener("load", () => {
-        const previous = bubble.dataset.objectUrl;
-        bubble.replaceChildren(img);
-        bubble.dataset.loaded = "1";
-        bubble.dataset.objectUrl = url;
-        if (previous) URL.revokeObjectURL(previous);
-      }, {once:true});
-      img.addEventListener("error", () => URL.revokeObjectURL(url), {once:true});
-      img.src = url;
-    } catch (_) {
-      // Keep the regular 👤 fallback when Telegram cannot return the preview.
-    }
+    if (bubble) observeCustomPreview(bubble);
   }
 
   function makeRailButton(mode, icon, label) {
@@ -614,14 +930,51 @@
     const button = document.createElement("button");
     button.type = "button";
     button.className = "apple-emoji-tab apple-emoji-custom-placeholder";
+    button.dataset.mode = "add-pack";
     button.dataset.customEmojiId = CUSTOM_EMOJI_FALLBACK_ID;
     button.setAttribute("aria-label", mt("emoji.custom_placeholder"));
     const bubble = document.createElement("span");
     bubble.className = "apple-emoji-custom-bubble";
     bubble.textContent = "👤";
     bubble.dataset.customEmojiId = CUSTOM_EMOJI_FALLBACK_ID;
+    bubble.dataset.fallback = "👤";
     button.appendChild(bubble);
     return button;
+  }
+
+  function makeCustomPackTab(pack) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "apple-emoji-tab apple-emoji-pack-tab";
+    button.dataset.pack = pack.name;
+    button.setAttribute("aria-label", pack.title || pack.name);
+    const first = pack.emojis?.[0];
+    if (first) {
+      button.appendChild(makeCustomPreviewNode({
+        ...first,
+        pack_name:pack.name,
+      }, "apple-emoji-pack-tab-preview"));
+    } else {
+      button.textContent = "▫️";
+    }
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetSearchUI();
+      renderCustomPack(pack.name);
+      requestAnimationFrame(placePanel);
+    });
+    return button;
+  }
+
+  function syncCustomPackTabs() {
+    if (!panel) return;
+    const tabs = panel.querySelector(".apple-emoji-tabs");
+    const addButton = tabs?.querySelector?.(".apple-emoji-custom-placeholder");
+    if (!tabs || !addButton) return;
+
+    tabs.querySelectorAll(".apple-emoji-pack-tab").forEach(button => button.remove());
+    customPacks.forEach(pack => tabs.insertBefore(makeCustomPackTab(pack), addButton));
   }
 
   function buildPanel() {
@@ -738,13 +1091,18 @@
     custom.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
-      hydrateCustomEmojiPreview(custom);
+      resetSearchUI();
+      renderAddPackView();
+      requestAnimationFrame(placePanel);
     });
 
     tabs.append(recent, normal, custom);
-    requestAnimationFrame(() => hydrateCustomEmojiPreview(custom));
-
     root.append(head, searchWrap, grid, tabs);
+
+    requestAnimationFrame(() => {
+      hydrateCustomEmojiPreview(custom);
+      syncCustomPackTabs();
+    });
     return root;
   }
 

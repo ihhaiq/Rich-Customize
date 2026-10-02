@@ -1,4 +1,4 @@
-/* Beta 0.3.66 — reliable rail switching + Telegram custom emoji preview. */
+/* Beta 0.3.67 — Telegram-like custom emoji pack loader and persistent pack rail. */
 .apple-emoji-picker-pop{
   position:fixed!important;
   z-index:3400!important;
@@ -205,7 +205,9 @@
   padding:4px 4px 0;
   border-top:1px solid color-mix(in srgb,var(--text) 8%,transparent);
   overflow-x:auto;
+  overflow-y:hidden;
   scrollbar-width:none;
+  scroll-snap-type:x proximity;
 }
 .apple-emoji-tabs::-webkit-scrollbar{display:none}
 .apple-emoji-tab{
@@ -258,10 +260,41 @@
   line-height:1;
   overflow:hidden;
 }
-.apple-emoji-custom-img{
+.apple-emoji-custom-img,
+.apple-emoji-pack-tab-preview img{
   display:block;
   width:23px;
   height:23px;
+  object-fit:contain;
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+.apple-emoji-pack-tab-preview{
+  width:25px;
+  height:25px;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  border-radius:50%;
+  font-size:16px;
+}
+.apple-emoji-pack-tab{
+  overflow:hidden;
+}
+.apple-emoji-pack-preview{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  font-size:26px;
+  line-height:1;
+}
+.apple-emoji-pack-img{
+  display:block;
+  width:33px;
+  height:33px;
   object-fit:contain;
   pointer-events:none;
   user-select:none;
@@ -284,6 +317,71 @@
   padding:12px 10px 10px;
   border-bottom:1px solid color-mix(in srgb,var(--text) 7%,transparent);
 }
+
+.apple-emoji-pack-form{
+  grid-column:1/-1;
+  align-self:start;
+  width:100%;
+  min-height:190px;
+  padding:18px 12px 14px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:10px;
+}
+.apple-emoji-pack-form-copy{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  text-align:start;
+}
+.apple-emoji-pack-form-copy strong{
+  color:var(--text);
+  font-size:14px;
+  font-weight:700;
+}
+.apple-emoji-pack-form-copy span{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.5;
+}
+.apple-emoji-pack-link{
+  width:100%;
+  height:38px;
+  padding:7px 11px;
+  border:1px solid color-mix(in srgb,var(--text) 10%,transparent);
+  border-radius:12px;
+  outline:0;
+  background:rgba(255,255,255,.035);
+  color:var(--text);
+  caret-color:var(--accent);
+  font-size:13px;
+}
+.apple-emoji-pack-link:focus{
+  border-color:color-mix(in srgb,var(--accent) 32%,rgba(255,255,255,.08));
+  background:rgba(255,255,255,.045);
+}
+.apple-emoji-pack-submit{
+  min-height:37px;
+  padding:8px 13px;
+  border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  border-radius:12px;
+  background:color-mix(in srgb,var(--accent) 15%,rgba(255,255,255,.025));
+  color:var(--text);
+  font-size:13px;
+  font-weight:700;
+}
+.apple-emoji-pack-submit:active{transform:scale(.985)}
+.apple-emoji-pack-submit:disabled,
+.apple-emoji-pack-link:disabled{opacity:.55}
+.apple-emoji-pack-status{
+  min-height:18px;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.4;
+  text-align:start;
+}
+.apple-emoji-search-wrap[hidden]{display:none!important}
 
 .apple-emoji-loading{
   min-height:176px!important;
