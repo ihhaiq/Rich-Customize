@@ -1,4 +1,4 @@
-/* Beta 0.3.70 — Telegram-like pack rail motion and picker transitions. */
+/* Beta 0.3.71 — full Telegram-like emoji category rail + packs. */
 .apple-emoji-picker-pop{
   position:fixed!important;
   z-index:3400!important;
@@ -260,13 +260,18 @@
   object-fit:contain;
   pointer-events:none;
 }
-.apple-emoji-recent-tab svg,
-.apple-emoji-normal-tab svg{
+.apple-emoji-tab svg{
   width:20px!important;
   height:20px!important;
   fill:none;
   stroke:currentColor;
   stroke-width:1.65;
+}
+.apple-emoji-category-tab{
+  opacity:.92;
+}
+.apple-emoji-category-tab.active{
+  opacity:1;
 }
 .apple-emoji-custom-placeholder{
   opacity:.96;
