@@ -387,7 +387,6 @@
     });
     backdrop.appendChild(card);
     document.body.appendChild(backdrop);
-    requestAnimationFrame(() => card.querySelector(".button-title-input")?.focus());
   }
   window.RichButtonDialog = {open:openButtonDialog, close:closeButtonDialog};
 
@@ -472,7 +471,6 @@
           executeCommand(command.name);
         } else {
           slashInput.value = `${command.hint} `;
-          slashInput.focus();
           autoGrow(slashInput);
         }
       }));
@@ -508,7 +506,6 @@
     if (target?.matches?.("input,textarea,[contenteditable='true']")) return;
     event.preventDefault();
     slashInput.value = "/";
-    slashInput.focus();
     openSlashMenu("");
   });
 
