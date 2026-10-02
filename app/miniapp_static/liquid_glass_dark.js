@@ -1,28 +1,41 @@
-// Optional deep-black Liquid Glass theme controlled by the ⚡ top-bar toggle.
+// ⚡ toggles between the classic Liquid Glass UI and a lightweight no-glass UI.
 (()=>{
-  const ROOT_CLASS="liquid-glass-dark";
-  const STORAGE_KEY="richCustomizeLiquidGlassDark";
+  const LITE_CLASS="miniapp-lite-ui";
+  const OLD_DARK_CLASS="liquid-glass-dark";
+  const STORAGE_KEY="richCustomizeUiMode";
   const BUTTON_ID="liquidGlassToggle";
 
   function readPreference(){
-    try{return localStorage.getItem(STORAGE_KEY)==="1";}catch(_){return false;}
+    try{return localStorage.getItem(STORAGE_KEY)==="lite";}catch(_){return false;}
   }
 
-  function savePreference(enabled){
-    try{localStorage.setItem(STORAGE_KEY,enabled?"1":"0");}catch(_){}
+  function savePreference(lite){
+    try{localStorage.setItem(STORAGE_KEY,lite?"lite":"glass");}catch(_){}
   }
 
-  function syncButton(button,enabled){
+  function copy(lite){
+    const language=String(window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code||document.documentElement.lang||"").toLowerCase();
+    const ar=language.startsWith("ar");
+    return lite
+      ? (ar?"العودة إلى الزجاج السائل":"Switch to Liquid Glass")
+      : (ar?"استخدام الواجهة الخفيفة":"Use lightweight interface");
+  }
+
+  function syncButton(button,lite){
     if(!button)return;
-    button.classList.toggle("active",enabled);
-    button.setAttribute("aria-pressed",enabled?"true":"false");
-    button.dataset.enabled=enabled?"1":"0";
+    button.classList.toggle("active",lite);
+    button.setAttribute("aria-pressed",lite?"true":"false");
+    button.dataset.mode=lite?"lite":"glass";
+    button.title=copy(lite);
+    button.setAttribute("aria-label",copy(lite));
   }
 
-  function applyTheme(enabled,{persist=true,haptic=false}={}){
-    document.documentElement.classList.toggle(ROOT_CLASS,enabled);
-    syncButton(document.getElementById(BUTTON_ID),enabled);
-    if(persist)savePreference(enabled);
+  function applyTheme(lite,{persist=true,haptic=false}={}){
+    const root=document.documentElement;
+    root.classList.remove(OLD_DARK_CLASS);
+    root.classList.toggle(LITE_CLASS,lite);
+    syncButton(document.getElementById(BUTTON_ID),lite);
+    if(persist)savePreference(lite);
     if(haptic){
       try{window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.();}catch(_){}
     }
@@ -38,8 +51,6 @@
     button.id=BUTTON_ID;
     button.className="icon-btn liquid-glass-toggle";
     button.type="button";
-    button.title="Liquid Glass";
-    button.setAttribute("aria-label","Liquid Glass");
     button.setAttribute("aria-pressed","false");
 
     const bolt=document.createElement("span");
@@ -53,7 +64,7 @@
     else actions.appendChild(button);
 
     button.addEventListener("click",()=>{
-      applyTheme(!document.documentElement.classList.contains(ROOT_CLASS),{
+      applyTheme(!document.documentElement.classList.contains(LITE_CLASS),{
         persist:true,
         haptic:true,
       });
@@ -63,9 +74,9 @@
 
   function init(){
     const button=ensureToggle();
-    const enabled=readPreference();
-    document.documentElement.classList.toggle(ROOT_CLASS,enabled);
-    syncButton(button,enabled);
+    const lite=readPreference();
+    applyTheme(lite,{persist:false});
+    syncButton(button,lite);
   }
 
   if(document.readyState==="loading"){
