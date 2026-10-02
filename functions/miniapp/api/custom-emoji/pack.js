@@ -25,13 +25,35 @@ export async function onRequestGet(context) {
       throw new HttpError(400, 'not_a_custom_emoji_pack');
     }
 
-    const emojis = set.stickers.map((sticker) => ({
-      custom_emoji_id: String(sticker?.custom_emoji_id || ''),
-      emoji: String(sticker?.emoji || '▫️'),
-    })).filter(item => /^\d{5,32}$/.test(item.custom_emoji_id));
+    const ids = set.stickers
+      .map((sticker) => String(sticker?.custom_emoji_id || '').trim())
+      .filter((id) => /^[1-9][0-9]{0,19}$/.test(id));
 
-    if (!emojis.length || emojis.length !== set.stickers.length) {
+    if (!ids.length || ids.length !== set.stickers.length) {
       throw new HttpError(502, 'incomplete_custom_emoji_pack');
+    }
+
+    const exact = new Map();
+    for (let offset = 0; offset < ids.length; offset += 200) {
+      const verified = await telegramApi(context.env, 'getCustomEmojiStickers', {
+        custom_emoji_ids: ids.slice(offset, offset + 200),
+      });
+      for (const sticker of Array.isArray(verified) ? verified : []) {
+        const id = String(sticker?.custom_emoji_id || '').trim();
+        const emoji = String(sticker?.emoji || '').trim();
+        if (/^[1-9][0-9]{0,19}$/.test(id) && emoji) exact.set(id, emoji);
+      }
+    }
+
+    const emojis = ids.map((id) => ({
+      custom_emoji_id: id,
+      // Use Telegram's exact fallback for this document ID. A placeholder or
+      // mismatched emoji can make RichTextCustomEmoji invalid at send time.
+      emoji: exact.get(id) || '',
+    }));
+
+    if (emojis.some((item) => !item.emoji)) {
+      throw new HttpError(502, 'incomplete_custom_emoji_metadata');
     }
 
     return json({
