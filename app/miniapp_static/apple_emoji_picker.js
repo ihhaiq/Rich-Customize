@@ -1,4 +1,4 @@
-// Beta 0.3.69 — persistent custom emoji cache, larger picker and no auto keyboard.
+// Beta 0.3.70 — Telegram-like pack rail motion and compact picker transitions.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -733,7 +733,31 @@
     grid.classList.remove("apple-emoji-grid-switch");
     void grid.offsetWidth;
     grid.classList.add("apple-emoji-grid-switch");
-    window.setTimeout(() => grid?.classList?.remove("apple-emoji-grid-switch"), 190);
+    window.setTimeout(() => grid?.classList?.remove("apple-emoji-grid-switch"), 170);
+  }
+
+  function centerRailTab(button) {
+    const tabs = button?.closest?.(".apple-emoji-tabs");
+    if (!tabs || !button) return;
+
+    const target = button.offsetLeft - (tabs.clientWidth - button.offsetWidth) / 2;
+    const max = Math.max(0, tabs.scrollWidth - tabs.clientWidth);
+    const left = Math.max(0, Math.min(max, target));
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
+    try {
+      tabs.scrollTo({left, behavior:reduced ? "auto" : "smooth"});
+    } catch (_) {
+      tabs.scrollLeft = left;
+    }
+  }
+
+  function animateRailSelection(button) {
+    if (!button || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+    button.classList.remove("apple-emoji-tab-pop");
+    void button.offsetWidth;
+    button.classList.add("apple-emoji-tab-pop");
+    window.setTimeout(() => button?.classList?.remove("apple-emoji-tab-pop"), 220);
   }
 
   function appendSectionTitle(grid, text, {divider=false} = {}) {
@@ -774,10 +798,23 @@
   }
 
   function setRailActive(mode) {
-    panel?.querySelectorAll(".apple-emoji-tab").forEach(button => {
+    if (!panel) return;
+    let activeButton = null;
+    let changed = false;
+
+    panel.querySelectorAll(".apple-emoji-tab").forEach(button => {
       const matchesMode = button.dataset.mode && button.dataset.mode === mode;
       const matchesPack = button.dataset.pack && mode === "pack:" + button.dataset.pack;
-      button.classList.toggle("active", Boolean(matchesMode || matchesPack));
+      const next = Boolean(matchesMode || matchesPack);
+      if (next && !button.classList.contains("active")) changed = true;
+      button.classList.toggle("active", next);
+      if (next) activeButton = button;
+    });
+
+    if (!activeButton) return;
+    requestAnimationFrame(() => {
+      centerRailTab(activeButton);
+      if (changed) animateRailSelection(activeButton);
     });
   }
 
@@ -1095,6 +1132,9 @@
 
     tabs.querySelectorAll(".apple-emoji-pack-tab").forEach(button => button.remove());
     customPacks.forEach(pack => tabs.insertBefore(makeCustomPackTab(pack), addButton));
+
+    const mode = String(panel.dataset.mode || activeCategory || "normal");
+    requestAnimationFrame(() => setRailActive(mode));
   }
 
   function buildPanel() {
