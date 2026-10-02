@@ -1,4 +1,4 @@
-/* Beta 0.3.72 — collapsible emoji wallet: laughing opens, recent closes. */
+/* Beta 0.3.73 — standard-emoji-only wallet; premium packs stay outside. */
 .apple-emoji-picker-pop{
   position:fixed!important;
   z-index:3400!important;
@@ -528,4 +528,55 @@ html.mobile-performance .apple-emoji-tab-pop{
 
 @media(prefers-reduced-motion:reduce){
   .apple-emoji-wallet{transition:none!important;scroll-behavior:auto!important}
+}
+
+
+/* Standard emoji wallet: premium pack tabs and add-pack button are siblings,
+   not children, so this capsule visually contains only regular categories. */
+.apple-emoji-wallet{
+  position:relative;
+  min-height:36px;
+  padding:2px 5px;
+  margin-inline:1px;
+  border:1px solid color-mix(in srgb,var(--text) 8%,transparent);
+  border-radius:999px;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012)),
+    color-mix(in srgb,var(--panel2) 46%,transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.055),
+    inset 0 -1px 0 rgba(0,0,0,.08),
+    0 2px 7px rgba(0,0,0,.08);
+}
+.apple-emoji-wallet.open::before,
+.apple-emoji-wallet.open::after{
+  content:"";
+  position:sticky;
+  z-index:2;
+  top:0;
+  bottom:0;
+  width:9px;
+  flex:0 0 9px;
+  pointer-events:none;
+}
+.apple-emoji-wallet.open::before{
+  left:0;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--panel2) 74%,transparent),transparent);
+}
+.apple-emoji-wallet.open::after{
+  right:0;
+  background:linear-gradient(270deg,color-mix(in srgb,var(--panel2) 74%,transparent),transparent);
+}
+.apple-emoji-wallet .apple-emoji-category-tab{
+  flex:0 0 34px;
+}
+.apple-emoji-pack-tab,
+.apple-emoji-custom-placeholder{
+  position:relative;
+  z-index:3;
+}
+html.miniapp-lite-ui .apple-emoji-wallet{
+  background:var(--panel2)!important;
+  border-color:var(--line)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
 }
