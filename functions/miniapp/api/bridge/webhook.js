@@ -8,6 +8,7 @@ import {
   verifyAndPinMainBotIdentity,
   downloadBridgeJson,
   reactBridgeMessageSuccess,
+  reactBridgeMessageFailure,
   sendBridgeSyncAck,
   sendBridgeSyncFailure,
   sendBridgeFullSyncNotice,
@@ -92,6 +93,7 @@ export async function onRequestPost(context) {
     try {
       syncPayload = await downloadBridgeJson(context.env, message.document.file_id);
     } catch (error) {
+      await reactBridgeMessageFailure(context.env, message);
       await sendBridgeSyncFailure(context.env, error, {
         syncId: parsed.sync_id,
         userId: parsed.user_id,
@@ -163,6 +165,7 @@ export async function onRequestPost(context) {
           sync_id: String(syncPayload.sync_id || ''),
         });
       } catch (error) {
+        await reactBridgeMessageFailure(context.env, message);
         if (syncType === 'full_snapshot') {
           await markMirrorBootstrapFailed(db, error?.message || error).catch(() => {});
         }
@@ -199,6 +202,7 @@ export async function onRequestPost(context) {
       errorCode: parsed.code || 'BRIDGE_ERROR',
       errorMessage: parsed.detail || 'Telegram Serverless bridge request failed',
     });
+    await reactBridgeMessageFailure(context.env, message);
     if (String(pending.action) === 'full_sync') {
       await markMirrorBootstrapFailed(
         db,
@@ -217,6 +221,7 @@ export async function onRequestPost(context) {
       errorCode: 'ACTION_MISMATCH',
       errorMessage: 'Bridge response action does not match pending request',
     });
+    await reactBridgeMessageFailure(context.env, message);
     return json({ ok: true, request_id: requestId, status: 'error' });
   }
 
@@ -231,6 +236,7 @@ export async function onRequestPost(context) {
       errorCode: 'USER_MISMATCH',
       errorMessage: 'Bridge response user_id does not match pending request',
     });
+    await reactBridgeMessageFailure(context.env, message);
     return json({ ok: true, request_id: requestId, status: 'error' });
   }
 
@@ -245,6 +251,7 @@ export async function onRequestPost(context) {
       errorCode: 'PAGE_MISMATCH',
       errorMessage: 'Bridge response page_id does not match pending request',
     });
+    await reactBridgeMessageFailure(context.env, message);
     return json({ ok: true, request_id: requestId, status: 'error' });
   }
 
@@ -255,6 +262,7 @@ export async function onRequestPost(context) {
       responseKind: 'document',
       responseFileId: message.document.file_id,
     });
+    await reactBridgeMessageSuccess(context.env, message);
     return json({ ok: true, request_id: requestId, status: 'ready' });
   }
 
@@ -264,6 +272,7 @@ export async function onRequestPost(context) {
     responseKind: 'ack',
     responseJson: smallResult(action, parsed),
   });
+  await reactBridgeMessageSuccess(context.env, message);
   return json({ ok: true, request_id: requestId, status: 'ready' });
 }
 
