@@ -1,4 +1,4 @@
-// Beta 0.3.68 — shared custom emoji previews with bounded loading.
+// Beta 0.3.69 — persistent custom emoji cache, larger picker and no auto keyboard.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -22,6 +22,9 @@
   const SEARCH_LIMIT = 180;
   const CUSTOM_PACK_LIMIT = 20;
   const CUSTOM_PREVIEW_CONCURRENCY = 5;
+  const CUSTOM_PREVIEW_CACHE_NAME = "rich-custom-emoji-previews-v1";
+  const CUSTOM_PREVIEW_CACHE_INDEX_KEY = "rich_customize_custom_preview_cache_index";
+  const CUSTOM_PREVIEW_CACHE_LIMIT = 120;
   const CUSTOM_EMOJI_FALLBACK_ID = "6046274330164203359";
   const SEARCH_PRESETS = [
     {key:"love", icon:"❤️", emojis:["❤️","🩷","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❤️‍🔥","❤️‍🩹","❣️","💕","💞","💓","💗","💖","💘","💝","😍","🥰","😘","💋"]},
@@ -210,7 +213,6 @@
   }
 
   function insertIntoContentEditable(editor, emoji) {
-    editor.focus({preventScroll:true});
     const sel = window.getSelection();
     let range = savedRange?.cloneRange?.();
     if (!range || !editor.contains(range.commonAncestorContainer)) {
@@ -233,7 +235,6 @@
   }
 
   function insertIntoInput(input, emoji) {
-    input.focus({preventScroll:true});
     const fallback = input.value?.length || 0;
     const [start,end] = savedInputSelection || [input.selectionStart ?? fallback, input.selectionEnd ?? fallback];
     input.setRangeText(emoji, start, end, "end");
@@ -419,7 +420,6 @@
 
   function insertCustomEmojiIntoEditor(editor, item) {
     if (!editor || !item?.custom_emoji_id) return;
-    editor.focus({preventScroll:true});
     const sel = window.getSelection();
     let range = savedRange?.cloneRange?.();
     if (!range || !editor.contains(range.commonAncestorContainer)) {
@@ -522,6 +522,74 @@
     });
   }
 
+  function persistentPreviewRequest(key) {
+    return new Request(
+      new URL("/__rich_customize_emoji_cache__/" + encodeURIComponent(key), window.location.origin),
+      {method:"GET"},
+    );
+  }
+
+  function previewCacheIndex() {
+    try {
+      const value = JSON.parse(localStorage.getItem(CUSTOM_PREVIEW_CACHE_INDEX_KEY) || "[]");
+      return Array.isArray(value) ? value.filter(item => typeof item === "string") : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  async function touchPersistentPreview(key) {
+    if (!("caches" in window)) return;
+    const next = [key, ...previewCacheIndex().filter(item => item !== key)];
+    const stale = next.slice(CUSTOM_PREVIEW_CACHE_LIMIT);
+    try {
+      localStorage.setItem(
+        CUSTOM_PREVIEW_CACHE_INDEX_KEY,
+        JSON.stringify(next.slice(0, CUSTOM_PREVIEW_CACHE_LIMIT)),
+      );
+    } catch (_) {}
+    if (!stale.length) return;
+    try {
+      const cache = await caches.open(CUSTOM_PREVIEW_CACHE_NAME);
+      await Promise.all(stale.map(item => cache.delete(persistentPreviewRequest(item))));
+    } catch (_) {}
+  }
+
+  async function readPersistentPreview(key) {
+    if (!("caches" in window)) return null;
+    try {
+      const cache = await caches.open(CUSTOM_PREVIEW_CACHE_NAME);
+      const response = await cache.match(persistentPreviewRequest(key));
+      if (!response) return null;
+      const blob = await response.blob();
+      if (!blob.size) {
+        await cache.delete(persistentPreviewRequest(key));
+        return null;
+      }
+      touchPersistentPreview(key);
+      return blob;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function writePersistentPreview(key, blob) {
+    if (!("caches" in window) || !blob?.size) return;
+    try {
+      const cache = await caches.open(CUSTOM_PREVIEW_CACHE_NAME);
+      await cache.put(
+        persistentPreviewRequest(key),
+        new Response(blob, {
+          headers:{
+            "content-type":blob.type || "application/octet-stream",
+            "cache-control":"public, max-age=31536000, immutable",
+          },
+        }),
+      );
+      touchPersistentPreview(key);
+    } catch (_) {}
+  }
+
   function customPreviewBlob(itemOrId) {
     const item = typeof itemOrId === "object" && itemOrId
       ? itemOrId
@@ -532,10 +600,13 @@
 
     const key = previewFileId ? `file:${previewFileId}` : `emoji:${id}`;
     if (!customPreviewBlobs.has(key)) {
-      const initData = String(window.Telegram?.WebApp?.initData || "");
-      if (!initData) return Promise.reject(new Error("missing_init_data"));
-
       customPreviewBlobs.set(key, queueCustomPreview(async () => {
+        const cached = await readPersistentPreview(key);
+        if (cached) return cached;
+
+        const initData = String(window.Telegram?.WebApp?.initData || "");
+        if (!initData) throw new Error("missing_init_data");
+
         const url = previewFileId
           ? `/miniapp/api/media/${encodeURIComponent(previewFileId)}`
           : `/miniapp/api/custom-emoji/${encodeURIComponent(id)}`;
@@ -548,6 +619,7 @@
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const blob = await response.blob();
         if (!blob.size) throw new Error("empty_custom_emoji_preview");
+        writePersistentPreview(key, blob);
         return blob;
       }).catch(error => {
         customPreviewBlobs.delete(key);
@@ -836,8 +908,7 @@
       const value = String(input.value || "").trim();
       if (!value) {
         status.textContent = mt("emoji.pack_link_required");
-        input.focus({preventScroll:true});
-        return;
+            return;
       }
       const initData = String(window.Telegram?.WebApp?.initData || "");
       if (!initData) {
@@ -887,7 +958,6 @@
       }
     });
 
-    requestAnimationFrame(() => input.focus({preventScroll:true}));
   }
 
   function searchCatalog(query) {
@@ -1111,7 +1181,6 @@
       event.stopPropagation();
       resetSearchUI();
       renderMode(activeCategory);
-      searchInput.focus({preventScroll:true});
       requestAnimationFrame(placePanel);
     });
 
