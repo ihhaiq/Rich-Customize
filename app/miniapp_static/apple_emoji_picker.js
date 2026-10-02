@@ -1,4 +1,4 @@
-// Beta 0.3.67 — custom emoji pack loader inside the Telegram-like emoji rail.
+// Beta 0.3.68 — shared custom emoji previews with bounded loading.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -21,6 +21,7 @@
   const CUSTOM_PACKS_KEY = "rich_customize_custom_emoji_packs";
   const SEARCH_LIMIT = 180;
   const CUSTOM_PACK_LIMIT = 20;
+  const CUSTOM_PREVIEW_CONCURRENCY = 5;
   const CUSTOM_EMOJI_FALLBACK_ID = "6046274330164203359";
   const SEARCH_PRESETS = [
     {key:"love", icon:"❤️", emojis:["❤️","🩷","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❤️‍🔥","❤️‍🩹","❣️","💕","💞","💓","💗","💖","💘","💝","😍","🥰","😘","💋"]},
@@ -116,6 +117,8 @@
   let catalog = null;
   let customPacks = loadCustomPacks();
   const customPreviewBlobs = new Map();
+  const customPreviewQueue = [];
+  let customPreviewActive = 0;
   let customPreviewObserver = null;
 
   function unicodeFromUnified(unified) {
@@ -251,7 +254,12 @@
       ? String(entry.custom_emoji_id || "") !== customId
       : String(entry.unified || "") !== String(item.unified || ""));
     recent.unshift(customId
-      ? {custom_emoji_id:customId, emoji:String(item.emoji || "▫️"), pack_name:String(item.pack_name || "")}
+      ? {
+          custom_emoji_id:customId,
+          emoji:String(item.emoji || "▫️"),
+          pack_name:String(item.pack_name || ""),
+          preview_file_id:String(item.preview_file_id || ""),
+        }
       : {unified:item.unified, image:item.image, emoji:item.emoji});
     try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, 36))); } catch (_) {}
   }
@@ -493,29 +501,65 @@
     return img;
   }
 
-  function customPreviewBlob(emojiId) {
-    const id = String(emojiId || "");
+  function runCustomPreviewQueue() {
+    while (customPreviewActive < CUSTOM_PREVIEW_CONCURRENCY && customPreviewQueue.length) {
+      const job = customPreviewQueue.shift();
+      customPreviewActive += 1;
+      Promise.resolve()
+        .then(job.task)
+        .then(job.resolve, job.reject)
+        .finally(() => {
+          customPreviewActive -= 1;
+          runCustomPreviewQueue();
+        });
+    }
+  }
+
+  function queueCustomPreview(task) {
+    return new Promise((resolve, reject) => {
+      customPreviewQueue.push({task, resolve, reject});
+      runCustomPreviewQueue();
+    });
+  }
+
+  function customPreviewBlob(itemOrId) {
+    const item = typeof itemOrId === "object" && itemOrId
+      ? itemOrId
+      : {custom_emoji_id:String(itemOrId || "")};
+    const id = String(item.custom_emoji_id || "");
+    const previewFileId = String(item.preview_file_id || "");
     if (!id) return Promise.reject(new Error("missing_custom_emoji_id"));
-    if (!customPreviewBlobs.has(id)) {
+
+    const key = previewFileId ? `file:${previewFileId}` : `emoji:${id}`;
+    if (!customPreviewBlobs.has(key)) {
       const initData = String(window.Telegram?.WebApp?.initData || "");
       if (!initData) return Promise.reject(new Error("missing_init_data"));
-      customPreviewBlobs.set(id, fetch(`/miniapp/api/custom-emoji/${encodeURIComponent(id)}`, {
-        method:"GET",
-        headers:{"X-Telegram-Init-Data":initData},
-        cache:"force-cache",
-        credentials:"same-origin",
-      }).then(async response => {
+
+      customPreviewBlobs.set(key, queueCustomPreview(async () => {
+        const url = previewFileId
+          ? `/miniapp/api/media/${encodeURIComponent(previewFileId)}`
+          : `/miniapp/api/custom-emoji/${encodeURIComponent(id)}`;
+        const response = await fetch(url, {
+          method:"GET",
+          headers:{"X-Telegram-Init-Data":initData},
+          cache:"force-cache",
+          credentials:"same-origin",
+        });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const blob = await response.blob();
         if (!blob.size) throw new Error("empty_custom_emoji_preview");
         return blob;
       }).catch(error => {
-        customPreviewBlobs.delete(id);
+        customPreviewBlobs.delete(key);
         throw error;
       }));
     }
-    return customPreviewBlobs.get(id);
+    return customPreviewBlobs.get(key);
   }
+
+  window.RichCustomEmojiPreview = Object.freeze({
+    getBlob:customPreviewBlob,
+  });
 
   async function hydrateCustomPreviewNode(node) {
     if (!node || node.dataset.loaded === "1" || node.dataset.loading === "1") return;
@@ -523,7 +567,10 @@
     if (!emojiId) return;
     node.dataset.loading = "1";
     try {
-      const blob = await customPreviewBlob(emojiId);
+      const blob = await customPreviewBlob({
+        custom_emoji_id:emojiId,
+        preview_file_id:String(node.dataset.previewFileId || ""),
+      });
       if (!node.isConnected) return;
       const url = URL.createObjectURL(blob);
       const img = document.createElement("img");
@@ -577,6 +624,7 @@
     const node = document.createElement("span");
     node.className = className;
     node.dataset.customEmojiId = String(item.custom_emoji_id || "");
+    node.dataset.previewFileId = String(item.preview_file_id || "");
     node.dataset.fallback = String(item.emoji || "▫️");
     node.textContent = String(item.emoji || "▫️");
     observeCustomPreview(node);
@@ -690,6 +738,7 @@
               custom_emoji_id:String(saved.custom_emoji_id),
               emoji:String(saved.emoji || "▫️"),
               pack_name:String(saved.pack_name || ""),
+              preview_file_id:String(saved.preview_file_id || ""),
               name:String(saved.emoji || "▫️"),
             }
           : (catalog.byUnified.get(saved.unified) || catalog.byEmoji.get(saved.emoji)))
@@ -819,6 +868,7 @@
             .map(item => ({
               custom_emoji_id:String(item.custom_emoji_id || ""),
               emoji:String(item.emoji || "▫️"),
+              preview_file_id:String(item.preview_file_id || ""),
             }))
             .filter(item => /^\d{5,32}$/.test(item.custom_emoji_id)),
         };

@@ -1,9 +1,11 @@
-// Beta 0.3.20 — render Unicode emoji as Apple artwork inside rich text editors only.
+// Beta 0.3.68 — render Unicode and Telegram custom emoji artwork inside rich text editors.
 // The persisted value stays Unicode. Visual <img> nodes are converted back to
 // Unicode whenever the editor is cloned by the existing serializer.
 (() => {
   const EDITOR_SELECTOR = ".rich-inline-editor";
   const INLINE_SELECTOR = "img.apple-inline-emoji[data-emoji]";
+  const CUSTOM_SELECTOR = "tg-emoji[emoji-id]";
+  const customInlineUrls = new Map();
   const DATA_URLS = [
     "https://cdn.jsdelivr.net/npm/emoji-datasource-apple@16.0.0/emoji.json",
     "https://cdnjs.cloudflare.com/ajax/libs/emoji-datasource-apple/16.0.0/emoji.json",
@@ -191,11 +193,16 @@
     return segmenter ? tokeniseWithSegmenter(text) : tokeniseFallback(text);
   }
 
+  function customEmojiFallback(node) {
+    return String(node?.dataset?.customEmojiFallback || node?.textContent || "🙂");
+  }
+
   function logicalLength(node) {
     if (!node) return 0;
     if (node.nodeType === Node.TEXT_NODE) return (node.nodeValue || "").length;
     if (node.nodeType !== Node.ELEMENT_NODE) return 0;
     if (node.matches?.(INLINE_SELECTOR)) return String(node.dataset.emoji || node.alt || "").length;
+    if (node.matches?.(CUSTOM_SELECTOR)) return customEmojiFallback(node).length;
     if (node.tagName === "BR") return 1;
     let total = 0;
     node.childNodes.forEach(child => { total += logicalLength(child); });
@@ -225,6 +232,10 @@
       if (node.nodeType !== Node.ELEMENT_NODE) return;
       if (node.matches?.(INLINE_SELECTOR)) {
         total += String(node.dataset.emoji || node.alt || "").length;
+        return;
+      }
+      if (node.matches?.(CUSTOM_SELECTOR)) {
+        total += customEmojiFallback(node).length;
         return;
       }
       if (node.tagName === "BR") {
@@ -268,8 +279,10 @@
         return;
       }
       if (node.nodeType !== Node.ELEMENT_NODE) return;
-      if (node.matches?.(INLINE_SELECTOR)) {
-        const length = String(node.dataset.emoji || node.alt || "").length;
+      if (node.matches?.(INLINE_SELECTOR) || node.matches?.(CUSTOM_SELECTOR)) {
+        const length = node.matches?.(CUSTOM_SELECTOR)
+          ? customEmojiFallback(node).length
+          : String(node.dataset.emoji || node.alt || "").length;
         const parent = node.parentNode;
         const index = parent ? Array.prototype.indexOf.call(parent.childNodes, node) : -1;
         if (remaining <= length) {
@@ -316,13 +329,73 @@
   function shouldSkipTextNode(node) {
     if (!node?.parentElement || failedTextNodes.has(node)) return true;
     return Boolean(node.parentElement.closest(
-      ".inline-rich-button-token,.apple-inline-emoji,script,style,textarea,input",
+      ".inline-rich-button-token,.apple-inline-emoji,tg-emoji[emoji-id],script,style,textarea,input",
     ));
   }
 
+  function customPreviewBlob(emojiId) {
+    const service = window.RichCustomEmojiPreview;
+    if (service?.getBlob) return service.getBlob({custom_emoji_id:String(emojiId || "")});
+
+    const initData = String(window.Telegram?.WebApp?.initData || "");
+    if (!initData) return Promise.reject(new Error("missing_init_data"));
+    return fetch(`/miniapp/api/custom-emoji/${encodeURIComponent(String(emojiId || ""))}`, {
+      method:"GET",
+      headers:{"X-Telegram-Init-Data":initData},
+      cache:"force-cache",
+      credentials:"same-origin",
+    }).then(async response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      if (!blob.size) throw new Error("empty_custom_emoji_preview");
+      return blob;
+    });
+  }
+
+  function customInlineUrl(emojiId) {
+    const id = String(emojiId || "");
+    if (!customInlineUrls.has(id)) {
+      customInlineUrls.set(id, customPreviewBlob(id).then(blob => URL.createObjectURL(blob)).catch(error => {
+        customInlineUrls.delete(id);
+        throw error;
+      }));
+    }
+    return customInlineUrls.get(id);
+  }
+
+  function decorateCustomEmoji(editor) {
+    editor.querySelectorAll(CUSTOM_SELECTOR).forEach(tag => {
+      const emojiId = String(tag.getAttribute("emoji-id") || "");
+      if (!/^[1-9][0-9]{0,19}$/.test(emojiId)) return;
+
+      const fallback = customEmojiFallback(tag);
+      tag.dataset.customEmojiFallback = fallback;
+      tag.contentEditable = "false";
+      tag.classList.add("custom-inline-emoji");
+      tag.setAttribute("aria-label", fallback);
+
+      if (tag.dataset.customEmojiRendered === "1" || tag.dataset.customEmojiLoading === "1") return;
+      tag.dataset.customEmojiLoading = "1";
+
+      customInlineUrl(emojiId).then(url => {
+        if (!tag.isConnected) return;
+        tag.style.backgroundImage = `url("${url}")`;
+        tag.dataset.customEmojiRendered = "1";
+        delete tag.dataset.customEmojiLoading;
+      }).catch(() => {
+        delete tag.dataset.customEmojiLoading;
+      });
+    });
+  }
+
   function decorateEditor(editor) {
-    if (!emojiMap || !editor?.isConnected || !editor.matches?.(EDITOR_SELECTOR)) return;
+    if (!editor?.isConnected || !editor.matches?.(EDITOR_SELECTOR)) return;
     const snapshot = selectionSnapshot(editor);
+    decorateCustomEmoji(editor);
+    if (!emojiMap) {
+      restoreSelection(editor, snapshot);
+      return;
+    }
     const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) {
@@ -389,6 +462,14 @@
           clone.querySelectorAll(INLINE_SELECTOR).forEach(img => {
             img.replaceWith(document.createTextNode(img.dataset.emoji || img.alt || ""));
           });
+          clone.querySelectorAll(CUSTOM_SELECTOR).forEach(tag => {
+            const fallback = customEmojiFallback(tag);
+            const emojiId = String(tag.getAttribute("emoji-id") || "");
+            const clean = document.createElement("tg-emoji");
+            if (emojiId) clean.setAttribute("emoji-id", emojiId);
+            clean.textContent = fallback;
+            tag.replaceWith(clean);
+          });
         }
       } catch (_) {}
       return clone;
@@ -413,7 +494,30 @@
 
   const blocks = document.getElementById("blocks");
   if (blocks && typeof MutationObserver === "function") {
-    const observer = new MutationObserver(() => scheduleAll());
+    const observer = new MutationObserver(records => {
+      let needsFullScan = false;
+      const touched = new Set();
+
+      records.forEach(record => {
+        const source = record.target?.nodeType === Node.ELEMENT_NODE
+          ? record.target
+          : record.target?.parentElement;
+        const editor = source?.closest?.(EDITOR_SELECTOR);
+        if (editor) touched.add(editor);
+
+        if (record.type === "childList") {
+          record.addedNodes.forEach(node => {
+            if (node.nodeType !== Node.ELEMENT_NODE) return;
+            if (node.matches?.(EDITOR_SELECTOR)) touched.add(node);
+            node.querySelectorAll?.(EDITOR_SELECTOR).forEach(item => touched.add(item));
+            if (!editor && node.querySelector?.(EDITOR_SELECTOR)) needsFullScan = true;
+          });
+        }
+      });
+
+      touched.forEach(scheduleEditor);
+      if (needsFullScan && !touched.size) scheduleAll();
+    });
     observer.observe(blocks, {subtree:true, childList:true, characterData:true});
   }
 
@@ -422,6 +526,15 @@
     decorate:editor => scheduleEditor(editor),
     load:loadCatalog,
   });
+
+  window.addEventListener("pagehide", () => {
+    customInlineUrls.forEach(promise => {
+      Promise.resolve(promise).then(url => {
+        try { URL.revokeObjectURL(url); } catch (_) {}
+      }).catch(() => {});
+    });
+    customInlineUrls.clear();
+  }, {once:true});
 
   loadCatalog().then(scheduleAll).catch(() => {});
 })();

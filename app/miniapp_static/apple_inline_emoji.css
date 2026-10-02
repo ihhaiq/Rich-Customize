@@ -1,4 +1,4 @@
-/* Beta 0.3.20 — Apple artwork for emoji displayed inside rich text editors. */
+/* Beta 0.3.68 — Apple Unicode emoji + Telegram custom emoji previews in rich text editors. */
 .rich-inline-editor .apple-inline-emoji{
   display:inline-block!important;
   width:1.12em!important;
@@ -30,5 +30,47 @@
 .rich-inline-editor.live-heading-5 .apple-inline-emoji,
 .rich-inline-editor.heading-6 .apple-inline-emoji,
 .rich-inline-editor.live-heading-6 .apple-inline-emoji{
+  vertical-align:-0.16em!important;
+}
+
+
+.rich-inline-editor tg-emoji.custom-inline-emoji,
+.details-child-text[contenteditable='true'] tg-emoji.custom-inline-emoji{
+  display:inline-block!important;
+  width:1.12em!important;
+  min-width:1.12em!important;
+  max-width:1.12em!important;
+  height:1.12em!important;
+  margin:0 .015em!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:.18em!important;
+  vertical-align:-0.19em!important;
+  background-color:transparent!important;
+  background-repeat:no-repeat!important;
+  background-position:center!important;
+  background-size:contain!important;
+  color:transparent!important;
+  text-shadow:none!important;
+  overflow:hidden!important;
+  white-space:nowrap!important;
+  box-shadow:none!important;
+  user-select:none!important;
+  -webkit-user-select:none!important;
+  cursor:text!important;
+}
+
+.rich-inline-editor.heading-1 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.live-heading-1 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.heading-2 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.live-heading-2 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.heading-3 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.live-heading-3 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.heading-4 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.live-heading-4 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.heading-5 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.live-heading-5 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.heading-6 tg-emoji.custom-inline-emoji,
+.rich-inline-editor.live-heading-6 tg-emoji.custom-inline-emoji{
   vertical-align:-0.16em!important;
 }

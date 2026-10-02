@@ -41,7 +41,14 @@ export async function onRequestGet(context) {
       for (const sticker of Array.isArray(verified) ? verified : []) {
         const id = String(sticker?.custom_emoji_id || '').trim();
         const emoji = String(sticker?.emoji || '').trim();
-        if (/^[1-9][0-9]{0,19}$/.test(id) && emoji) exact.set(id, emoji);
+        if (!/^[1-9][0-9]{0,19}$/.test(id) || !emoji) continue;
+        const previewFileId = String(
+          sticker?.thumbnail?.file_id
+          || sticker?.thumb?.file_id
+          || (!sticker?.is_animated && !sticker?.is_video ? sticker?.file_id : '')
+          || ''
+        ).trim();
+        exact.set(id, {emoji, preview_file_id:previewFileId});
       }
     }
 
@@ -49,7 +56,10 @@ export async function onRequestGet(context) {
       custom_emoji_id: id,
       // Use Telegram's exact fallback for this document ID. A placeholder or
       // mismatched emoji can make RichTextCustomEmoji invalid at send time.
-      emoji: exact.get(id) || '',
+      emoji: exact.get(id)?.emoji || '',
+      // The Mini App can fetch this file directly through its authenticated
+      // media proxy, avoiding getCustomEmojiStickers for every visible cell.
+      preview_file_id: exact.get(id)?.preview_file_id || '',
     }));
 
     if (emojis.some((item) => !item.emoji)) {
