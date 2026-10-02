@@ -1,4 +1,4 @@
-// Beta 0.3.72 — Telegram-like collapsible emoji wallet: smile opens, recent closes.
+// Beta 0.3.73 — wallet contains only standard emoji categories; premium packs stay outside.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -949,7 +949,7 @@
     activeCategory = "pack:" + pack.name;
     panel.dataset.mode = activeCategory;
     panel.dataset.view = "custom-pack";
-    setWalletOpen(true);
+    setWalletOpen(false);
     showSearchBar(true);
 
     const grid = panel.querySelector(".apple-emoji-grid");
@@ -970,7 +970,7 @@
   function renderAddPackView() {
     if (!panel) return;
     panel.dataset.view = "add-pack";
-    setWalletOpen(true);
+    setWalletOpen(false);
     showSearchBar(false);
     const grid = panel.querySelector(".apple-emoji-grid");
     const title = panel.querySelector(".apple-emoji-category-title");
@@ -1218,6 +1218,7 @@
       event.preventDefault();
       event.stopPropagation();
       resetSearchUI();
+      setWalletOpen(false);
       renderCustomPack(pack.name);
       requestAnimationFrame(placePanel);
     });
@@ -1226,12 +1227,12 @@
 
   function syncCustomPackTabs() {
     if (!panel) return;
-    const wallet = panel.querySelector(".apple-emoji-wallet");
-    const addButton = wallet?.querySelector?.(".apple-emoji-custom-placeholder");
-    if (!wallet || !addButton) return;
+    const tabs = panel.querySelector(".apple-emoji-tabs");
+    const addButton = tabs?.querySelector?.(".apple-emoji-custom-placeholder");
+    if (!tabs || !addButton) return;
 
-    wallet.querySelectorAll(".apple-emoji-pack-tab").forEach(button => button.remove());
-    customPacks.forEach(pack => wallet.insertBefore(makeCustomPackTab(pack), addButton));
+    tabs.querySelectorAll(".apple-emoji-pack-tab").forEach(button => button.remove());
+    customPacks.forEach(pack => tabs.insertBefore(makeCustomPackTab(pack), addButton));
 
     const mode = String(panel.dataset.mode || activeCategory || "normal");
     requestAnimationFrame(() => setRailActive(mode));
@@ -1374,8 +1375,8 @@
     wallet.className = "apple-emoji-wallet closed";
     wallet.setAttribute("aria-hidden","true");
 
-    // Smileys is represented by the permanent laughing button, so the wallet
-    // contains the remaining categories, custom packs and the add-pack button.
+    // The wallet is reserved for standard emoji categories only.
+    // Premium packs and the add-pack button always stay outside it.
     const categoryButtons = CATEGORY_ORDER
       .filter(category => category !== "smileys")
       .map(category => makeCategoryRailButton(category));
@@ -1385,13 +1386,13 @@
       event.preventDefault();
       event.stopPropagation();
       resetSearchUI();
-      setWalletOpen(true);
+      setWalletOpen(false);
       renderAddPackView();
       requestAnimationFrame(placePanel);
     });
 
-    wallet.append(...categoryButtons, custom);
-    tabs.append(recent, laughing, wallet);
+    wallet.append(...categoryButtons);
+    tabs.append(recent, laughing, wallet, custom);
     grid.addEventListener("scroll", syncCategoryFromScroll, {passive:true});
     root.append(head, searchWrap, grid, tabs);
 
