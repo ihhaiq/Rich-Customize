@@ -1,4 +1,4 @@
-/* Beta 0.3.71 — full Telegram-like emoji category rail + packs. */
+/* Beta 0.3.72 — collapsible emoji wallet: laughing opens, recent closes. */
 .apple-emoji-picker-pop{
   position:fixed!important;
   z-index:3400!important;
@@ -207,6 +207,17 @@
   border-top:1px solid color-mix(in srgb,var(--text) 8%,transparent);
   border-radius:14px;
   background:color-mix(in srgb,var(--panel) 44%,transparent);
+  overflow:hidden;
+  scrollbar-width:none;
+}
+
+.apple-emoji-wallet{
+  min-width:0;
+  max-width:calc(100% - 78px);
+  flex:1 1 auto;
+  display:flex;
+  align-items:center;
+  gap:3px;
   overflow-x:auto;
   overflow-y:hidden;
   scrollbar-width:none;
@@ -214,6 +225,28 @@
   scroll-behavior:smooth;
   overscroll-behavior-x:contain;
   -webkit-overflow-scrolling:touch;
+  transform-origin:left center;
+  transition:
+    max-width .20s cubic-bezier(.2,.82,.2,1),
+    opacity .14s ease,
+    transform .20s cubic-bezier(.2,.82,.2,1);
+}
+.apple-emoji-wallet::-webkit-scrollbar{display:none}
+.apple-emoji-wallet.closed{
+  max-width:0;
+  opacity:0;
+  transform:scaleX(.88);
+  pointer-events:none;
+}
+.apple-emoji-wallet.open{
+  opacity:1;
+  transform:scaleX(1);
+  pointer-events:auto;
+}
+.apple-emoji-wallet.no-motion{transition:none!important}
+.apple-emoji-recent-tab,
+.apple-emoji-laughing-tab{
+  flex:0 0 36px;
 }
 .apple-emoji-tabs::-webkit-scrollbar{display:none}
 .apple-emoji-tab{
@@ -491,4 +524,8 @@ html.mobile-performance .apple-emoji-tab-pop{
   .apple-emoji-tabs{scroll-behavior:auto}
   .apple-emoji-tab{transition:none!important}
   .apple-emoji-tab-pop{animation:none!important}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .apple-emoji-wallet{transition:none!important;scroll-behavior:auto!important}
 }
