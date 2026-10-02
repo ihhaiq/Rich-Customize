@@ -740,18 +740,19 @@
   }
 
   function centerRailTab(button) {
-    const tabs = button?.closest?.(".apple-emoji-tabs");
-    if (!tabs || !button) return;
+    if (!button) return;
+    const scroller = button.closest?.(".apple-emoji-wallet") || button.closest?.(".apple-emoji-tabs");
+    if (!scroller) return;
 
-    const target = button.offsetLeft - (tabs.clientWidth - button.offsetWidth) / 2;
-    const max = Math.max(0, tabs.scrollWidth - tabs.clientWidth);
+    const target = button.offsetLeft - (scroller.clientWidth - button.offsetWidth) / 2;
+    const max = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
     const left = Math.max(0, Math.min(max, target));
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
     try {
-      tabs.scrollTo({left, behavior:reduced ? "auto" : "smooth"});
+      scroller.scrollTo({left, behavior:reduced ? "auto" : "smooth"});
     } catch (_) {
-      tabs.scrollLeft = left;
+      scroller.scrollLeft = left;
     }
   }
 
@@ -1350,8 +1351,10 @@
 
     // "Laughing" is the permanent normal-emoji launcher. It opens the wallet
     // and returns to the Smileys section, matching Telegram's two-stage rail.
-    const laughing = makeCategoryRailButton("smileys");
-    laughing.classList.add("apple-emoji-laughing-tab");
+    const smileMeta = Object.values(CATEGORY_META).find(item => item.key === "smileys");
+    const laughing = makeRailButton("", "smileys", smileMeta?.labelKey ? mt(smileMeta.labelKey) : mt("emoji.normal"));
+    laughing.classList.add("apple-emoji-laughing-tab","apple-emoji-category-tab");
+    laughing.dataset.category = "smileys";
     laughing.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
