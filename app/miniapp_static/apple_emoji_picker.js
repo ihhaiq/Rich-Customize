@@ -1,4 +1,4 @@
-// Beta 0.3.73 — wallet contains only standard emoji categories; premium packs stay outside.
+// Beta 0.3.75 — allow only one premium emoji pack; hide the add-pack control after it is added.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -20,7 +20,7 @@
   const RECENT_KEY = "rich_customize_apple_recent_emoji";
   const CUSTOM_PACKS_KEY = "rich_customize_custom_emoji_packs";
   const SEARCH_LIMIT = 180;
-  const CUSTOM_PACK_LIMIT = 20;
+  const CUSTOM_PACK_LIMIT = 1;
   const CUSTOM_PREVIEW_CONCURRENCY = 5;
   const CUSTOM_PREVIEW_CACHE_NAME = "rich-custom-emoji-previews-v1";
   const CUSTOM_PREVIEW_CACHE_INDEX_KEY = "rich_customize_custom_preview_cache_index";
@@ -287,9 +287,12 @@
   }
 
   function rememberCustomPack(pack) {
-    if (!pack?.name || !Array.isArray(pack.emojis) || !pack.emojis.length) return;
-    customPacks = [pack, ...customPacks.filter(item => item.name !== pack.name)].slice(0, CUSTOM_PACK_LIMIT);
+    if (!pack?.name || !Array.isArray(pack.emojis) || !pack.emojis.length) return false;
+    const existing = customPacks[0] || null;
+    if (existing && existing.name !== pack.name) return false;
+    customPacks = [pack].slice(0, CUSTOM_PACK_LIMIT);
     saveCustomPacks();
+    return true;
   }
 
   function customPack(name) {
@@ -969,6 +972,11 @@
 
   function renderAddPackView() {
     if (!panel) return;
+    if (customPacks.length >= CUSTOM_PACK_LIMIT) {
+      const existing = customPacks[0];
+      if (existing) renderCustomPack(existing.name);
+      return;
+    }
     panel.dataset.view = "add-pack";
     setWalletOpen(false);
     showSearchBar(false);
@@ -1017,6 +1025,11 @@
 
     card.addEventListener("submit", async event => {
       event.preventDefault();
+      if (customPacks.length >= CUSTOM_PACK_LIMIT) {
+        const existing = customPacks[0];
+        if (existing) renderCustomPack(existing.name);
+        return;
+      }
       const value = String(input.value || "").trim();
       if (!value) {
         status.textContent = mt("emoji.pack_link_required");
@@ -1057,7 +1070,7 @@
         };
         if (!pack.name || !pack.emojis.length) throw new Error("empty_custom_emoji_pack");
 
-        rememberCustomPack(pack);
+        if (!rememberCustomPack(pack)) throw new Error("custom_emoji_pack_limit");
         syncCustomPackTabs();
         resetSearchUI();
         renderCustomPack(pack.name);
@@ -1228,11 +1241,17 @@
   function syncCustomPackTabs() {
     if (!panel) return;
     const tabs = panel.querySelector(".apple-emoji-tabs");
-    const addButton = tabs?.querySelector?.(".apple-emoji-custom-placeholder");
-    if (!tabs || !addButton) return;
+    if (!tabs) return;
+    const addButton = tabs.querySelector(".apple-emoji-custom-placeholder");
 
     tabs.querySelectorAll(".apple-emoji-pack-tab").forEach(button => button.remove());
-    customPacks.forEach(pack => tabs.insertBefore(makeCustomPackTab(pack), addButton));
+    customPacks.slice(0, CUSTOM_PACK_LIMIT).forEach(pack => {
+      const packButton = makeCustomPackTab(pack);
+      if (addButton?.isConnected) tabs.insertBefore(packButton, addButton);
+      else tabs.appendChild(packButton);
+    });
+
+    if (addButton && customPacks.length >= CUSTOM_PACK_LIMIT) addButton.remove();
 
     const mode = String(panel.dataset.mode || activeCategory || "normal");
     requestAnimationFrame(() => setRailActive(mode));
@@ -1387,17 +1406,23 @@
       event.stopPropagation();
       resetSearchUI();
       setWalletOpen(false);
-      renderAddPackView();
+      if (customPacks.length >= CUSTOM_PACK_LIMIT) {
+        const existing = customPacks[0];
+        if (existing) renderCustomPack(existing.name);
+      } else {
+        renderAddPackView();
+      }
       requestAnimationFrame(placePanel);
     });
 
     wallet.append(...categoryButtons);
-    tabs.append(recent, laughing, wallet, custom);
+    tabs.append(recent, laughing, wallet);
+    if (customPacks.length < CUSTOM_PACK_LIMIT) tabs.append(custom);
     grid.addEventListener("scroll", syncCategoryFromScroll, {passive:true});
     root.append(head, searchWrap, grid, tabs);
 
     requestAnimationFrame(() => {
-      hydrateCustomEmojiPreview(custom);
+      if (custom.isConnected) hydrateCustomEmojiPreview(custom);
       syncCustomPackTabs();
       setWalletOpen(panel?.dataset.mode !== "recent", {animate:false});
     });
