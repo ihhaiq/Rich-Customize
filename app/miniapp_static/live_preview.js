@@ -125,6 +125,100 @@ listEditor = function(block) {
   return list;
 };
 
+function sanitizeTableCellHtml(rawHtml, fallbackText = "") {
+  const source = String(rawHtml || "");
+  if (!source) return escapeHtml(String(fallbackText || ""));
+  const template = document.createElement("template");
+  template.innerHTML = source;
+  const allowed = new Set(["B","STRONG","I","EM","U","INS","S","STRIKE","DEL","TG-SPOILER","CODE","MARK","SUB","SUP","A","TG-EMOJI"]);
+
+  const cleanNode = node => {
+    if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.nodeValue || "");
+    if (node.nodeType !== Node.ELEMENT_NODE) return document.createDocumentFragment();
+    if (node.tagName === "BR") return document.createTextNode(" ");
+    if (!allowed.has(node.tagName)) {
+      const fragment = document.createDocumentFragment();
+      Array.from(node.childNodes).forEach(child => fragment.appendChild(cleanNode(child)));
+      return fragment;
+    }
+
+    const clean = document.createElement(node.tagName.toLowerCase());
+    if (node.tagName === "A") {
+      const href = String(node.getAttribute("href") || "");
+      if (/^(https?:|tg:|mailto:|tel:|#)/i.test(href)) clean.setAttribute("href", href);
+    }
+    if (node.tagName === "TG-EMOJI") {
+      const emojiId = String(node.getAttribute("emoji-id") || "");
+      if (/^[1-9][0-9]{0,19}$/.test(emojiId)) clean.setAttribute("emoji-id", emojiId);
+    }
+    Array.from(node.childNodes).forEach(child => clean.appendChild(cleanNode(child)));
+    return clean;
+  };
+
+  const output = document.createElement("div");
+  Array.from(template.content.childNodes).forEach(child => output.appendChild(cleanNode(child)));
+  return output.innerHTML;
+}
+
+function insertPlainTextAtSelection(editor, text) {
+  const selection = window.getSelection();
+  let range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+  if (!range || !editor.contains(range.commonAncestorContainer)) {
+    range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+  }
+  range.deleteContents();
+  const node = document.createTextNode(String(text || ""));
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  try {
+    editor.dispatchEvent(new InputEvent("input", {bubbles:true, inputType:"insertText", data:String(text || "")}));
+  } catch (_) {
+    editor.dispatchEvent(new Event("input", {bubbles:true}));
+  }
+}
+
+function createRichTableCellEditor(cell, placeholder, {onFocus,onPointerDown,onInput} = {}) {
+  const editor = document.createElement("div");
+  editor.className = "rich-table-cell-editor";
+  editor.contentEditable = "true";
+  editor.spellcheck = true;
+  editor.dataset.placeholder = String(placeholder || "");
+  editor.setAttribute("role", "textbox");
+  editor.setAttribute("aria-multiline", "false");
+  editor.innerHTML = sanitizeTableCellHtml(cell?.html, cell?.text || "");
+
+  const sync = () => {
+    const clone = editor.cloneNode(true);
+    const text = String(clone.textContent || "").replace(/[\r\n]+/g, " ");
+    const html = String(clone.innerHTML || "").replace(/(?:<br\s*\/?>)+/gi, " ");
+    onInput?.({text, html});
+  };
+
+  if (typeof onFocus === "function") editor.addEventListener("focus", onFocus);
+  if (typeof onPointerDown === "function") editor.addEventListener("pointerdown", onPointerDown);
+  editor.addEventListener("beforeinput", event => {
+    if (event.inputType === "insertParagraph" || event.inputType === "insertLineBreak") event.preventDefault();
+  });
+  editor.addEventListener("keydown", event => {
+    if (event.key === "Enter") event.preventDefault();
+  });
+  editor.addEventListener("paste", event => {
+    const text = String(event.clipboardData?.getData("text/plain") || "").replace(/[\r\n]+/g, " ");
+    if (!text) return;
+    event.preventDefault();
+    insertPlainTextAtSelection(editor, text);
+  });
+  editor.addEventListener("input", sync);
+  return editor;
+}
+
+window.RichTableCellEditor = Object.freeze({create:createRichTableCellEditor});
+
 tableEditor = function(block) {
   const d = block.data || (block.data = {});
   const wrap = document.createElement("div");
@@ -137,21 +231,27 @@ tableEditor = function(block) {
   rows.forEach((row, ri) => {
     const tr = document.createElement("tr");
     row.forEach((raw, ci) => {
-      const cell = typeof raw === "object" ? raw : {text:String(raw ?? "")};
+      const cell = typeof raw === "object" && raw !== null ? {...raw} : {text:String(raw ?? "")};
       const td = document.createElement("td");
       if (cell.colspan) td.colSpan = Number(cell.colspan);
       if (cell.rowspan) td.rowSpan = Number(cell.rowspan);
       if (cell.align) td.style.textAlign = cell.align;
-      const input = document.createElement("input");
-      input.value = cell.text || "";
-      input.placeholder = `${ri + 1}:${ci + 1}`;
-      input.addEventListener("focus", () => selectBlock(block.id));
-      input.addEventListener("input", () => {
-        rows[ri][ci] = typeof raw === "object" ? {...raw, text:input.value} : input.value;
-        rebuildTableHtml(block);
-        markDirty();
+      const editor = createRichTableCellEditor(cell, `${ri + 1}:${ci + 1}`, {
+        onFocus:() => selectBlock(block.id),
+        onInput:({text,html}) => {
+          const currentCell = rows[ri]?.[ci];
+          const next = typeof currentCell === "object" && currentCell !== null
+            ? {...currentCell}
+            : {text:String(currentCell ?? "")};
+          next.text = text;
+          next.html = html;
+          delete next.rich_text;
+          rows[ri][ci] = next;
+          rebuildTableHtml(block);
+          markDirty();
+        },
       });
-      td.appendChild(input);
+      td.appendChild(editor);
       tr.appendChild(td);
     });
     table.appendChild(tr);
@@ -445,7 +545,7 @@ renderBlocks = function() {
     const d=block.data||(block.data={}),wrap=document.createElement("div");wrap.className="telegram-table telegram-table-contextual";if(d.is_bordered===false)wrap.classList.add("no-borders");if(d.is_striped)wrap.classList.add("striped");if(d.is_compact)wrap.classList.add("compact");
     const table=document.createElement("table"),rows=Array.isArray(d.rows)?d.rows:(d.rows=[]);
     rows.forEach((row,ri)=>{const tr=document.createElement("tr");row.forEach((raw,ci)=>{const cell=cellObject(raw),td=document.createElement("td");td.dataset.row=String(ri);td.dataset.col=String(ci);if(cell.colspan)td.colSpan=Math.max(1,Number(cell.colspan));if(cell.rowspan)td.rowSpan=Math.max(1,Number(cell.rowspan));td.style.textAlign=cell.align||"left";td.style.verticalAlign=cell.valign||"middle";if(cell.is_header)td.classList.add("table-cell-shaded");
-      const input=document.createElement("input");input.value=cell.text||"";input.placeholder=`${ri+1}:${ci+1}`;input.addEventListener("focus",()=>{selectBlock?.(block.id);selectCell(block,td,ri,ci);});input.addEventListener("pointerdown",()=>selectCell(block,td,ri,ci));input.addEventListener("input",()=>{const next=cellObject(rows[ri][ci]);next.text=input.value;if(!next.valign)next.valign="middle";rows[ri][ci]=next;try{rebuildTableHtml?.(block);}catch(_){}try{markDirty?.();}catch(_){}});td.appendChild(input);tr.appendChild(td);});table.appendChild(tr);});wrap.appendChild(table);return wrap;
+      const editor=createRichTableCellEditor(cell,`${ri+1}:${ci+1}`,{onFocus:()=>{selectBlock?.(block.id);selectCell(block,td,ri,ci);},onPointerDown:()=>selectCell(block,td,ri,ci),onInput:({text,html})=>{const next=cellObject(rows[ri][ci]);next.text=text;next.html=html;delete next.rich_text;if(!next.valign)next.valign="middle";rows[ri][ci]=next;try{rebuildTableHtml?.(block);}catch(_){}try{markDirty?.();}catch(_){}}});td.appendChild(editor);tr.appendChild(td);});table.appendChild(tr);});wrap.appendChild(table);return wrap;
   }
 
   if(typeof tableEditor==="function")tableEditor=enhancedTableEditor;
