@@ -309,6 +309,31 @@
 .apple-emoji-custom-placeholder{
   opacity:.96;
 }
+.apple-emoji-custom-placeholder.is-locked{
+  opacity:.42;
+  filter:saturate(.35);
+  cursor:not-allowed;
+  position:relative;
+}
+.apple-emoji-custom-placeholder.is-locked::after{
+  content:"🔒";
+  position:absolute;
+  inset-inline-end:-1px;
+  inset-block-end:-1px;
+  width:14px;
+  height:14px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:color-mix(in srgb,var(--panel) 86%,transparent);
+  border:1px solid color-mix(in srgb,var(--text) 12%,transparent);
+  font-size:8px;
+  line-height:1;
+  pointer-events:none;
+}
+.apple-emoji-custom-placeholder.is-locked:active{
+  transform:none!important;
+}
 .apple-emoji-custom-bubble{
   width:27px;
   height:27px;
