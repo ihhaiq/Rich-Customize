@@ -301,16 +301,35 @@
         if (cell.colspan) td.colSpan = Number(cell.colspan);
         if (cell.rowspan) td.rowSpan = Number(cell.rowspan);
         if (cell.align) td.style.textAlign = cell.align;
-        const input = document.createElement("input");
-        input.value = cell.text || "";
-        input.placeholder = `${ri + 1}:${ci + 1}`;
-        input.addEventListener("focus", () => selectBlock(detailsBlock.id));
-        input.addEventListener("input", () => {
-          rows[ri][ci] = typeof raw === "object" ? {...raw, text:input.value} : input.value;
-          rebuildTableHtml(child);
-          markDirty();
+        const editor = window.RichTableCellEditor?.create?.(cell, `${ri + 1}:${ci + 1}`, {
+          onFocus:() => selectBlock(detailsBlock.id),
+          onInput:({text,html}) => {
+            const currentCell = rows[ri]?.[ci];
+            const next = typeof currentCell === "object" && currentCell !== null
+              ? {...currentCell}
+              : {text:String(currentCell ?? "")};
+            next.text = text;
+            next.html = html;
+            delete next.rich_text;
+            rows[ri][ci] = next;
+            rebuildTableHtml(child);
+            markDirty();
+          },
         });
-        td.appendChild(input);
+        if (editor) {
+          td.appendChild(editor);
+        } else {
+          const input = document.createElement("input");
+          input.value = cell.text || "";
+          input.placeholder = `${ri + 1}:${ci + 1}`;
+          input.addEventListener("focus", () => selectBlock(detailsBlock.id));
+          input.addEventListener("input", () => {
+            rows[ri][ci] = typeof raw === "object" ? {...raw, text:input.value} : input.value;
+            rebuildTableHtml(child);
+            markDirty();
+          });
+          td.appendChild(input);
+        }
         tr.appendChild(td);
       });
       table.appendChild(tr);
