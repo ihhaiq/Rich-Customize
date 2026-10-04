@@ -1,4 +1,4 @@
-// Beta 0.3.77 — keep the active premium pack tab inert so selecting it again does not rebuild previews.
+// Beta 0.3.78 — insert emoji at the exact saved caret, including rich table cells.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -176,7 +176,7 @@
   function isMessageTarget(el) {
     if (!el) return false;
     if (el === document.getElementById("slashInput")) return true;
-    if (el.matches?.(".rich-inline-editor,.details-child-text[contenteditable='true'],.block-editor[contenteditable='true']")) return true;
+    if (el.matches?.(".rich-inline-editor,.rich-table-cell-editor[contenteditable='true'],.details-child-text[contenteditable='true'],.block-editor[contenteditable='true']")) return true;
     return Boolean(el.isContentEditable && el.closest?.("#blocks"));
   }
 
@@ -195,7 +195,7 @@
     const node = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
       ? range.commonAncestorContainer
       : range.commonAncestorContainer.parentElement;
-    const editor = node?.closest?.(".rich-inline-editor,.details-child-text[contenteditable='true'],.block-editor[contenteditable='true']");
+    const editor = node?.closest?.(".rich-inline-editor,.rich-table-cell-editor[contenteditable='true'],.details-child-text[contenteditable='true'],.block-editor[contenteditable='true']");
     if (!editor || !isMessageTarget(editor)) return;
     activeTarget = editor;
     savedRange = range.cloneRange();
