@@ -151,7 +151,7 @@ html.editor-dragging{user-select:none;-webkit-user-select:none}
   pointer-events:none!important;
   caret-color:transparent!important;
 }
-.preview-mode .telegram-table input{
+.preview-mode .telegram-table :is(input,.rich-table-cell-editor){
   border:0!important;
   background:transparent!important;
   box-shadow:none!important;
