@@ -1,4 +1,4 @@
-// Beta 0.3.76 — allow one premium emoji pack; keep the add-pack control visible but locked at the limit.
+// Beta 0.3.77 — keep the active premium pack tab inert so selecting it again does not rebuild previews.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -1240,6 +1240,12 @@
     button.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
+
+      const mode = "pack:" + pack.name;
+      const alreadyOpen = panel?.dataset.mode === mode
+        && panel?.dataset.view === "custom-pack";
+      if (alreadyOpen) return;
+
       resetSearchUI();
       setWalletOpen(false);
       renderCustomPack(pack.name);
