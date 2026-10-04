@@ -1,8 +1,8 @@
-// Beta 0.3.68 — render Unicode and Telegram custom emoji artwork inside rich text editors.
+// Beta 0.3.69 — render Unicode and Telegram custom emoji artwork inside rich text and table-cell editors.
 // The persisted value stays Unicode. Visual <img> nodes are converted back to
 // Unicode whenever the editor is cloned by the existing serializer.
 (() => {
-  const EDITOR_SELECTOR = ".rich-inline-editor";
+  const EDITOR_SELECTOR = ".rich-inline-editor,.rich-table-cell-editor";
   const INLINE_SELECTOR = "img.apple-inline-emoji[data-emoji]";
   const CUSTOM_SELECTOR = "tg-emoji[emoji-id]";
   const customInlineUrls = new Map();
