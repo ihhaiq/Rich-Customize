@@ -1,4 +1,4 @@
-// Beta 0.3.75 — allow only one premium emoji pack; hide the add-pack control after it is added.
+// Beta 0.3.76 — allow one premium emoji pack; keep the add-pack control visible but locked at the limit.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -973,8 +973,8 @@
   function renderAddPackView() {
     if (!panel) return;
     if (customPacks.length >= CUSTOM_PACK_LIMIT) {
-      const existing = customPacks[0];
-      if (existing) renderCustomPack(existing.name);
+      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("warning"); } catch (_) {}
+      if (typeof toast === "function") toast(mt("emoji.pack_limit_reached"));
       return;
     }
     panel.dataset.view = "add-pack";
@@ -1196,19 +1196,29 @@
     return button;
   }
 
+  function syncAddPackLockState(button) {
+    if (!button) return;
+    const locked = customPacks.length >= CUSTOM_PACK_LIMIT;
+    button.classList.toggle("is-locked", locked);
+    button.dataset.locked = locked ? "1" : "0";
+    button.setAttribute("aria-disabled", locked ? "true" : "false");
+    button.setAttribute("aria-label", locked ? mt("emoji.pack_limit_reached") : mt("emoji.custom_placeholder"));
+    button.title = locked ? mt("emoji.pack_limit_reached") : mt("emoji.custom_placeholder");
+  }
+
   function makeCustomPlaceholderTab() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "apple-emoji-tab apple-emoji-custom-placeholder";
     button.dataset.mode = "add-pack";
     button.dataset.customEmojiId = CUSTOM_EMOJI_FALLBACK_ID;
-    button.setAttribute("aria-label", mt("emoji.custom_placeholder"));
     const bubble = document.createElement("span");
     bubble.className = "apple-emoji-custom-bubble";
     bubble.textContent = "👤";
     bubble.dataset.customEmojiId = CUSTOM_EMOJI_FALLBACK_ID;
     bubble.dataset.fallback = "👤";
     button.appendChild(bubble);
+    syncAddPackLockState(button);
     return button;
   }
 
@@ -1251,7 +1261,7 @@
       else tabs.appendChild(packButton);
     });
 
-    if (addButton && customPacks.length >= CUSTOM_PACK_LIMIT) addButton.remove();
+    syncAddPackLockState(addButton);
 
     const mode = String(panel.dataset.mode || activeCategory || "normal");
     requestAnimationFrame(() => setRailActive(mode));
@@ -1407,17 +1417,18 @@
       resetSearchUI();
       setWalletOpen(false);
       if (customPacks.length >= CUSTOM_PACK_LIMIT) {
-        const existing = customPacks[0];
-        if (existing) renderCustomPack(existing.name);
-      } else {
-        renderAddPackView();
+        try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("warning"); } catch (_) {}
+        if (typeof toast === "function") toast(mt("emoji.pack_limit_reached"));
+        syncAddPackLockState(custom);
+        requestAnimationFrame(placePanel);
+        return;
       }
+      renderAddPackView();
       requestAnimationFrame(placePanel);
     });
 
     wallet.append(...categoryButtons);
-    tabs.append(recent, laughing, wallet);
-    if (customPacks.length < CUSTOM_PACK_LIMIT) tabs.append(custom);
+    tabs.append(recent, laughing, wallet, custom);
     grid.addEventListener("scroll", syncCategoryFromScroll, {passive:true});
     root.append(head, searchWrap, grid, tabs);
 
