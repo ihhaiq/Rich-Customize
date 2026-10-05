@@ -4,6 +4,7 @@ export const B2B_PROTOCOL = 'RCB1';
 export const B2B_BRIDGE_CHAT_ID = -1003993506865;
 export const B2B_TARGET_BOT_USERNAME = 'RichCustomizebot';
 export const B2B_RELAY_BOT_USERNAME = 'Richminiappsbot';
+const SYNC_OK_CUSTOM_EMOJI_ID = '5800644828383415728';
 
 const REQUEST_TTL_SECONDS = 5 * 60;
 const REQUEST_ID_RE = /^[A-Za-z0-9_-]{8,80}$/;
@@ -752,11 +753,19 @@ export async function sendBridgeSyncAck(env, payload, replyMessage = null) {
     await reactBridgeMessageSuccess(env, replyMessage);
   }
 
+  const ackText = '✅ ' + B2B_PROTOCOL + ' SYNC_OK\n'
+    + 'sync_id: ' + syncId + '\n'
+    + 'sync_seq: ' + String(payload?.sync_seq || payload?.baseline_seq || 0);
+
   return telegramJson(env, 'sendMessage', {
     chat_id: bridgeChatId(env),
-    text: '✅ ' + B2B_PROTOCOL + ' SYNC_OK\n'
-      + 'sync_id: ' + syncId + '\n'
-      + 'sync_seq: ' + String(payload?.sync_seq || payload?.baseline_seq || 0),
+    text: ackText,
+    entities: [{
+      type: 'custom_emoji',
+      offset: 0,
+      length: 1,
+      custom_emoji_id: SYNC_OK_CUSTOM_EMOJI_ID,
+    }],
     disable_notification: true,
     ...(replyId ? { reply_parameters: { message_id: replyId } } : {}),
   });
