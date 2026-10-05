@@ -700,30 +700,36 @@ export async function bridgeRequestRow(db, id, userId) {
   return row;
 }
 
-export async function reactBridgeMessage(env, message, emoji = '✅') {
+export async function reactBridgeMessage(env, message, reaction = null) {
   const chatId = Number(message?.chat?.id || 0);
   const messageId = Number(message?.message_id || 0);
-  if (!chatId || !messageId) return false;
+  if (!chatId || !messageId || !reaction) return false;
   try {
     await telegramJson(env, 'setMessageReaction', {
       chat_id: chatId,
       message_id: messageId,
-      reaction: [{ type: 'emoji', emoji: String(emoji || '✅') }],
+      reaction: [reaction],
       is_big: false,
     });
     return true;
   } catch (error) {
-    console.warn('Could not react to bridge message', emoji, error);
+    console.warn('Could not react to bridge message', reaction, error);
     return false;
   }
 }
 
 export async function reactBridgeMessageSuccess(env, message) {
-  return reactBridgeMessage(env, message, '✅');
+  return reactBridgeMessage(env, message, {
+    type: 'custom_emoji',
+    custom_emoji_id: SYNC_OK_CUSTOM_EMOJI_ID,
+  });
 }
 
 export async function reactBridgeMessageFailure(env, message) {
-  return reactBridgeMessage(env, message, '❌');
+  return reactBridgeMessage(env, message, {
+    type: 'emoji',
+    emoji: '❌',
+  });
 }
 
 function syncMentionText(text, env) {
@@ -745,13 +751,6 @@ export async function sendBridgeSyncAck(env, payload, replyMessage = null) {
   const syncId = String(payload?.sync_id || '').trim();
   if (!syncId) return null;
   const replyId = Number(replyMessage?.message_id || 0);
-
-  // Keep the current textual ACK, and also mark the original Rich Editor
-  // bridge message as successfully processed. Reaction failures are isolated
-  // inside reactBridgeMessageSuccess and must never block the ACK.
-  if (replyId) {
-    await reactBridgeMessageSuccess(env, replyMessage);
-  }
 
   const ackText = '✅ ' + B2B_PROTOCOL + ' SYNC_OK\n'
     + 'sync_id: ' + syncId + '\n'
