@@ -1,6 +1,8 @@
-import { json, HttpError, handleError } from '../../../_lib/http.js';
+import { json, readJson, HttpError, handleError } from '../../../_lib/http.js';
 import { miniAppUser } from '../../../_lib/telegram-auth.js';
 import { telegramApi } from '../../../_lib/telegram-api.js';
+import { claimCustomEmojiPack } from '../../../_lib/custom-emoji-packs.js';
+import { isDeveloper } from '../../../../lib/developer-access.js';
 
 function packName(input) {
   const value = String(input || '').trim();
@@ -12,12 +14,20 @@ function packName(input) {
   return null;
 }
 
-export async function onRequestGet(context) {
-  try {
-    await miniAppUser(context);
+async function requestedPack(context) {
+  if (context.request.method === 'POST') {
+    const payload = await readJson(context.request);
+    return packName(payload.set);
+  }
+  const url = new URL(context.request.url);
+  return packName(url.searchParams.get('set'));
+}
 
-    const url = new URL(context.request.url);
-    const name = packName(url.searchParams.get('set'));
+async function servePack(context) {
+  try {
+    const user = await miniAppUser(context);
+    const developer = isDeveloper(user.id);
+    const name = await requestedPack(context);
     if (!name) throw new HttpError(400, 'invalid_custom_emoji_pack_link');
 
     const set = await telegramApi(context.env, 'getStickerSet', {name});
@@ -53,24 +63,34 @@ export async function onRequestGet(context) {
     }
 
     const emojis = ids.map((id) => ({
-      custom_emoji_id: id,
-      // Use Telegram's exact fallback for this document ID. A placeholder or
-      // mismatched emoji can make RichTextCustomEmoji invalid at send time.
-      emoji: exact.get(id)?.emoji || '',
-      // The Mini App can fetch this file directly through its authenticated
-      // media proxy, avoiding getCustomEmojiStickers for every visible cell.
-      preview_file_id: exact.get(id)?.preview_file_id || '',
+      custom_emoji_id:id,
+      emoji:exact.get(id)?.emoji || '',
+      preview_file_id:exact.get(id)?.preview_file_id || '',
     }));
 
     if (emojis.some((item) => !item.emoji)) {
       throw new HttpError(502, 'incomplete_custom_emoji_metadata');
     }
 
+    const canonicalName = String(set.name || name);
+    const access = await claimCustomEmojiPack(
+      context.env,
+      user.id,
+      canonicalName,
+      {unlimited:developer},
+    );
+
     return json({
       ok:true,
+      access:{
+        is_developer:developer,
+        custom_emoji_pack_limit:access.limit,
+        custom_emoji_pack_count:access.packCount,
+        custom_emoji_packs:access.packNames,
+      },
       pack:{
-        name:String(set.name || name),
-        title:String(set.title || name),
+        name:canonicalName,
+        title:String(set.title || canonicalName),
         emoji_count:emojis.length,
         emojis,
       },
@@ -83,6 +103,10 @@ export async function onRequestGet(context) {
   }
 }
 
-export async function onRequestPost() {
-  return new Response('Method Not Allowed', {status:405});
+export async function onRequestGet(context) {
+  return servePack(context);
+}
+
+export async function onRequestPost(context) {
+  return servePack(context);
 }
