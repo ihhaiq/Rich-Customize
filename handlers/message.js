@@ -19,6 +19,8 @@ import { handleShowcaseMessage } from 'lib/showcase';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
+import { handleBrandingSuccessfulPayment } from 'lib/branding';
+import { sendMarketingLanding } from 'lib/marketing-campaign';
 import { handleMiniAppBridgeMessage } from 'lib/miniapp-bridge';
 import { handleMiniAppUserPickerShared } from 'lib/miniapp-user-picker';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
@@ -42,6 +44,13 @@ function matchesCommand(command, name) {
   return command === '/' + name || command.startsWith('/' + name + '@');
 }
 
+function commandArgument(text, name) {
+  if (typeof text !== 'string') return '';
+  const parts = text.trim().split(/\s+/);
+  if (!parts.length || !matchesCommand(String(parts[0] || '').toLowerCase(), name)) return '';
+  return String(parts.slice(1).join(' ') || '').trim();
+}
+
 export default async function (message, ctx = {}) {
   const updateId = ctx?.update?.update_id;
   if (!await claimUpdate(updateId)) return;
@@ -51,6 +60,7 @@ export default async function (message, ctx = {}) {
   try {
     bridgeHandled = await handleMiniAppBridgeMessage(message, { updateId });
     if (bridgeHandled) return;
+    if (await handleBrandingSuccessfulPayment(message)) return;
     if (await handleMiniAppUserPickerShared(message)) return;
     if (!await allowMessageRequest(message)) return;
     const command = commandName(message?.text);
@@ -136,6 +146,9 @@ export default async function (message, ctx = {}) {
       }
       return;
     }
+
+    const marketingSource = commandArgument(message?.text, 'start');
+    if (await sendMarketingLanding(message, marketingSource)) return;
 
     const replyMarkup = buildWelcomeKeyboard(languageCode);
     try {
