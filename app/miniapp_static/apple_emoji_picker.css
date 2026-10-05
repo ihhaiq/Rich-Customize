@@ -207,8 +207,10 @@
   border-top:1px solid color-mix(in srgb,var(--text) 8%,transparent);
   border-radius:14px;
   background:color-mix(in srgb,var(--panel) 44%,transparent);
-  overflow:hidden;
+  overflow-x:auto;
+  overflow-y:hidden;
   scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
 }
 
 .apple-emoji-wallet{
