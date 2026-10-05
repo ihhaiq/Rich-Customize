@@ -1,10 +1,24 @@
 import { json, handleError } from '../../_lib/http.js';
 import { miniAppUser } from '../../_lib/telegram-auth.js';
+import { customEmojiPackAccess } from '../../_lib/custom-emoji-packs.js';
+import { isDeveloper } from '../../../lib/developer-access.js';
 
 export async function onRequestGet(context) {
   try {
     const user = await miniAppUser(context);
-    return json({ ok: true, user, beta: '0.3' });
+    const developer = isDeveloper(user.id);
+    const packAccess = await customEmojiPackAccess(context.env, user.id, {unlimited:developer});
+    return json({
+      ok:true,
+      user,
+      beta:'0.3',
+      is_developer:developer,
+      limits:{
+        custom_emoji_packs:packAccess.limit,
+      },
+      custom_emoji_packs:packAccess.packNames,
+      custom_emoji_pack_count:packAccess.packCount,
+    });
   } catch (error) {
     return handleError(error);
   }
