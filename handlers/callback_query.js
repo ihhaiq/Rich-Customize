@@ -54,6 +54,14 @@ export default async function (query, ctx = {}) {
     if (await guardEditorCallback(query)) return;
 
     const data = String(query.data || '');
+    if (data === 'r:channels_soon') {
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: 'قريبا',
+        show_alert: true,
+      });
+      return;
+    }
     const chatId = query.message?.chat?.id;
     const messageId = query.message?.message_id;
     if (
