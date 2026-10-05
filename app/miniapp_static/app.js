@@ -34,6 +34,13 @@ let pageOpenRunning = false;
 let lastPageOpenAt = 0;
 const PAGE_OPEN_COOLDOWN_MS = 700;
 const pageCache = new Map();
+let currentUserId=0;
+let mutationVersion=0;
+let offlineDraftTimer=null;
+let publishRunning=false;
+const OFFLINE_DRAFT_TTL_MS=7*24*60*60*1000;
+const PERF_QUEUE_KEY="rich_customize_perf_queue_v1";
+const APP_BOOT_STARTED=performance.now();
 
 function copySessionValue(value){
   if(value==null)return value;
@@ -262,9 +269,149 @@ function info(type){return BLOCKS.find(x=>x.type===type)||{type,icon:"generic",l
 function normalizePositions(){current?.blocks?.forEach((b,i)=>b.position=i)}
 function autoGrow(el){el.style.height="auto";el.style.height=`${Math.max(38,el.scrollHeight)}px`}
 
-function newDraft(){
+function offlineDraftKey(){
+  return currentUserId>0?`rich_customize_offline_draft_v1:${currentUserId}`:null
+}
+function clearOfflineDraft(){
+  const key=offlineDraftKey();if(!key)return;
+  clearTimeout(offlineDraftTimer);offlineDraftTimer=null;
+  try{localStorage.removeItem(key)}catch(_){}
+}
+function offlineDraftPayload(){
+  if(!current)return null;
+  normalizePositions();
+  return {
+    version:1,
+    user_id:currentUserId,
+    updated_at:Date.now(),
+    page_id:current.page_id||null,
+    base_revision:Number(current.revision||0),
+    base_updated_at:Number(current.updated_at||0),
+    title:pageTitle.value||current.title||mt("editor.untitled"),
+    blocks:copySessionValue(current.blocks||[]),
+    buttons:copySessionValue(current.buttons||[]),
+    buttons_per_row:Number(current.buttons_per_row||1),
+    buttons_align:String(current.buttons_align||"center"),
+    composer_text:String(slashInput?.value||""),
+  }
+}
+function persistOfflineDraftNow(){
+  const key=offlineDraftKey();if(!key||!current)return;
+  const payload=offlineDraftPayload();
+  const meaningful=Boolean(payload?.blocks?.length||payload?.composer_text?.trim()||dirty);
+  if(!meaningful){clearOfflineDraft();return}
+  try{localStorage.setItem(key,JSON.stringify(payload))}catch(_){}
+}
+function scheduleOfflineDraft(){
+  clearTimeout(offlineDraftTimer);
+  offlineDraftTimer=setTimeout(persistOfflineDraftNow,180)
+}
+function readOfflineDraft(){
+  const key=offlineDraftKey();if(!key)return null;
+  try{
+    const value=JSON.parse(localStorage.getItem(key)||"null");
+    if(!value||value.version!==1||Number(value.user_id)!==Number(currentUserId))return null;
+    if(Date.now()-Number(value.updated_at||0)>OFFLINE_DRAFT_TTL_MS){clearOfflineDraft();return null}
+    if(!Array.isArray(value.blocks))return null;
+    return value
+  }catch(_){return null}
+}
+function confirmOfflineConflict(){
+  const message=mt("save.offline_conflict_confirm");
+  return new Promise(resolve=>{
+    if(tg?.showConfirm){
+      try{tg.showConfirm(message,value=>resolve(Boolean(value)));return}catch(_){}
+    }
+    resolve(window.confirm(message))
+  })
+}
+function applyOfflineDraft(draft){
+  current={
+    page_id:draft.page_id||null,
+    title:String(draft.title||mt("editor.untitled")),
+    blocks:copySessionValue(draft.blocks||[]),
+    buttons:copySessionValue(draft.buttons||[]),
+    buttons_per_row:Number(draft.buttons_per_row||1),
+    buttons_align:String(draft.buttons_align||"center"),
+    revision:Number(draft.base_revision||0),
+    updated_at:Number(draft.base_updated_at||0),
+  };
+  normalizePositions();
+  pageTitle.value=current.title;
+  slashInput.value=String(draft.composer_text||"");
+  autoGrow(slashInput);
+  selectedBlockId=null;insertIndex=null;dirty=true;history=[];future=[];
+  mutationVersion+=1;
+  renderBlocks();pushHistory();syncHistory();
+  updateSaveState(mt("save.offline_restored"));
+}
+async function restoreOfflineDraft(pages){
+  const draft=readOfflineDraft();if(!draft)return false;
+  if(draft.page_id){
+    const summary=(Array.isArray(pages)?pages:[]).find(page=>String(page?.page_id||"")===String(draft.page_id));
+    const serverRevision=Number(summary?.revision||0);
+    const serverUpdatedAt=Number(summary?.updated_at||0);
+    const conflict=(serverRevision>Number(draft.base_revision||0))
+      ||(serverUpdatedAt>Number(draft.base_updated_at||0));
+    if(conflict){
+      const approved=await confirmOfflineConflict();
+      if(!approved){clearOfflineDraft();return false}
+    }
+  }
+  applyOfflineDraft(draft);
+  toast(mt("save.offline_restored"),2800);
+  return true
+}
+
+function loadPerfQueue(){
+  try{const value=JSON.parse(localStorage.getItem(PERF_QUEUE_KEY)||"[]");return Array.isArray(value)?value.slice(-120):[]}catch(_){return[]}
+}
+function savePerfQueue(queue){
+  try{localStorage.setItem(PERF_QUEUE_KEY,JSON.stringify((queue||[]).slice(-120)))}catch(_){}
+}
+let perfQueue=loadPerfQueue();
+let perfFlushTimer=null;
+function recordPerf(metric,durationMs=0){
+  const name=String(metric||"").replace(/[^a-z0-9_.-]/gi,"").slice(0,48);
+  if(!name)return;
+  perfQueue.push({metric:name,duration_ms:Math.max(0,Math.min(120000,Math.round(Number(durationMs)||0)))});
+  if(perfQueue.length>120)perfQueue=perfQueue.slice(-120);
+  savePerfQueue(perfQueue);
+  clearTimeout(perfFlushTimer);
+  perfFlushTimer=setTimeout(()=>flushPerf(),5000)
+}
+async function flushPerf({keepalive=false}={}){
+  if(!perfQueue.length||!tg?.initData||navigator.onLine===false)return;
+  const batch=perfQueue.slice(0,30);
+  try{
+    const response=await fetch("/miniapp/api/performance",{
+      method:"POST",
+      headers:{"X-Telegram-Init-Data":tg.initData,"Content-Type":"application/json"},
+      body:JSON.stringify({samples:batch}),
+      cache:"no-store",
+      credentials:"same-origin",
+      keepalive:Boolean(keepalive),
+    });
+    if(!response.ok)return;
+    perfQueue.splice(0,batch.length);savePerfQueue(perfQueue);
+    if(perfQueue.length&&!keepalive)setTimeout(()=>flushPerf(),1200)
+  }catch(_){}
+}
+window.RichMiniAppPerf=Object.freeze({
+  start:()=>performance.now(),
+  record:(name,startedOrDuration)=>{
+    const value=Number(startedOrDuration||0);
+    const duration=value>0&&value<=performance.now()?performance.now()-value:value;
+    recordPerf(name,duration)
+  },
+  flush:()=>flushPerf(),
+});
+
+function newDraft({preserveOffline=false}={}){
+  if(!preserveOffline)clearOfflineDraft();
   current={page_id:null,title:mt("editor.untitled"),blocks:[],buttons:[],buttons_per_row:1,buttons_align:"center"};
   pageTitle.value=current.title;selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
+  mutationVersion+=1;
   renderBlocks();updateSaveState(mt("editor.unsaved"));pushHistory();hideMenus();closeSheets();
 }
 
@@ -278,23 +425,33 @@ function emptyPageSaveError(){
   error.code="EMPTY_PAGE";
   return error;
 }
-function markDirty(){dirty=true;updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));scheduleHistory()}
+function markDirty(){dirty=true;mutationVersion+=1;updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));scheduleHistory();scheduleOfflineDraft()}
 function snapshot(){return current?JSON.stringify({title:pageTitle.value,blocks:current.blocks}):null}
 function pushHistory(){if(!current)return;const raw=snapshot();if(history[history.length-1]===raw)return;history.push(raw);if(history.length>60)history.shift();future=[];syncHistory()}
 function scheduleHistory(){clearTimeout(historyTimer);historyTimer=setTimeout(pushHistory,260)}
 function syncHistory(){undoBtn.disabled=history.length<2;redoBtn.disabled=!future.length}
-function restoreSnapshot(raw){if(!raw||!current)return;const data=JSON.parse(raw);pageTitle.value=data.title||mt("editor.untitled");current.title=pageTitle.value;current.blocks=data.blocks||[];normalizePositions();selectedBlockId=null;renderBlocks();dirty=true;updateSaveState(mt("editor.unsaved"));syncHistory()}
+function restoreSnapshot(raw){if(!raw||!current)return;const data=JSON.parse(raw);pageTitle.value=data.title||mt("editor.untitled");current.title=pageTitle.value;current.blocks=data.blocks||[];normalizePositions();selectedBlockId=null;renderBlocks();dirty=true;mutationVersion+=1;updateSaveState(mt("editor.unsaved"));syncHistory();scheduleOfflineDraft()}
 function undo(){if(history.length<2)return;const now=history.pop();future.push(now);restoreSnapshot(history[history.length-1])}
 function redo(){if(!future.length)return;const next=future.pop();history.push(next);restoreSnapshot(next)}
 
 async function saveNow(){
   if(!current||!dirty)return current;
   if(!hasSavablePageContent()){
+    persistOfflineDraftNow();
     updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));
     throw emptyPageSaveError();
   }
+  if(navigator.onLine===false){
+    persistOfflineDraftNow();
+    updateSaveState(mt("save.offline_local"));
+    const error=new Error(mt("save.offline_local"));
+    error.code="OFFLINE_LOCAL_SAVED";
+    throw error;
+  }
   normalizePositions();
   const doc=current;
+  const saveVersion=mutationVersion;
+  const perfStarted=performance.now();
   updateSaveState(mt("save.saving"),{saving:true});
   const body={title:pageTitle.value||mt("editor.untitled"),blocks:doc.blocks,buttons:doc.buttons||[],buttons_per_row:doc.buttons_per_row||1,buttons_align:doc.buttons_align||"center",...(doc.page_id?{base_revision:Number(doc.revision||1),base_updated_at:Number(doc.updated_at||0)}:{})};
   try{
@@ -313,9 +470,22 @@ async function saveNow(){
     if(doc.page_id&&data?.sync_seq!=null)doc.sync_seq=Number(data.sync_seq||0);
     doc.title=pageTitle.value||mt("editor.untitled");
     cacheSavedPage(doc);
-    if(current===doc){dirty=false;current.title=doc.title;updateSaveState(mt("save.saved_at",{time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}))}
+    recordPerf("page_save",performance.now()-perfStarted);
+    if(current===doc&&mutationVersion===saveVersion){
+      dirty=false;current.title=doc.title;clearOfflineDraft();
+      updateSaveState(mt("save.saved_at",{time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}))
+    }else if(current===doc){
+      dirty=true;scheduleOfflineDraft();updateSaveState(mt("editor.unsaved"))
+    }
     return doc;
-  }catch(error){if(current===doc){dirty=true;updateSaveState(mt("save.failed"))};throw error}
+  }catch(error){
+    recordPerf("page_save_failed",performance.now()-perfStarted);
+    if(current===doc){
+      dirty=true;persistOfflineDraftNow();
+      updateSaveState(Number(error?.status)===409?mt("save.offline_conflict"):mt("save.failed"))
+    }
+    throw error
+  }
 }
 function queueSave(){
   
@@ -505,10 +675,12 @@ async function loadPages(){
   }
 }
 function applyOpenedPage(page,pageId){
+  clearOfflineDraft();
   current=copySessionValue(page);
   current.blocks=(current.blocks||[]).sort((a,b)=>(a.position||0)-(b.position||0));
   pageTitle.value=current.title||pageId;
   selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
+  mutationVersion+=1;
   slashInput.value="";autoGrow(slashInput);
   renderBlocks();updateSaveState(mt("save.saved"));pushHistory();closeSheets();
 }
@@ -525,6 +697,7 @@ function confirmDiscardForPageOpen(){
   });
 }
 function discardCurrentSessionForPageOpen(){
+  clearOfflineDraft();
   clearTimeout(historyTimer);
   historyTimer=null;
   dirty=false;
@@ -553,6 +726,7 @@ async function openPage(pageId){
   }
 
   pageOpenRunning=true;
+  const perfStarted=performance.now();
   try{
     if(hasUnsavedEditorWork()){
       const approved=await confirmDiscardForPageOpen();
@@ -564,6 +738,7 @@ async function openPage(pageId){
     const local=cachedPage(id);
     if(local){
       applyOpenedPage(local,id);
+      recordPerf("page_open_cache",performance.now()-perfStarted);
       return true;
     }
     await withWait(async()=>{
@@ -571,8 +746,10 @@ async function openPage(pageId){
       cacheSavedPage(data.page);
       applyOpenedPage(data.page,id);
     },"جاري تحميل الصفحة");
+    recordPerf("page_open_network",performance.now()-perfStarted);
     return true;
   }catch(error){
+    recordPerf("page_open_failed",performance.now()-perfStarted);
     toast(error.status===429?mt("pages.open_too_fast"):error.message);
     return false;
   }finally{
@@ -633,8 +810,11 @@ async function openSendPanel(){
   try{showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}))}
 }
 async function sendTo(dest,button){
+  if(publishRunning){toast(mt("send.already_sending"));return}
+  publishRunning=true;
+  const perfStarted=performance.now();
   const old=button.innerHTML;
-  button.disabled=true;
+  document.querySelectorAll("#destinations .sheet-item").forEach(item=>{item.disabled=true});
   button.textContent=mt("send.sending");
   try{
     const body={kind:dest.kind};
@@ -655,20 +835,22 @@ async function sendTo(dest,button){
       ()=>api("/miniapp/api/send",{method:"POST",body:JSON.stringify(body)}),
       "جاري نشر الصفحة",
     );
+    recordPerf("publish",performance.now()-perfStarted);
     closeSheets();
     toast(mt("send.sent_to",{title:dest.title}));
   }catch(error){
+    recordPerf("publish_failed",performance.now()-perfStarted);
     const message=publishErrorMessage(error);
     if(dest.kind==="chat"&&destinationShouldDisappear(error)){
       button.remove();
-      if(!destinationsEl.querySelector(".sheet-item")){
-        closeSheets();
-      }
+      if(!destinationsEl.querySelector(".sheet-item"))closeSheets();
     }else{
-      button.disabled=false;
       button.innerHTML=old;
     }
     toast(message,4300);
+  }finally{
+    publishRunning=false;
+    document.querySelectorAll("#destinations .sheet-item").forEach(item=>{item.disabled=false});
   }
 }
 
@@ -686,7 +868,7 @@ $("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=m
 document.querySelectorAll(".composer-toolbar [data-tool]").forEach(btn=>btn.addEventListener("click",()=>openSlashMenu("",CATEGORIES[btn.dataset.tool]||null)));
 
 slashInput.addEventListener("focus",()=>{insertIndex=Number.isInteger(insertIndex)?insertIndex:current.blocks.length});
-slashInput.addEventListener("input",()=>{autoGrow(slashInput);const value=slashInput.value;if(value.startsWith("/")){openSlashMenu(value.slice(1))}else slashMenu.classList.add("hidden")});
+slashInput.addEventListener("input",()=>{autoGrow(slashInput);scheduleOfflineDraft();const value=slashInput.value;if(value.startsWith("/")){openSlashMenu(value.slice(1))}else slashMenu.classList.add("hidden")});
 slashInput.addEventListener("keydown",event=>{
   if(event.key==="Escape"){hideMenus();return}
   if(event.key==="Enter"&&!event.shiftKey){
@@ -710,7 +892,9 @@ async function boot(){
 
   try{
     const meData=await api("/miniapp/api/me");
+    currentUserId=Number(meData?.user?.id||0);
     window.RichMiniAppAccess={
+      userId:currentUserId,
       isDeveloper:Boolean(meData?.is_developer),
       customEmojiPackLimit:meData?.limits?.custom_emoji_packs==null?null:Math.max(0,Number(meData.limits.custom_emoji_packs)||0),
       customEmojiPacks:Array.isArray(meData?.custom_emoji_packs)?meData.custom_emoji_packs.map(name=>String(name||"")).filter(Boolean):[],
@@ -732,7 +916,10 @@ async function boot(){
     setPagesSnapshot(pages);
 
     const resumeTarget=String(window.RichMiniAppResume?.initialPage||"");
-    if(!resumeTarget&&!current)newDraft();
+    const restored=await restoreOfflineDraft(pages);
+    if(!restored&&!resumeTarget&&!current)newDraft({preserveOffline:true});
+    recordPerf("boot",performance.now()-APP_BOOT_STARTED);
+    flushPerf();
     waitOverlay?.hide();
   }catch(error){
     updateSaveState(mt("save.failed"));
@@ -741,4 +928,14 @@ async function boot(){
     toast(error.message);
   }
 }
+window.addEventListener("pagehide",()=>{persistOfflineDraftNow();flushPerf({keepalive:true})});
+window.addEventListener("beforeunload",persistOfflineDraftNow);
+window.addEventListener("online",()=>{
+  flushPerf();
+  if(dirty&&hasSavablePageContent()){
+    setTimeout(()=>queueSave().catch(error=>{
+      if(String(error?.code||"")!=="OFFLINE_LOCAL_SAVED")toast(Number(error?.status)===409?mt("save.offline_conflict"):mt("save.failed"))
+    }),650)
+  }
+});
 boot();
