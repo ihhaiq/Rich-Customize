@@ -314,13 +314,15 @@
 
   function rememberCustomPack(pack) {
     if (!pack?.name || !Array.isArray(pack.emojis) || !pack.emojis.length) return false;
-    const index = customPacks.findIndex(item => String(item?.name || "") === String(pack.name));
+    const name = String(pack.name);
+    const index = customPacks.findIndex(item => String(item?.name || "") === name);
     if (index >= 0) {
       customPacks[index] = pack;
       saveCustomPacks();
       return true;
     }
-    if (!hasCustomPackCapacity()) return false;
+    const serverAuthorized = serverPackNames().includes(name);
+    if (!serverAuthorized && !hasCustomPackCapacity()) return false;
     customPacks.push(pack);
     saveCustomPacks();
     return true;
