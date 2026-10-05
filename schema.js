@@ -269,3 +269,25 @@ export const managedPublishPanels = table('managed_publish_panels', {
   selectedChatIds: json('selected_chat_ids').notNull().default([]),
   updatedAt: integer('updated_at').notNull(),
 });
+
+
+export const brandingEntitlements = table('branding_entitlements', {
+  userId: integer('user_id').primaryKey(),
+  rightsRemoved: integer('rights_removed').notNull().default(0),
+  source: text('source').notNull().default(''),
+  currency: text('currency'),
+  amount: integer('amount'),
+  telegramPaymentChargeId: text('telegram_payment_charge_id'),
+  paidAt: integer('paid_at'),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const marketingCampaignAttribution = table('marketing_campaign_attribution', {
+  userId: integer('user_id').primaryKey(),
+  source: text('source').notNull(),
+  attributedAt: integer('attributed_at').notNull(),
+  firstPublishAt: integer('first_publish_at'),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  sourceIdx: index('idx_marketing_campaign_source').on(t.source),
+}));
