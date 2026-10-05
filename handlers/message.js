@@ -74,7 +74,7 @@ export default async function (message, ctx = {}) {
       return;
     }
 
-    if (matchesCommand(command, 'campaigns')) {
+    if (matchesCommand(command, 'campaigns') || matchesCommand(command, 'ads')) {
       if (await sendMarketingCampaignSummary(message)) return;
     }
 
