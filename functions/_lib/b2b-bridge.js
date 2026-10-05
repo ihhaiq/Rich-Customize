@@ -744,6 +744,14 @@ export async function sendBridgeSyncAck(env, payload, replyMessage = null) {
   const syncId = String(payload?.sync_id || '').trim();
   if (!syncId) return null;
   const replyId = Number(replyMessage?.message_id || 0);
+
+  // Keep the current textual ACK, and also mark the original Rich Editor
+  // bridge message as successfully processed. Reaction failures are isolated
+  // inside reactBridgeMessageSuccess and must never block the ACK.
+  if (replyId) {
+    await reactBridgeMessageSuccess(env, replyMessage);
+  }
+
   return telegramJson(env, 'sendMessage', {
     chat_id: bridgeChatId(env),
     text: '✅ ' + B2B_PROTOCOL + ' SYNC_OK\n'
