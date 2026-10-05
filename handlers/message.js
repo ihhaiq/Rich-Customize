@@ -20,7 +20,7 @@ import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import { handleBrandingSuccessfulPayment } from 'lib/branding';
-import { sendMarketingLanding } from 'lib/marketing-campaign';
+import { sendMarketingCampaignSummary, sendMarketingLanding } from 'lib/marketing-campaign';
 import { handleMiniAppBridgeMessage } from 'lib/miniapp-bridge';
 import { handleMiniAppUserPickerShared } from 'lib/miniapp-user-picker';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
@@ -72,6 +72,10 @@ export default async function (message, ctx = {}) {
     if (matchesCommand(command, 'dev')) {
       await openDeveloperPanel(message);
       return;
+    }
+
+    if (matchesCommand(command, 'campaigns')) {
+      if (await sendMarketingCampaignSummary(message)) return;
     }
 
     if (matchesCommand(command, 'privacy')) {
