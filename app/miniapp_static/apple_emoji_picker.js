@@ -1,4 +1,4 @@
-// Beta 0.3.78 — insert emoji at the exact saved caret, including rich table cells.
+// Beta 0.3.79 — server-authorized premium pack limits; developers can add unlimited packs.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -20,7 +20,7 @@
   const RECENT_KEY = "rich_customize_apple_recent_emoji";
   const CUSTOM_PACKS_KEY = "rich_customize_custom_emoji_packs";
   const SEARCH_LIMIT = 180;
-  const CUSTOM_PACK_LIMIT = 1;
+  const DEFAULT_CUSTOM_PACK_LIMIT = 1;
   const CUSTOM_PREVIEW_CONCURRENCY = 5;
   const CUSTOM_PREVIEW_CACHE_NAME = "rich-custom-emoji-previews-v1";
   const CUSTOM_PREVIEW_CACHE_INDEX_KEY = "rich_customize_custom_preview_cache_index";
@@ -268,13 +268,39 @@
     try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, 36))); } catch (_) {}
   }
 
+  function customPackLimit() {
+    const access = window.RichMiniAppAccess;
+    if (access?.isDeveloper && access?.customEmojiPackLimit == null) return Infinity;
+    const value = Number(access?.customEmojiPackLimit);
+    return Number.isFinite(value) && value >= 0 ? value : DEFAULT_CUSTOM_PACK_LIMIT;
+  }
+
+  function serverPackNames() {
+    return Array.isArray(window.RichMiniAppAccess?.customEmojiPacks)
+      ? window.RichMiniAppAccess.customEmojiPacks.map(name => String(name || "")).filter(Boolean)
+      : [];
+  }
+
+  function effectivePackCount() {
+    return Math.max(customPacks.length, serverPackNames().length);
+  }
+
+  function hasCustomPackCapacity() {
+    const limit = customPackLimit();
+    return !Number.isFinite(limit) || effectivePackCount() < limit;
+  }
+
+  function visibleCustomPacks() {
+    const limit = customPackLimit();
+    return Number.isFinite(limit) ? customPacks.slice(0, limit) : customPacks.slice();
+  }
+
   function loadCustomPacks() {
     try {
       const value = JSON.parse(localStorage.getItem(CUSTOM_PACKS_KEY) || "[]");
       if (!Array.isArray(value)) return [];
       return value
-        .filter(pack => pack && /^[A-Za-z0-9_]{1,64}$/.test(String(pack.name || "")) && Array.isArray(pack.emojis))
-        .slice(0, CUSTOM_PACK_LIMIT);
+        .filter(pack => pack && /^[A-Za-z0-9_]{1,64}$/.test(String(pack.name || "")) && Array.isArray(pack.emojis));
     } catch (_) {
       return [];
     }
@@ -282,15 +308,20 @@
 
   function saveCustomPacks() {
     try {
-      localStorage.setItem(CUSTOM_PACKS_KEY, JSON.stringify(customPacks.slice(0, CUSTOM_PACK_LIMIT)));
+      localStorage.setItem(CUSTOM_PACKS_KEY, JSON.stringify(customPacks));
     } catch (_) {}
   }
 
   function rememberCustomPack(pack) {
     if (!pack?.name || !Array.isArray(pack.emojis) || !pack.emojis.length) return false;
-    const existing = customPacks[0] || null;
-    if (existing && existing.name !== pack.name) return false;
-    customPacks = [pack].slice(0, CUSTOM_PACK_LIMIT);
+    const index = customPacks.findIndex(item => String(item?.name || "") === String(pack.name));
+    if (index >= 0) {
+      customPacks[index] = pack;
+      saveCustomPacks();
+      return true;
+    }
+    if (!hasCustomPackCapacity()) return false;
+    customPacks.push(pack);
     saveCustomPacks();
     return true;
   }
@@ -972,7 +1003,7 @@
 
   function renderAddPackView() {
     if (!panel) return;
-    if (customPacks.length >= CUSTOM_PACK_LIMIT) {
+    if (!hasCustomPackCapacity()) {
       try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("warning"); } catch (_) {}
       if (typeof toast === "function") toast(mt("emoji.pack_limit_reached"));
       return;
@@ -996,7 +1027,9 @@
     const strong = document.createElement("strong");
     strong.textContent = mt("emoji.pack_add_title");
     const hint = document.createElement("span");
-    hint.textContent = mt("emoji.pack_add_hint");
+    hint.textContent = Number.isFinite(customPackLimit())
+      ? mt("emoji.pack_add_hint")
+      : mt("emoji.pack_add_hint_developer");
     intro.append(strong, hint);
 
     const input = document.createElement("input");
@@ -1025,9 +1058,9 @@
 
     card.addEventListener("submit", async event => {
       event.preventDefault();
-      if (customPacks.length >= CUSTOM_PACK_LIMIT) {
-        const existing = customPacks[0];
-        if (existing) renderCustomPack(existing.name);
+      if (!hasCustomPackCapacity()) {
+        status.textContent = mt("emoji.pack_limit_reached");
+        syncCustomPackTabs();
         return;
       }
       const value = String(input.value || "").trim();
@@ -1047,15 +1080,33 @@
       status.textContent = "";
 
       try {
-        const response = await fetch("/miniapp/api/custom-emoji/pack?set=" + encodeURIComponent(value), {
-          method:"GET",
-          headers:{"X-Telegram-Init-Data":initData},
+        const response = await fetch("/miniapp/api/custom-emoji/pack", {
+          method:"POST",
+          headers:{
+            "X-Telegram-Init-Data":initData,
+            "Content-Type":"application/json",
+          },
+          body:JSON.stringify({set:value}),
           cache:"no-store",
           credentials:"same-origin",
         });
         const data = await response.json().catch(() => null);
         if (!response.ok || !data?.ok || !data?.pack) {
-          throw new Error(data?.error || data?.message || "pack_load_failed");
+          const error = new Error(data?.error || data?.message || "pack_load_failed");
+          error.code = String(data?.error || "");
+          throw error;
+        }
+        if (data?.access) {
+          const currentAccess = window.RichMiniAppAccess || {};
+          window.RichMiniAppAccess = {
+            ...currentAccess,
+            isDeveloper:Boolean(data.access.is_developer),
+            customEmojiPackLimit:data.access.custom_emoji_pack_limit==null?null:Number(data.access.custom_emoji_pack_limit),
+            customEmojiPackCount:Math.max(0,Number(data.access.custom_emoji_pack_count||0)),
+            customEmojiPacks:Array.isArray(data.access.custom_emoji_packs)
+              ? data.access.custom_emoji_packs.map(name => String(name || "")).filter(Boolean)
+              : serverPackNames(),
+          };
         }
         const pack = {
           name:String(data.pack.name || ""),
@@ -1075,14 +1126,99 @@
         resetSearchUI();
         renderCustomPack(pack.name);
         try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("success"); } catch (_) {}
-      } catch (_) {
-        status.textContent = mt("emoji.pack_load_failed");
+      } catch (error) {
+        if (String(error?.code || error?.message || "") === "custom_emoji_pack_limit") {
+          status.textContent = mt("emoji.pack_limit_reached");
+          syncCustomPackTabs();
+        } else {
+          status.textContent = mt("emoji.pack_load_failed");
+        }
         input.disabled = false;
         submit.disabled = false;
         submit.textContent = mt("emoji.pack_add");
       }
     });
 
+  }
+
+  let accessPackSyncRunning = false;
+
+  async function syncRegularPackWithServer() {
+    if (accessPackSyncRunning || customPackLimit() !== DEFAULT_CUSTOM_PACK_LIMIT) return;
+    const initData = String(window.Telegram?.WebApp?.initData || "");
+    if (!initData) return;
+
+    const serverNames = serverPackNames();
+    const targetName = serverNames[0] || String(customPacks[0]?.name || "");
+    if (!targetName) {
+      syncCustomPackTabs();
+      return;
+    }
+
+    accessPackSyncRunning = true;
+    try {
+      const response = await fetch("/miniapp/api/custom-emoji/pack", {
+        method:"POST",
+        headers:{
+          "X-Telegram-Init-Data":initData,
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify({set:targetName}),
+        cache:"no-store",
+        credentials:"same-origin",
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok || !data?.pack) return;
+
+      if (data?.access) {
+        const currentAccess = window.RichMiniAppAccess || {};
+        window.RichMiniAppAccess = {
+          ...currentAccess,
+          isDeveloper:Boolean(data.access.is_developer),
+          customEmojiPackLimit:data.access.custom_emoji_pack_limit==null?null:Number(data.access.custom_emoji_pack_limit),
+          customEmojiPackCount:Math.max(0,Number(data.access.custom_emoji_pack_count||0)),
+          customEmojiPacks:Array.isArray(data.access.custom_emoji_packs)
+            ? data.access.custom_emoji_packs.map(name => String(name || "")).filter(Boolean)
+            : serverPackNames(),
+        };
+      }
+
+      const pack = {
+        name:String(data.pack.name || ""),
+        title:String(data.pack.title || data.pack.name || ""),
+        emojis:(Array.isArray(data.pack.emojis) ? data.pack.emojis : [])
+          .map(item => ({
+            custom_emoji_id:String(item.custom_emoji_id || ""),
+            emoji:String(item.emoji || "▫️"),
+            preview_file_id:String(item.preview_file_id || ""),
+          }))
+          .filter(item => /^\d{5,32}$/.test(item.custom_emoji_id)),
+      };
+      if (pack.name && pack.emojis.length) {
+        const existing = customPacks.findIndex(item => String(item?.name || "") === pack.name);
+        if (existing >= 0) customPacks[existing] = pack;
+        else customPacks.unshift(pack);
+        const limit = customPackLimit();
+        if (Number.isFinite(limit)) customPacks = customPacks.slice(0, limit);
+        saveCustomPacks();
+      }
+      syncCustomPackTabs();
+    } catch (_) {
+      syncCustomPackTabs();
+    } finally {
+      accessPackSyncRunning = false;
+    }
+  }
+
+  window.addEventListener("rich-miniapp-access", () => {
+    syncCustomPackTabs();
+    syncRegularPackWithServer();
+  });
+  if (window.RichMiniAppAccess) {
+    queueMicrotask(() => {
+      syncCustomPackTabs();
+      syncRegularPackWithServer();
+    });
   }
 
   function searchCatalog(query) {
@@ -1198,7 +1334,7 @@
 
   function syncAddPackLockState(button) {
     if (!button) return;
-    const locked = customPacks.length >= CUSTOM_PACK_LIMIT;
+    const locked = !hasCustomPackCapacity();
     button.classList.toggle("is-locked", locked);
     button.dataset.locked = locked ? "1" : "0";
     button.setAttribute("aria-disabled", locked ? "true" : "false");
@@ -1261,7 +1397,7 @@
     const addButton = tabs.querySelector(".apple-emoji-custom-placeholder");
 
     tabs.querySelectorAll(".apple-emoji-pack-tab").forEach(button => button.remove());
-    customPacks.slice(0, CUSTOM_PACK_LIMIT).forEach(pack => {
+    visibleCustomPacks().forEach(pack => {
       const packButton = makeCustomPackTab(pack);
       if (addButton?.isConnected) tabs.insertBefore(packButton, addButton);
       else tabs.appendChild(packButton);
@@ -1422,7 +1558,7 @@
       event.stopPropagation();
       resetSearchUI();
       setWalletOpen(false);
-      if (customPacks.length >= CUSTOM_PACK_LIMIT) {
+      if (!hasCustomPackCapacity()) {
         try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("warning"); } catch (_) {}
         if (typeof toast === "function") toast(mt("emoji.pack_limit_reached"));
         syncAddPackLockState(custom);
