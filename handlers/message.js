@@ -23,7 +23,7 @@ import { handleMiniAppBridgeMessage } from 'lib/miniapp-bridge';
 import { handleMiniAppUserPickerShared } from 'lib/miniapp-user-picker';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
 import { handlePremiumEmojiMessage } from 'lib/editor-premium-emoji';
-import { handleEditorCoreMessage } from 'lib/editor-core';
+import { handleEditorCoreMessage, isForwardedRichMessage } from 'lib/editor-core';
 import { handleEditorPageMessage } from 'lib/editor-pages';
 import { handleEditorButtonMessage } from 'lib/editor-buttons';
 import { loadEditorSession } from 'lib/editor-session';
@@ -88,6 +88,11 @@ export default async function (message, ctx = {}) {
       // In groups/supergroups the bot must stay silent unless a supported command
       // was handled above.
       if (String(message?.chat?.type || '') !== 'private') return;
+
+      if (
+        isForwardedRichMessage(message)
+        && await handleEditorCoreMessage(message, {autoOpen:true, confirmReplace:true})
+      ) return;
 
       if (await handlePremiumEmojiMessage(message)) return;
       if (await handleEditorBlockMessage(message)) return;
