@@ -1,4 +1,4 @@
-// Beta 0.3.79 — server-authorized premium pack limits; developers can add unlimited packs.
+// Beta 0.3.80 — server-authorized premium pack limits; developers can add unlimited packs.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
