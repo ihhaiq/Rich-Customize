@@ -1,4 +1,4 @@
-// Beta 0.3.80 — server-authorized premium pack limits; developers can add unlimited packs.
+// Beta 0.3.81 — unified search, smart recents, pack management, persistent preview cache.
 (() => {
   const oldButton = document.getElementById("emojiBtn");
   if (!oldButton) return;
@@ -24,7 +24,7 @@
   const CUSTOM_PREVIEW_CONCURRENCY = 5;
   const CUSTOM_PREVIEW_CACHE_NAME = "rich-custom-emoji-previews-v1";
   const CUSTOM_PREVIEW_CACHE_INDEX_KEY = "rich_customize_custom_preview_cache_index";
-  const CUSTOM_PREVIEW_CACHE_LIMIT = 120;
+  const CUSTOM_PREVIEW_CACHE_LIMIT = 300;
   const CUSTOM_EMOJI_FALLBACK_ID = "6046274330164203359";
   const SEARCH_PRESETS = [
     {key:"love", icon:"❤️", emojis:["❤️","🩷","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❤️‍🔥","❤️‍🩹","❣️","💕","💞","💓","💗","💖","💘","💝","😍","🥰","😘","💋"]},
@@ -245,27 +245,60 @@
     dispatchInput(input, emoji);
   }
 
+  function recentIdentity(entry) {
+    const customId = String(entry?.custom_emoji_id || "");
+    return customId ? "c:" + customId : "u:" + String(entry?.unified || entry?.emoji || "");
+  }
+
+  function recentScore(entry, now = Date.now()) {
+    const count = Math.max(1, Number(entry?.use_count || 1));
+    const ageDays = Math.max(0, now - Number(entry?.last_used || 0)) / 86400000;
+    const frequency = Math.log2(1 + count) * 18;
+    const recency = Math.exp(-ageDays / 10) * 30;
+    return frequency + recency;
+  }
+
   function loadRecent() {
     try {
       const value = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
-      return Array.isArray(value) ? value.filter(Boolean).slice(0, 36) : [];
+      if (!Array.isArray(value)) return [];
+      const now = Date.now();
+      return value
+        .filter(Boolean)
+        .map((entry,index) => ({
+          ...entry,
+          use_count:Math.max(1,Number(entry.use_count || 1)),
+          last_used:Number(entry.last_used || (now - index * 60000)),
+        }))
+        .sort((a,b) => recentScore(b,now) - recentScore(a,now))
+        .slice(0,36);
     } catch (_) { return []; }
   }
 
   function addRecent(item) {
+    const now = Date.now();
     const customId = String(item?.custom_emoji_id || "");
-    const recent = loadRecent().filter(entry => customId
-      ? String(entry.custom_emoji_id || "") !== customId
-      : String(entry.unified || "") !== String(item.unified || ""));
-    recent.unshift(customId
+    const next = customId
       ? {
           custom_emoji_id:customId,
           emoji:String(item.emoji || "▫️"),
           pack_name:String(item.pack_name || ""),
           preview_file_id:String(item.preview_file_id || ""),
         }
-      : {unified:item.unified, image:item.image, emoji:item.emoji});
-    try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, 36))); } catch (_) {}
+      : {unified:item.unified, image:item.image, emoji:item.emoji};
+    const identity = recentIdentity(next);
+    const recent = loadRecent();
+    const existing = recent.find(entry => recentIdentity(entry) === identity);
+    const merged = {
+      ...(existing || {}),
+      ...next,
+      use_count:Math.max(1,Number(existing?.use_count || 0) + 1),
+      last_used:now,
+    };
+    const updated = [merged, ...recent.filter(entry => recentIdentity(entry) !== identity)]
+      .sort((a,b) => recentScore(b,now) - recentScore(a,now))
+      .slice(0,36);
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(updated)); } catch (_) {}
   }
 
   function customPackLimit() {
@@ -641,8 +674,12 @@
     if (!customPreviewBlobs.has(key)) {
       customPreviewBlobs.set(key, queueCustomPreview(async () => {
         const cached = await readPersistentPreview(key);
-        if (cached) return cached;
+        if (cached) {
+          try { window.RichMiniAppPerf?.record?.("emoji_preview_cache", 0); } catch (_) {}
+          return cached;
+        }
 
+        const previewStarted = performance.now();
         const initData = String(window.Telegram?.WebApp?.initData || "");
         if (!initData) throw new Error("missing_init_data");
 
@@ -659,6 +696,7 @@
         const blob = await response.blob();
         if (!blob.size) throw new Error("empty_custom_emoji_preview");
         writePersistentPreview(key, blob);
+        try { window.RichMiniAppPerf?.record?.("emoji_preview_network", previewStarted); } catch (_) {}
         return blob;
       }).catch(error => {
         customPreviewBlobs.delete(key);
@@ -726,7 +764,7 @@
           customPreviewObserver?.unobserve(entry.target);
           hydrateCustomPreviewNode(entry.target);
         });
-      }, {root:null, rootMargin:"80px"});
+      }, {root:null, rootMargin:"160px"});
     }
     customPreviewObserver.observe(node);
   }
@@ -943,6 +981,7 @@
     const grid = panel.querySelector(".apple-emoji-grid");
     const title = panel.querySelector(".apple-emoji-category-title");
     if (!grid) return;
+    grid.classList.remove("apple-emoji-pack-manager-grid");
     grid.innerHTML = "";
 
     if (activeCategory === "recent") {
@@ -991,6 +1030,7 @@
     const grid = panel.querySelector(".apple-emoji-grid");
     const title = panel.querySelector(".apple-emoji-category-title");
     if (!grid) return;
+    grid.classList.remove("apple-emoji-pack-manager-grid");
     if (title) title.textContent = pack.title || pack.name;
     grid.innerHTML = "";
     appendItems(grid, pack.emojis.map(item => ({
@@ -1016,6 +1056,7 @@
     const grid = panel.querySelector(".apple-emoji-grid");
     const title = panel.querySelector(".apple-emoji-category-title");
     if (!grid) return;
+    grid.classList.remove("apple-emoji-pack-manager-grid");
     if (title) title.textContent = mt("emoji.pack_add_title");
     grid.innerHTML = "";
     setRailActive("add-pack");
@@ -1098,18 +1139,7 @@
           error.code = String(data?.error || "");
           throw error;
         }
-        if (data?.access) {
-          const currentAccess = window.RichMiniAppAccess || {};
-          window.RichMiniAppAccess = {
-            ...currentAccess,
-            isDeveloper:Boolean(data.access.is_developer),
-            customEmojiPackLimit:data.access.custom_emoji_pack_limit==null?null:Number(data.access.custom_emoji_pack_limit),
-            customEmojiPackCount:Math.max(0,Number(data.access.custom_emoji_pack_count||0)),
-            customEmojiPacks:Array.isArray(data.access.custom_emoji_packs)
-              ? data.access.custom_emoji_packs.map(name => String(name || "")).filter(Boolean)
-              : serverPackNames(),
-          };
-        }
+        if (data?.access) applyPackAccess(data.access);
         const pack = {
           name:String(data.pack.name || ""),
           title:String(data.pack.title || data.pack.name || ""),
@@ -1145,65 +1175,95 @@
 
   let accessPackSyncRunning = false;
 
-  async function syncRegularPackWithServer() {
-    if (accessPackSyncRunning || customPackLimit() !== DEFAULT_CUSTOM_PACK_LIMIT) return;
+  function applyPackAccess(access) {
+    if (!access) return;
+    const currentAccess = window.RichMiniAppAccess || {};
+    const names = Array.isArray(access.custom_emoji_packs)
+      ? access.custom_emoji_packs.map(name => String(name || "")).filter(Boolean)
+      : serverPackNames();
+    window.RichMiniAppAccess = {
+      ...currentAccess,
+      isDeveloper:Boolean(access.is_developer),
+      customEmojiPackLimit:access.custom_emoji_pack_limit==null?null:Number(access.custom_emoji_pack_limit),
+      customEmojiPackCount:Math.max(0,Number(access.custom_emoji_pack_count||0)),
+      customEmojiPacks:names,
+    };
+    if (names.length) {
+      const order = new Map(names.map((name,index) => [name,index]));
+      customPacks.sort((a,b) => {
+        const ai=order.has(String(a?.name||""))?order.get(String(a.name)):Number.MAX_SAFE_INTEGER;
+        const bi=order.has(String(b?.name||""))?order.get(String(b.name)):Number.MAX_SAFE_INTEGER;
+        return ai-bi;
+      });
+      const limit=customPackLimit();
+      if(Number.isFinite(limit))customPacks=customPacks.filter(pack=>names.includes(String(pack?.name||""))).slice(0,limit);
+      saveCustomPacks();
+    } else if (Number.isFinite(customPackLimit())) {
+      customPacks=[];
+      saveCustomPacks();
+    }
+  }
+
+  async function fetchPackFromServer(name) {
+    const initData = String(window.Telegram?.WebApp?.initData || "");
+    if (!initData || !name) return null;
+    const response = await fetch("/miniapp/api/custom-emoji/pack", {
+      method:"POST",
+      headers:{
+        "X-Telegram-Init-Data":initData,
+        "Content-Type":"application/json",
+      },
+      body:JSON.stringify({set:name}),
+      cache:"no-store",
+      credentials:"same-origin",
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.ok || !data?.pack) return null;
+    applyPackAccess(data.access);
+    return {
+      name:String(data.pack.name || ""),
+      title:String(data.pack.title || data.pack.name || ""),
+      emojis:(Array.isArray(data.pack.emojis) ? data.pack.emojis : [])
+        .map(item => ({
+          custom_emoji_id:String(item.custom_emoji_id || ""),
+          emoji:String(item.emoji || "▫️"),
+          preview_file_id:String(item.preview_file_id || ""),
+        }))
+        .filter(item => /^\d{5,32}$/.test(item.custom_emoji_id)),
+    };
+  }
+
+  async function syncPacksWithServer() {
+    if (accessPackSyncRunning) return;
     const initData = String(window.Telegram?.WebApp?.initData || "");
     if (!initData) return;
-
-    const serverNames = serverPackNames();
-    const targetName = serverNames[0] || String(customPacks[0]?.name || "");
-    if (!targetName) {
-      syncCustomPackTabs();
-      return;
-    }
-
     accessPackSyncRunning = true;
     try {
-      const response = await fetch("/miniapp/api/custom-emoji/pack", {
-        method:"POST",
-        headers:{
-          "X-Telegram-Init-Data":initData,
-          "Content-Type":"application/json",
-        },
-        body:JSON.stringify({set:targetName}),
-        cache:"no-store",
-        credentials:"same-origin",
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.ok || !data?.pack) return;
+      const serverNames = serverPackNames();
+      const localNames = customPacks.map(pack => String(pack?.name || "")).filter(Boolean);
+      const targets = serverNames.length
+        ? serverNames
+        : (Number.isFinite(customPackLimit()) ? localNames.slice(0,1) : localNames);
 
-      if (data?.access) {
-        const currentAccess = window.RichMiniAppAccess || {};
-        window.RichMiniAppAccess = {
-          ...currentAccess,
-          isDeveloper:Boolean(data.access.is_developer),
-          customEmojiPackLimit:data.access.custom_emoji_pack_limit==null?null:Number(data.access.custom_emoji_pack_limit),
-          customEmojiPackCount:Math.max(0,Number(data.access.custom_emoji_pack_count||0)),
-          customEmojiPacks:Array.isArray(data.access.custom_emoji_packs)
-            ? data.access.custom_emoji_packs.map(name => String(name || "")).filter(Boolean)
-            : serverPackNames(),
-        };
+      for (const name of targets) {
+        if (customPack(name) && serverNames.includes(name)) continue;
+        const pack = await fetchPackFromServer(name);
+        if (!pack?.name || !pack.emojis.length) continue;
+        const index = customPacks.findIndex(item => String(item?.name || "") === pack.name);
+        if (index >= 0) customPacks[index] = pack;
+        else customPacks.push(pack);
       }
 
-      const pack = {
-        name:String(data.pack.name || ""),
-        title:String(data.pack.title || data.pack.name || ""),
-        emojis:(Array.isArray(data.pack.emojis) ? data.pack.emojis : [])
-          .map(item => ({
-            custom_emoji_id:String(item.custom_emoji_id || ""),
-            emoji:String(item.emoji || "▫️"),
-            preview_file_id:String(item.preview_file_id || ""),
-          }))
-          .filter(item => /^\d{5,32}$/.test(item.custom_emoji_id)),
-      };
-      if (pack.name && pack.emojis.length) {
-        const existing = customPacks.findIndex(item => String(item?.name || "") === pack.name);
-        if (existing >= 0) customPacks[existing] = pack;
-        else customPacks.unshift(pack);
-        const limit = customPackLimit();
-        if (Number.isFinite(limit)) customPacks = customPacks.slice(0, limit);
-        saveCustomPacks();
+      const orderedNames = serverPackNames();
+      if (orderedNames.length) {
+        const order = new Map(orderedNames.map((name,index)=>[name,index]));
+        customPacks = customPacks
+          .filter(pack => !Number.isFinite(customPackLimit()) || orderedNames.includes(String(pack?.name||"")))
+          .sort((a,b)=>(order.get(String(a?.name||""))??999999)-(order.get(String(b?.name||""))??999999));
       }
+      const limit=customPackLimit();
+      if(Number.isFinite(limit))customPacks=customPacks.slice(0,limit);
+      saveCustomPacks();
       syncCustomPackTabs();
     } catch (_) {
       syncCustomPackTabs();
@@ -1212,15 +1272,163 @@
     }
   }
 
+  async function mutatePackAccess(method,payload) {
+    const initData = String(window.Telegram?.WebApp?.initData || "");
+    if (!initData) throw new Error("missing_init_data");
+    const response = await fetch("/miniapp/api/custom-emoji/packs", {
+      method,
+      headers:{
+        "X-Telegram-Init-Data":initData,
+        "Content-Type":"application/json",
+      },
+      body:JSON.stringify(payload||{}),
+      cache:"no-store",
+      credentials:"same-origin",
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.ok || !data?.access) throw new Error(data?.error || "pack_manage_failed");
+    applyPackAccess(data.access);
+    return data.access;
+  }
+
+  function confirmPackDelete(pack) {
+    const message = mt("emoji.pack_delete_confirm",{title:pack?.title||pack?.name||""});
+    return new Promise(resolve => {
+      const tg = window.Telegram?.WebApp;
+      if (tg?.showConfirm) {
+        try { tg.showConfirm(message,value=>resolve(Boolean(value))); return; } catch (_) {}
+      }
+      resolve(window.confirm(message));
+    });
+  }
+
+  async function persistPackOrder() {
+    const names=visibleCustomPacks().map(pack=>String(pack.name));
+    const access=await mutatePackAccess("PUT",{action:"reorder",names});
+    applyPackAccess(access);
+    saveCustomPacks();
+    syncCustomPackTabs();
+  }
+
+  function renderPackManagerView() {
+    if (!panel) return;
+    activeCategory="pack-manager";
+    panel.dataset.mode="pack-manager";
+    panel.dataset.view="pack-manager";
+    setWalletOpen(false);
+    showSearchBar(false);
+    const grid=panel.querySelector(".apple-emoji-grid");
+    const title=panel.querySelector(".apple-emoji-category-title");
+    if(!grid)return;
+    if(title)title.textContent=mt("emoji.pack_manage");
+    grid.innerHTML="";
+    grid.classList.add("apple-emoji-pack-manager-grid");
+
+    const packs=visibleCustomPacks();
+    if(!packs.length){
+      appendEmpty(grid,mt("emoji.pack_manage_empty"));
+      syncCustomPackTabs();
+      return;
+    }
+
+    packs.forEach((pack,index)=>{
+      const row=document.createElement("div");
+      row.className="apple-emoji-pack-manager-row";
+
+      const preview=document.createElement("div");
+      preview.className="apple-emoji-pack-manager-preview";
+      const first=pack.emojis?.[0];
+      if(first)preview.appendChild(makeCustomPreviewNode({...first,pack_name:pack.name},"apple-emoji-pack-preview"));
+      else preview.textContent="▫️";
+
+      const copy=document.createElement("div");
+      copy.className="apple-emoji-pack-manager-copy";
+      const strong=document.createElement("strong");
+      strong.textContent=pack.title||pack.name;
+      const small=document.createElement("small");
+      small.textContent=mt("emoji.pack_count",{count:Number(pack.emojis?.length||0)});
+      copy.append(strong,small);
+
+      const actions=document.createElement("div");
+      actions.className="apple-emoji-pack-manager-actions";
+      const makeAction=(label,html,handler,disabled=false)=>{
+        const button=document.createElement("button");
+        button.type="button";button.className="apple-emoji-pack-manager-action";
+        button.setAttribute("aria-label",label);button.title=label;button.innerHTML=html;button.disabled=disabled;
+        button.addEventListener("pointerdown",event=>event.preventDefault());
+        button.addEventListener("click",async event=>{
+          event.preventDefault();event.stopPropagation();
+          if(button.disabled)return;
+          button.disabled=true;
+          try{await handler()}catch(_){if(typeof toast==="function")toast(mt("emoji.pack_manage_failed"))}
+          finally{if(button.isConnected)button.disabled=false}
+        });
+        return button;
+      };
+
+      actions.append(
+        makeAction(mt("emoji.pack_pin"),"★",async()=>{
+          const access=await mutatePackAccess("PUT",{action:"pin",name:pack.name});
+          applyPackAccess(access);syncCustomPackTabs();renderPackManagerView();
+        }),
+        makeAction(mt("emoji.pack_move_up"),"↑",async()=>{
+          const current=visibleCustomPacks();const at=current.findIndex(item=>item.name===pack.name);
+          if(at<=0)return;[current[at-1],current[at]]=[current[at],current[at-1]];
+          customPacks=current;saveCustomPacks();await persistPackOrder();renderPackManagerView();
+        },index===0),
+        makeAction(mt("emoji.pack_move_down"),"↓",async()=>{
+          const current=visibleCustomPacks();const at=current.findIndex(item=>item.name===pack.name);
+          if(at<0||at>=current.length-1)return;[current[at+1],current[at]]=[current[at],current[at+1]];
+          customPacks=current;saveCustomPacks();await persistPackOrder();renderPackManagerView();
+        },index===packs.length-1),
+        makeAction(mt("emoji.pack_delete"),"×",async()=>{
+          if(!await confirmPackDelete(pack))return;
+          const access=await mutatePackAccess("DELETE",{name:pack.name});
+          customPacks=customPacks.filter(item=>String(item?.name||"")!==String(pack.name));
+          applyPackAccess(access);saveCustomPacks();syncCustomPackTabs();renderPackManagerView();
+          try{window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("success")}catch(_){}
+        })
+      );
+
+      row.append(preview,copy,actions);
+      grid.appendChild(row);
+    });
+    setRailActive("pack-manager",{animate:false});
+    grid.scrollTop=0;
+  }
+
   window.addEventListener("rich-miniapp-access", () => {
     syncCustomPackTabs();
-    syncRegularPackWithServer();
+    syncPacksWithServer();
   });
   if (window.RichMiniAppAccess) {
     queueMicrotask(() => {
       syncCustomPackTabs();
-      syncRegularPackWithServer();
+      syncPacksWithServer();
     });
+  }
+
+  function customSearchEntry(pack,item) {
+    const fallback=String(item?.emoji||"▫️");
+    const base=collectSearchTerms({
+      name:fallback,
+      short_name:fallback,
+      texts:[pack?.title,pack?.name],
+    },fallback);
+    const terms=[...new Set([
+      ...base.terms,
+      normalizeSearchText(pack?.title||""),
+      normalizeSearchText(pack?.name||""),
+    ].filter(Boolean))];
+    return {
+      item:{
+        ...item,
+        pack_name:String(pack?.name||""),
+        name:String(pack?.title||pack?.name||fallback),
+      },
+      terms,
+      text:terms.join(" "),
+    };
   }
 
   function searchCatalog(query) {
@@ -1229,24 +1437,49 @@
     const normalized = normalizeSearchText(rawQuery);
     if (!normalized) return [];
     const tokens = normalized.split(" ").filter(Boolean);
+    const matches=[];
 
-    return catalog.all
-      .map(item => {
-        if (rawQuery === item.emoji) return {item, score:-100};
-        if (!tokens.every(token => item.searchText.includes(token))) return null;
+    catalog.all.forEach(item => {
+      if (rawQuery === item.emoji) {
+        matches.push({item,score:-100});
+        return;
+      }
+      if (!tokens.every(token => item.searchText.includes(token))) return;
+      let score=40;
+      if(item.searchTerms.some(term=>term===normalized))score=0;
+      else if(item.searchTerms.some(term=>term.startsWith(normalized)))score=10;
+      else if(item.searchTerms.some(term=>tokens.every(token=>term.includes(token))))score=20;
+      else if(item.searchText.includes(normalized))score=30;
+      matches.push({item,score});
+    });
 
-        let score = 40;
-        if (item.searchTerms.some(term => term === normalized)) score = 0;
-        else if (item.searchTerms.some(term => term.startsWith(normalized))) score = 10;
-        else if (item.searchTerms.some(term => tokens.every(token => term.includes(token)))) score = 20;
-        else if (item.searchText.includes(normalized)) score = 30;
+    visibleCustomPacks().forEach((pack,packIndex)=>{
+      (pack.emojis||[]).forEach((item,itemIndex)=>{
+        const entry=customSearchEntry(pack,item);
+        if(rawQuery===String(item.emoji||"")){
+          matches.push({item:entry.item,score:-95+packIndex/100});
+          return;
+        }
+        if(!tokens.every(token=>entry.text.includes(token)))return;
+        let score=36;
+        if(entry.terms.some(term=>term===normalized))score=4;
+        else if(entry.terms.some(term=>term.startsWith(normalized)))score=14;
+        else if(entry.text.includes(normalized))score=26;
+        matches.push({item:entry.item,score:score+(packIndex/100)+(itemIndex/100000)});
+      });
+    });
 
-        return {item, score};
+    const seenCustom=new Set();
+    return matches
+      .sort((a,b)=>a.score-b.score)
+      .filter(entry=>{
+        const id=String(entry.item?.custom_emoji_id||"");
+        if(!id)return true;
+        if(seenCustom.has(id))return false;
+        seenCustom.add(id);return true;
       })
-      .filter(Boolean)
-      .sort((a,b) => (a.score - b.score) || (a.item.sortOrder - b.item.sortOrder))
-      .slice(0, SEARCH_LIMIT)
-      .map(entry => entry.item);
+      .slice(0,SEARCH_LIMIT)
+      .map(entry=>entry.item);
   }
 
   function renderSearchItems(items) {
@@ -1406,6 +1639,8 @@
     });
 
     syncAddPackLockState(addButton);
+    const manageButton = panel.querySelector(".apple-emoji-pack-manage");
+    if (manageButton) manageButton.hidden = !customPacks.length;
 
     const mode = String(panel.dataset.mode || activeCategory || "normal");
     requestAnimationFrame(() => setRailActive(mode));
@@ -1427,7 +1662,22 @@
     const badge = document.createElement("small");
     badge.textContent = mt("emoji.apple");
     headMain.append(title, badge);
-    head.append(headMain);
+    const managePacks = document.createElement("button");
+    managePacks.type = "button";
+    managePacks.className = "apple-emoji-pack-manage";
+    managePacks.setAttribute("aria-label", mt("emoji.pack_manage"));
+    managePacks.title = mt("emoji.pack_manage");
+    managePacks.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10M9 17h6"/><circle cx="8" cy="7" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="12" cy="17" r="1.5"/></svg>';
+    managePacks.hidden = !customPacks.length;
+    managePacks.addEventListener("pointerdown", event => event.preventDefault());
+    managePacks.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetSearchUI();
+      renderPackManagerView();
+      requestAnimationFrame(placePanel);
+    });
+    head.append(headMain, managePacks);
 
     const searchWrap = document.createElement("div");
     searchWrap.className = "apple-emoji-search-wrap";
@@ -1586,6 +1836,7 @@
 
   async function openPanel() {
     if (panel) { closePanel(); return; }
+    const perfStarted=performance.now();
     try { window.RichTextToolbarMenu?.close?.(); } catch (_) {}
     try { hideMenus?.(); } catch (_) {}
 
@@ -1606,6 +1857,7 @@
       panel = nextPanel;
       const recent = loadRecent();
       renderMode(recent.length ? "recent" : "normal");
+      try { window.RichMiniAppPerf?.record?.("emoji_picker_open", perfStarted); } catch (_) {}
       requestAnimationFrame(placePanel);
     } catch (error) {
       closePanel();
