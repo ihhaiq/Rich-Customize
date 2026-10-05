@@ -1,5 +1,6 @@
 import { json, readJson, handleError, HttpError } from '../../_lib/http.js';
 import { miniAppUser } from '../../_lib/telegram-auth.js';
+import { isDeveloper } from '../../../lib/developer-access.js';
 
 let schemaReadyPromise = null;
 
@@ -79,6 +80,30 @@ export async function onRequestPost(context) {
   }
 }
 
-export async function onRequestGet() {
-  return new Response('Method Not Allowed', {status:405});
+export async function onRequestGet(context) {
+  try {
+    const user = await miniAppUser(context);
+    if (!isDeveloper(user.id)) throw new HttpError(403, 'developer_only');
+    const db = context.env?.DB;
+    await ensureSchema(db);
+    const currentMinute = Math.floor(Date.now() / 60000);
+    const rows = await db.prepare(
+      'SELECT metric, SUM(samples) AS samples, SUM(total_ms) AS total_ms, MAX(max_ms) AS max_ms '
+      + 'FROM miniapp_performance_minutes WHERE minute >= ? '
+      + 'GROUP BY metric ORDER BY metric ASC'
+    ).bind(currentMinute - 60).all();
+    const metrics = (rows?.results || []).map((row) => {
+      const samples = Math.max(0, Number(row.samples || 0));
+      const total = Math.max(0, Number(row.total_ms || 0));
+      return {
+        metric:String(row.metric || ''),
+        samples,
+        average_ms:samples ? Math.round(total / samples) : 0,
+        max_ms:Math.max(0, Number(row.max_ms || 0)),
+      };
+    });
+    return json({ok:true,window_minutes:60,metrics});
+  } catch (error) {
+    return handleError(error);
+  }
 }
