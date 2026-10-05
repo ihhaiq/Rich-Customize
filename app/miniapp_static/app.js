@@ -709,7 +709,14 @@ async function boot(){
   }
 
   try{
-    await api("/miniapp/api/me");
+    const meData=await api("/miniapp/api/me");
+    window.RichMiniAppAccess={
+      isDeveloper:Boolean(meData?.is_developer),
+      customEmojiPackLimit:meData?.limits?.custom_emoji_packs==null?null:Math.max(0,Number(meData.limits.custom_emoji_packs)||0),
+      customEmojiPacks:Array.isArray(meData?.custom_emoji_packs)?meData.custom_emoji_packs.map(name=>String(name||"")).filter(Boolean):[],
+      customEmojiPackCount:Math.max(0,Number(meData?.custom_emoji_pack_count||0)),
+    };
+    window.dispatchEvent(new CustomEvent("rich-miniapp-access",{detail:window.RichMiniAppAccess}));
   }catch(error){
     updateSaveState(mt("save.unauthorized"));
     slashInput.disabled=true;
