@@ -893,3 +893,133 @@ Done means:
 **Upgrade the platform first, simplify the architecture second.**
 
 CLI 0.2.0 migration, Mini App hosting, and native endpoints are three related but separable changes. Keep them separable in commits and testing so a failure in one layer does not force a risky all-at-once rollback.
+
+
+---
+
+## 27. Confirmed Telegram Serverless 0.2.0 details (documentation review)
+
+This section supersedes older “unknown” wording elsewhere in this plan where the item is explicitly confirmed here.
+
+### Endpoint model and trusted identity
+
+Native Mini App backend functions live under `tgcloud/endpoints/<name>.js` and are invoked with `Telegram.WebApp.Serverless.call("endpointName", payload, callback)`.
+
+Telegram carries and validates Mini App `initData` for native calls before endpoint execution; endpoint code receives Telegram context through `ctx.initData`. Therefore authorization must derive the acting user from the trusted endpoint context, never from a client-supplied `user_id`.
+
+Telegram Serverless also provides structured `EndpointError` handling. Use it for expected validation, ownership, not-found and revision-conflict failures. Unexpected exceptions must not be deliberately exposed to the client.
+
+### Confirmed module layout
+
+```text
+tgcloud/
+  handlers/
+  endpoints/
+  lib/
+  schema.js
+```
+
+Handlers and endpoints are discovery directories and should remain flat/one-level. Put nested reusable business logic in `tgcloud/lib/`. Project-local modules can use relative imports with the `.js` extension.
+
+### Push safety
+
+Treat the local tgcloud project as the desired deployed module set: a remote module absent locally may be removed by a push. A partial/failed upgrade must therefore never be pushed.
+
+Before the first 0.2 push, verify every handler, shared dependency, schema module and intentional endpoint is present and inspect status/diff. Do not casually run `tgcloud fetch` over uncommitted migration work.
+
+### tgcloud.jsonc and Mini App hosting
+
+The new config can describe static source/build output plus SPA behavior, immutable asset patterns, headers and redirects. Use only the exact schema accepted by the installed CLI.
+
+Do not mark stable filenames such as the current `app.js` immutable. Long-lived immutable caching is for content-hashed assets.
+
+The existing `app/miniapp_static/_redirects` is Cloudflare-specific; translate only required behavior into supported tgcloud configuration and test deep links.
+
+The hosted application reserves the platform `/api/` namespace for endpoints. Do not create conflicting static frontend routes/assets.
+
+Explicit static-hosting removal configuration (for example documented `static: false` behavior) is not equivalent to simply omitting static management. Verify exact installed-CLI behavior before using destructive hosting settings.
+
+### Deployment coupling
+
+CLI 0.2 can deploy configured static output together with the Serverless project. This improves version consistency but increases blast radius.
+
+Do not combine first CLI upgrade, database migration, first endpoint migration and production Mini App host cutover in one deployment.
+
+### Local testing
+
+Use documented `tgcloud run` endpoint/context support for logic tests. A synthetic local context does not prove Telegram authentication; security acceptance requires a real Telegram Mini App invocation.
+
+### Architectural consequence
+
+RCB1 is now a strong retirement candidate for Mini App ↔ Serverless operations, but only after per-operation parity.
+
+Desired long-term path:
+
+```text
+Telegram-hosted Mini App
+      ↓ Telegram.WebApp.Serverless.call
+validated Telegram endpoint context
+      ↓
+tgcloud/endpoints/*
+      ↓
+shared tgcloud/lib business logic
+      ↓
+Telegram Serverless DB / Bot API
+```
+
+Keep Cloudflare/RCB1 during migration. Treat media/upload and native picker/resume as separate decisions.
+
+---
+
+## 28. Revised endpoint migration waves
+
+1. **Read-only bounded operations:** page list, single page read, bounded destination/config reads.
+2. **Revision-safe mutations:** save/create/delete with optimistic concurrency and idempotency/reconciliation.
+3. **Telegram side effects:** publish and native user-picker flows; never blindly retry ambiguous failures.
+4. **Media/large payloads:** migrate only after endpoint limits and real-device tests prove suitability. A permanent hybrid with Cloudflare is acceptable.
+
+---
+
+## 29. Questions for Telegram Serverless developers
+
+These remain open because their answers can materially change the architecture or safety design:
+
+1. What are the exact maximum serialized request and response sizes for `Telegram.WebApp.Serverless.call()` / endpoints? Are limits measured before or after encoding/compression?
+2. What are the exact wall-clock timeout, CPU, memory and concurrency limits for endpoints? Are they identical to update handlers?
+3. Does `Serverless.call()` support `Uint8Array`, `ArrayBuffer` or other binary payloads, or only JSON-compatible structured data? What size limits apply?
+4. Can Telegram retry an endpoint execution after transport/internal failure? Are execution semantics at-most-once, at-least-once, or unspecified? This is critical for CREATE/PUBLISH.
+5. If the Mini App closes or times out, can the endpoint continue executing server-side? Is a cancellation signal exposed?
+6. What freshness/replay policy is applied to the `initData` validated for `Serverless.call()`? Is `auth_date` checked against a documented maximum age on every call?
+7. Is an endpoint callable only from the bot/app's own Mini App context? What server-side binding prevents reuse of copied otherwise-valid initData from another context?
+8. What per-user, per-app, per-endpoint and global rate limits apply, and what error/code is returned when exceeded?
+9. Are Bot API calls from endpoints subject to restrictions different from handlers, especially uploads and slower send operations?
+10. What are the static-hosting limits: file count, total deployment size, individual file size and MIME restrictions?
+11. After `tgcloud push`, what invalidation/propagation guarantees apply to non-immutable `index.html` and stable-name JS/CSS?
+12. Which security/cache response headers are supported in `tgcloud.jsonc` (CSP, COOP/COEP, Permissions-Policy, Cache-Control, etc.)?
+13. Is there an official atomic rollback for both modules and hosted Mini App, or must an old local Git state be pushed again?
+14. What rollback support exists after a database migration? Should applications assume schema migrations must remain backward-compatible?
+15. Is `npx tgcloud upgrade` guaranteed to modify local files only, without remote deployment/database effects? Is rerunning it after partial failure supported/idempotent?
+16. With the 0.2 layout, exactly how does `tgcloud fetch` behave with local unpushed changes: replacement, merge, or revision-conflict protection?
+17. What minimum Telegram client/WebApp version supports `Telegram.WebApp.Serverless.call`, and what behavior should be expected on older clients?
+18. What endpoint observability exists: request IDs, duration, logs/traces, and a stable correlation ID available to both client and server?
+19. Is endpoint-to-endpoint invocation supported/recommended, or should endpoints stay thin and share logic exclusively through `tgcloud/lib/`?
+20. Is there any new primitive for preserving/restoring Mini App state around Telegram native `request_users` picker flows, or should apps continue implementing their own resume mechanism?
+
+Until answered: keep payloads bounded, mutations revision-aware/idempotent, legacy transport available where necessary, and media on the proven path.
+
+---
+
+## 30. Updated execution rule
+
+Treat this migration as four independent deliverables:
+
+```text
+A. CLI 0.2 / tgcloud layout migration
+B. Telegram static Mini App hosting
+C. Native Serverless endpoint transport
+D. Legacy Cloudflare / RCB1 retirement
+```
+
+A can ship without B/C/D. B can be tested without retiring Cloudflare. C migrates operation-by-operation. D happens last after evidence and explicit review.
+
+**Never make D an automatic consequence of A, B or C.**
