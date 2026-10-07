@@ -4,7 +4,7 @@ import vm from 'node:vm';
 
 // Dependency-free isolated V8 harness. Only Telegram API and DB I/O are mocked;
 // editor, rendering, localization, session TTL and undo/redo run real modules.
-export async function harness({ intl = Intl } = {}) {
+export async function harness({ intl = Intl, extraModules = {} } = {}) {
   const root = path.resolve(import.meta.dirname, '../..');
   const context = vm.createContext({ console, Intl: intl, Date, Math, JSON, setTimeout, clearTimeout, crypto: globalThis.crypto });
   const records = {};
@@ -60,7 +60,7 @@ export async function harness({ intl = Intl } = {}) {
   const apiState = { pack: null };
   const eq = (column, value) => row => row[column.key] === value;
   const lt = (column, value) => row => row[column.key] < value;
-  const mocks = { sdk: { api, db }, 'sdk/db': { eq, lt, and: (...parts) => row => parts.every(p => p(row)) }, schema: tables };
+  const mocks = { sdk: { api, db, InputFile: class InputFile {} }, 'sdk/db': { eq, lt, asc: column => column, desc: column => column, gte: (column, value) => row => row[column.key] >= value, sql: () => null, and: (...parts) => row => parts.every(p => p(row)) }, schema: tables };
   const modules = new Map();
   const load = (name) => {
     if (modules.has(name)) return modules.get(name);
@@ -72,7 +72,8 @@ export async function harness({ intl = Intl } = {}) {
     modules.set(name, module);
     return module;
   };
-  const entry = new vm.SourceTextModule(`import * as flow from 'lib/editor-premium-emoji';
+  const extraImports = Object.entries(extraModules).map(([key, name]) => `import * as ${key} from '${name}'; export { ${key} };`).join('\n');
+  const entry = new vm.SourceTextModule(`${extraImports}\nimport * as flow from 'lib/editor-premium-emoji';
     import * as text from 'lib/rich-text'; import * as movement from 'lib/premium-emoji-text';
     import * as targets from 'lib/editor-emoji-targets'; import * as blocks from 'lib/editor-blocks';
     import * as renderer from 'lib/editor-renderer'; import * as session from 'lib/editor-session';

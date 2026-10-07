@@ -59,7 +59,7 @@ export async function onRequestPost(context) {
   try {
     const user = await miniAppUser(context);
     const payload = await readJson(context.request);
-    const content = validatePagePayload(payload);
+    const content = validatePagePayload(payload, null, user.id);
     if (!content.blocks.length) throw new HttpError(400, 'Page must contain at least one block');
 
     const title = String(payload.title || 'Untitled').trim().slice(0, 64);

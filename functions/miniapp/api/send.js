@@ -34,7 +34,7 @@ export async function onRequestPost(context) {
     // New/dirty editor pages are published as an ephemeral RCB1 document.
     // They are never inserted into or written back to rich_pages.
     if (Array.isArray(payload.blocks)) {
-      const content = validatePagePayload(payload);
+      const content = validatePagePayload(payload, null, user.id);
       if (!content.blocks.length) throw new HttpError(400, 'Page must contain at least one block');
 
       const title = String(payload.title || 'Untitled').trim().slice(0, 64);

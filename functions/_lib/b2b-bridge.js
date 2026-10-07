@@ -1,3 +1,4 @@
+import { isDeveloper } from '../../lib/developer-access.js';
 import { HttpError } from './http.js';
 
 export const B2B_PROTOCOL = 'RCB1';
@@ -278,6 +279,7 @@ async function reusableBridgeRequest(db, { userId, action, pageId = null }) {
 }
 
 async function guardPageOpenBurst(db, userId, pageId) {
+  if (isDeveloper(userId)) return;
   await ensureBridgeSchema(db);
   const owner = safeUserId(userId);
   const id = safePageId(pageId, true);

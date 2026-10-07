@@ -1,3 +1,4 @@
+import { isDeveloper } from '../../lib/developer-access.js';
 import { plainRichText } from '../../lib/rich-text.js';
 import { validateStoredButtons } from '../../lib/button-validation.js';
 import { HttpError } from './http.js';
@@ -216,7 +217,8 @@ function generatedVisibleText(block) {
   return text + caption + credit;
 }
 
-export function validatePagePayload(payload, current = null) {
+export function validatePagePayload(payload, current = null, userId = null) {
+  const developer = isDeveloper(userId);
   const fallback = current || {};
   const blocks = payload.blocks;
   const buttons = payload.buttons ?? fallback.buttons ?? [];
@@ -228,12 +230,12 @@ export function validatePagePayload(payload, current = null) {
   }
 
   const blockCount = countBlocks(blocks);
-  if (blockCount > MAX_PAGE_BLOCKS) {
+  if (!developer && blockCount > MAX_PAGE_BLOCKS) {
     throw new HttpError(400, 'editor limit exceeded: blocks (' + blockCount + '/' + MAX_PAGE_BLOCKS + ')');
   }
 
   const characterCount = visibleCharacterText(blocks).length;
-  if (characterCount > MAX_VISIBLE_CHARACTERS) {
+  if (!developer && characterCount > MAX_VISIBLE_CHARACTERS) {
     throw new HttpError(
       400,
       'editor limit exceeded: characters (' + characterCount + '/' + MAX_VISIBLE_CHARACTERS + ')',
@@ -246,14 +248,14 @@ export function validatePagePayload(payload, current = null) {
       const item = stack.pop();
       if (String(item?.type || '') === 'table') {
         const rows = tableRows(item);
-        if (rows.length > MAX_TABLE_ROWS) {
+        if (!developer && rows.length > MAX_TABLE_ROWS) {
           throw new HttpError(
             400,
             'editor limit exceeded: table_rows (' + rows.length + '/' + MAX_TABLE_ROWS + ')',
           );
         }
         const widest = Math.max(0, ...rows.map(rowWidth));
-        if (widest > MAX_TABLE_COLUMNS) {
+        if (!developer && widest > MAX_TABLE_COLUMNS) {
           throw new HttpError(
             400,
             'editor limit exceeded: table_columns (' + widest + '/' + MAX_TABLE_COLUMNS + ')',

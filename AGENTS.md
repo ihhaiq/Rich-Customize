@@ -140,6 +140,22 @@ Developer IDs live in `lib/developer-access.js`.
 
 Do not overwrite or remove configured local developer IDs during cleanup or deploy preparation.
 
+Developer usage exemptions must use `isDeveloper` with a trusted Telegram user ID.
+Pass the authenticated actor to content validators and the stored page owner to
+saved-page rendering (including inline/guest navigation). Never trust a client
+`is_developer`, `user_id`, or limits override to grant the exemption.
+
+Developers bypass product quotas for blocks, visible text, table size, slideshow
+item count, saved pages, premium emoji packs and per-user request windows across
+editing, saving, previewing, publishing and syncing. Keep authentication,
+ownership/revision checks, deduplication, mutation locks, global bridge backpressure,
+transport-size bounds and Telegram API limits intact. Frontend checks are advisory;
+Cloudflare and Serverless must independently enforce the same owner policy.
+
+This branch currently has no scheduled-publishing implementation or scheduled-post
+quota. Any future scheduler must apply the same developer exemption to its product
+horizon/count quotas without bypassing Telegram's scheduling constraints.
+
 ## Cleanup phase
 
 Current work is cleanup/stabilization before new feature development.
