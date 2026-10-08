@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS managed_bots (
   bot_username TEXT,
   webhook_key TEXT NOT NULL UNIQUE,
   webhook_secret TEXT NOT NULL,
+  token_encrypted TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'disabled' CHECK(status IN ('disabled','active','suspended','needs_relink')),
   welcome_text TEXT NOT NULL DEFAULT '',
   license_id TEXT,
