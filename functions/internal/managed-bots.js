@@ -31,8 +31,6 @@ export async function onRequest({request,env}){
  const tokenEncrypted=await encryptToken(input.token,env.MANAGED_BOT_ENCRYPTION_KEY);
  // No webhook is set until explicit activation. Registration cannot disrupt an existing bot.
  await env.DB.prepare('INSERT INTO managed_bots (id,owner_id,bot_telegram_id,bot_username,webhook_key,webhook_secret,token_encrypted,status,welcome_text,created_at,updated_at) VALUES (?,?,?,?,?,?,?,\'disabled\',?,?,?)')
- .bind(id,String(input.ownerId),String(me.id),String(me.username||''),webhookKey,webhookSecret,'',now,now).run().catch(async()=>{throw Error('registration_failed');});
- // Token storage is a separate statement to avoid returning credentials.
- await env.DB.prepare('UPDATE managed_bots SET token_encrypted=? WHERE id=?').bind(tokenEncrypted,id).run();
+ .bind(id,String(input.ownerId),String(me.id),String(me.username||''),webhookKey,webhookSecret,tokenEncrypted,'',now,now).run().catch(async()=>{throw Error('registration_failed');});
  return responseJson({ok:true,id,username:me.username,status:'disabled',requiresActivation:true},201);
 }
