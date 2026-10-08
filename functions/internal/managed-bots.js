@@ -1,5 +1,5 @@
 import {responseJson} from '../_lib/managed-bots.js';
-import {randomHex,encryptToken,telegram,requireAdmin,validBotToken} from '../_lib/managed-bot-runtime.js';
+import {randomHex,encryptToken,decryptToken,telegram,requireAdmin,validBotToken} from '../_lib/managed-bot-runtime.js';
 export async function onRequest({request,env}){
  const denied=requireAdmin(request,env);if(denied)return denied;
  if(!env.DB||!env.MANAGED_BOT_ENCRYPTION_KEY)return responseJson({error:'not_configured'},503);
@@ -9,6 +9,21 @@ export async function onRequest({request,env}){
  }
  if(request.method!=='POST')return responseJson({error:'method_not_allowed'},405);
  let input;try{input=await request.json();}catch{return responseJson({error:'invalid_json'},400);}
+ if(input?.action==='activate'){
+  if(typeof input.id!=='string'||input.confirmWebhookTakeover!==true)return responseJson({error:'confirmation_required'},400);
+  const bot=await env.DB.prepare('SELECT id,webhook_key,webhook_secret,token_encrypted,status FROM managed_bots WHERE id=?').bind(input.id).first();
+  if(!bot)return responseJson({error:'not_found'},404);
+  const origin=new URL(request.url).origin;
+  if(!origin.startsWith('https://'))return responseJson({error:'https_required'},400);
+  try{
+    const token=await decryptToken(bot.token_encrypted,env.MANAGED_BOT_ENCRYPTION_KEY);
+    const current=await telegram(token,'getWebhookInfo',{});
+    if(current?.url && input.confirmWebhookTakeover!==true)return responseJson({error:'existing_webhook'},409);
+    await telegram(token,'setWebhook',{url:origin+'/managed-bots/'+bot.webhook_key,secret_token:bot.webhook_secret,drop_pending_updates:false,allowed_updates:['message']});
+    await env.DB.prepare("UPDATE managed_bots SET status='active',updated_at=? WHERE id=?").bind(Date.now(),bot.id).run();
+    return responseJson({ok:true,status:'active'});
+  }catch{return responseJson({error:'activation_failed'},503);}
+ }
  if(input?.action==='disable'){
   if(typeof input.id!=='string')return responseJson({error:'invalid_id'},400);
   const row=await env.DB.prepare('SELECT id FROM managed_bots WHERE id=?').bind(input.id).first();
