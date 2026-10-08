@@ -209,3 +209,9 @@ Read [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rol
 - Keep the locked emoji-pack add tab tappable so users can inspect plan comparison. Developers with unlimited quota should never see the pack-limit offer unless the trusted server returns a true limit error.
 - UI copy is Arabic and English with English fallback for other supported locales until translations are supplied. Preserve Telegram initData gating; no billing code, tokens, or Cloudflare bot backend.
 - Test entry: `node --test tests/serverless/subscription-offers.test.mjs`. Cloudflare Pages auto-deploy is authorized from `serverless-cleanup`, **tgcloud deployment remains deferred**.
+
+## Plan roadmap presentation (2026-10-09)
+
+- User requested all benefits from `sups.md` be visible in the Mini App offer comparison. `subscription_offers.js` now lists saved pages (12/50/150), blocks (30/60/120), branding removal, templates, per-page version history (suggested 5/20), and early access; each unapproved Plus/Golden perk is explicitly tagged `Proposed`/`مقترح`.
+- The approval boundary does not change: **only text quotas 20k/25k/32k and emoji packs 2/8/50 have approved plan figures**; pricing and all other proposed paid benefits require a separate decision, implementation and verified billing. Do not add entitlement access from marketing markup. Do not imply saved templates or history exist before implementing them in Telegram Serverless.
+- Free currently supports 12 saved pages, 30 blocks, and separate 99 Stars branding removal (subject to its existing entitlement); proposals for paid tiers cannot silently modify these limits. Keep the display updated when `sups.md` decisions change.

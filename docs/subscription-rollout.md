@@ -58,3 +58,10 @@ Review any old tests expecting 25k for free; update them only when the new free 
 - A link opens `https://t.me/richDonateBot?start=rich_plans_text` for text, `rich_plans_emoji` for custom emoji packs or `rich_plans_limits` for other caps. Telegram `openTelegramLink` is used in the Mini App; the URL is a fallback. These `/start` payloads are **a proposed future contract**, not a live payment integration.
 - The copy discloses that paid plans/prices are not yet available. No paid plan is activated in browser state and no token/payment is processed by Cloudflare.
 - `tests/serverless/subscription-offers.test.mjs` covers classification, UI comparison and deep-link payloads in a mocked DOM. Real Telegram UI and `@richDonateBot` payload handling remain unverified until Telegram Serverless can be deployed.
+
+## Plan comparison expanded (2026-10-09)
+
+- The plan modal also lists all extra features already proposed in `sups.md`: saved pages Free 12 / Plus 50 / Golden 150, blocks Free 30 / Plus 60 / Golden 120, potential bundled removal of branding, saved templates, page history (suggested latest 5/20), and early access in Golden. **These are roadmap proposals**, not approved paid entitlements.
+- Grouping keeps text+emoji packs separately labeled as approved limits. The proposed features are visibly marked `مقترح`/`Proposed` and no unapproved monthly price appears. Brand-removal for Free remains a separate 99 Stars purchase; it is never implicitly revoked.
+- Page version history and saved template mechanics are **not implemented in Telegram Serverless**. Version history would store recoverable snapshots of a specific saved page, whereas a template would create a separate editable new page. Do not claim either is usable merely because the offer modal now lists it.
+- The modal remains scrollable, while its exit/link controls stay at its bottom. Cache version is `0.3.83`. No `tgcloud` deploy.
