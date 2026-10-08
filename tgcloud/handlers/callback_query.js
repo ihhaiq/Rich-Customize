@@ -7,6 +7,7 @@ import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import { handleBrandingCallback } from 'lib/branding';
+import { handleManagedBotCallback } from 'lib/managed-bot-billing';
 import { handleEditorBlockCallback } from 'lib/editor-block-flow';
 import { handlePageNavigationCallback } from 'lib/page-navigation';
 import { handleEditorPageCallback } from 'lib/editor-pages';
@@ -53,6 +54,7 @@ export default async function (query, ctx = {}) {
     if (await handleShowcaseCallback(query)) return;
     if (await handleLegalCallback(query)) return;
     if (await handleBrandingCallback(query)) return;
+    if (await handleManagedBotCallback(query)) return;
     if (await guardEditorCallback(query)) return;
 
     const data = String(query.data || '');

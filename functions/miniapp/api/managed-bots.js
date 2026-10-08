@@ -10,7 +10,12 @@ export async function onRequest(context) {
  try{
  if(!env.DB||!env.MANAGED_BOT_ENCRYPTION_KEY)fail('not_configured',503);
  const owner=String(user.id);await rateLimit(env.DB,'owner:'+owner,60);
- if(request.method==='GET')return responseJson(await listBots(env,owner));
+ if(request.method==='GET'){
+  const result=await listBots(env,owner);
+  let licenseSyncRequestId=null;
+  try{licenseSyncRequestId=await queueTextBridgeRequest(context,{action:'licenses',userId:user.id});}catch(error){console.warn('managed license bridge sync unavailable',error);}
+  return responseJson({...result,license_sync_request_id:licenseSyncRequestId});
+ }
  if(request.method!=='POST')return responseJson({error:'method_not_allowed'},405);
  const raw=await request.text();if(raw.length>16384)fail('too_large',413);
  let input;try{input=JSON.parse(raw);}catch{fail('invalid_json');}if(!input||typeof input!=='object')fail('invalid_input');

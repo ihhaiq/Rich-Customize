@@ -38,7 +38,7 @@ export function publicBot(b) {
 export async function listBots(env,owner) {
  const rows=await env.DB.prepare(`SELECT b.*,l.expires_at,l.status AS license_status FROM managed_bots b LEFT JOIN managed_bot_licenses l ON l.id=b.license_id AND l.owner_id=b.owner_id WHERE b.owner_id=? ORDER BY b.created_at DESC`).bind(String(owner)).all();
  const licenses=await env.DB.prepare(`SELECT l.id,l.expires_at FROM managed_bot_licenses l WHERE owner_id=? AND status='active' AND expires_at>? AND NOT EXISTS(SELECT 1 FROM managed_bots b WHERE b.license_id=l.id)`).bind(String(owner),Date.now()).all();
- return {bots:rows.results.map(b=>publicBot({...b,status:b.status==='active'&&(!(b.expires_at>Date.now())||b.license_status!=='active')?'suspended':b.status})),licenses:licenses.results,registration_enabled:env.MANAGED_BOTS_REGISTRATION_ENABLED==='true'};
+ return {bots:rows.results.map(b=>publicBot({...b,status:b.status==='active'&&(!(b.expires_at>Date.now())||b.license_status!=='active')?'suspended':b.status})),licenses:licenses.results,registration_enabled:env.MANAGED_BOTS_REGISTRATION_ENABLED!=='false'};
 }
 async function verifyToken(env,token) {
  if(!validBotToken(token))fail('invalid_token');
@@ -51,7 +51,7 @@ async function verifyToken(env,token) {
  return me;
 }
 export async function registerBot(env,owner,input) {
- if(env.MANAGED_BOTS_REGISTRATION_ENABLED!=='true')fail('registration_closed',403);
+ if(env.MANAGED_BOTS_REGISTRATION_ENABLED==='false')fail('registration_closed',403);
  const licenseId=String(input.license_id||'');
  await requireLicense(env,{license_id:licenseId,owner_id:owner});
  const me=await verifyToken(env,input.token);

@@ -5,6 +5,7 @@ import {
   bridgeRequestRow,
   downloadBridgeJson,
 } from '../../../_lib/b2b-bridge.js';
+import { syncLicenseRows } from '../../../_lib/managed-bot-licenses.js';
 
 function requestedId(context) {
   return String(context.params?.request_id || '');
@@ -20,7 +21,7 @@ function parseStoredJson(value) {
   }
 }
 
-function normalizeDocumentResult(row, payload) {
+async function normalizeDocumentResult(row, payload, env) {
   if (String(payload?.protocol || '') !== B2B_PROTOCOL) {
     throw new HttpError(502, 'Bridge protocol mismatch');
   }
@@ -37,6 +38,15 @@ function normalizeDocumentResult(row, payload) {
       ok: true,
       beta: '0.4-b2b',
       pages: Array.isArray(payload.pages) ? payload.pages : [],
+    };
+  }
+
+  if (row.action === 'licenses') {
+    await syncLicenseRows(env, row.user_id, payload.licenses);
+    return {
+      ok: true,
+      beta: '0.4-b2b',
+      licenses: Array.isArray(payload.licenses) ? payload.licenses : [],
     };
   }
 
@@ -107,7 +117,7 @@ export async function onRequestGet(context) {
 
     if (row.response_kind === 'document') {
       const payload = await downloadBridgeJson(context.env, row.response_file_id);
-      return json(normalizeDocumentResult(row, payload));
+      return json(await normalizeDocumentResult(row, payload, context.env));
     }
 
     if (row.response_kind === 'ack') {

@@ -516,6 +516,7 @@ function command(env, action) {
   const map = {
     ping: 'rcb_ping',
     pages: 'rcb_pages',
+    licenses: 'rcb_licenses',
     page: 'rcb_page',
     managed_page: 'rcb_managed_page',
     create: 'rcb_create',

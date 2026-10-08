@@ -20,6 +20,7 @@ import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import { handleBrandingSuccessfulPayment } from 'lib/branding';
+import { handleManagedBotSuccessfulPayment, sendManagedBotPlans } from 'lib/managed-bot-billing';
 import { sendMarketingCampaignSummary, sendMarketingLanding } from 'lib/marketing-campaign';
 import { handleMiniAppBridgeMessage } from 'lib/miniapp-bridge';
 import { handleMiniAppUserPickerShared } from 'lib/miniapp-user-picker';
@@ -61,6 +62,7 @@ export default async function (message, ctx = {}) {
     bridgeHandled = await handleMiniAppBridgeMessage(message, { updateId });
     if (bridgeHandled) return;
     if (await handleBrandingSuccessfulPayment(message)) return;
+    if (await handleManagedBotSuccessfulPayment(message)) return;
     if (await handleMiniAppUserPickerShared(message)) return;
     if (!await allowMessageRequest(message)) return;
     const command = commandName(message?.text);
@@ -71,6 +73,11 @@ export default async function (message, ctx = {}) {
 
     if (message?.chat?.type === 'private' && (matchesCommand(command, 'mybots') || message?.text?.trim() === 'بوتاتي')) {
       await api.sendMessage({chat_id:message.chat.id,text:'بوتاتي — إدارة بوتاتك وربط صفحاتك الغنية.',reply_markup:{inline_keyboard:[[{text:'فتح بوتاتي',url:'https://t.me/RichCustomizebot/editor?startapp=managed_bots'}]]}});
+      return;
+    }
+
+    if (message?.chat?.type === 'private' && (matchesCommand(command, 'managedbots') || matchesCommand(command, 'managedbot'))) {
+      await sendManagedBotPlans(message);
       return;
     }
 

@@ -21,11 +21,13 @@
 7. سجل تحديثات دائم، deduplication حسب `(bot_id, job_id)`، قفل لكل بوت، leases وقيد نهائي قبل الإرسال، backoff للأخطاء القابلة للإعادة، حالة مستقلة للنتائج غير المؤكدة.
 8. تراخيص مستقلة مرتبطة بمالك، تجديد/إلغاء/انتهاء بأحداث خادم موثقة وموقعة، منع تكرار الحدث ورفض تبديل المالك وتجاهل الإصدارات الأقدم. انتهاء الترخيص يعلق المعالجة فور الفحص دون حذف الإعدادات؛ التجديد لا يعيد التشغيل تلقائياً: المالك يفعل البوت مجدداً.
 
-## الاشتراكات وStars — مقفلة للإطلاق
+## الاشتراكات وStars
 
-المجلد `subscription-bot/` ليس معالج دفع إنتاجياً مكتملاً. لم يُنشأ deployment له ولم توضع أسعار أو اشتراكات تجريبية للمستخدمين.
+الدفع يمر عبر البوت الرئيسي/الوسيط الحالي باستخدام Telegram Stars، ولا يحتاج deployment مستقلاً. الأسعار المعتمدة حالياً: 50 نجمة لمدة شهر، أو 999 نجمة لترخيص دائم لبوت واحد.
 
-`POST /internal/managed-licenses` **مهايئ استحقاقات خادم إلى خادم، وليس إثبات دفع بحد ذاته**. يبقى مغلقاً ما لم يكن `MANAGED_BOTS_LICENSE_PROVIDER_ENABLED=true`. لا تشغله قبل وجود مصدر يتحقق من `successful_payment` و`currency=XTR` والمبلغ وinvoice/order والمالك ومعرّف الدفع الفريد، ويراجع الاسترداد والتجديد وStars reconciliation. توقيع الحدث يثبت مصدره فقط؛ لا يغني عن هذه التحققات المالية. لذلك التسجيل العام مغلق افتراضياً أيضاً.
+ينشئ النظام طلباً فريداً، ويفحص `pre_checkout_query`، ثم لا يصدر الترخيص إلا من `successful_payment` صحيح بعملة `XTR` والمبلغ والـpayload ومعرّف الدفع. كل charge محفوظ مرة واحدة لمنع التكرار، وكل ترخيص مستقل عن اشتراك المحرر.
+
+`POST /internal/managed-licenses` **مهايئ استحقاقات خادم إلى خادم، وليس إثبات دفع بحد ذاته**. يبقى مصدراً احتياطياً للأحداث الموقعة. مزامنة الترخيص الاعتيادية للتطبيق المصغر تقرأ التراخيص المصدرة من Serverless عبر RCB1 وتكتب نسخة تشغيلية في D1؛ لا تقبل الواجهة أي ترخيص من العميل.
 
 صيغة الحدث بعد اكتمال المصدر الموثوق:
 
@@ -70,8 +72,8 @@
 | `MANAGED_BOTS_PUBLIC_ORIGIN` | أصل HTTPS النهائي بلا مسار، مثل `https://rich-customize.pages.dev` |
 | `MANAGED_BOTS_RESERVED_IDS` | أرقام البوتات الداخلية مفصولة بفواصل، خصوصاً بوت التبرع الفعلي |
 | `MANAGED_BOTS_RESERVED_USERNAMES` | أسماء إضافية محجوزة؛ الأسماء الافتراضية محجوزة أيضاً |
-| `MANAGED_BOTS_LICENSE_PROVIDER_ENABLED` | اتركه `false` إلى اكتمال والتحقق من مصدر Stars |
-| `MANAGED_BOTS_REGISTRATION_ENABLED` | اتركه `false` للإطلاق العام قبل اجتياز الدفع والاختبار التشغيلي |
+| `MANAGED_BOTS_LICENSE_PROVIDER_ENABLED` | `false` ما لم يوجد مصدر خارجي موثوق للأحداث؛ لا يلزم لمسار Stars المركزي |
+| `MANAGED_BOTS_REGISTRATION_ENABLED` | اتركه غير مضبوط أو `true` بعد ضبط D1؛ اجعله `false` للإيقاف الطارئ |
 
 التشفير الحالي v1/AES-GCM محفوظ للتوافق. تدوير **توكن البوت** مدعوم؛ تدوير مفتاح التشفير العام يحتاج إجراء منفصلاً يعيد تشفير السجلات، فلا تغير المفتاح مباشرة.
 
@@ -92,7 +94,7 @@ npx wrangler d1 execute <DB_NAME> --remote --file=cloudflare/d1/migrations/0001-
 npx tgcloud status
 npx tgcloud diff
 npx tgcloud push
-# لا يلزم tgcloud migrate لهذه التغييرات: tgcloud/schema.js لم يتغير.
+# تغيّر tgcloud/schema.js لإضافة سجل طلبات Stars والتراخيص؛ يلزم مراجعة migration/حالة CLI قبل تطبيقه على الإنتاج.
 
 # بعد ضبط Secrets والجسر وmigration وموافقة نشر Pages
 npx wrangler pages deploy app/miniapp_static --project-name <PAGES_PROJECT> --branch serverless-cleanup

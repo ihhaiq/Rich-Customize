@@ -30,3 +30,28 @@ export async function acceptLicenseEvent(request,env) {
  ]);}catch{fail('event_conflict',409);}
  return {ok:true};
 }
+
+export async function syncLicenseRows(env, ownerId, rows) {
+ const owner=String(ownerId||'');
+ if(!/^\d{1,16}$/.test(owner)) fail('invalid_event');
+ if(!Array.isArray(rows)||rows.length>50) fail('invalid_event');
+ const statements=[];
+ for(const row of rows){
+  const licenseId=String(row?.id||'');
+  const status=String(row?.status||'');
+  const expiresAt=Number(row?.expires_at);
+  const version=Number(row?.version||1);
+  if(!/^[A-Za-z0-9_-]{8,100}$/.test(licenseId)||!['active','cancelled','expired'].includes(status)
+   ||!Number.isSafeInteger(expiresAt)||!Number.isSafeInteger(version)||version<1)fail('invalid_event');
+  const eventId=`bridge_${licenseId}_${version}`;
+  const digest=`bridge:${owner}:${licenseId}:${status}:${expiresAt}:${version}`;
+  statements.push(env.DB.prepare('INSERT OR IGNORE INTO managed_license_events(event_id,license_id,version,digest,received_at) VALUES(?,?,?,?,?)')
+   .bind(eventId,licenseId,version,digest,Date.now()));
+  statements.push(env.DB.prepare(`INSERT INTO managed_bot_licenses(id,owner_id,status,expires_at,version,source_event,updated_at) VALUES(?,?,?,?,?,?,?)
+   ON CONFLICT(id) DO UPDATE SET status=excluded.status,expires_at=excluded.expires_at,version=excluded.version,source_event=excluded.source_event,updated_at=excluded.updated_at
+   WHERE managed_bot_licenses.version<excluded.version AND managed_bot_licenses.owner_id=excluded.owner_id`)
+   .bind(licenseId,owner,status,expiresAt,version,eventId,Date.now()));
+ }
+ if(statements.length) await env.DB.batch(statements);
+ return {ok:true,synced:rows.length};
+}

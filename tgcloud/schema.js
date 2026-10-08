@@ -282,6 +282,49 @@ export const brandingEntitlements = table('branding_entitlements', {
   updatedAt: integer('updated_at').notNull(),
 });
 
+export const managedBotOrders = table('managed_bot_orders', {
+  orderId: text('order_id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  planId: text('plan_id').notNull(),
+  amount: integer('amount').notNull(),
+  currency: text('currency').notNull().default('XTR'),
+  invoicePayload: text('invoice_payload').notNull(),
+  status: text('status').notNull().default('pending'),
+  licenseId: text('license_id'),
+  createdAt: integer('created_at').notNull(),
+  paidAt: integer('paid_at'),
+}, (t) => ({
+  userIdx: index('idx_managed_bot_orders_user').on(t.userId, t.createdAt),
+  payloadIdx: index('idx_managed_bot_orders_payload').on(t.invoicePayload),
+}));
+
+export const managedBotPayments = table('managed_bot_payments', {
+  chargeId: text('charge_id').primaryKey(),
+  orderId: text('order_id').notNull(),
+  userId: integer('user_id').notNull(),
+  amount: integer('amount').notNull(),
+  currency: text('currency').notNull().default('XTR'),
+  paidAt: integer('paid_at').notNull(),
+  refundedAt: integer('refunded_at'),
+}, (t) => ({
+  orderIdx: index('idx_managed_bot_payments_order').on(t.orderId),
+  userIdx: index('idx_managed_bot_payments_user').on(t.userId, t.paidAt),
+}));
+
+export const managedBotLicenses = table('managed_bot_licenses', {
+  licenseId: text('license_id').primaryKey(),
+  ownerId: integer('owner_id').notNull(),
+  planId: text('plan_id').notNull(),
+  status: text('status').notNull().default('active'),
+  expiresAt: integer('expires_at').notNull(),
+  version: integer('version').notNull().default(1),
+  sourcePaymentId: text('source_payment_id').notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  ownerIdx: index('idx_managed_bot_licenses_owner').on(t.ownerId, t.status, t.expiresAt),
+}));
+
 export const marketingCampaignAttribution = table('marketing_campaign_attribution', {
   userId: integer('user_id').primaryKey(),
   source: text('source').notNull(),

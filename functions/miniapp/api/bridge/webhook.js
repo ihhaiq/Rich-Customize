@@ -39,6 +39,7 @@ function responseAction(source) {
   const value = String(source || '').toUpperCase();
   if (value.includes('FULL_SYNC_OK')) return 'full_sync';
   if (value.includes('GET_PAGES_OK')) return 'pages';
+  if (value.includes('GET_MANAGED_LICENSES_OK')) return 'licenses';
   if (value.includes('GET_MANAGED_PAGE_OK')) return 'managed_page';
   if (value.includes('GET_PAGE_OK')) return 'page';
   if (value.includes('GET_DESTINATIONS_OK')) return 'destinations';

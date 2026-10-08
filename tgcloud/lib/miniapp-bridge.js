@@ -1,4 +1,5 @@
 import { managedPage } from 'lib/managed-pages';
+import { listManagedBotLicensesForBridge } from 'lib/managed-bot-billing';
 import { api, db, InputFile } from 'sdk';
 import { and, eq, lt } from 'sdk/db';
 import {
@@ -49,6 +50,7 @@ const COMMANDS = Object.freeze({
   rcb_ping: 'ping',
   rcb_full_sync: 'full_sync',
   rcb_pages: 'pages',
+  rcb_licenses: 'licenses',
   rcb_page: 'page',
   rcb_managed_page: 'managed_page',
   rcb_create: 'create',
@@ -1131,6 +1133,16 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
       reason: 'bootstrap',
     });
     else if (action === 'pages') result = await handlePages(message, id, ownerId);
+    else if (action === 'licenses') {
+      const licenses = await listManagedBotLicensesForBridge(ownerId);
+      await sendJson(
+        message,
+        'managed_licenses_' + id + '.json',
+        '✅ RCB1 GET_MANAGED_LICENSES_OK\\nrequest_id: ' + id + '\\nuser_id: ' + ownerId,
+        { protocol: BRIDGE_PROTOCOL, request_id: id, action, user_id: ownerId, licenses },
+      );
+      result = { status: 'ok' };
+    }
     else if (action === 'managed_page') {
       const payload = await managedPage(ownerId,idValue);
       await sendJson(message,'managed_'+id+'.json','✅ RCB1 GET_MANAGED_PAGE_OK\nrequest_id: '+id+'\nuser_id: '+ownerId+'\npage_id: '+idValue,{protocol:BRIDGE_PROTOCOL,request_id:id,action,user_id:ownerId,...payload});
