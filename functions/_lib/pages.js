@@ -1,5 +1,5 @@
 import { isDeveloper } from '../../tgcloud/lib/developer-access.js';
-import { PLAN_LIMITS, resolveEditorEntitlement, checkEditorTextQuota, LEGACY_FREE_TEXT_LIMIT } from '../../tgcloud/lib/subscription-policy.js';
+import { PLAN_LIMITS, resolveEditorEntitlement, checkEditorTextQuota } from '../../tgcloud/lib/subscription-policy.js';
 import { plainRichText } from '../../tgcloud/lib/rich-text.js';
 import { validateStoredButtons } from '../../tgcloud/lib/button-validation.js';
 import { HttpError } from './http.js';
@@ -218,7 +218,7 @@ function generatedVisibleText(block) {
   return text + caption + credit;
 }
 
-export function validatePagePayload(payload, current = null, userId = null, { relayLegacyUpdate = false } = {}) {
+export function validatePagePayload(payload, current = null, userId = null) {
   const developer = isDeveloper(userId);
   const fallback = current || {};
   const blocks = payload.blocks;
@@ -240,11 +240,9 @@ export function validatePagePayload(payload, current = null, userId = null, { re
   const quota = checkEditorTextQuota(
     resolveEditorEntitlement({ developer }), characterCount, { previousCount },
   );
-  // If the authenticated mirror is unavailable, only an existing-page PUT
-  // may pass the old gateway ceiling; Serverless rechecks its stored baseline.
-  const relayCompatible = relayLegacyUpdate === true
-    && characterCount <= LEGACY_FREE_TEXT_LIMIT;
-  if (!quota.allowed && !relayCompatible) {
+  // Never forward over-quota content using an unverified gateway fallback.
+  // During phased deployment, Serverless may still run the former 25k policy.
+  if (!quota.allowed) {
     throw new HttpError(400,
       'editor limit exceeded: characters (' + characterCount + '/' + quota.limit + ')');
   }

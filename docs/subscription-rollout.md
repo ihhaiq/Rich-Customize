@@ -8,10 +8,10 @@ Updated 2026-10-08. This is an **implementation ledger**, not a production or pr
 - `tgcloud/lib/editor-blocks.js` and `functions/_lib/pages.js`: the free text ceiling now derives from policy, not duplicate hardcoded `25000`. Neither route grants plans from client JSON.
 - For existing stored pages above 20k, `previousBlocks` is **trusted server-stored** page content. Updates may retain/reduce old size but not expand it; a new page/import/direct-unsaved publish cannot claim a legacy exemption.
 - `tgcloud/lib/editor-pages.js`, `tgcloud/lib/editor-session.js`, and `tgcloud/lib/miniapp-bridge.js`: protect manual saves, automatic synchronization and authoritative Mini App SAVE. Verification is after fetching the actual owned record and checking concurrency.
-- `functions/miniapp/api/pages/[page_id].js` accepts a legacy PUT within the previous 25k gateway envelope when Cloudflare's mirror is unavailable, but this is **not** the final approval. The verified owner/revision and saved-page comparison in Serverless reject unauthorized size growth. Do not treat the D1 mirror or client-submitted `previousCount` as an entitlement authority.
+- `functions/miniapp/api/pages/[page_id].js` uses `functions/_lib/quota-baseline.js`: a legacy PUT above 20k is accepted by the **gateway** only if its owner-scoped D1 page mirror matches the submitted page revision/updated_at; missing or stale mirrors fail closed at 20k. This remains a gateway precheck, with Telegram Serverless rechecking verified stored content after its later deployment. An old Serverless runtime could otherwise still permit 25k edits while Cloudflare has the new limits.
 - Saved-page publish/delivery routes pass the authenticated, stored original as a compatibility baseline to the renderer. Unsaved direct-send does not. Mixed/new content must obey the new free limit.
 - `functions/_lib/custom-emoji-packs.js`: free Mini App emoji-packs 1 → **2**, backfill old `miniapp_custom_emoji_primary_pack` into `miniapp_custom_emoji_packs` without destructive SQL, and atomic conditional INSERT for concurrency. `app/miniapp_static/apple_emoji_picker.js` default and cached-pack slicing updated for 2. Developer unlimited access still requires verified Telegram identity.
-- `tests/serverless/a1-quotas.test.mjs` and `tests/serverless/a1-emoji-packs.test.mjs` plus existing quota tests are staged. **The automated Node/Cloudflare/Serverless suites have not been run in this session.**
+- `tests/serverless/a1-quotas.test.mjs`, `tests/serverless/a1-integration.test.mjs` and `tests/serverless/a1-emoji-packs.test.mjs` plus existing quota tests are staged. An earlier GitHub Actions run failed **before job steps**. Complete automated Node and end-to-end Telegram/Cloudflare suites are not yet verified.
 
 
 ## A1 first verification attempt — 2026-10-09
@@ -19,7 +19,7 @@ Updated 2026-10-08. This is an **implementation ledger**, not a production or pr
 - Workflow: [`.github/workflows/a1-quota-tests.yml`](../.github/workflows/a1-quota-tests.yml), runs on branch `serverless-cleanup` without any deployment/secrets.
 - [GitHub Actions run 37844480265](https://github.com/ihhaiq/Rich-Customize/actions/runs/37844480265): **failed before any job step** (`steps=[]`, runner billable duration `0 ms`). This is **not** a failed Node test result; inspect GitHub Actions configuration/runner access and job annotations before assuming a code defect.
 - Isolated V8 checks (real policy module, evaluated without import syntax): **20/20 PASS**. Isolated emoji pack tests (the repository's three A1 test functions run against real pack module with mocked D1): **3/3 PASS**.
-- This is **partial verification only**. Native Node test suite, authentic D1 concurrency/migration and Telegram Serverless integrations are **not verified**. Do not mark A1 done, deploy, or proceed with paid entitlements on this basis alone.
+- This is **partial verification only**. Native Node test suite, authentic D1 concurrency/migration and Telegram Serverless integrations are **not verified**. Do not mark A1 done or proceed with paid entitlements on this basis alone. The user has separately approved Cloudflare Pages auto-deployment but NOT tgcloud.
 
 ## Important limitations before publishing
 
@@ -36,8 +36,17 @@ Updated 2026-10-08. This is an **implementation ledger**, not a production or pr
 ## Local verification (no deployment)
 
 ```bash
-node --experimental-vm-modules --test tests/serverless/subscription-policy.test.mjs tests/serverless/a1-quotas.test.mjs tests/serverless/developer-limits.test.mjs tests/serverless/a1-emoji-packs.test.mjs
+node --experimental-vm-modules --test tests/serverless/subscription-policy.test.mjs tests/serverless/a1-quotas.test.mjs tests/serverless/a1-integration.test.mjs tests/serverless/developer-limits.test.mjs tests/serverless/a1-emoji-packs.test.mjs
 node --experimental-vm-modules --test tests/serverless/*.test.mjs
 ```
 
-Review any old tests expecting 25k for free; update them only when the new free quota is intended, not by concealing regression. No `tgcloud push`, `tgcloud migrate`, Cloudflare publish, branch merge or production D1 deletion without explicit approval.
+Review any old tests expecting 25k for free; update them only when the new free quota is intended, not by concealing regression. The user has authorized **Cloudflare Pages auto-deploy** from `serverless-cleanup` (no skip prefix). No `tgcloud push`, `tgcloud migrate`, `main` merge, or destructive production D1 mutation without separate authorization.
+
+## A1 review of bypass and overwrite risks (2026-10-09)
+
+- **Fixed:** Untrusted unsaved draft blocks no longer grant a historical text quota exception during editing of Details/other extra blocks. `trustedEditorQuotaBaseline` reads only a page actually owned by the authenticated editor.
+- **Fixed:** Manual saved-page updates and editor autosync protect owner/page/revision in the write itself, preventing a newer revision committed between read and write from being blindly overwritten.
+- **Fixed for phased deployment:** Cloudflare PUT has no untrusted <=25k fallback. Owner-scoped D1 mirror must match base revision/time, otherwise the request is checked as fresh 20k content; this is important until Telegram Serverless is separately upgraded.
+- **Covered by tests:** `a1-integration.test.mjs` (new-page and unsaved direct-send rejection, legacy read, owner scope, mirror mismatch, CAS source guard). These source/mock tests are not a live Telegram test.
+- **Remaining risk:** a bot editor session already stale *before* a new save begins is not identified from a session-pinned page revision (not currently stored). A separate revision-in-session design/migration is needed to eliminate that last-write hazard. Do not silently overwrite externally modified pages and do not mark A1 closed until this is addressed or acceptance is explicitly scoped.
+- **Deployment order:** Cloudflare auto-deploy now permitted; **no tgcloud production deployment** until the user can run/review it. Confirm Cloudflare build and read-only public assets, then run authenticated smoke tests once Serverless matches source. Do not claim a live integration pass from mock tests alone.

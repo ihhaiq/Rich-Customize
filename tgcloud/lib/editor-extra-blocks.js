@@ -43,6 +43,7 @@ import {
   resetEditorTransientState,
   setEditorState,
   updateEditorSession,
+  trustedEditorQuotaBaseline,
 } from 'lib/editor-session';
 import {
   messageToBlocks,
@@ -244,7 +245,9 @@ async function finishAdd(userId, session, message, block, languageCode) {
   const blocks = clone(session.blocks || []);
   addBlock(blocks, block);
   alignLinkedAnchors(blocks);
-  const limit = validateEditorLimits(blocks, userId, { previousBlocks: session.blocks || [] });
+  const limit = validateEditorLimits(blocks, userId, {
+    previousBlocks: await trustedEditorQuotaBaseline(userId, session),
+  });
   if (!limit.ok) {
     await api.sendMessage({ chat_id: message.chat.id, text: limitText(limit, languageCode) });
     return false;
@@ -288,7 +291,9 @@ async function replaceTopBlock(userId, session, message, block, replacement, lan
     return false;
   }
   alignLinkedAnchors(blocks);
-  const limit = validateEditorLimits(blocks, userId, { previousBlocks: session.blocks || [] });
+  const limit = validateEditorLimits(blocks, userId, {
+    previousBlocks: await trustedEditorQuotaBaseline(userId, session),
+  });
   if (!limit.ok) {
     await api.sendMessage({ chat_id: message.chat.id, text: limitText(limit, languageCode) });
     return false;
@@ -633,7 +638,9 @@ function detailsInnerPage(details, child, languageCode) {
 }
 
 async function saveMutatedBlocks(userId, session, blocks, changes = {}) {
-  const limit = validateEditorLimits(blocks, userId, { previousBlocks: session.blocks || [] });
+  const limit = validateEditorLimits(blocks, userId, {
+    previousBlocks: await trustedEditorQuotaBaseline(userId, session),
+  });
   if (!limit.ok) return { ok: false, limit };
   await rememberEditorState(userId, session);
   const updated = await updateEditorSession(userId, { blocks, ...changes });

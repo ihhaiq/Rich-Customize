@@ -30,5 +30,6 @@ jobs:
           node --experimental-vm-modules --test \
             tests/serverless/subscription-policy.test.mjs \
             tests/serverless/a1-quotas.test.mjs \
+            tests/serverless/a1-integration.test.mjs \
             tests/serverless/developer-limits.test.mjs \
             tests/serverless/a1-emoji-packs.test.mjs

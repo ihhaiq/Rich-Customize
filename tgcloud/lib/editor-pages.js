@@ -203,7 +203,7 @@ async function persistPage(userId, title, session, existingId = null) {
     assertQuota(existing.blocks || []);
     stamp = Math.max(stamp, Number(existing.updatedAt || 0) + 1);
     const version = await nextPageSyncVersion(existing.revision || 1);
-    await db.update(richPages).set({
+    const changed = await db.update(richPages).set({
       title: cleanedTitle,
       blocks: clone(session.blocks || []),
       buttons: clone(session.messageButtons || []),
@@ -212,7 +212,16 @@ async function persistPage(userId, title, session, existingId = null) {
       updatedAt: stamp,
       revision: version.revision,
       syncSeq: version.syncSeq,
-    }).where(eq(richPages.pageId, String(existingId))).run();
+    }).where(and(
+      eq(richPages.pageId, String(existingId)),
+      eq(richPages.ownerId, Number(userId)),
+      eq(richPages.revision, Number(existing.revision || 1)),
+    )).returning({ pageId: richPages.pageId }).run();
+    if (!Array.isArray(changed) || !changed.length) {
+      const error = new Error('PAGE_CONFLICT');
+      error.pageBusy = true;
+      throw error;
+    }
     const saved = await getPage(existingId);
     if (saved) {
       try {

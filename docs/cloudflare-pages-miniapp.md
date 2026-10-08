@@ -227,3 +227,11 @@ npx tgcloud webhook sync
 ```
 
 Bot-to-Bot Communication Mode must be enabled for both bots before smoke testing.
+
+## A1 phased rollout: Cloudflare before tgcloud (2026-10-09)
+
+The production branch is `serverless-cleanup` and the owner has approved **automatic Cloudflare deployment on branch commits**. Do not use `[CF-Pages-Skip]` while this instruction remains in force. This does not authorize `tgcloud push` or `tgcloud migrate`.
+
+Until the new Telegram Serverless version is deployed, Cloudflare PUT for an existing page must not trust the older Serverless 25k quota. `functions/_lib/quota-baseline.js` only allows a 20k+ legacy page update if the owner-specific D1 mirror is present and its revision/updated_at matches the request base. A missing/stale mirror fails closed, preserving old content in storage but requiring the mirror to catch up before modifying >20k. CREATE and direct unsaved PUBLISH are always subject to 20k.
+
+Deployment checks: confirm Pages deployment is successful; verify `/miniapp/static/editor.html` and `/miniapp/static/app.js` are accessible. Unauthenticated HTTP checks cannot prove owner quota enforcement or Telegram B2B delivery; those require authenticated real-user smoke tests after tgcloud is deployed.

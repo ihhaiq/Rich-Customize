@@ -112,7 +112,7 @@ async function syncSavedPageSession(userId, session) {
   const title = String(session.currentPageTitle || page.title || pageId).trim().slice(0, 64)
     || String(page.title || pageId);
 
-  await db.update(richPages).set({
+  const changed = await db.update(richPages).set({
     title,
     blocks: clone(session.blocks || []),
     buttons: clone(session.messageButtons || []),
@@ -121,7 +121,14 @@ async function syncSavedPageSession(userId, session) {
     updatedAt: stamp,
     revision: version.revision,
     syncSeq: version.syncSeq,
-  }).where(eq(richPages.pageId, pageId)).run();
+  }).where(and(
+    eq(richPages.pageId, pageId),
+    eq(richPages.ownerId, Number(userId)),
+    eq(richPages.revision, Number(page.revision || 1)),
+  )).returning({ pageId: richPages.pageId }).run();
+  if (!Array.isArray(changed) || !changed.length) {
+    return { status:'conflict', changed:false };
+  }
 
   const saved = await db.select().from(richPages)
     .where(eq(richPages.pageId, pageId)).get();
@@ -137,6 +144,16 @@ async function syncSavedPageSession(userId, session) {
     }
   }
   return { status:'synced', changed:true, page:saved || page };
+}
+
+// Only persisted pages owned by this user may give legacy text quota headroom.
+export async function trustedEditorQuotaBaseline(userId, session) {
+  const id = String(session?.currentPageId || '').trim();
+  const owner = Number(userId);
+  if (!id || !Number.isSafeInteger(owner) || owner <= 0) return null;
+  const page = await db.select().from(richPages)
+    .where(and(eq(richPages.pageId, id), eq(richPages.ownerId, owner))).get();
+  return page && Array.isArray(page.blocks) ? page.blocks : null;
 }
 
 export async function syncSavedEditorPage(userId) {

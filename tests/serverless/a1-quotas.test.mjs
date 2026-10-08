@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { harness } from './harness.mjs';
 import { validatePagePayload } from '../../functions/_lib/pages.js';
 import { DEVELOPER_IDS } from '../../tgcloud/lib/developer-access.js';
+import { quotaSafeMirrorBaseline } from '../../functions/_lib/quota-baseline.js';
 
 const ordinary=123;
 const text=n=>[{id:'a',type:'paragraph',position:0,data:{text:'x'.repeat(n)}}];
@@ -28,8 +29,8 @@ test('A1 uses verified saved page baseline to allow unchanged/reduced overage',a
   assert.equal(h.blocks.validateEditorLimits(text(24001),ordinary,{previousBlocks:original}).code,'characters');
   assert.throws(()=>validatePagePayload({blocks:text(24001)}, {blocks:original},ordinary),/characters/);
   assert.throws(()=>validatePagePayload({blocks:text(23000)}, null,ordinary),/characters/);
-  assert.doesNotThrow(()=>validatePagePayload({blocks:text(23000)}, null,ordinary,{relayLegacyUpdate:true}));
-  assert.throws(()=>validatePagePayload({blocks:text(25001)}, null,ordinary,{relayLegacyUpdate:true}),/characters/);
+  assert.throws(()=>validatePagePayload({blocks:text(23000)}, null,ordinary),/characters/);
+  assert.throws(()=>validatePagePayload({blocks:text(25001)}, null,ordinary),/characters/);
 });
 
 test('developer quota exceptions come only from authenticated identity',async()=>{
@@ -49,4 +50,25 @@ test('nested and native rich text is counted consistently in two validators',asy
   assert.equal(local,20001);
   assert.equal(h.blocks.validateEditorLimits(blocks,ordinary).code,'characters');
   assert.throws(()=>validatePagePayload({blocks},null,ordinary),/characters/);
+});
+
+test('Cloudflare legacy PUT gateway fails closed until a verified mirror revision matches', async()=>{
+  const saved={revision:7,updated_at:300,blocks:text(23000)};
+  const service={ready:async()=>true,getPage:async(db,owner,id)=>
+    owner===ordinary&&id==='p' ? saved : null};
+  for(const body of [{base_revision:6},{base_revision:8},{base_updated_at:299}]){
+    const baseline=await quotaSafeMirrorBaseline({},ordinary,'p',body,service);
+    assert.equal(baseline,null);
+    assert.throws(()=>validatePagePayload({blocks:text(23000)},baseline,ordinary),/characters/);
+  }
+  const verified=await quotaSafeMirrorBaseline({},ordinary,'p',{base_revision:7},service);
+  assert.ok(verified);
+  assert.doesNotThrow(()=>validatePagePayload({blocks:text(22000)},verified,ordinary));
+  assert.throws(()=>validatePagePayload({blocks:text(23001)},verified,ordinary),/characters/);
+  const missing=await quotaSafeMirrorBaseline({},ordinary,'p',{base_revision:7},{
+    ...service,ready:async()=>false,
+  });
+  assert.equal(missing,null);
+  assert.throws(()=>validatePagePayload({blocks:text(22000)},missing,ordinary),/characters/);
+  assert.equal(await quotaSafeMirrorBaseline({},999,'p',{base_revision:7},service),null);
 });

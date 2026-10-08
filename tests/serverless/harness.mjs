@@ -25,9 +25,14 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
       return q;
     },
     update(table) {
-      let values; let predicate = () => true;
+      let values; let predicate = () => true; let wantsReturn = false;
       const q = { set(v) { values = v; return q; }, where(p) { predicate = p; return q; },
-        async run() { records[table._name].filter(predicate).forEach(row => Object.assign(row, clone(values))); } };
+        returning() { wantsReturn = true; return q; },
+        async run() {
+          const affected = records[table._name].filter(predicate);
+          affected.forEach(row => Object.assign(row, clone(values)));
+          return wantsReturn ? affected.map(clone) : undefined;
+        } };
       return q;
     },
     delete(table) {

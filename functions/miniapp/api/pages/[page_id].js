@@ -1,6 +1,7 @@
 import { json, readJson, handleError, HttpError } from '../../../_lib/http.js';
 import { miniAppUser } from '../../../_lib/telegram-auth.js';
 import { validatePagePayload } from '../../../_lib/pages.js';
+import { quotaSafeMirrorBaseline } from '../../../_lib/quota-baseline.js';
 import {
   queueDocumentBridgeRequest,
   queueTextBridgeRequest,
@@ -66,11 +67,14 @@ export async function onRequestPut(context) {
     const user = await miniAppUser(context);
     const pageId = requestedPageId(context);
     const payload = await readJson(context.request);
-    // Only existing-page PUT uses the legacy 25k gateway envelope.
-    // Telegram Serverless enforces the verified saved-page baseline.
-    const content = validatePagePayload(payload, null, user.id, {
-      relayLegacyUpdate: true,
+    // Cloudflare must enforce the quota even while an older Serverless
+    // deployment still accepts 25k text. A stale/missing mirror grants nothing.
+    const db = requireBridgeDb(context.env);
+    const baseline = await quotaSafeMirrorBaseline(db, user.id, pageId, payload, {
+      ready: pageMirrorReady,
+      getPage: getMirrorPage,
     });
+    const content = validatePagePayload(payload, baseline, user.id);
     if (!content.blocks.length) throw new HttpError(400, 'Page must contain at least one block');
 
     const title = String(payload.title || pageId).trim().slice(0, 64);
