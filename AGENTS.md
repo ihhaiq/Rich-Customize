@@ -231,3 +231,8 @@ Read [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rol
 - Plus/Golden benefits and prices are **approved features of their plans**, not suggestions. Never render `مقترح`, `Proposed`, `is-proposed`, `عند التفعيل` or similar qualifiers next to every benefit in the Mini App comparison.
 - An honest **single availability note** remains mandatory: paid subscription purchases and Telegram Serverless entitlement activation are not live until billing, migrations and integration tests are complete. This does not change which benefits belong to each plan.
 - No templates. Scheduling is outside the plan comparison until separately approved.
+
+## Pricing-first plan cards (2026-10-09)
+- Owner requested a visual redesign of Mini App plan offers: show plan name and **prominent approved monthly price** (Free, 150 Stars/30 days, 350 Stars/30 days), then present all approved benefits in a single compact two-column feature list. **Never split a plan card into quotas and benefits.**
+- The ONLY note below comparison cards should be: `الباقات في الإصدار التجريبي وغير متاحة للبيع حالياً.` (English fallback: Subscriptions are in beta and not available for purchase yet). Remove extra explanatory paragraphs; do not claim payment is currently enabled.
+- No saved templates, no future scheduling. Preserve `@richDonateBot` Telegram deep links for learning about plans, not direct payment. New appearance files: `subscription_offers.js`/`subscription_offers.css`, cache key 0.3.86.

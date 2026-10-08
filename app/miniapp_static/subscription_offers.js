@@ -27,9 +27,9 @@
       chars: "{count} حرف",
       packs: "{count} حزمة إيموجي",
       current: "خطتك الحالية",
-      planned: "الشراء غير متاح حالياً",
-      approvedGroup: "حدود الباقة",
-      roadmapGroup: "مميزات الباقة",
+      planned: "النسخة التجريبية",
+      everyMonth: "كل ٣٠ يوم",
+      freeTier: "مجاني",
       textQuotaLabel: "عدد الأحرف",
       packQuotaLabel: "حزم الإيموجي",
       pages: "الصفحات المحفوظة",
@@ -44,12 +44,12 @@
       lastVersions: "آخر {count} نسخ",
       lastVersionsMany: "آخر {count} نسخة",
       earlyProposed: "مشمولة",
-      roadmapNotice: "هذه المميزات مشمولة بالخطط المعتمدة، لكن تفعيل الاشتراكات المدفوعة يحتاج اكتمال نظام الدفع ونشر تحديث Serverless.",
+      roadmapNotice: "",
       priceLabel: "السعر الشهري",
       monthlyPrice: "{count} نجمة / ٣٠ يوم",
       freePrice: "مجاناً",
 
-      notice: "الأسعار المعتمدة للخطط ظاهرة للمقارنة فقط. Plus وGolden Ticket بعدُها مو متاحتين للبيع، وفتح البوت ما يعني إتمام شراء.",
+      notice: "الباقات في الإصدار التجريبي وغير متاحة للبيع حالياً.",
       link: "افتح بوت التبرع لمعرفة الخطط",
       dismiss: "رجوع إلى المحرر",
       close: "إغلاق",
@@ -64,9 +64,9 @@
       chars: "{count} characters",
       packs: "{count} custom emoji packs",
       current: "Current plan",
-      planned: "Purchase not available yet",
-      approvedGroup: "Plan limits",
-      roadmapGroup: "Included benefits",
+      planned: "Beta",
+      everyMonth: "Every 30 days",
+      freeTier: "Free",
       textQuotaLabel: "Text",
       packQuotaLabel: "Emoji packs",
       pages: "Saved pages",
@@ -81,12 +81,12 @@
       lastVersions: "Last {count} versions",
       lastVersionsMany: "Last {count} versions",
       earlyProposed: "Included",
-      roadmapNotice: "All listed benefits are included in the approved plans. Paid subscriptions require verified billing and the Telegram Serverless deployment.",
+      roadmapNotice: "",
       priceLabel: "Monthly price",
       monthlyPrice: "{count} Stars / 30 days",
       freePrice: "Free",
 
-      notice: "Listed plan prices are informational only. Plus and Golden Ticket are not yet available for purchase, and opening the bot does not make a payment.",
+      notice: "Subscriptions are in beta and not available for purchase yet.",
       link: "Open donation bot to see plans",
       dismiss: "Back to editor",
       close: "Close",
@@ -155,37 +155,53 @@
     head.append(textArea, closeButton);
     modal.append(head, element("h3", "rich-subscription-section-title", tr("plans")));
     const list = element("div", "rich-subscription-plans");
-    function featureRow(target, label, value) {
-      const row = element("div", "rich-subscription-feature");
-      row.append(element("span", "rich-subscription-feature-label", tr(label)));
-      row.append(element("span", "rich-subscription-feature-value", value));
-      target.append(row);
+    function perk(target, label, value, { included = true } = {}) {
+      const item = element("div", "rich-subscription-perk" + (included ? "" : " is-unavailable"));
+      item.append(
+        element("strong", "rich-subscription-perk-value", value),
+        element("span", "rich-subscription-perk-label", tr(label)),
+      );
+      target.append(item);
     }
     for (const [index, plan] of OFFERS.entries()) {
-      const item = element("div", "rich-subscription-plan");
+      const tier = index === 0 ? "free" : index === 1 ? "plus" : "golden";
+      const card = element("article", "rich-subscription-plan is-" + tier);
       const top = element("div", "rich-subscription-plan-head");
-      top.append(element("strong", "", plan.name), element("small", "",
-        tr(index === 0 ? "current" : "planned")));
-      item.append(top);
-      item.append(element("small", "rich-subscription-group-title", tr("approvedGroup")));
-      const approved = element("div", "rich-subscription-features");
-      featureRow(approved, "textQuotaLabel", tr("chars", { count: format(plan.text) }));
-      featureRow(approved, "packQuotaLabel", tr("packs", { count: format(plan.emojiPacks) }));
-      item.append(approved);
-      item.append(element("small", "rich-subscription-group-title rich-subscription-roadmap-title", tr("roadmapGroup")));
-      const roadmap = element("div", "rich-subscription-features");
-      featureRow(roadmap, "pages", format(plan.pages));
-      featureRow(roadmap, "blocks", format(plan.blocks));
-      featureRow(roadmap, "priceLabel", index === 0 ? tr("freePrice") : tr("monthlyPrice", { count: format(plan.price) }));
-      featureRow(roadmap, "rights", index === 0 ? tr("separatePurchase") : tr("couldInclude"));
-      featureRow(roadmap, "history", plan.history ? tr(plan.history > 10 ? "lastVersionsMany" : "lastVersions", { count: format(plan.history) }) : tr("notIncluded"));
-      featureRow(roadmap, "earlyAccess", plan.earlyAccess ? tr("earlyProposed") : tr("notIncluded"));
-      item.append(roadmap);
-      list.append(item);
+      const identity = element("div", "rich-subscription-plan-identity");
+      identity.append(element("strong", "rich-subscription-name", plan.name));
+      if (index === 0) identity.append(element("small", "rich-subscription-current", tr("current")));
+      top.append(identity);
+      const pricing = element("div", "rich-subscription-pricing");
+      if (index === 0) {
+        pricing.append(element("strong", "rich-subscription-price-amount", tr("freeTier")));
+      } else {
+        const line = element("div", "rich-subscription-price-line");
+        line.append(
+          element("strong", "rich-subscription-price-amount", format(plan.price)),
+          element("span", "rich-subscription-star", "★"),
+        );
+        pricing.append(line, element("small", "rich-subscription-period", tr("everyMonth")));
+      }
+      top.append(pricing);
+      card.append(top);
+      const benefits = element("div", "rich-subscription-perks");
+      perk(benefits, "textQuotaLabel", format(plan.text));
+      perk(benefits, "packQuotaLabel", format(plan.emojiPacks));
+      perk(benefits, "pages", format(plan.pages));
+      perk(benefits, "blocks", format(plan.blocks));
+      perk(benefits, "rights",
+        index === 0 ? tr("separatePurchase") : tr("couldInclude"));
+      perk(benefits, "history",
+        plan.history ? tr(plan.history > 10 ? "lastVersionsMany" : "lastVersions", {
+          count: format(plan.history),
+        }) : tr("notIncluded"), { included:plan.history > 0 });
+      if (plan.earlyAccess) {
+        perk(benefits, "earlyAccess", tr("earlyProposed"));
+      }
+      card.append(benefits);
+      list.append(card);
     }
-    modal.append(list,
-      element("p", "rich-subscription-notice", tr("roadmapNotice")),
-      element("p", "rich-subscription-notice", tr("notice")));
+    modal.append(list, element("p", "rich-subscription-notice", tr("notice")));
     const actions = element("div", "rich-subscription-actions");
     const cta = element("a", "rich-subscription-cta", tr("link"));
     cta.href = linkFor(kind);

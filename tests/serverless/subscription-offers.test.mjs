@@ -71,8 +71,8 @@ test('text limit opens factual comparison and specific donation-bot deep link', 
   const text=planContent.join(' ');
   assert.match(text,/Plus/);
   assert.match(text,/Golden Ticket/);
-  assert.match(text,/الشراء غير متاح حالياً/);
-  assert.match(text,/مو متاحتين للبيع/);
+  assert.match(text,/الإصدار التجريبي وغير متاحة للبيع حالياً/);
+  assert.equal((text.match(/الإصدار التجريبي وغير متاحة للبيع حالياً/g)||[]).length,1);
   // All owner-approved plan benefits are shown, but not sold before billing.
   assert.match(text,/الصفحات المحفوظة/);
   assert.match(text,/البلوكات/);
@@ -83,9 +83,19 @@ test('text limit opens factual comparison and specific donation-bot deep link', 
   assert.match(text,/آخر ٢٠ نسخة/);
   assert.match(text,/مشمولة بالاشتراك/);
   assert.doesNotMatch(text,/مقترح|عند التفعيل|فكرة مستقبلية|القوالب/);
-  assert.match(text,/١٥٠ نجمة/);
-  assert.match(text,/٣٥٠ نجمة/);
-  assert.doesNotMatch(text,/قيد التجهيز|قيد الدراسة/);
+  assert.match(text,/١٥٠/);
+  assert.match(text,/٣٥٠/);
+  assert.match(text,/١٥٠/);
+  assert.match(text,/كل ٣٠ يوم/);
+  assert.equal(dialog.children.filter(node=>node?.tag==='p' && node?.className==='rich-subscription-notice').length,1);
+  const cards = dialog.children.flatMap(child=>child?.className==='rich-subscription-plans' ? child.children : []);
+  assert.equal(cards.length,3);
+  for(const card of cards){
+    assert.ok(card.children.some(child=>child?.className==='rich-subscription-plan-head'));
+    assert.ok(card.children.some(child=>child?.className==='rich-subscription-perks'));
+    assert.equal(card.children.some(child=>String(child?.className||'').includes('group-title')),false);
+  }
+  assert.doesNotMatch(text,/قيد التجهيز|قيد الدراسة|حدود الباقة|مميزات الباقة|القوالب/);
   let prevented = false;
   anchor.handlers.click({preventDefault(){prevented = true;}});
   assert.equal(prevented,true);

@@ -249,3 +249,6 @@ The Mini App quota modal lists the approved post-launch plan comparison includin
 These features remain source-staged until trusted Telegram Serverless subscriptions are enabled. The Cloudflare gateway must still use conservative Free validation while authenticated paid entitlements are unavailable on the gateway; the app does not claim Plus/Golden are available for purchase.
 
 **Plan-label rule:** Owner-approved plan benefits must appear without `مقترح`, `Proposed`, or repeated `عند التفعيل` labels; one separate availability notice says paid subscriptions are not yet purchasable. Templates were canceled. Version `0.3.85` refreshes the plan modal assets.
+
+## Subscription UI styling revision 2026-10-09
+The subscription comparison is a pricing-first compact card layout: price (Stars/30 days) stands out beside plan name; approved entitlements are shown in one simple grid without separate headings for quotas and features. A single notice below the cards says plans are in beta and unavailable for sale. Deep links to `@richDonateBot` remain informational. No templates or billing activation from Cloudflare.

@@ -1,32 +1,100 @@
-/* Plan limits only; independent of the editor sheets and emoji picker. */
-.rich-subscription-backdrop{position:fixed;inset:0;z-index:4600;background:rgba(0,0,0,.70);display:flex;align-items:flex-end;justify-content:center;padding:16px 12px calc(env(safe-area-inset-bottom,0px) + 12px);overflow-y:auto;overscroll-behavior:contain}
-.rich-subscription-modal{box-sizing:border-box;width:min(100%,440px);max-height:min(720px,calc(100dvh - 36px));overflow-y:auto;border-radius:26px;padding:20px 17px;background:var(--panel,#20242b);color:var(--text,#fff);border:1px solid rgba(255,255,255,.17);box-shadow:0 22px 70px rgba(0,0,0,.42);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
-.rich-subscription-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+/* Rich Customize plan offers — compact pricing-first sheet. */
+.rich-subscription-backdrop{
+  position:fixed;inset:0;z-index:4600;display:flex;justify-content:center;align-items:flex-end;
+  padding:12px 10px calc(10px + env(safe-area-inset-bottom,0px));
+  background:rgba(4,9,15,.78);overflow:auto;overscroll-behavior:contain;
+}
+.rich-subscription-modal{
+  --plan-fg:var(--text,#f1f5fa);
+  --plan-muted:var(--muted,#9da8b8);
+  box-sizing:border-box;width:min(100%,440px);
+  max-height:calc(100dvh - 28px);overflow:auto;overscroll-behavior:contain;
+  padding:20px 16px 0;border-radius:27px;
+  background:var(--panel,#15202c);color:var(--plan-fg);
+  border:1px solid rgba(255,255,255,.13);
+  box-shadow:0 24px 90px rgba(0,0,0,.55);
+}
+.rich-subscription-head{display:flex;align-items:flex-start;justify-content:space-between;gap:13px}
 .rich-subscription-headcopy{min-width:0}
-.rich-subscription-head h2{font-size:20px;font-weight:750;line-height:1.35;margin:0 0 7px}
-.rich-subscription-head p{font-size:13px;color:var(--muted,#aeb4c0);line-height:1.65;margin:0 0 6px}
-.rich-subscription-usage{display:block;font-size:12px;color:var(--text,#fff);opacity:.85}
-.rich-subscription-close{flex-shrink:0;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);border-radius:50%;width:32px;height:32px;color:inherit;cursor:pointer;font-size:23px;line-height:1}
-.rich-subscription-section-title{font-size:13px;font-weight:700;margin:18px 0 11px}
-.rich-subscription-plans{display:grid;gap:9px}
-.rich-subscription-plan{border:1px solid var(--line,rgba(255,255,255,.12));border-radius:16px;padding:12px 14px;background:var(--panel2,rgba(255,255,255,.045));display:grid;gap:5px;font-size:12px}
-.rich-subscription-plan-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:3px}
-.rich-subscription-plan-head strong{font-size:15px}
-.rich-subscription-plan-head small{font-size:11px;color:var(--muted,#aeb4c0)}
-.rich-subscription-notice{font-size:12px;line-height:1.65;color:var(--muted,#aeb4c0);margin:13px 0}
-.rich-subscription-actions{display:grid;gap:8px}
-.rich-subscription-cta,.rich-subscription-dismiss{display:block;box-sizing:border-box;width:100%;border-radius:14px;padding:13px 10px;line-height:1.35;font-size:13px;font-weight:700;text-align:center;cursor:pointer;text-decoration:none}
-.rich-subscription-cta{background:var(--accent,#3285e5);color:#fff;border:1px solid rgba(255,255,255,.14)}
-.rich-subscription-dismiss{border:1px solid var(--line,rgba(255,255,255,.14));background:transparent;color:var(--text,#fff)}
-@media(min-width:640px){.rich-subscription-backdrop{align-items:center}}
-@media(prefers-reduced-motion:no-preference){.rich-subscription-modal{animation:rich-subscription-in .18s ease-out}@keyframes rich-subscription-in{from{opacity:.7;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}}
-
-/* Owner-approved benefits; purchase availability is disclosed separately. */
-.rich-subscription-group-title{display:block;font-size:11px;font-weight:650;color:var(--muted,#aeb4c0);margin:9px 0 2px}
-.rich-subscription-roadmap-title{padding-top:8px;border-top:1px solid var(--line,rgba(255,255,255,.12))}
-.rich-subscription-features{display:grid;gap:7px}
-.rich-subscription-feature{display:flex;gap:10px;align-items:start;justify-content:space-between;line-height:1.55}
-.rich-subscription-feature-label{flex:0 1 49%;color:var(--muted,#aeb4c0);font-size:12px}
-.rich-subscription-feature-value{flex:1 1 51%;min-width:0;text-align:end;display:flex;align-items:flex-end;flex-direction:column;gap:1px;font-size:12px;font-weight:600;color:var(--text,#fff)}
-.rich-subscription-scheduling{margin-top:4px}
-.rich-subscription-actions{position:sticky;bottom:-20px;margin:12px -17px -20px;padding:11px 17px calc(14px + env(safe-area-inset-bottom,0px));background:var(--panel,#20242b);border-top:1px solid var(--line,rgba(255,255,255,.12));z-index:1}
+.rich-subscription-head h2{margin:0 0 5px;font-size:21px;font-weight:750;line-height:1.35}
+.rich-subscription-head p{margin:0;font-size:12px;line-height:1.65;color:var(--plan-muted)}
+.rich-subscription-usage{display:block;margin-top:7px;color:var(--plan-fg);font-size:12px}
+.rich-subscription-close{
+  flex:none;display:grid;place-items:center;width:34px;height:34px;
+  border-radius:50%;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.07);font:22px/1 inherit;color:inherit;cursor:pointer;
+}
+.rich-subscription-section-title{margin:20px 0 11px;font-size:14px;font-weight:720}
+.rich-subscription-plans{display:grid;gap:12px}
+.rich-subscription-plan{
+  position:relative;overflow:hidden;border-radius:21px;padding:15px 15px 11px;
+  background:linear-gradient(125deg,rgba(255,255,255,.055),rgba(255,255,255,.012));
+  border:1px solid rgba(255,255,255,.13);box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+}
+.rich-subscription-plan.is-plus{
+  border-color:rgba(66,159,251,.42);
+  background:linear-gradient(135deg,rgba(30,116,197,.18),rgba(255,255,255,.026) 60%);
+}
+.rich-subscription-plan.is-golden{
+  border-color:rgba(225,177,102,.43);
+  background:linear-gradient(135deg,rgba(180,130,58,.13),rgba(255,255,255,.028) 62%);
+}
+.rich-subscription-plan-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.085);
+}
+.rich-subscription-plan-identity{display:grid;gap:4px;min-width:0}
+.rich-subscription-name{font-size:17px;line-height:1.2;font-weight:760;letter-spacing:-.01em}
+.rich-subscription-current{font-size:11px;color:var(--plan-muted)}
+.rich-subscription-pricing{flex:none;display:grid;justify-items:end;gap:3px}
+.rich-subscription-price-line{display:flex;align-items:center;gap:7px;direction:ltr}
+.rich-subscription-price-amount{
+  font-size:30px;line-height:1.1;font-weight:820;font-variant-numeric:tabular-nums;
+  letter-spacing:-.04em;white-space:nowrap;
+}
+.rich-subscription-star{font-size:21px;line-height:1;color:#e7bc6f}
+.rich-subscription-plan.is-plus .rich-subscription-price-amount{color:#83c1ff}
+.rich-subscription-plan.is-golden .rich-subscription-price-amount{color:#f3d092}
+.rich-subscription-period{font-size:11px;color:var(--plan-muted)}
+.rich-subscription-perks{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  column-gap:12px;row-gap:0;padding-top:4px;
+}
+.rich-subscription-perk{
+  min-width:0;display:flex;flex-direction:column;gap:3px;padding:10px 0 8px;
+  border-bottom:1px solid rgba(255,255,255,.055);
+}
+.rich-subscription-perk-value{
+  font-size:14px;font-weight:720;line-height:1.35;
+  overflow-wrap:anywhere;
+}
+.rich-subscription-perk-label{font-size:11px;line-height:1.5;color:var(--plan-muted)}
+.rich-subscription-perk.is-unavailable .rich-subscription-perk-value{color:var(--plan-muted);font-weight:520}
+.rich-subscription-notice{
+  margin:16px 4px 11px;color:var(--plan-muted);text-align:center;
+  font-size:12px;line-height:1.6;
+}
+.rich-subscription-actions{
+  position:sticky;bottom:0;z-index:1;display:grid;gap:8px;
+  padding:12px 0 calc(15px + env(safe-area-inset-bottom,0px));
+  background:var(--panel,#15202c);
+  border-top:1px solid rgba(255,255,255,.085);
+}
+.rich-subscription-cta,.rich-subscription-dismiss{
+  box-sizing:border-box;display:block;width:100%;padding:13px 10px;
+  border-radius:14px;text-align:center;font-size:13px;font-weight:730;
+  line-height:1.35;text-decoration:none;cursor:pointer;
+}
+.rich-subscription-cta{background:#268fe8;color:white;border:1px solid rgba(255,255,255,.14)}
+.rich-subscription-dismiss{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.11);color:var(--plan-fg)}
+@media(min-width:640px){.rich-subscription-backdrop{align-items:center;padding:22px}.rich-subscription-modal{max-height:calc(100dvh - 44px)}}
+@media(max-width:350px){
+  .rich-subscription-modal{padding-inline:12px}
+  .rich-subscription-plan{padding-inline:12px}
+  .rich-subscription-perks{column-gap:9px}
+  .rich-subscription-price-amount{font-size:26px}
+}
+@media(prefers-reduced-motion:no-preference){
+  .rich-subscription-modal{animation:rich-subscription-enter .19s ease-out}
+  @keyframes rich-subscription-enter{from{opacity:.65;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+}

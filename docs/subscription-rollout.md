@@ -81,3 +81,8 @@ Implementation in source:
 ## Final terminology for plan UI (2026-10-09)
 
 All compared features are approved membership benefits. The Mini App must **not** display `مقترح`, `Proposed`, or a repeated `عند التفعيل` tag. Explain purchase unavailability separately once. New Serverless features still require migration and deployment; source code alone is not a live paid service.
+
+## Pricing-first offer UI (2026-10-09)
+- Replace old large multi-section cards with compact pricing-first plan cards. Free is free, Plus 150 Stars per 30 days, Golden Ticket 350 Stars per 30 days. Show a single ungrouped benefit grid within each card (text, emoji packs, pages, blocks, branding removal, history, early access where included). No templates.
+- Remove repetitive explanatory disclaimers beneath the cards. Keep only one availability notice in Arabic: `الباقات في الإصدار التجريبي وغير متاحة للبيع حالياً.` An English fallback conveys the same thing. Retain the donation-bot deep link but do not treat it as a live invoice.
+- Editor cache version for subscription UI is `0.3.86`; Cloudflare auto-deploy from `serverless-cleanup` remains authorized, Telegram Serverless stays deferred.
