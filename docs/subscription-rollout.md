@@ -13,6 +13,14 @@ Updated 2026-10-08. This is an **implementation ledger**, not a production or pr
 - `functions/_lib/custom-emoji-packs.js`: free Mini App emoji-packs 1 → **2**, backfill old `miniapp_custom_emoji_primary_pack` into `miniapp_custom_emoji_packs` without destructive SQL, and atomic conditional INSERT for concurrency. `app/miniapp_static/apple_emoji_picker.js` default and cached-pack slicing updated for 2. Developer unlimited access still requires verified Telegram identity.
 - `tests/serverless/a1-quotas.test.mjs` and `tests/serverless/a1-emoji-packs.test.mjs` plus existing quota tests are staged. **The automated Node/Cloudflare/Serverless suites have not been run in this session.**
 
+
+## A1 first verification attempt — 2026-10-09
+
+- Workflow: [`.github/workflows/a1-quota-tests.yml`](../.github/workflows/a1-quota-tests.yml), runs on branch `serverless-cleanup` without any deployment/secrets.
+- [GitHub Actions run 37844480265](https://github.com/ihhaiq/Rich-Customize/actions/runs/37844480265): **failed before any job step** (`steps=[]`, runner billable duration `0 ms`). This is **not** a failed Node test result; inspect GitHub Actions configuration/runner access and job annotations before assuming a code defect.
+- Isolated V8 checks (real policy module, evaluated without import syntax): **20/20 PASS**. Isolated emoji pack tests (the repository's three A1 test functions run against real pack module with mocked D1): **3/3 PASS**.
+- This is **partial verification only**. Native Node test suite, authentic D1 concurrency/migration and Telegram Serverless integrations are **not verified**. Do not mark A1 done, deploy, or proceed with paid entitlements on this basis alone.
+
 ## Important limitations before publishing
 
 1. Cloudflare Mini App pack data currently reside in D1 for the active app, not the future Serverless entitlement database. Do not destroy, overwrite, or silently migrate live pack records. A2 must define the authoritative personal subscription store and a separate safe pack migration if necessary.

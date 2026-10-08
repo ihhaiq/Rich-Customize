@@ -184,3 +184,11 @@ Read [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rol
 - Existing unapproved numeric caps (pages, blocks, tables, slideshow) remain unchanged. Preserve saved over-limit content and snapshots; ensure downgrades never delete/clip stored material.
 - For local verification use `node --experimental-vm-modules --test tests/serverless/subscription-policy.test.mjs tests/serverless/a1-quotas.test.mjs tests/serverless/developer-limits.test.mjs tests/serverless/a1-emoji-packs.test.mjs`. Full suite is recommended when available. Do not claim tests ran unless actually run.
 - Never merge `main`, or issue `tgcloud push`, `tgcloud migrate`, or Cloudflare deployment without explicit approval. Documentation/changes here are source only. Use the `[CF-Pages-Skip]` commit prefix if Cloudflare must not auto-deploy this unfinished staged feature.
+
+## A1 test evidence and CI caveat (2026-10-09)
+
+- Keep `.github/workflows/a1-quota-tests.yml` as the focused no-deployment A1 CI job (four test files).
+- First run https://github.com/ihhaiq/Rich-Customize/actions/runs/37844480265 reported failure **without executing steps**, runner duration 0 ms. Investigate GitHub Actions runner/permissions/annotations rather than interpreting this as a Node test failure.
+- A separate isolated JS/V8 test executed 20 policy assertions against `tgcloud/lib/subscription-policy.js` and the three A1 emoji-pack test functions with their mocked D1: all passed. **These are not Node test-suite results, not real SQLite/D1 concurrency tests, and not production acceptance.**
+- The next agent must rerun `node --experimental-vm-modules --test tests/serverless/subscription-policy.test.mjs tests/serverless/a1-quotas.test.mjs tests/serverless/developer-limits.test.mjs tests/serverless/a1-emoji-packs.test.mjs` on an available runner/local checkout before claiming A1 tests complete.
+- Never deploy `tgcloud`, Cloudflare or `main` as a side effect of A1 test or documentation changes. Use `[CF-Pages-Skip]` on commits to the Cloudflare production branch until deployment is explicitly approved.
