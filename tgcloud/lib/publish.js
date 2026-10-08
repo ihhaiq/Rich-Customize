@@ -278,13 +278,18 @@ export async function handlePublishCallback(query){
       const registered=new Map((await listChats(userId)).map(x=>[Number(x.chatId),x]));
       const prepared=await prepareMessageButtons(latest.messageButtons||[]);
       const includeBranding=await shouldIncludeBranding(userId);
+      const quotaSavedPage=latest.currentPageId
+        ? await db.select().from(richPages).where(eq(richPages.pageId,String(latest.currentPageId))).get()
+        : null;
+      const previousBlocks=quotaSavedPage && Number(quotaSavedPage.ownerId)===Number(userId)
+        ? quotaSavedPage.blocks || [] : null;
       const succeeded=[],failed=[],reasons=[];
       for(const chatId of selected){
         const title=String(registered.get(chatId)?.title||chatId);
         if(!await canPublish(chatId,userId)){await removeUserChat(userId,chatId);failed.push(title);continue;}
         try{
           const markup=prepared.length?buildMessageButtonsKeyboard(prepared,{buttonsPerRow:Number(latest.buttonsPerRow||1),sourcePageId:latest.currentPageId||null}):undefined;
-          await sendRichMessageSafe({chat_id:chatId,rich_message:buildInputRichMessage(latest.blocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
+          await sendRichMessageSafe({chat_id:chatId,rich_message:buildInputRichMessage(latest.blocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,previousBlocks}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
           succeeded.push(title);
         }catch(error){
           failed.push(title);
@@ -706,6 +711,7 @@ async function publishBridgePageContent({
       userId,
       sourcePageId: id,
       includeBranding,
+      ...(id != null ? { previousBlocks: page.blocks || [] } : {}),
     });
   } catch (error) {
     const detail = publishErrorDetail(error);

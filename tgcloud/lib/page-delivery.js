@@ -32,6 +32,7 @@ export async function savedPageQueryResult(pageId, languageCode = 'en') {
       userId: page.ownerId,
       sourcePageId: String(page.pageId),
       includeBranding,
+      previousBlocks: page.blocks || [],
     },
   );
   const replyMarkup = preparedButtons.length

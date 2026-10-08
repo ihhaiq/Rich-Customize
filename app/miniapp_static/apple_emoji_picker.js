@@ -20,7 +20,7 @@
   const RECENT_KEY = "rich_customize_apple_recent_emoji";
   const CUSTOM_PACKS_KEY = "rich_customize_custom_emoji_packs";
   const SEARCH_LIMIT = 180;
-  const DEFAULT_CUSTOM_PACK_LIMIT = 1;
+  const DEFAULT_CUSTOM_PACK_LIMIT = 2;
   const CUSTOM_PREVIEW_CONCURRENCY = 5;
   const CUSTOM_PREVIEW_CACHE_NAME = "rich-custom-emoji-previews-v1";
   const CUSTOM_PREVIEW_CACHE_INDEX_KEY = "rich_customize_custom_preview_cache_index";
@@ -1243,7 +1243,7 @@
       const localNames = customPacks.map(pack => String(pack?.name || "")).filter(Boolean);
       const targets = serverNames.length
         ? serverNames
-        : (Number.isFinite(customPackLimit()) ? localNames.slice(0,1) : localNames);
+        : (Number.isFinite(customPackLimit()) ? localNames.slice(0,customPackLimit()) : localNames);
 
       for (const name of targets) {
         if (customPack(name) && serverNames.includes(name)) continue;

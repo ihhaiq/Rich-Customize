@@ -1,4 +1,5 @@
 import { isDeveloper } from 'lib/developer-access';
+import { PLAN_LIMITS, resolveEditorEntitlement, checkEditorTextQuota } from 'lib/subscription-policy';
 import { messageHtmlText, messageRichText } from 'lib/rich-text';
 import { resolveLanguage, t } from 'lib/i18n';
 // Serverless port of app/editor/models.py, app/editor/document.py,
@@ -59,7 +60,7 @@ export const DETAILS_CHILD_TYPES = Object.freeze([
 
 export const EDITOR_SESSION_TTL_SECONDS = 2 * 60 * 60;
 export const MAX_PAGE_BLOCKS = 30;
-export const MAX_VISIBLE_CHARACTERS = 25000;
+export const MAX_VISIBLE_CHARACTERS = PLAN_LIMITS.free.text;
 export const MAX_TABLE_COLUMNS = 25;
 export const MAX_TABLE_ROWS = 50;
 export const MAX_SAVED_PAGES = 12;
@@ -562,7 +563,7 @@ export function validateTableRows(rows, userId = null) {
   return { ok: true };
 }
 
-export function validateEditorLimits(blocks, userId = null) {
+export function validateEditorLimits(blocks, userId = null, { previousBlocks = null } = {}) {
   if (isDeveloper(userId)) return { ok: true };
   const list = Array.isArray(blocks) ? blocks : [];
   const actualBlocks = editorBlockCount(list);
@@ -571,8 +572,12 @@ export function validateEditorLimits(blocks, userId = null) {
   }
 
   const characters = visibleCharacterCount(list);
-  if (characters > MAX_VISIBLE_CHARACTERS) {
-    return { ok: false, code: 'characters', limit: MAX_VISIBLE_CHARACTERS, actual: characters };
+  const previousCount = Array.isArray(previousBlocks) ? visibleCharacterCount(previousBlocks) : 0;
+  const quota = checkEditorTextQuota(
+    resolveEditorEntitlement({ developer: isDeveloper(userId) }), characters, { previousCount },
+  );
+  if (!quota.allowed) {
+    return { ok: false, code: 'characters', limit: quota.limit, actual: characters };
   }
 
   const visit = (items) => {

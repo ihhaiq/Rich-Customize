@@ -185,11 +185,14 @@ async function allocatePageId() {
 }
 
 async function persistPage(userId, title, session, existingId = null) {
-  const limit = validateEditorLimits(session.blocks || [], userId);
-  if (!limit.ok) {
-    const error = new Error('EDITOR_LIMIT');
-    error.editorLimit = limit;
-    throw error;
+  // Legacy allowance must use actual persisted blocks for this page owner.
+  function assertQuota(previousBlocks = null) {
+    const limit = validateEditorLimits(session.blocks || [], userId, { previousBlocks });
+    if (!limit.ok) {
+      const error = new Error('EDITOR_LIMIT');
+      error.editorLimit = limit;
+      throw error;
+    }
   }
 
   const cleanedTitle = String(title || '').trim().slice(0, 64) || 'Untitled page';
@@ -197,6 +200,7 @@ async function persistPage(userId, title, session, existingId = null) {
   if (existingId) {
     const existing = await getPage(existingId);
     if (!existing || Number(existing.ownerId) !== Number(userId)) return null;
+    assertQuota(existing.blocks || []);
     stamp = Math.max(stamp, Number(existing.updatedAt || 0) + 1);
     const version = await nextPageSyncVersion(existing.revision || 1);
     await db.update(richPages).set({
@@ -221,6 +225,7 @@ async function persistPage(userId, title, session, existingId = null) {
     return String(existingId);
   }
 
+  assertQuota();
   const ownerLock = await acquireOwnerPageLock(userId);
   if (!ownerLock) {
     const error = new Error('PAGE_BUSY');
@@ -271,7 +276,7 @@ async function restorePage(userId, pageId, snapshot) {
     if (await getPage(pageId)) return false;
     if (!isDeveloper(userId) && await ownerPageCount(userId) >= MAX_SAVED_PAGES) return false;
     const blocks = clone(snapshot.blocks || []);
-    if (!validateEditorLimits(blocks, userId).ok) return false;
+    if (!validateEditorLimits(blocks, userId, { previousBlocks: blocks }).ok) return false;
     const stamp = nowSeconds();
     const version = await nextPageSyncVersion(snapshot.revision || 1);
     await db.insert(richPages).values({

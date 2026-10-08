@@ -1,6 +1,7 @@
 import { HttpError } from './http.js';
+import { PLAN_LIMITS } from '../../tgcloud/lib/subscription-policy.js';
 
-export const REGULAR_CUSTOM_EMOJI_PACK_LIMIT = 1;
+export const REGULAR_CUSTOM_EMOJI_PACK_LIMIT = PLAN_LIMITS.free.emojiPacks;
 
 let schemaReadyPromise = null;
 
@@ -47,6 +48,12 @@ async function ensureSchema(db) {
     await db.prepare(
       'CREATE INDEX IF NOT EXISTS idx_miniapp_custom_emoji_pack_state_user '
       + 'ON miniapp_custom_emoji_pack_state(user_id, pinned DESC, sort_order ASC)'
+    ).run();
+    // One-pack beta used a separate primary table. Backfill it atomically;
+    // keep the original record until rollout is verified (no destructive D1).
+    await db.prepare(
+      'INSERT OR IGNORE INTO miniapp_custom_emoji_packs(user_id, pack_name, added_at) '
+      + 'SELECT user_id, pack_name, added_at FROM miniapp_custom_emoji_primary_pack'
     ).run();
     return true;
   })().catch((error) => {
@@ -105,15 +112,12 @@ export async function customEmojiPackAccess(env, userId, {unlimited = false} = {
   const owner = safeUserId(userId);
 
   if (!unlimited) {
-    const primary = await db.prepare(
-      'SELECT pack_name FROM miniapp_custom_emoji_primary_pack WHERE user_id = ?'
-    ).bind(owner).first();
-    const packNames = primary?.pack_name ? [String(primary.pack_name)] : [];
+    const stored = await orderedPackNames(db, owner);
     return {
       unlimited:false,
       limit:REGULAR_CUSTOM_EMOJI_PACK_LIMIT,
-      packNames,
-      packCount:packNames.length,
+      packNames:stored.slice(0, REGULAR_CUSTOM_EMOJI_PACK_LIMIT),
+      packCount:stored.length,
     };
   }
 
@@ -134,24 +138,24 @@ export async function claimCustomEmojiPack(env, userId, packName, {unlimited = f
   const stamp = Math.floor(Date.now() / 1000);
 
   if (!unlimited) {
+    // Single conditional SQLite write: simultaneous requests cannot both
+    // observe a free slot then exceed the two-pack limit.
     await db.prepare(
-      'INSERT OR IGNORE INTO miniapp_custom_emoji_primary_pack(user_id, pack_name, added_at) '
+      'INSERT OR IGNORE INTO miniapp_custom_emoji_packs(user_id, pack_name, added_at) '
+      + 'SELECT ?, ?, ? WHERE ('
+      + 'SELECT COUNT(*) FROM miniapp_custom_emoji_packs WHERE user_id = ?'
+      + ') < ?'
+    ).bind(owner, name, stamp, owner, REGULAR_CUSTOM_EMOJI_PACK_LIMIT).run();
+    const row = await db.prepare(
+      'SELECT pack_name FROM miniapp_custom_emoji_packs WHERE user_id = ? AND pack_name = ?'
+    ).bind(owner, name).first();
+    if (!row?.pack_name) throw new HttpError(403, 'custom_emoji_pack_limit');
+  } else {
+    await db.prepare(
+      'INSERT OR IGNORE INTO miniapp_custom_emoji_packs(user_id, pack_name, added_at) '
       + 'VALUES(?, ?, ?)'
     ).bind(owner, name, stamp).run();
-
-    const primary = await db.prepare(
-      'SELECT pack_name FROM miniapp_custom_emoji_primary_pack WHERE user_id = ?'
-    ).bind(owner).first();
-
-    if (!primary?.pack_name || String(primary.pack_name) !== name) {
-      throw new HttpError(403, 'custom_emoji_pack_limit');
-    }
   }
-
-  await db.prepare(
-    'INSERT OR IGNORE INTO miniapp_custom_emoji_packs(user_id, pack_name, added_at) '
-    + 'VALUES(?, ?, ?)'
-  ).bind(owner, name, stamp).run();
   await ensurePackState(db, owner, name, stamp);
 
   return customEmojiPackAccess(env, owner, {unlimited});
@@ -164,16 +168,12 @@ export async function deleteCustomEmojiPack(env, userId, packName, {unlimited = 
   const name = safePackName(packName);
 
   if (!unlimited) {
-    const primary = await db.prepare(
-      'SELECT pack_name FROM miniapp_custom_emoji_primary_pack WHERE user_id = ?'
-    ).bind(owner).first();
-    if (primary?.pack_name && String(primary.pack_name) !== name) {
-      throw new HttpError(403, 'custom_emoji_pack_forbidden');
-    }
-    await db.prepare(
-      'DELETE FROM miniapp_custom_emoji_primary_pack WHERE user_id = ? AND pack_name = ?'
-    ).bind(owner, name).run();
+    const visible = await orderedPackNames(db, owner);
+    if (!visible.includes(name)) throw new HttpError(403, 'custom_emoji_pack_forbidden');
   }
+  await db.prepare(
+    'DELETE FROM miniapp_custom_emoji_primary_pack WHERE user_id = ? AND pack_name = ?'
+  ).bind(owner, name).run();
 
   await db.prepare(
     'DELETE FROM miniapp_custom_emoji_packs WHERE user_id = ? AND pack_name = ?'

@@ -38,3 +38,14 @@ export function checkApprovedQuota(entitlement, quota, count) {
 
 // An unverified client-supplied plan MUST NOT be passed as an active entitlement.
 // The trusted subscription service must verify and persist payment events first.
+
+export const LEGACY_FREE_TEXT_LIMIT = 25000;
+// Previous count must come only from a verified stored page, not user-supplied JSON.
+export function checkEditorTextQuota(entitlement, count, { previousCount = 0 } = {}) {
+  if (!Number.isSafeInteger(count) || count < 0) throw new Error('Invalid character count');
+  if (!Number.isSafeInteger(previousCount) || previousCount < 0) throw new Error('Invalid previous character count');
+  if (entitlement?.unlimitedProductQuotas === true) return { allowed:true, limit:null, actual:count, legacy:false };
+  const limit=PLAN_LIMITS[normalizePlan(entitlement?.plan)].text;
+  const legacy=previousCount>limit && count<=previousCount;
+  return { allowed:count<=limit||legacy, limit, actual:count, legacy };
+}

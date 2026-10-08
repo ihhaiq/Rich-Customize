@@ -1,10 +1,11 @@
 import { isDeveloper } from '../../tgcloud/lib/developer-access.js';
+import { PLAN_LIMITS, resolveEditorEntitlement, checkEditorTextQuota, LEGACY_FREE_TEXT_LIMIT } from '../../tgcloud/lib/subscription-policy.js';
 import { plainRichText } from '../../tgcloud/lib/rich-text.js';
 import { validateStoredButtons } from '../../tgcloud/lib/button-validation.js';
 import { HttpError } from './http.js';
 
 export const MAX_PAGE_BLOCKS = 30;
-export const MAX_VISIBLE_CHARACTERS = 25000;
+export const MAX_VISIBLE_CHARACTERS = PLAN_LIMITS.free.text;
 export const MAX_TABLE_ROWS = 50;
 export const MAX_TABLE_COLUMNS = 25;
 export const MAX_BUTTONS = 100;
@@ -217,7 +218,7 @@ function generatedVisibleText(block) {
   return text + caption + credit;
 }
 
-export function validatePagePayload(payload, current = null, userId = null) {
+export function validatePagePayload(payload, current = null, userId = null, { relayLegacyUpdate = false } = {}) {
   const developer = isDeveloper(userId);
   const fallback = current || {};
   const blocks = payload.blocks;
@@ -235,11 +236,17 @@ export function validatePagePayload(payload, current = null, userId = null) {
   }
 
   const characterCount = visibleCharacterText(blocks).length;
-  if (!developer && characterCount > MAX_VISIBLE_CHARACTERS) {
-    throw new HttpError(
-      400,
-      'editor limit exceeded: characters (' + characterCount + '/' + MAX_VISIBLE_CHARACTERS + ')',
-    );
+  const previousCount = Array.isArray(current?.blocks) ? visibleCharacterText(current.blocks).length : 0;
+  const quota = checkEditorTextQuota(
+    resolveEditorEntitlement({ developer }), characterCount, { previousCount },
+  );
+  // If the authenticated mirror is unavailable, only an existing-page PUT
+  // may pass the old gateway ceiling; Serverless rechecks its stored baseline.
+  const relayCompatible = relayLegacyUpdate === true
+    && characterCount <= LEGACY_FREE_TEXT_LIMIT;
+  if (!quota.allowed && !relayCompatible) {
+    throw new HttpError(400,
+      'editor limit exceeded: characters (' + characterCount + '/' + quota.limit + ')');
   }
 
   for (const block of blocks) {

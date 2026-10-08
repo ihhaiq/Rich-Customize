@@ -1,6 +1,7 @@
 import { db } from 'sdk';
 import { and, eq, lt } from 'sdk/db';
 import { editorSessions, maintenanceLocks, richPages } from 'schema';
+import { validateEditorLimits } from 'lib/editor-blocks';
 import {
   EDITOR_SESSION_TTL_SECONDS,
   normalizeBlockScrollOffset,
@@ -104,6 +105,8 @@ async function syncSavedPageSession(userId, session) {
     return { status:'unchanged', changed:false, page };
   }
 
+  const quota = validateEditorLimits(session.blocks || [], userId, { previousBlocks: page.blocks || [] });
+  if (!quota.ok) return { status:'quota_exceeded', changed:false, limit:quota };
   const stamp = Math.max(nowSeconds(), Number(page.updatedAt || 0) + 1);
   const version = await nextPageSyncVersion(page.revision || 1);
   const title = String(session.currentPageTitle || page.title || pageId).trim().slice(0, 64)

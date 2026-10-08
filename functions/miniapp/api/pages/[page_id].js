@@ -66,7 +66,11 @@ export async function onRequestPut(context) {
     const user = await miniAppUser(context);
     const pageId = requestedPageId(context);
     const payload = await readJson(context.request);
-    const content = validatePagePayload(payload, null, user.id);
+    // Only existing-page PUT uses the legacy 25k gateway envelope.
+    // Telegram Serverless enforces the verified saved-page baseline.
+    const content = validatePagePayload(payload, null, user.id, {
+      relayLegacyUpdate: true,
+    });
     if (!content.blocks.length) throw new HttpError(400, 'Page must contain at least one block');
 
     const title = String(payload.title || pageId).trim().slice(0, 64);

@@ -409,12 +409,13 @@ export function buildInputRichMessage(
     navigationToken = null,
     navigationButtons = null,
     includeBranding = false,
+    previousBlocks = null,
   } = {},
 ) {
   if (!Array.isArray(blocks) || !blocks.length) {
     throw new Error('The rich message has no blocks');
   }
-  const limit = validateEditorLimits(blocks, userId);
+  const limit = validateEditorLimits(blocks, userId, { previousBlocks });
   if (!limit.ok) {
     throw new Error('EDITOR_LIMIT:' + limit.code + ':' + limit.actual + ':' + limit.limit);
   }

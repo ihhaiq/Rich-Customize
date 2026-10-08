@@ -170,3 +170,17 @@ Cleanup policy:
 - do not start unrelated feature work during cleanup unless explicitly requested
 
 The obsolete `app/**/*.py` implementation has been removed. Do not recreate Python runtime files in this branch.
+
+## A1 subscription quota migration (October 2026)
+
+Read [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rollout.md) before changing subscription limits.
+**Implemented/staged on serverless-cleanup, not automatically deployed to tgcloud:**
+
+- Text quota policy: free 20,000, Plus 25,000, Golden 32,000 visible UTF-16 units, using `tgcloud/lib/subscription-policy.js`. Plus/Golden remain **not purchasable or active** until a verified payment-backed entitlement source exists; no client-supplied plan is trusted. Developer is exempt only when `isDeveloper(authenticatedTelegramUserId)` is true.
+- Preserve existing page content above the free ceiling: an authorized UPDATE may retain or **decrease** its actual stored character count, but cannot increase it. Never grant this exemption to CREATE or arbitrary unsaved payloads. The baseline is trusted `rich_pages.blocks` or a verified owner-specific mirror (read is advisory); Serverless always rechecks before mutation. Unsaved direct publishing has no grandfather exception. Existing saved-page delivery is allowed to render already stored content.
+- `functions/_lib/pages.js` is a Cloudflare **gateway** validator. For a PUT when its mirror is unavailable/stale, it can pass a legacy payload <=25k to the bridge, **not grant approval**. Serverless `tgcloud/lib/miniapp-bridge.js` must validate against actual saved blocks after ownership/revision checks. Never trust `previousBlocks`, `relayLegacyUpdate`, `plan`, or a developer flag from HTTP/RCB1 JSON.
+- Counts should agree across `tgcloud/lib/editor-blocks.js` and `functions/_lib/pages.js`, including nested details/lists, native blocks, table cells and rich content. Do not include system branding/footer in the **user content** quota; do separately respect Telegram message-size limits.
+- Free custom emoji pack quota is **2** (Plus 8/Golden 50 are policy only). Current Mini App packs are persisted in **Cloudflare D1**: `miniapp_custom_emoji_packs` and a legacy `miniapp_custom_emoji_primary_pack`; migration backfills legacy records without dropping either table. Nondeveloper pack insertion must use a single conditional atomic SQLite write. Do **not** mistake this transitional D1 storage for a paid-entitlement authority or silently migrate/delete user packs. Future move to Serverless requires its own approved migration.
+- Existing unapproved numeric caps (pages, blocks, tables, slideshow) remain unchanged. Preserve saved over-limit content and snapshots; ensure downgrades never delete/clip stored material.
+- For local verification use `node --experimental-vm-modules --test tests/serverless/subscription-policy.test.mjs tests/serverless/a1-quotas.test.mjs tests/serverless/developer-limits.test.mjs tests/serverless/a1-emoji-packs.test.mjs`. Full suite is recommended when available. Do not claim tests ran unless actually run.
+- Never merge `main`, or issue `tgcloud push`, `tgcloud migrate`, or Cloudflare deployment without explicit approval. Documentation/changes here are source only. Use the `[CF-Pages-Skip]` commit prefix if Cloudflare must not auto-deploy this unfinished staged feature.

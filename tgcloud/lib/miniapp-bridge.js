@@ -483,7 +483,7 @@ async function validateButtonPageTargets(ownerId, buttons) {
   }
 }
 
-function validatePageInput(payload, { requirePageId = true } = {}) {
+function validatePageInput(payload, { requirePageId = true, previousBlocks = null, skipQuota = false } = {}) {
   if (!payload || Array.isArray(payload) || typeof payload !== 'object') {
     throw new BridgeError('INVALID_PAGE_PAYLOAD', 'Page payload must be a JSON object.', { alert: true });
   }
@@ -500,7 +500,7 @@ function validatePageInput(payload, { requirePageId = true } = {}) {
   ) {
     throw new BridgeError('EMPTY_PAGE', 'blocks must contain at least one valid block object.');
   }
-  const limits = validateEditorLimits(payload.blocks, ownerId);
+  const limits = skipQuota ? { ok:true } : validateEditorLimits(payload.blocks, ownerId, { previousBlocks });
   if (!limits.ok) {
     throw new BridgeError(
       'EDITOR_LIMIT_' + String(limits.code || 'UNKNOWN').toUpperCase(),
@@ -761,7 +761,7 @@ async function handleCreate(message, id, envelope) {
 
 async function handleSave(message, id, envelope) {
   const documentPayload = await readJsonDocument(message, envelope);
-  const input = validatePageInput(documentPayload);
+  const input = validatePageInput(documentPayload, { skipQuota: true });
   await validateButtonPageTargets(input.ownerId, input.buttons);
   const baseRevision = positiveInteger(documentPayload.base_revision);
   const baseUpdatedAt = positiveInteger(documentPayload.base_updated_at);
@@ -789,6 +789,7 @@ async function handleSave(message, id, envelope) {
     throw new BridgeError('PAGE_CONFLICT', 'Page was changed after the Mini App loaded it. Reload the latest version.');
   }
 
+  validatePageInput(documentPayload, { previousBlocks: existing.blocks || [] });
   const stamp = Math.max(now(), Number(existing.updatedAt || 0) + 1);
   const version = await nextPageSyncVersion(existing.revision || 1);
   const updated = await db.update(richPages).set({

@@ -10,7 +10,7 @@ const paragraph = text => ({ id: crypto.randomUUID(), type: 'paragraph', positio
 const table = (rows, cols) => ({ id: 'table', type: 'table', data: { rows: Array.from({length: rows}, () => Array.from({length: cols}, () => ({text:'x'}))) } });
 const cases = [
   ['blocks', Array.from({length:31}, () => paragraph('x'))],
-  ['characters', [paragraph('x'.repeat(25001))]],
+  ['characters', [paragraph('x'.repeat(20001))]],
   ['table_rows', [table(51, 1)]],
   ['table_columns', [table(1, 26)]],
   ['table_rows', [{id:'nested', type:'details', data:{summary_text:'Details', children:[table(51, 1)]}}]],
@@ -34,7 +34,7 @@ test('bot and Mini App apply owner quotas consistently; missing or forged identi
 
 test('regular users may reach the exact existing thresholds', async () => {
   const h = await harness();
-  for (const blocks of [Array.from({length:30},()=>paragraph('x')), [paragraph('x'.repeat(25000))], [table(50,25)]]) {
+  for (const blocks of [Array.from({length:30},()=>paragraph('x')), [paragraph('x'.repeat(20000))], [table(50,25)]]) {
     assert.equal(h.blocks.validateEditorLimits(blocks, regular).ok, true);
     assert.doesNotThrow(() => validatePagePayload({blocks}, null, regular));
   }
