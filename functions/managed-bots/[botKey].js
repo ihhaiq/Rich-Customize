@@ -29,6 +29,16 @@ export async function onRequestPost({request,env,params}) {
   const existing=await env.DB.prepare('SELECT status FROM managed_bot_updates WHERE bot_id=? AND update_id=?')
     .bind(bot.id,update.update_id).first();
   if (existing?.status==='completed') return responseJson({ok:true,duplicate:true});
+  if (existing?.status==='processing') return responseJson({error:'already_processing'},503);
+  if (existing?.status==='failed') {
+    const reset=await env.DB.prepare("UPDATE managed_bot_updates SET status='processing' WHERE bot_id=? AND update_id=? AND status='failed'").bind(bot.id,update.update_id).run();
+    if (!reset.meta?.changes) return responseJson({error:'already_processing'},503);
+  }
+  if (!existing) {
+    const claimed=await env.DB.prepare("INSERT OR IGNORE INTO managed_bot_updates(bot_id,update_id,status,received_at) VALUES(?,?,'processing',?)")
+      .bind(bot.id,update.update_id,Date.now()).run();
+    if (!claimed.meta?.changes) return responseJson({error:'already_processing'},503);
+  }
   if (message?.chat?.type==='private' && typeof message.text==='string') {
     const cmd=message.text.trim().split(/\\s+/)[0].split('@')[0].toLowerCase();
     let reply=null;
@@ -39,7 +49,10 @@ export async function onRequestPost({request,env,params}) {
       try{
         const token=await decryptToken(bot.token_encrypted,env.MANAGED_BOT_ENCRYPTION_KEY);
         await telegram(token,'sendMessage',{chat_id:message.chat.id,text:reply.slice(0,4000)});
-      }catch{return responseJson({error:'delivery_failed'},503);}
+      }catch{
+        await env.DB.prepare("UPDATE managed_bot_updates SET status='failed' WHERE bot_id=? AND update_id=?").bind(bot.id,update.update_id).run().catch(()=>{});
+        return responseJson({error:'delivery_failed'},503);
+      }
     }
   }
   try{
