@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "devDependencies": {
-    "@tgcloud/cli": "^0.1.2"
+    "@tgcloud/cli": "^0.2.0"
   },
   "scripts": {
     "test:emoji": "node --experimental-vm-modules --test tests/serverless/premium-emoji.test.mjs",
