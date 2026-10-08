@@ -50,3 +50,11 @@ Review any old tests expecting 25k for free; update them only when the new free 
 - **Covered by tests:** `a1-integration.test.mjs` (new-page and unsaved direct-send rejection, legacy read, owner scope, mirror mismatch, CAS source guard). These source/mock tests are not a live Telegram test.
 - **Remaining risk:** a bot editor session already stale *before* a new save begins is not identified from a session-pinned page revision (not currently stored). A separate revision-in-session design/migration is needed to eliminate that last-write hazard. Do not silently overwrite externally modified pages and do not mark A1 closed until this is addressed or acceptance is explicitly scoped.
 - **Deployment order:** Cloudflare auto-deploy now permitted; **no tgcloud production deployment** until the user can run/review it. Confirm Cloudflare build and read-only public assets, then run authenticated smoke tests once Serverless matches source. Do not claim a live integration pass from mock tests alone.
+
+## Mini App upgrade information on limits (2026-10-09)
+
+- Quota-limit API failures in the Mini App now open a dedicated modal instead of an error-only experience. The premium emoji pack lock also opens this modal when tapped.
+- The offer presents **approved quotas only**, no speculative pricing: Free 20k text/2 packs, Plus 25k/8, Golden Ticket 32k/50. Nonapproved page/block/table increases must not be promoted as paid benefits.
+- A link opens `https://t.me/richDonateBot?start=rich_plans_text` for text, `rich_plans_emoji` for custom emoji packs or `rich_plans_limits` for other caps. Telegram `openTelegramLink` is used in the Mini App; the URL is a fallback. These `/start` payloads are **a proposed future contract**, not a live payment integration.
+- The copy discloses that paid plans/prices are not yet available. No paid plan is activated in browser state and no token/payment is processed by Cloudflare.
+- `tests/serverless/subscription-offers.test.mjs` covers classification, UI comparison and deep-link payloads in a mocked DOM. Real Telegram UI and `@richDonateBot` payload handling remain unverified until Telegram Serverless can be deployed.

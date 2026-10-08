@@ -246,7 +246,9 @@ async function api(path,options={}){
     if(data?.ok===false)throw apiError(data,"Request failed");
     return data;
   }catch(error){
-    if(shouldReportApiError(error)){
+    // Quota errors are expected product limits, not server incidents.
+    const offered=Boolean(window.RichSubscriptionOffers?.showForError?.(error));
+    if(!offered && shouldReportApiError(error)){
       try{
         window.RichMiniAppErrors?.report?.(error,{
           source:"api",

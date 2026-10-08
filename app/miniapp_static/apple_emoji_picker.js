@@ -318,6 +318,13 @@
     return Math.max(customPacks.length, serverPackNames().length);
   }
 
+  function showPackLimitOffer() {
+    // A locked add-pack tab remains clickable so people can inspect plans.
+    if (!window.RichSubscriptionOffers?.show?.("emojiPacks", {
+      actual:effectivePackCount(), limit:customPackLimit(),
+    }) && typeof toast === "function") toast(mt("emoji.pack_limit_reached"));
+  }
+
   function hasCustomPackCapacity() {
     const limit = customPackLimit();
     return !Number.isFinite(limit) || effectivePackCount() < limit;
@@ -1047,7 +1054,7 @@
     if (!panel) return;
     if (!hasCustomPackCapacity()) {
       try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("warning"); } catch (_) {}
-      if (typeof toast === "function") toast(mt("emoji.pack_limit_reached"));
+      showPackLimitOffer();
       return;
     }
     panel.dataset.view = "add-pack";
@@ -1103,6 +1110,7 @@
       event.preventDefault();
       if (!hasCustomPackCapacity()) {
         status.textContent = mt("emoji.pack_limit_reached");
+        showPackLimitOffer();
         syncCustomPackTabs();
         return;
       }
@@ -1161,6 +1169,7 @@
       } catch (error) {
         if (String(error?.code || error?.message || "") === "custom_emoji_pack_limit") {
           status.textContent = mt("emoji.pack_limit_reached");
+          showPackLimitOffer();
           syncCustomPackTabs();
         } else {
           status.textContent = mt("emoji.pack_load_failed");
@@ -1812,7 +1821,7 @@
       setWalletOpen(false);
       if (!hasCustomPackCapacity()) {
         try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("warning"); } catch (_) {}
-        if (typeof toast === "function") toast(mt("emoji.pack_limit_reached"));
+        showPackLimitOffer();
         syncAddPackLockState(custom);
         requestAnimationFrame(placePanel);
         return;

@@ -235,3 +235,9 @@ The production branch is `serverless-cleanup` and the owner has approved **autom
 Until the new Telegram Serverless version is deployed, Cloudflare PUT for an existing page must not trust the older Serverless 25k quota. `functions/_lib/quota-baseline.js` only allows a 20k+ legacy page update if the owner-specific D1 mirror is present and its revision/updated_at matches the request base. A missing/stale mirror fails closed, preserving old content in storage but requiring the mirror to catch up before modifying >20k. CREATE and direct unsaved PUBLISH are always subject to 20k.
 
 Deployment checks: confirm Pages deployment is successful; verify `/miniapp/static/editor.html` and `/miniapp/static/app.js` are accessible. Unauthenticated HTTP checks cannot prove owner quota enforcement or Telegram B2B delivery; those require authenticated real-user smoke tests after tgcloud is deployed.
+
+## Subscription quota presentation (2026-10-09)
+
+`editor.html` loads `subscription_offers.js` and `subscription_offers.css`. When saving text above 20k, `app.js` calls the offer UI for recognized quota errors only. When the Free plan's two custom emoji pack slots are full, the add-pack tab stays tappable and shows the same comparison modal. Other quota errors are informational, as page/block/table paid expansion is **not approved**.
+
+Each modal shows Free / Plus / Golden Ticket approved text+pack limits and a Telegram deep link to `@richDonateBot` with payload `rich_plans_text`, `rich_plans_emoji`, or `rich_plans_limits`. Payment is explicitly **not live**. Test the live link inside Telegram and confirm which bot receives `/start` after official managed-bot support is established; Cloudflare does not process the payment.
