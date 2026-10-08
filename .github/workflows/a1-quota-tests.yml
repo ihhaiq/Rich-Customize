@@ -1,0 +1,34 @@
+name: A1 subscription quotas tests
+
+on:
+  push:
+    branches:
+      - serverless-cleanup
+    paths:
+      - '.github/workflows/a1-quota-tests.yml'
+      - 'tgcloud/lib/**'
+      - 'functions/_lib/**'
+      - 'tests/serverless/**'
+      - 'package.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quota-tests:
+    name: Subscription A1 policy and limits
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run A1 and developer regression tests
+        run: |
+          node --experimental-vm-modules --test \
+            tests/serverless/subscription-policy.test.mjs \
+            tests/serverless/a1-quotas.test.mjs \
+            tests/serverless/developer-limits.test.mjs \
+            tests/serverless/a1-emoji-packs.test.mjs
