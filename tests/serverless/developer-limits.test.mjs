@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { harness } from './harness.mjs';
-import { DEVELOPER_IDS } from '../../lib/developer-access.js';
+import { DEVELOPER_IDS } from '../../tgcloud/lib/developer-access.js';
 import { validatePagePayload } from '../../functions/_lib/pages.js';
 
 const developer = DEVELOPER_IDS[0];

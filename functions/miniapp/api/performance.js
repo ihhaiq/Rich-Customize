@@ -1,6 +1,6 @@
 import { json, readJson, handleError, HttpError } from '../../_lib/http.js';
 import { miniAppUser } from '../../_lib/telegram-auth.js';
-import { isDeveloper } from '../../../lib/developer-access.js';
+import { isDeveloper } from '../../../tgcloud/lib/developer-access.js';
 
 let schemaReadyPromise = null;
 

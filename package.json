@@ -12,6 +12,8 @@
     "deploy": "tgcloud push",
     "run": "tgcloud run",
     "migrate": "tgcloud migrate",
-    "webhook": "tgcloud webhook"
+    "webhook": "tgcloud webhook",
+    "test": "node --experimental-vm-modules --test tests/serverless/*.test.mjs",
+    "test:managed": "node --experimental-vm-modules --test tests/serverless/managed-bots.test.mjs"
   }
 }

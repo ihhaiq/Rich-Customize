@@ -1,4 +1,4 @@
-import { isDeveloper } from '../../lib/developer-access.js';
+import { isDeveloper } from '../../tgcloud/lib/developer-access.js';
 import { HttpError } from './http.js';
 
 export const B2B_PROTOCOL = 'RCB1';
@@ -517,6 +517,7 @@ function command(env, action) {
     ping: 'rcb_ping',
     pages: 'rcb_pages',
     page: 'rcb_page',
+    managed_page: 'rcb_managed_page',
     create: 'rcb_create',
     save: 'rcb_save',
     delete: 'rcb_delete',

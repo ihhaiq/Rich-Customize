@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MARKETING_COPY, marketingCopy } from '../../lib/marketing-copy.js';
+import { MARKETING_COPY, marketingCopy } from '../../tgcloud/lib/marketing-copy.js';
 
 const LOCALES = [
   'ar','en','es','de','it','pt','nl','pl','uk','ru',

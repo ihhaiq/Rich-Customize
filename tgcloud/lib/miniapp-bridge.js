@@ -1,3 +1,4 @@
+import { managedPage } from 'lib/managed-pages';
 import { api, db, InputFile } from 'sdk';
 import { and, eq, lt } from 'sdk/db';
 import {
@@ -49,6 +50,7 @@ const COMMANDS = Object.freeze({
   rcb_full_sync: 'full_sync',
   rcb_pages: 'pages',
   rcb_page: 'page',
+  rcb_managed_page: 'managed_page',
   rcb_create: 'create',
   rcb_save: 'save',
   rcb_delete: 'delete',
@@ -1089,7 +1091,7 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
     ownerId = ['ping', 'full_sync'].includes(action) ? null : userId(envelope.user_id);
     const publishNeedsPageId = action === 'publish' && !message?.document?.file_id;
     idValue = (
-      ['page', 'save', 'delete', 'user_picker'].includes(action)
+      ['page', 'managed_page', 'save', 'delete', 'user_picker'].includes(action)
       || publishNeedsPageId
     ) ? pageId(envelope.page_id) : null;
     const senderBotId = await authorizeBridgeMessage(message, action);
@@ -1129,6 +1131,11 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
       reason: 'bootstrap',
     });
     else if (action === 'pages') result = await handlePages(message, id, ownerId);
+    else if (action === 'managed_page') {
+      const payload = await managedPage(ownerId,idValue);
+      await sendJson(message,'managed_'+id+'.json','✅ RCB1 GET_MANAGED_PAGE_OK\nrequest_id: '+id+'\nuser_id: '+ownerId+'\npage_id: '+idValue,{protocol:BRIDGE_PROTOCOL,request_id:id,action,user_id:ownerId,...payload});
+      result={status:'ok'};
+    }
     else if (action === 'page') result = await handlePage(message, id, ownerId, idValue);
     else if (action === 'destinations') result = await handleDestinations(
       message,

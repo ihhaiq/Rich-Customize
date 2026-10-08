@@ -6,7 +6,7 @@ import {
   pinCustomEmojiPack,
   reorderCustomEmojiPacks,
 } from '../../../_lib/custom-emoji-packs.js';
-import { isDeveloper } from '../../../../lib/developer-access.js';
+import { isDeveloper } from '../../../../tgcloud/lib/developer-access.js';
 
 function accessPayload(access, developer) {
   return {

@@ -69,6 +69,11 @@ export default async function (message, ctx = {}) {
       message.from.language_code = languageCode;
     }
 
+    if (message?.chat?.type === 'private' && (matchesCommand(command, 'mybots') || message?.text?.trim() === 'بوتاتي')) {
+      await api.sendMessage({chat_id:message.chat.id,text:'بوتاتي — إدارة بوتاتك وربط صفحاتك الغنية.',reply_markup:{inline_keyboard:[[{text:'فتح بوتاتي',url:'https://t.me/RichCustomizebot/editor?startapp=managed_bots'}]]}});
+      return;
+    }
+
     if (matchesCommand(command, 'dev')) {
       await openDeveloperPanel(message);
       return;

@@ -5,7 +5,7 @@ import vm from 'node:vm';
 // Dependency-free isolated V8 harness. Only Telegram API and DB I/O are mocked;
 // editor, rendering, localization, session TTL and undo/redo run real modules.
 export async function harness({ intl = Intl, extraModules = {} } = {}) {
-  const root = path.resolve(import.meta.dirname, '../..');
+  const root = path.resolve(import.meta.dirname, '../../tgcloud');
   const context = vm.createContext({ console, Intl: intl, Date, Math, JSON, setTimeout, clearTimeout, crypto: globalThis.crypto });
   const records = {};
   const calls = [];

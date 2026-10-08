@@ -1,50 +1,107 @@
-# Managed Bots — implementation status
+# البوتات المُدارة — التنفيذ والتشغيل
 
-Architecture: one Rich Customize repository, one existing Telegram Serverless editor, and a shared Cloudflare webhook router for additional bots. Each bot still needs its own BotFather token. The router does not need a second Telegram Serverless instance per bot.
+تحديث ٨ أكتوبر ٢٠٢٦. هذا وصف للكود والاختبارات المحلية، وليس إعلان نشر أو جاهزية إنتاج.
 
-## Added
-- `functions/managed-bots/[botKey].js`: fail-closed POST endpoint; random-key format, D1 lookup, Telegram secret-header verification, size/JSON/update validation.
-- `functions/_lib/managed-bots.js`: shared validation.
-- `cloudflare/d1/managed_bots.sql`: proposed tenant metadata and update deduplication schema, **not applied**.
-- `sups.md`: updated managed-bot product and architecture plan.
+## الحدود المعمارية
 
-## Not yet enabled
-- Token registration, getMe and setWebhook provisioning, encryption/secret vault, token rotation.
-- Real update dispatcher, Telegram Bot API sender, durable deduplication and retries.
-- Owner authorization and editor «بوتاتي» UI, subscription enforcement and billing.
-- Secure entitlement synchronization with the editor Serverless, deployment and integration tests.
+- المحرر ومصدر `rich_pages` في Telegram Serverless الحالي تحت `tgcloud/`، مع CLI 0.2.0.
+- Cloudflare Pages Functions محرك مركزي واحد؛ لا Serverless deployment إضافي ولا نسخة محرر لكل بوت أو لبوت التبرع.
+- D1 يخزن الهوية والتوكن المشفر والترخيص والإعدادات ومراجع الصفحات والنشر وحالات الوظائف. لا يخزن أجسام الصفحات أو محتوى popup. أجسام التحديثات الواردة مشفرة ومؤقتة حتى الاكتمال/الإلغاء.
+- `rcb_managed_page` امتداد قراءة لـRCB1: يتحقق Serverless من المالك ويستخدم `buildInputRichMessage` نفسه، بلا تذييل ترويجي. يرجع المستند عبر الجسر الموثق؛ Cloudflare يتحقق من الطلب والمالك والصفحة ونوع الاستجابة. لا يستخدم مرآة الصفحات كمصدر لهذه العملية.
+- إدارة العملاء تستخرج المالك من Telegram `initData` الموقع باستخدام توكن المحرر. لا تقبل `owner_id` أو خطة مدفوعة من الجسم.
 
-The endpoint deliberately responds 503 to authenticated updates until durable handling exists. Do not register a live Telegram webhook against it yet; doing so would cause retries without handling updates.
+## ما أصبح منفذاً
 
-## Credential placement
-Use server-side secrets and a verified encrypted credential store. Do not put BotFather tokens in GitHub, D1 plaintext, Mini App assets or the request path. The webhook verification secret is distinct from the bot token.
+1. واجهة عربية مستقلة «بوتاتي» ضمن التطبيق الحالي: قائمة البوتات والتراخيص والحالة والانتهاء، التسجيل، التفعيل، الإيقاف، الترحيب النصي/الغني، الأوامر، تغيير التوكن، الإرسال، العمليات وإلغاء الربط. تظهر في ترحيب المحرر وأمر `/mybots` ونص «بوتاتي» ورابط داخل المحرر.
+2. تسجيل عبر HTTPS مع حقل password يُفرغ مباشرة؛ `getMe` والتحقق من الهوية، حجز بوت المحرر/الترحيل/التبرع والأرقام الإضافية، AES-GCM بتشفير عشوائي مستقل، ومنع التكرار بفهارس فريدة. SQL يتحقق من الترخيص أثناء INSERT نفسه؛ الترخيص لا يرتبط ببوتين تحت التزامن.
+3. لا يتغير Webhook عند التسجيل. التفعيل يعرض حاجة التأكيد ويحتاج موافقة إضافية عند وجود Webhook خارجي. الإيقاف يعطل المعالجة أولاً ويحذف اتصالنا فقط، ولا يحذف Webhook انتقل إلى خدمة أخرى. تغيير التوكن يقبل البوت نفسه فقط ويغير سر Webhook ويحتاج تفعيل جديداً. إلغاء الربط يحذف الاتصال والتوكن ويلغي المعلق؛ لا يحذف البوت من BotFather.
+4. `/start` نص أو صفحة غنية، `/help`، و`/admin` للمالك فقط. الأوامر الإضافية تحمل وصفاً/رداً نصياً بسيطاً. رسائل المجموعات المدعومة تعالج الأوامر، ولا يُعاد الرد آلياً على منشورات القنوات. نشر المالك يتحقق من إدارته للدردشة ومن صلاحيات البوت؛ لا يتيح الإرسال إلى مستخدم خاص آخر.
+5. بلوكات محرك المحرر نفسها، روابط ونسخ وأزرار غنية وinline، callbacks محصورة ببوت ودردشة ورسالة منشورة. صفحة الترحيب تقرأ أحدث نسخة وقت المعالجة.
+6. الملفات ذات `file_id` تنزل من Telegram بتوكن المحرر أو الترحيل ثم ترفع كمرفق multipart جديد بهوية البوت المُدار؛ لا يعاد استعمال `file_id` بين البوتات. الروابط HTTPS تمر إلى Bot API. لا تخزن بايتات الوسائط في D1.
+7. سجل تحديثات دائم، deduplication حسب `(bot_id, job_id)`، قفل لكل بوت، leases وقيد نهائي قبل الإرسال، backoff للأخطاء القابلة للإعادة، حالة مستقلة للنتائج غير المؤكدة.
+8. تراخيص مستقلة مرتبطة بمالك، تجديد/إلغاء/انتهاء بأحداث خادم موثقة وموقعة، منع تكرار الحدث ورفض تبديل المالك وتجاهل الإصدارات الأقدم. انتهاء الترخيص يعلق المعالجة فور الفحص دون حذف الإعدادات؛ التجديد لا يعيد التشغيل تلقائياً: المالك يفعل البوت مجدداً.
 
-Do not modify `AGENTS.md` as part of this rollout.
+## الاشتراكات وStars — مقفلة للإطلاق
 
-## Implemented after foundation
+المجلد `subscription-bot/` ليس معالج دفع إنتاجياً مكتملاً. لم يُنشأ deployment له ولم توضع أسعار أو اشتراكات تجريبية للمستخدمين.
 
-- Central admin-only Cloudflare endpoint `/internal/managed-bots` (GET/POST) with bearer secret `MANAGED_BOTS_ADMIN_KEY`.
-- Admin registration checks BotFather token with Telegram `getMe`, rejects the main editor bot, prevents duplicate bot IDs, and stores the token as AES-GCM ciphertext in D1 using server-only `MANAGED_BOT_ENCRYPTION_KEY`.
-- Registration does **not** change the bot's existing webhook. Explicit `activate` action with `confirmWebhookTakeover:true` configures `setWebhook` for the shared Cloudflare endpoint.
-- The webhook validates Telegram's secret header, decrypts the correct bot credential server-side, supports private `/start` and owner-only `/admin` responses, and records completed update IDs.
-- Admin actions `welcome` and `disable` are available. Disabling changes routing status; webhook cleanup and automatic bot-token rotation are **not** implemented.
+`POST /internal/managed-licenses` **مهايئ استحقاقات خادم إلى خادم، وليس إثبات دفع بحد ذاته**. يبقى مغلقاً ما لم يكن `MANAGED_BOTS_LICENSE_PROVIDER_ENABLED=true`. لا تشغله قبل وجود مصدر يتحقق من `successful_payment` و`currency=XTR` والمبلغ وinvoice/order والمالك ومعرّف الدفع الفريد، ويراجع الاسترداد والتجديد وStars reconciliation. توقيع الحدث يثبت مصدره فقط؛ لا يغني عن هذه التحققات المالية. لذلك التسجيل العام مغلق افتراضياً أيضاً.
 
-### Configuration (do not commit values)
+صيغة الحدث بعد اكتمال المصدر الموثوق:
 
-Cloudflare Pages runtime secrets:
-- `MANAGED_BOTS_ADMIN_KEY`: independently generated long random bearer secret (at least 32 characters).
-- `MANAGED_BOT_ENCRYPTION_KEY`: independently generated high-entropy encryption passphrase (at least 32 characters); losing or changing it makes stored tokens undecryptable without migration.
-- `DB`: existing D1 binding.
+```json
+{"event_id":"unique_event_id","license_id":"unique_license_id","owner_id":"123456789","status":"active","expires_at":1800000000000,"version":1}
+```
 
-Run the SQL migration in `cloudflare/d1/managed_bots.sql` against the correct D1 database before attempting registration. **No migration or deployment was executed by this change.**
+`expires_at` و`X-Managed-Timestamp` بالميلي ثانية. حالات الحدث `active / cancelled / expired`. التوقيع `X-Managed-Signature` يساوي hex لـHMAC-SHA256 بالمفتاح `MANAGED_BOTS_LICENSE_KEY` على `timestamp + "." + rawBody`. نافذة الوقت خمس دقائق؛ إعادة الحدث نفسه لا تمدد الاشتراك. المعرّف والإصدار فريدان، والدفعة D1 batch ذرية. لا ترسل المفتاح إلى المتصفح أو بوتات العملاء. اختبارات الوحدة تزرع تراخيص صناعية في SQLite محلية فقط.
 
-### Critical remaining work before public release
+## الاعتمادية وحدود exactly-once
 
-1. Owner-authenticated «بوتاتي» UI in the editor, instead of exposing the administrative bearer endpoint to users.
-2. Subscription/license verification and quota enforcement on creation and activation.
-3. Robust durable queue/outbox to avoid duplicate outgoing messages when a send succeeds but D1 acknowledgement fails; worker processing and operational retries.
-4. Stronger credential lifecycle: token rotation, revocation, secure owner verification, deletion, and webhook restoration policy.
-5. Production tests with an isolated test bot, Cloudflare deploy and D1 migration, telemetry and alerting.
-6. Telegram Stars payment verification, cancellation/refund reconciliation, and trusted subscription synchronization.
+الحالات: `pending → processing → sending → completed`، مع `failed / uncertain / cancelled`.
 
-**Do not expose the admin key to a Mini App or browser. Do not onboard customers until the above work is complete.**
+- يُحفظ التحديث المشفر قبل المعالجة. لا يُعاد إرسال المكتمل أو غير المؤكد.
+- الفشل الصريح القابل للإعادة، مثل 429، يرجع إلى pending مع backoff. التحديثات قبل الإرسال تستعاد بعد انتهاء lease.
+- إذا نجح إرسال Telegram وتعذر تسجيله، أو انقطع الاتصال أثناءه، تصبح النتيجة `uncertain`. إذا انقطع المنفذ تماماً في حالة sending، تحولها الاستعادة إلى uncertain. **لا يوجد ضمان exactly-once**: API لا يوفر هنا مفتاح إرسال idempotent أو بحثاً مضموناً عن الرسالة السابقة. قد تحتاج العملية إلى فحص يدوي وقد تفقد استجابة؛ لا نفضل التكرار الآلي.
+- القفل القديم بعد خمس دقائق يحرر مع تعليق البوت للمراجعة، ولا تعاد عملية دورة الحياة الخارجية عمياناً. يلزم فحص الاتصال وإعادة التفعيل. lease المعالجة ٩٠ ثانية ومهلة اتصال Telegram ١٢ ثانية؛ الفحص الذري قبل الإرسال يمنع المنفذ القديم من الإرسال بعد فقد الملكية.
+- pending/processing القديمة أكثر من ٢٤ ساعة تلغى إذا انتهى lease. لا يعاد تشغيل رسائل قديمة إلى ما لا نهاية.
+- أعد استدعاء `POST /internal/managed-bots` من مجدول خادم موثوق كل دقيقة، مع `Authorization: Bearer <MANAGED_BOTS_ADMIN_KEY>`. يعالج حتى ٢٠ وظيفة بالاستدعاء. لم يُنشأ أو يشغّل مجدول إنتاج في هذه المهمة. Telegram يعيد طلبات webhook التي ترجع 503، وواجهة المالك تتابع مهام إرسالها، لكن لا يغني ذلك عن المجدول.
+- `GET /internal/managed-bots` يعرض آخر الوظائف الفاشلة/غير المؤكدة دون محتواها أو أسرارها. لوحة المالك تعرض عمليات بوتاته فقط.
+
+## السلوك الاحتياطي والقيود
+
+- callback_data العادي يحافظ على قيمته ويعطي إقرار استلام؛ لا يشغل كوداً مخصصاً أو أوامر محرر/مطور/دفع. popup ضمن حدود `answerCallbackQuery` (٢٠٠ حرف). التنقل لصفحة يجلبها دائماً بمالك البوت نفسه.
+- عمليات callbacks تُقبل فقط من الرسائل المسجلة لهذا البوت. تغير revision الصفحة يجعل أزرار الرسالة القديمة تظهر تنبيهاً لفتح النسخة الجديدة؛ لا ينفذ زر قديم فعلاً جديداً بسبب تبديل ترتيب الأزرار. حذف الصفحة يمنع قراءتها. callbacks القديمة للبوت الرئيسي لم تُغيّر.
+- أزرار web_app/login/inline-switch والتنقل المقيد بالمشتركين في قائمة أزرار الصفحة تُعرض معطلة؛ لا تُستعار هوية أو صلاحيات البوت الرئيسي. أنواع callbacks الغنية غير المرتبطة بتنقل معروف تحصل على إقرار فقط.
+- نقل الوسائط محدود بـ٢٠ MiB للملف و٤٠ MiB للرسالة و٢٠ ملفاً فريداً. الملف غير المتاح لمصدريه، الملفات الأكبر، و`tg://document` أو `attach://` غير المحلول تفشل قبل الإرسال برسالة تطلب إعادة الرفع/التقليل. لا يُرسل نص مبتور بصمت مكان رسالة غنية فاشلة.
+- لا يوجد محرر كامل داخل بوت العميل؛ التأليف وحفظ الصفحات في المحرر الرئيسي، والإدارة والنشر من «بوتاتي».
+- حفظ إيصال النشر لا يمكن ضمانه إذا فشلت قاعدة البيانات بعد الإرسال؛ تلك الرسالة تدخل حالة غير مؤكدة وقد لا تعمل أزرارها، بدلاً من نسبتها إلى مالك خاطئ.
+- لم تختبر مفاتيح حقيقية أو دفعاً حقيقياً أو BotFather أو Webhooks خارجية. اختبار بيئة معاينة مع بوت تجريبي شرط قبل الإنتاج. فشل تنزيل Chromium في بيئة العمل يمنع ادعاء مراجعة بصرية فعلية للواجهة.
+
+## إعدادات Cloudflare المطلوبة
+
+| الإعداد | الغرض |
+| --- | --- |
+| `DB` | D1 الحالية؛ تطبيق مخطط managed فقط بعد الموافقة |
+| `BOT_TOKEN` | توكن المحرر للتحقق من initData وقراءة ملفاته، موجود سابقاً |
+| `B2B_BOT_TOKEN` وباقي إعدادات RCB1 | الجسر الحالي؛ لا تستبدلها |
+| `MANAGED_BOT_ENCRYPTION_KEY` | Secret عشوائي قوي لا يقل عن ٣٢ حرفاً؛ فقده/تغييره دون إعادة تشفير يجعل التوكنات غير قابلة للقراءة |
+| `MANAGED_BOTS_ADMIN_KEY` | Secret مستقل لا يقل عن ٣٢ حرفاً للاستعادة والمراقبة فقط |
+| `MANAGED_BOTS_LICENSE_KEY` | Secret مستقل بين مصدر الاشتراكات والمهايئ |
+| `MANAGED_BOTS_PUBLIC_ORIGIN` | أصل HTTPS النهائي بلا مسار، مثل `https://rich-customize.pages.dev` |
+| `MANAGED_BOTS_RESERVED_IDS` | أرقام البوتات الداخلية مفصولة بفواصل، خصوصاً بوت التبرع الفعلي |
+| `MANAGED_BOTS_RESERVED_USERNAMES` | أسماء إضافية محجوزة؛ الأسماء الافتراضية محجوزة أيضاً |
+| `MANAGED_BOTS_LICENSE_PROVIDER_ENABLED` | اتركه `false` إلى اكتمال والتحقق من مصدر Stars |
+| `MANAGED_BOTS_REGISTRATION_ENABLED` | اتركه `false` للإطلاق العام قبل اجتياز الدفع والاختبار التشغيلي |
+
+التشفير الحالي v1/AES-GCM محفوظ للتوافق. تدوير **توكن البوت** مدعوم؛ تدوير مفتاح التشفير العام يحتاج إجراء منفصلاً يعيد تشفير السجلات، فلا تغير المفتاح مباشرة.
+
+## migrations وأوامر النشر — لم تنفذ
+
+راجع نسخة احتياطية ومخطط D1 أولاً. إذا كانت بيانات قديمة تتشارك `license_id`، فالفهرس الفريد يوقف migration لتصحيحها، ولا تحذفها تلقائياً. ملف الأساس idempotent؛ migration 0001 يطبق **مرة واحدة فقط** ويفشل عند تكراره. يحتفظ بالسجلات والتوكنات القديمة ويحول الحالات القديمة غير المكتملة إلى uncertain.
+
+```sh
+# مراجعة محلية واختبارات؛ Node 24 يدعم node:sqlite في الاختبارات
+npm test
+npx wrangler pages functions build functions --outdir /tmp/rich-pages-build
+
+# بعد موافقة منفصلة فقط، مع اسم قاعدة بيانات مؤكّد
+npx wrangler d1 execute <DB_NAME> --remote --file=cloudflare/d1/managed_bots.sql
+npx wrangler d1 execute <DB_NAME> --remote --file=cloudflare/d1/migrations/0001-managed-bots-runtime.sql
+
+# من جذر المستودع، مع CLI 0.2.0 والحساب الصحيح؛ بعد الموافقة فقط
+npx tgcloud status
+npx tgcloud diff
+npx tgcloud push
+# لا يلزم tgcloud migrate لهذه التغييرات: tgcloud/schema.js لم يتغير.
+
+# بعد ضبط Secrets والجسر وmigration وموافقة نشر Pages
+npx wrangler pages deploy app/miniapp_static --project-name <PAGES_PROJECT> --branch serverless-cleanup
+```
+
+الفرع `serverless-cleanup` موثق كفرع إنتاج Pages. رفع هذه المهمة يستعمل **بادئة** `[CF-Pages-Skip]` في رسالة commit لتجاوز نشر Pages وفق الوثائق الرسمية؛ هذا ليس تصريحاً بأي نشر لاحق. لا تغير إعدادات Git integration ولا تشغّل إعادة بناء يدوية دون الموافقة.
+
+## مراجع المراجعة
+
+- https://core.telegram.org/bots/serverless — الهيكل الفعلي CLI 0.2.0 وملفات `tgcloud/`، وتم فحص `tgcloud --help` محلياً دون أوامر إنتاج.
+- https://core.telegram.org/bots/api — sendRichMessage وgetFile وWebhooks والأزرار.
+- https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/#skipping-a-build-via-a-commit-message — منع النشر عند رفع الكود.

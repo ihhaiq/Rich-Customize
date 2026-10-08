@@ -1,6 +1,6 @@
-import { isDeveloper } from '../../lib/developer-access.js';
-import { plainRichText } from '../../lib/rich-text.js';
-import { validateStoredButtons } from '../../lib/button-validation.js';
+import { isDeveloper } from '../../tgcloud/lib/developer-access.js';
+import { plainRichText } from '../../tgcloud/lib/rich-text.js';
+import { validateStoredButtons } from '../../tgcloud/lib/button-validation.js';
 import { HttpError } from './http.js';
 
 export const MAX_PAGE_BLOCKS = 30;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PLAN_LIMITS, resolveEditorEntitlement, resolveCloneEntitlement, checkApprovedQuota } from '../../lib/subscription-policy.js';
+import { PLAN_LIMITS, resolveEditorEntitlement, resolveCloneEntitlement, checkApprovedQuota } from '../../tgcloud/lib/subscription-policy.js';
 
 test('approved pack quotas are 2, 8, 50', () => {
   assert.equal(PLAN_LIMITS.free.emojiPacks, 2);

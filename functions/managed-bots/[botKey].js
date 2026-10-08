@@ -1,66 +1,23 @@
-import { isSafeBotKey, safeEqual, validUpdate, responseJson } from '../_lib/managed-bots.js';
-import { decryptToken, telegram } from '../_lib/managed-bot-runtime.js';
-
-// Fail closed: no public registration, no token acceptance, no payment handling.
-// D1 schema and trusted secret storage must be provisioned before enabling bots.
-export async function onRequestPost({request,env,params}) {
-  const botKey=String(params?.botKey || '');
-  if (!isSafeBotKey(botKey)) return responseJson({error:'not_found'},404);
-  if (!env?.DB) return responseJson({error:'unavailable'},503);
-  const bot=await env.DB.prepare(
-    'SELECT id, owner_id, status, webhook_secret, token_encrypted, welcome_text FROM managed_bots WHERE webhook_key = ? LIMIT 1'
-  ).bind(botKey).first().catch(()=>null);
-  if (!bot || bot.status !== 'active') return responseJson({error:'not_found'},404);
-  const secret=request.headers.get('X-Telegram-Bot-Api-Secret-Token');
-  if (!secret || !safeEqual(secret,String(bot.webhook_secret || ''))) return responseJson({error:'unauthorized'},401);
-  const size=Number(request.headers.get('content-length') || 0);
-  if (size > 262144) return responseJson({error:'too_large'},413);
-  let update;
-  try {
-    const raw=await request.text();
-    if (raw.length > 262144) return responseJson({error:'too_large'},413);
-    update=JSON.parse(raw);
-  } catch { return responseJson({error:'invalid_json'},400); }
-  if (!validUpdate(update)) return responseJson({error:'invalid_update'},400);
-  if (!env.MANAGED_BOT_ENCRYPTION_KEY) return responseJson({error:'unavailable'},503);
-  const message=update.message;
-  // Only recognized private-chat commands are handled; other updates are acknowledged.
-  // A failed send is retried by Telegram. Completed updates are deduplicated in D1.
-  const existing=await env.DB.prepare('SELECT status FROM managed_bot_updates WHERE bot_id=? AND update_id=?')
-    .bind(bot.id,update.update_id).first();
-  if (existing?.status==='completed') return responseJson({ok:true,duplicate:true});
-  if (existing?.status==='processing') return responseJson({error:'already_processing'},503);
-  if (existing?.status==='failed') {
-    const reset=await env.DB.prepare("UPDATE managed_bot_updates SET status='processing' WHERE bot_id=? AND update_id=? AND status='failed'").bind(bot.id,update.update_id).run();
-    if (!reset.meta?.changes) return responseJson({error:'already_processing'},503);
-  }
-  if (!existing) {
-    const claimed=await env.DB.prepare("INSERT OR IGNORE INTO managed_bot_updates(bot_id,update_id,status,received_at) VALUES(?,?,'processing',?)")
-      .bind(bot.id,update.update_id,Date.now()).run();
-    if (!claimed.meta?.changes) return responseJson({error:'already_processing'},503);
-  }
-  if (message?.chat?.type==='private' && typeof message.text==='string') {
-    const cmd=message.text.trim().split(/\\s+/)[0].split('@')[0].toLowerCase();
-    let reply=null;
-    if(cmd==='/start')reply=String(bot.welcome_text||'أهلاً بيك. هذا بوت مُدار بواسطة Rich Customize.');
-    if(cmd==='/admin')reply=String(message.from?.id)===String(bot.owner_id)
-      ? 'إدارة البوت حالياً من لوحة المشرف المركزية.':'هذا الأمر مخصص لمالك البوت.';
-    if(reply){
-      try{
-        const token=await decryptToken(bot.token_encrypted,env.MANAGED_BOT_ENCRYPTION_KEY);
-        await telegram(token,'sendMessage',{chat_id:message.chat.id,text:reply.slice(0,4000)});
-      }catch{
-        await env.DB.prepare("UPDATE managed_bot_updates SET status='failed' WHERE bot_id=? AND update_id=?").bind(bot.id,update.update_id).run().catch(()=>{});
-        return responseJson({error:'delivery_failed'},503);
-      }
-    }
-  }
-  try{
-    await env.DB.prepare("INSERT INTO managed_bot_updates(bot_id,update_id,status,received_at) VALUES(?,?,'completed',?) ON CONFLICT(bot_id,update_id) DO UPDATE SET status='completed'")
-      .bind(bot.id,update.update_id,Date.now()).run();
-  }catch{return responseJson({error:'persistence_failed'},503);}
-  return responseJson({ok:true});
+import { isSafeBotKey,safeEqual,validUpdate,responseJson } from '../_lib/managed-bots.js';
+import { enqueue,processJob } from '../_lib/managed-bot-jobs.js';
+import { rateLimit,licenseFor,ManagedError } from '../_lib/managed-bot-service.js';
+export async function onRequestPost(context) {
+ const {request,env,params}=context;
+ try {
+ if(!isSafeBotKey(String(params?.botKey||'')))return responseJson({error:'not_found'},404);
+ if(!env.DB||!env.MANAGED_BOT_ENCRYPTION_KEY)return responseJson({error:'unavailable'},503);
+ const bot=await env.DB.prepare('SELECT * FROM managed_bots WHERE webhook_key=?').bind(params.botKey).first();
+ if(!bot)return responseJson({error:'not_found'},404);
+ if(!safeEqual(request.headers.get('X-Telegram-Bot-Api-Secret-Token')||'',bot.webhook_secret))return responseJson({error:'unauthorized'},401);
+ if(bot.status!=='active'||!await licenseFor(env,bot))return responseJson({ok:true,paused:true});
+ await rateLimit(env.DB,'webhook:'+bot.id,120);
+ if(Number(request.headers.get('content-length'))>262144)return responseJson({error:'too_large'},413);
+ const raw=await request.text();if(new TextEncoder().encode(raw).length>262144)return responseJson({error:'too_large'},413);
+ let update;try{update=JSON.parse(raw);}catch{return responseJson({error:'invalid_json'},400);}
+ if(!validUpdate(update))return responseJson({error:'invalid_update'},400);
+ const job=await enqueue(env,bot,'u:'+update.update_id,{kind:'update',update});
+ const result=await processJob(context,bot.id,job.job_id);
+ return responseJson({ok:!['pending','busy'].includes(result.status),...result},['pending','busy'].includes(result.status)?503:200);
+ }catch(e){return responseJson({error:e instanceof ManagedError?e.code:'unavailable'},e instanceof ManagedError?e.status:503);}
 }
-export async function onRequestGet() {
-  return responseJson({error:'method_not_allowed'},405);
-}
+export async function onRequestGet(){return responseJson({error:'method_not_allowed'},405);}

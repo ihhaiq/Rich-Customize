@@ -19,11 +19,17 @@ export async function decryptToken(value,secret){
  if(record.v!==1)throw Error('unknown token format');
  return decoder.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:fromHex(record.iv)},await keyFromSecret(secret),fromHex(record.data)));
 }
+export class TelegramError extends Error {
+ constructor(code, uncertain=false, retryAfter=0) { super('telegram_failed'); this.code=code; this.uncertain=uncertain; this.retryAfter=retryAfter; }
+}
 export async function telegram(token,method,payload){
- const res=await fetch('https://api.telegram.org/bot'+token+'/'+method,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
- const data=await res.json();
- if(!res.ok||data.ok!==true)throw Error('Telegram API '+method+' failed: '+res.status);
- return data.result;
+ try {
+  const multipart=payload instanceof FormData;
+  const res=await fetch('https://api.telegram.org/bot'+token+'/'+method,{method:'POST',...(multipart?{}:{headers:{'content-type':'application/json'}}),body:multipart?payload:JSON.stringify(payload),signal:AbortSignal.timeout(12000)});
+  let data;try{data=await res.json();}catch{throw new TelegramError(res.status,true);}
+  if(!res.ok||data.ok!==true)throw new TelegramError(Number(data.error_code||res.status),res.status>=500,Math.min(3600,Number(data.parameters?.retry_after)||0));
+  return data.result;
+ }catch(error){if(error instanceof TelegramError)throw error;throw new TelegramError(0,true);}
 }
 export function adminAuthorized(request,env){
  const bearer=request.headers.get('authorization')||'';
@@ -32,4 +38,4 @@ export function adminAuthorized(request,env){
 export function requireAdmin(request,env){
  return adminAuthorized(request,env)?null:responseJson({error:'unauthorized'},401);
 }
-export function validBotToken(token){return typeof token==='string'&&/^\d{5,20}:[A-Za-z0-9_-]{30,}$/.test(token);}
+export function validBotToken(token){return typeof token==='string'&&/^\d{5,20}:[A-Za-z0-9_-]{30,100}$/.test(token);}

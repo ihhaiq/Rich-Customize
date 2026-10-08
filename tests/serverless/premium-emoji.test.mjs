@@ -136,9 +136,9 @@ test('picker has exact three columns, merged finish/more rows and complete extra
 
 test('all 20 catalogs contain every emoji key with matching placeholders', async () => {
   const h = await harness();
-  const { MESSAGE_KEYS, SUPPORTED_LOCALES } = await import('../../lib/i18n-keys.js');
+  const { MESSAGE_KEYS, SUPPORTED_LOCALES } = await import('../../tgcloud/lib/i18n-keys.js');
   for (const locale of SUPPORTED_LOCALES) {
-    const { default: values } = await import('../../lib/lang/' + locale + '.js');
+    const { default: values } = await import('../../tgcloud/lib/lang/' + locale + '.js');
     assert.equal(values.length, MESSAGE_KEYS.length);
     for (const key of MESSAGE_KEYS.filter(key => key.startsWith('emoji.'))) assert.ok(h.i18n.t(locale, key));
     assert.doesNotMatch(h.i18n.t(locale, 'emoji.range', { start: 10, end: 27, total: 60 }), /\{\w+\}/);
@@ -215,11 +215,11 @@ test('parallel duplicate clicks mutate only once and preview rendering errors pr
 
 test('entry and private-input wiring is present; JavaScript only with bare runtime imports', async () => {
   for (const file of ['editor-premium-emoji','editor-emoji-targets','premium-emoji-text']) {
-    const source = fs.readFileSync(new URL('../../lib/' + file + '.js', import.meta.url), 'utf8');
+    const source = fs.readFileSync(new URL('../../tgcloud/lib/' + file + '.js', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /from ['"](?:node:|\.\/|\.\.\/)/);
   }
-  assert.match(fs.readFileSync(new URL('../../handlers/message.js', import.meta.url),'utf8'), /handlePremiumEmojiMessage\(message\)/);
-  assert.match(fs.readFileSync(new URL('../../handlers/callback_query.js', import.meta.url),'utf8'), /handlePremiumEmojiCallback\(query\)/);
+  assert.match(fs.readFileSync(new URL('../../tgcloud/handlers/message.js', import.meta.url),'utf8'), /handlePremiumEmojiMessage\(message\)/);
+  assert.match(fs.readFileSync(new URL('../../tgcloud/handlers/callback_query.js', import.meta.url),'utf8'), /handlePremiumEmojiCallback\(query\)/);
 });
 
 test('table field selection inserts into the chosen cell without losing merge or formatting', async () => {

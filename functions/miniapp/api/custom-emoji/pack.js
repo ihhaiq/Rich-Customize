@@ -2,7 +2,7 @@ import { json, readJson, HttpError, handleError } from '../../../_lib/http.js';
 import { miniAppUser } from '../../../_lib/telegram-auth.js';
 import { telegramApi } from '../../../_lib/telegram-api.js';
 import { claimCustomEmojiPack } from '../../../_lib/custom-emoji-packs.js';
-import { isDeveloper } from '../../../../lib/developer-access.js';
+import { isDeveloper } from '../../../../tgcloud/lib/developer-access.js';
 
 function packName(input) {
   const value = String(input || '').trim();

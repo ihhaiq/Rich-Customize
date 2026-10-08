@@ -1,7 +1,7 @@
 import { json, handleError } from '../../_lib/http.js';
 import { miniAppUser } from '../../_lib/telegram-auth.js';
 import { customEmojiPackAccess } from '../../_lib/custom-emoji-packs.js';
-import { isDeveloper } from '../../../lib/developer-access.js';
+import { isDeveloper } from '../../../tgcloud/lib/developer-access.js';
 
 export async function onRequestGet(context) {
   try {

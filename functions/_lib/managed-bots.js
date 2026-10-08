@@ -1,4 +1,4 @@
-// Managed bot webhook foundation. Token storage/provisioning is intentionally not implemented.
+// Shared validation for the isolated managed-bot runtime.
 const encoder = new TextEncoder();
 export function isSafeBotKey(key) {
   return typeof key === 'string' && /^[a-f0-9]{32,64}$/.test(key);

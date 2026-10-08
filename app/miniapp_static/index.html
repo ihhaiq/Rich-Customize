@@ -48,7 +48,8 @@
           });
 
           if (!response.ok) throw new Error("Telegram verification failed");
-          window.location.replace("/editor.html");
+          const startParam = new URLSearchParams(initData).get("start_param");
+          window.location.replace(startParam === "managed_bots" ? "/managed-bots.html" : "/editor.html");
         } catch (_) {
           window.location.replace("/open-in-telegram.html?reason=verification");
         } finally {

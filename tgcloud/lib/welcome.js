@@ -66,6 +66,7 @@ export function buildWelcomeKeyboard(languageCode) {
   const locale = resolveLanguage(languageCode);
   return {
     inline_keyboard: [
+      [{ text: 'بوتاتي', url: 'https://t.me/RichCustomizebot/editor?startapp=managed_bots' }],
       [{ text: t(locale, 'welcome.add_group_button'), url: ADD_GROUP_URL }],
       [
         {
