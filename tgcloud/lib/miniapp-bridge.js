@@ -14,6 +14,9 @@ import {
   validateEditorLimits,
 } from 'lib/editor-blocks';
 import { logError } from 'lib/error-log';
+import { getEditorEntitlement } from 'lib/editor-subscriptions';
+import { safePlanLimit } from 'lib/subscription-policy';
+import { archivePreviousPageVersion } from 'lib/page-version-history';
 import { allowBridgeRequest } from 'lib/request-guard';
 import { validateStoredButtons } from 'lib/button-validation';
 import {
@@ -483,7 +486,7 @@ async function validateButtonPageTargets(ownerId, buttons) {
   }
 }
 
-function validatePageInput(payload, { requirePageId = true, previousBlocks = null, skipQuota = false } = {}) {
+async function validatePageInput(payload, { requirePageId = true, previousBlocks = null, skipQuota = false } = {}) {
   if (!payload || Array.isArray(payload) || typeof payload !== 'object') {
     throw new BridgeError('INVALID_PAGE_PAYLOAD', 'Page payload must be a JSON object.', { alert: true });
   }
@@ -500,7 +503,9 @@ function validatePageInput(payload, { requirePageId = true, previousBlocks = nul
   ) {
     throw new BridgeError('EMPTY_PAGE', 'blocks must contain at least one valid block object.');
   }
-  const limits = skipQuota ? { ok:true } : validateEditorLimits(payload.blocks, ownerId, { previousBlocks });
+  const limits = skipQuota ? { ok:true } : validateEditorLimits(payload.blocks, ownerId, {
+    previousBlocks, entitlement:await getEditorEntitlement(ownerId),
+  });
   if (!limits.ok) {
     throw new BridgeError(
       'EDITOR_LIMIT_' + String(limits.code || 'UNKNOWN').toUpperCase(),
@@ -696,7 +701,7 @@ async function handlePage(message, id, ownerId, idValue) {
 
 async function handleCreate(message, id, envelope) {
   const documentPayload = await readJsonDocument(message, envelope);
-  const input = validatePageInput(documentPayload, { requirePageId: false });
+  const input = await validatePageInput(documentPayload, { requirePageId: false });
   await validateButtonPageTargets(input.ownerId, input.buttons);
   const lock = await acquireCreateLock(input.ownerId);
   if (!lock) throw new BridgeError('PAGE_BUSY', 'Another page creation is already in progress. Retry shortly.');
@@ -722,10 +727,11 @@ async function handleCreate(message, id, envelope) {
       throw new BridgeError('PAGE_ID_COLLISION', 'Deterministic bridge page ID is already in use.', { alert: true });
     }
 
-    if (!isDeveloper(input.ownerId)) {
+    const allowedPages=safePlanLimit(await getEditorEntitlement(input.ownerId),'pages');
+    if (allowedPages != null) {
       const count = await db.$count(richPages, eq(richPages.ownerId, Number(input.ownerId)));
-      if (count >= MAX_SAVED_PAGES) {
-        throw new BridgeError('PAGE_LIMIT', 'Saved page limit reached: ' + MAX_SAVED_PAGES + '.');
+      if (count >= allowedPages) {
+        throw new BridgeError('PAGE_LIMIT', 'Saved page limit reached: ' + allowedPages + '.');
       }
     }
 
@@ -761,7 +767,7 @@ async function handleCreate(message, id, envelope) {
 
 async function handleSave(message, id, envelope) {
   const documentPayload = await readJsonDocument(message, envelope);
-  const input = validatePageInput(documentPayload, { skipQuota: true });
+  const input = await validatePageInput(documentPayload, { skipQuota: true });
   await validateButtonPageTargets(input.ownerId, input.buttons);
   const baseRevision = positiveInteger(documentPayload.base_revision);
   const baseUpdatedAt = positiveInteger(documentPayload.base_updated_at);
@@ -789,7 +795,7 @@ async function handleSave(message, id, envelope) {
     throw new BridgeError('PAGE_CONFLICT', 'Page was changed after the Mini App loaded it. Reload the latest version.');
   }
 
-  validatePageInput(documentPayload, { previousBlocks: existing.blocks || [] });
+  await validatePageInput(documentPayload, { previousBlocks: existing.blocks || [] });
   const stamp = Math.max(now(), Number(existing.updatedAt || 0) + 1);
   const version = await nextPageSyncVersion(existing.revision || 1);
   const updated = await db.update(richPages).set({
@@ -813,6 +819,10 @@ async function handleSave(message, id, envelope) {
     throw new BridgeError('PAGE_CONFLICT', 'Page changed while SAVE_PAGE was being applied. Reload the latest version.');
   }
   const saved = await getOwnedPage(input.ownerId, input.pageId);
+  if (saved) {
+    try { await archivePreviousPageVersion(input.ownerId, existing, saved); }
+    catch (error) { await logError('page_history.miniapp_save', error, { userId:input.ownerId }); }
+  }
   return {
     status: 'saved',
     user_id: input.ownerId,
@@ -911,7 +921,7 @@ async function handlePublish(message, id, ownerId, idValue, envelope) {
 
   if (message?.document?.file_id) {
     const documentPayload = await readJsonDocument(message, envelope);
-    directInput = validatePageInput(documentPayload, { requirePageId: false });
+    directInput = await validatePageInput(documentPayload, { requirePageId: false });
     await validateButtonPageTargets(directInput.ownerId, directInput.buttons);
     destination = documentPayload;
   }

@@ -17,6 +17,7 @@ import { recordOperation } from 'lib/usage-stats';
 import { resolveLanguage, resolveUserLanguage, t as i18nT, tr } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import { shouldIncludeBranding } from 'lib/branding';
+import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { recordMarketingPublish } from 'lib/marketing-campaign';
 
 const ADMIN = new Set(['administrator', 'creator']);
@@ -289,7 +290,7 @@ export async function handlePublishCallback(query){
         if(!await canPublish(chatId,userId)){await removeUserChat(userId,chatId);failed.push(title);continue;}
         try{
           const markup=prepared.length?buildMessageButtonsKeyboard(prepared,{buttonsPerRow:Number(latest.buttonsPerRow||1),sourcePageId:latest.currentPageId||null}):undefined;
-          await sendRichMessageSafe({chat_id:chatId,rich_message:buildInputRichMessage(latest.blocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,previousBlocks}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
+          await sendRichMessageSafe({chat_id:chatId,rich_message:buildInputRichMessage(latest.blocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,previousBlocks,entitlement:await getEditorEntitlement(userId)}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
           succeeded.push(title);
         }catch(error){
           failed.push(title);
@@ -711,6 +712,7 @@ async function publishBridgePageContent({
       userId,
       sourcePageId: id,
       includeBranding,
+      entitlement:await getEditorEntitlement(userId),
       ...(id != null ? { previousBlocks: page.blocks || [] } : {}),
     });
   } catch (error) {

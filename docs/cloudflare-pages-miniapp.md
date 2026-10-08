@@ -241,3 +241,9 @@ Deployment checks: confirm Pages deployment is successful; verify `/miniapp/stat
 `editor.html` loads `subscription_offers.js` and `subscription_offers.css`. When saving text above 20k, `app.js` calls the offer UI for recognized quota errors only. When the Free plan's two custom emoji pack slots are full, the add-pack tab stays tappable and shows the same comparison modal. Other quota errors are informational, as page/block/table paid expansion is **not approved**.
 
 Each modal shows Free / Plus / Golden Ticket approved text+pack limits and a Telegram deep link to `@richDonateBot` with payload `rich_plans_text`, `rich_plans_emoji`, or `rich_plans_limits`. Payment is explicitly **not live**. Test the live link inside Telegram and confirm which bot receives `/start` after official managed-bot support is established; Cloudflare does not process the payment.
+
+## Plan comparison without saved templates (2026-10-09)
+
+The Mini App quota modal lists the approved post-launch plan comparison including pages, blocks, active-plan branding removal, history, Golden early access and 150/350-Star 30-day prices. Saved templates are omitted by user decision. No Stars invoice or paid plan activation is handled by Cloudflare.
+
+These features remain source-staged until trusted Telegram Serverless subscriptions are enabled. The Cloudflare gateway must still use conservative Free validation while authenticated paid entitlements are unavailable on the gateway; the app does not claim Plus/Golden are available for purchase.

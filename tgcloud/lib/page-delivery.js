@@ -8,6 +8,7 @@ import {
 } from 'lib/page-buttons';
 import { resolveLanguage, tr } from 'lib/i18n';
 import { shouldIncludeBranding } from 'lib/branding';
+import { getEditorEntitlement } from 'lib/editor-subscriptions';
 
 const PAGE_CODE_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -33,6 +34,7 @@ export async function savedPageQueryResult(pageId, languageCode = 'en') {
       sourcePageId: String(page.pageId),
       includeBranding,
       previousBlocks: page.blocks || [],
+      entitlement:await getEditorEntitlement(page.ownerId),
     },
   );
   const replyMarkup = preparedButtons.length

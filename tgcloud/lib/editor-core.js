@@ -1,4 +1,5 @@
 import { api } from 'sdk';
+import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import {
   validateEditorLimits,
 } from 'lib/editor-blocks';
@@ -276,7 +277,7 @@ export async function handleEditorCoreMessage(
     return true;
   }
 
-  const limit = validateEditorLimits(draft.blocks, userId);
+  const limit = validateEditorLimits(draft.blocks, userId, {entitlement:await getEditorEntitlement(userId)});
   if (!limit.ok) {
     await api.sendMessage({
       chat_id:message.chat.id,

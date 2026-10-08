@@ -1,5 +1,5 @@
 import { isDeveloper } from 'lib/developer-access';
-import { PLAN_LIMITS, resolveEditorEntitlement, checkEditorTextQuota } from 'lib/subscription-policy';
+import { PLAN_LIMITS, resolveEditorEntitlement, checkEditorTextQuota, safePlanLimit } from 'lib/subscription-policy';
 import { messageHtmlText, messageRichText } from 'lib/rich-text';
 import { resolveLanguage, t } from 'lib/i18n';
 // Serverless port of app/editor/models.py, app/editor/document.py,
@@ -563,18 +563,22 @@ export function validateTableRows(rows, userId = null) {
   return { ok: true };
 }
 
-export function validateEditorLimits(blocks, userId = null, { previousBlocks = null } = {}) {
+export function validateEditorLimits(blocks, userId = null, { previousBlocks = null, entitlement = null } = {}) {
   if (isDeveloper(userId)) return { ok: true };
   const list = Array.isArray(blocks) ? blocks : [];
+  // entitlement is a trusted server-only value; browser/client data is never
+  // accepted as a plan or active subscription.
+  const trustedEntitlement = entitlement || resolveEditorEntitlement();
+  const blockLimit = safePlanLimit(trustedEntitlement, 'blocks');
   const actualBlocks = editorBlockCount(list);
-  if (actualBlocks > MAX_PAGE_BLOCKS) {
-    return { ok: false, code: 'blocks', limit: MAX_PAGE_BLOCKS, actual: actualBlocks };
+  if (blockLimit != null && actualBlocks > blockLimit) {
+    return { ok: false, code: 'blocks', limit: blockLimit, actual: actualBlocks };
   }
 
   const characters = visibleCharacterCount(list);
   const previousCount = Array.isArray(previousBlocks) ? visibleCharacterCount(previousBlocks) : 0;
   const quota = checkEditorTextQuota(
-    resolveEditorEntitlement({ developer: isDeveloper(userId) }), characters, { previousCount },
+    trustedEntitlement, characters, { previousCount },
   );
   if (!quota.allowed) {
     return { ok: false, code: 'characters', limit: quota.limit, actual: characters };

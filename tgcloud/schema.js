@@ -16,6 +16,32 @@ export const richPages = table('rich_pages', {
   ownerUpdatedIdx: index('idx_rich_pages_owner_updated').on(t.ownerId, t.updatedAt),
 }));
 
+// Editor subscriptions are distinct from Managed Bot licenses.
+// Only trusted Telegram-side billing code may write verified entitlements.
+export const editorSubscriptions = table('editor_subscriptions', {
+  userId: integer('user_id').primaryKey(),
+  plan: text('plan').notNull().default('free'),
+  status: text('status').notNull().default('inactive'),
+  source: text('source').notNull().default(''),
+  startedAt: integer('started_at').notNull().default(0),
+  expiresAt: integer('expires_at').notNull().default(0),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  expiresIdx: index('idx_editor_subscriptions_expires').on(t.status, t.expiresAt),
+}));
+
+// Dedicated per-page history; never overload full-backup page_snapshots.
+export const editorPageVersions = table('editor_page_versions', {
+  versionId: text('version_id').primaryKey(),
+  ownerId: integer('owner_id').notNull(),
+  pageId: text('page_id').notNull(),
+  revision: integer('revision').notNull(),
+  payload: json('payload').notNull().default({}),
+  createdAt: integer('created_at').notNull(),
+}, (t) => ({
+  ownerPageIdx: index('idx_editor_page_versions_owner_page').on(t.ownerId, t.pageId, t.createdAt),
+}));
+
 export const developerStates = table('developer_states', {
   userId: integer('user_id').primaryKey(),
   state: text('state').notNull(),

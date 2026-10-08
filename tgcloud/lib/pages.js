@@ -132,6 +132,7 @@ export function buildPagesRichMessage(
   if (pages.length) {
     const rows = [[
       textCell('🗑️', { header: true }),
+      textCell('🕘', { header: true }),
       textCell('✏️', { header: true }),
       textCell(copy.copyCode, { header: true }),
       textCell(copy.sortTitle, { header: true, align: 'right' }),
@@ -144,6 +145,10 @@ export function buildPagesRichMessage(
           text: '🗑️',
           callback_data: 'r:pdelete:' + pageId + ':' + pageIndex,
           style: 'danger',
+        }),
+        buttonCell({
+          text: '🕘',
+          callback_data: 'r:phistory:' + pageId,
         }),
         buttonCell({
           text: '✏️',

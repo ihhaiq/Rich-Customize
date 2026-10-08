@@ -1,4 +1,5 @@
 import { isDeveloper } from 'lib/developer-access';
+import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { api } from 'sdk';
 import {
   DETAILS_CHILD_TYPES,
@@ -247,6 +248,7 @@ async function finishAdd(userId, session, message, block, languageCode) {
   alignLinkedAnchors(blocks);
   const limit = validateEditorLimits(blocks, userId, {
     previousBlocks: await trustedEditorQuotaBaseline(userId, session),
+    entitlement: await getEditorEntitlement(userId),
   });
   if (!limit.ok) {
     await api.sendMessage({ chat_id: message.chat.id, text: limitText(limit, languageCode) });
@@ -293,6 +295,7 @@ async function replaceTopBlock(userId, session, message, block, replacement, lan
   alignLinkedAnchors(blocks);
   const limit = validateEditorLimits(blocks, userId, {
     previousBlocks: await trustedEditorQuotaBaseline(userId, session),
+    entitlement: await getEditorEntitlement(userId),
   });
   if (!limit.ok) {
     await api.sendMessage({ chat_id: message.chat.id, text: limitText(limit, languageCode) });
@@ -640,6 +643,7 @@ function detailsInnerPage(details, child, languageCode) {
 async function saveMutatedBlocks(userId, session, blocks, changes = {}) {
   const limit = validateEditorLimits(blocks, userId, {
     previousBlocks: await trustedEditorQuotaBaseline(userId, session),
+    entitlement: await getEditorEntitlement(userId),
   });
   if (!limit.ok) return { ok: false, limit };
   await rememberEditorState(userId, session);

@@ -7,9 +7,12 @@ export const PLAN_LIMITS = Object.freeze({
   golden: Object.freeze({ text: 32000, pages: 150, blocks: 120, emojiPacks: 50 }),
 });
 
-// Only the text limits and emoji-pack limits have been explicitly approved.
-// Other numeric quotas are proposals in sups.md; do not enforce them until approved.
-export const APPROVED_LIMITS = Object.freeze(['text', 'emojiPacks']);
+// Owner-approved plan benefits. They remain inaccessible until a server-verified
+// active subscription exists; this constant does not authorize payments.
+export const APPROVED_LIMITS = Object.freeze(['text', 'emojiPacks', 'pages', 'blocks']);
+export const PLAN_PRICES_STARS = Object.freeze({ free:0, plus:150, golden:350 });
+export const PLAN_PERIOD_DAYS = 30;
+export const PLAN_HISTORY_LIMITS = Object.freeze({ free:0, plus:5, golden:20 });
 export const PLAN_NAMES = Object.freeze(['free', 'plus', 'golden']);
 
 export function normalizePlan(value) {
@@ -48,4 +51,18 @@ export function checkEditorTextQuota(entitlement, count, { previousCount = 0 } =
   const limit=PLAN_LIMITS[normalizePlan(entitlement?.plan)].text;
   const legacy=previousCount>limit && count<=previousCount;
   return { allowed:count<=limit||legacy, limit, actual:count, legacy };
+}
+
+export function planBenefit(entitlement, key) {
+  const developer = entitlement?.unlimitedProductQuotas === true;
+  const plan = developer ? 'golden' : normalizePlan(entitlement?.plan);
+  if (key === 'history') return developer ? 50 : PLAN_HISTORY_LIMITS[plan];
+  if (key === 'brandingIncluded') return developer || plan !== 'free';
+  if (key === 'earlyAccess') return developer || plan === 'golden';
+  throw new Error('Unsupported benefit ' + key);
+}
+
+export function safePlanLimit(entitlement, key) {
+  if (!APPROVED_LIMITS.includes(key)) throw new Error('Unknown plan quota: ' + key);
+  return entitlement?.unlimitedProductQuotas === true ? null : PLAN_LIMITS[normalizePlan(entitlement?.plan)][key];
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PLAN_LIMITS, resolveEditorEntitlement, resolveCloneEntitlement, checkApprovedQuota, checkEditorTextQuota } from '../../tgcloud/lib/subscription-policy.js';
+import { PLAN_LIMITS, resolveEditorEntitlement, resolveCloneEntitlement, checkApprovedQuota, checkEditorTextQuota, planBenefit, PLAN_HISTORY_LIMITS, PLAN_PRICES_STARS } from '../../tgcloud/lib/subscription-policy.js';
 
 test('approved pack quotas are 2, 8, 50', () => {
   assert.equal(PLAN_LIMITS.free.emojiPacks, 2);
@@ -28,8 +28,28 @@ test('limits reject first excess value', () => {
     assert.equal(checkApprovedQuota(e,'emojiPacks',max+1).allowed,false);
   }
 });
-test('unapproved quotas are not enforceable', () => {
-  assert.throws(()=>checkApprovedQuota(resolveCloneEntitlement(),'pages',13));
+test('approved paid page/block quotas require a verified active entitlement', () => {
+  const free=resolveCloneEntitlement();
+  assert.equal(checkApprovedQuota(free,'pages',12).allowed,true);
+  assert.equal(checkApprovedQuota(free,'pages',13).allowed,false);
+  assert.equal(checkApprovedQuota(free,'blocks',31).allowed,false);
+  for(const [plan,pages,blocks] of [['plus',50,60],['golden',150,120]]) {
+    const inactive=resolveEditorEntitlement({plan});
+    const active=resolveEditorEntitlement({plan,active:true});
+    assert.equal(checkApprovedQuota(inactive,'pages',13).allowed,false);
+    assert.equal(checkApprovedQuota(active,'pages',pages).allowed,true);
+    assert.equal(checkApprovedQuota(active,'pages',pages+1).allowed,false);
+    assert.equal(checkApprovedQuota(active,'blocks',blocks).allowed,true);
+    assert.equal(checkApprovedQuota(active,'blocks',blocks+1).allowed,false);
+  }
+  assert.deepEqual(PLAN_HISTORY_LIMITS,{free:0,plus:5,golden:20});
+  assert.deepEqual(PLAN_PRICES_STARS,{free:0,plus:150,golden:350});
+  assert.equal(planBenefit(free,'history'),0);
+  assert.equal(planBenefit(free,'brandingIncluded'),false);
+  assert.equal(planBenefit(resolveEditorEntitlement({plan:'plus',active:true}),'brandingIncluded'),true);
+  assert.equal(planBenefit(resolveEditorEntitlement({plan:'golden',active:true}),'earlyAccess'),true);
+  assert.equal(planBenefit(resolveEditorEntitlement({plan:'plus',active:true}),'earlyAccess'),false);
+  assert.throws(()=>checkApprovedQuota(free,'templates',1));
 });
 
 test('legacy pages may keep or reduce original verified text but not grow it', () => {

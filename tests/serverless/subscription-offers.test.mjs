@@ -72,19 +72,20 @@ test('text limit opens factual comparison and specific donation-bot deep link', 
   assert.match(text,/Plus/);
   assert.match(text,/Golden Ticket/);
   assert.match(text,/قيد التجهيز/);
-  assert.match(text,/مو مفعّلة للبيع/);
-  // Other plan benefits must be visible, explicitly proposed, never shown as active.
+  assert.match(text,/مو متاحتين للبيع/);
+  // All owner-approved plan benefits are shown, but not sold before billing.
   assert.match(text,/الصفحات المحفوظة/);
   assert.match(text,/البلوكات/);
-  assert.match(text,/القوالب المحفوظة/);
   assert.match(text,/سجل نسخ الصفحة/);
   assert.match(text,/الوصول المبكر/);
   assert.match(text,/إزالة الحقوق/);
   assert.match(text,/آخر ٥ نسخ/);
   assert.match(text,/آخر ٢٠ نسخة/);
-  assert.match(text,/مقترح/);
-  assert.match(text,/مستقبلية غير معتمدة/);
-  assert.doesNotMatch(text,/١٥٠ نجمة|٣٥٠ نجمة/);
+  assert.match(text,/عند التفعيل/);
+  assert.match(text,/فكرة مستقبلية غير معتمدة/);
+  assert.match(text,/١٥٠ نجمة/);
+  assert.match(text,/٣٥٠ نجمة/);
+  assert.doesNotMatch(text,/القوالب المحفوظة/);
   let prevented = false;
   anchor.handlers.click({preventDefault(){prevented = true;}});
   assert.equal(prevented,true);

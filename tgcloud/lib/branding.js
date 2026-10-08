@@ -1,6 +1,8 @@
 import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { brandingEntitlements } from 'schema';
+import { getEditorEntitlement } from 'lib/editor-subscriptions';
+import { planBenefit } from 'lib/subscription-policy';
 
 export const BRANDING_PRICE_STARS = 99;
 export const BRANDING_INVOICE_PAYLOAD = 'remove_branding:v1';
@@ -33,7 +35,8 @@ export async function isBrandingRemoved(userId) {
 }
 
 export async function shouldIncludeBranding(userId) {
-  return !(await isBrandingRemoved(userId));
+  if (await isBrandingRemoved(userId)) return false;
+  return !planBenefit(await getEditorEntitlement(userId),'brandingIncluded');
 }
 
 export async function createBrandingRemovalInvoiceLink() {

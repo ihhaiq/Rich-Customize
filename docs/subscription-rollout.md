@@ -65,3 +65,15 @@ Review any old tests expecting 25k for free; update them only when the new free 
 - Grouping keeps text+emoji packs separately labeled as approved limits. The proposed features are visibly marked `مقترح`/`Proposed` and no unapproved monthly price appears. Brand-removal for Free remains a separate 99 Stars purchase; it is never implicitly revoked.
 - Page version history and saved template mechanics are **not implemented in Telegram Serverless**. Version history would store recoverable snapshots of a specific saved page, whereas a template would create a separate editable new page. Do not claim either is usable merely because the offer modal now lists it.
 - The modal remains scrollable, while its exit/link controls stay at its bottom. Cache version is `0.3.83`. No `tgcloud` deploy.
+
+## Owner decision: remove templates, implement other plan benefits (2026-10-09)
+
+Approved plan configuration is now Free/Plus/Golden: **20k/25k/32k text**, **2/8/50 emoji packs**, **12/50/150 pages**, **30/60/120 blocks**, **0/5/20 historical versions per saved page**, **0/150/350 Stars per 30 days**, included active-plan branding removal on Plus/Golden and Golden early-access eligibility. **Saved templates have been cancelled and are not included in the app.**
+
+Implementation in source:
+- Telegram-only `editor_subscriptions` and `editor_page_versions` schema tables. `lib/editor-subscriptions.js` reads an owner-verified active entitlement, rejects expired/inactive/untrusted sources. There is **no editor-subscription payment issuance yet**.
+- Saved-page history generated for meaningful saved changes on manual editor save, auto-sync, Mini App RCB1 SAVE and rename, with ownership, history count, revision CAS checks and restoration entry through the `🕘` control in saved pages. Restore archives the outgoing version.
+- Active Plus/Golden entitlement suppresses the branding footer while active; independently purchased permanent 99-Star removal remains after downgrade or expiry.
+- Limits are read in Telegram Serverless paths from trusted subscription state. Cloudflare Mini App maintains strict Free gateway validation until a Serverless-authenticated account entitlement transport exists; never accept client-submitted plan tiers to bypass it.
+- Golden early-access eligibility is exposed as a policy helper, but no experimental feature has been specifically designated.
+- **Operational blockers:** No proof of full Node suite / Telegram integration; new Serverless tables require schema review/migration; `tgcloud` is deliberately not deployed; no payment flow or paid plans live. Cloudflare Pages is the only automatic deployment allowed.
