@@ -13,12 +13,12 @@ export async function onRequest({request,env}){
   if(typeof input.id!=='string'||input.confirmWebhookTakeover!==true)return responseJson({error:'confirmation_required'},400);
   const bot=await env.DB.prepare('SELECT id,webhook_key,webhook_secret,token_encrypted,status FROM managed_bots WHERE id=?').bind(input.id).first();
   if(!bot)return responseJson({error:'not_found'},404);
-  const origin=new URL(request.url).origin;
-  if(!origin.startsWith('https://'))return responseJson({error:'https_required'},400);
+  const origin=String(env.MANAGED_BOTS_PUBLIC_ORIGIN||'').replace(/\/$/,'');
+  if(!/^https:\/\/[^/]+$/.test(origin))return responseJson({error:'https_required'},400);
   try{
     const token=await decryptToken(bot.token_encrypted,env.MANAGED_BOT_ENCRYPTION_KEY);
     const current=await telegram(token,'getWebhookInfo',{});
-    if(current?.url && input.confirmWebhookTakeover!==true)return responseJson({error:'existing_webhook'},409);
+    if(current?.url && !input.confirmWebhookTakeover)return responseJson({error:'existing_webhook'},409);
     await telegram(token,'setWebhook',{url:origin+'/managed-bots/'+bot.webhook_key,secret_token:bot.webhook_secret,drop_pending_updates:false,allowed_updates:['message']});
     await env.DB.prepare("UPDATE managed_bots SET status='active',updated_at=? WHERE id=?").bind(Date.now(),bot.id).run();
     return responseJson({ok:true,status:'active'});
@@ -26,15 +26,17 @@ export async function onRequest({request,env}){
  }
  if(input?.action==='disable'){
   if(typeof input.id!=='string')return responseJson({error:'invalid_id'},400);
-  const row=await env.DB.prepare('SELECT id FROM managed_bots WHERE id=?').bind(input.id).first();
+  const row=await env.DB.prepare('SELECT id,token_encrypted FROM managed_bots WHERE id=?').bind(input.id).first();
   if(!row)return responseJson({error:'not_found'},404);
+  try { const token=await decryptToken(row.token_encrypted,env.MANAGED_BOT_ENCRYPTION_KEY); await telegram(token,'deleteWebhook',{drop_pending_updates:false}); }
+  catch { return responseJson({error:'webhook_removal_failed'},503); }
   await env.DB.prepare("UPDATE managed_bots SET status='disabled',updated_at=? WHERE id=?").bind(Date.now(),input.id).run();
   return responseJson({ok:true,status:'disabled'});
  }
  if(input?.action==='welcome'){
   if(typeof input.id!=='string'||typeof input.text!=='string'||input.text.length>3000)return responseJson({error:'invalid_input'},400);
-  await env.DB.prepare('UPDATE managed_bots SET welcome_text=?,updated_at=? WHERE id=?').bind(input.text,Date.now(),input.id).run();
-  return responseJson({ok:true});
+  const result=await env.DB.prepare('UPDATE managed_bots SET welcome_text=?,updated_at=? WHERE id=?').bind(input.text,Date.now(),input.id).run();
+  return result.meta?.changes ? responseJson({ok:true}) : responseJson({error:'not_found'},404);
  }
  if(input?.action!=='register'||!validBotToken(input.token)||!/^\d{1,20}$/.test(String(input.ownerId||'')))return responseJson({error:'invalid_input'},400);
  let me;try{me=await telegram(input.token,'getMe',{});}catch{return responseJson({error:'invalid_token'},400);}
