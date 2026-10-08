@@ -54,16 +54,16 @@ Review any old tests expecting 25k for free; update them only when the new free 
 ## Mini App upgrade information on limits (2026-10-09)
 
 - Quota-limit API failures in the Mini App now open a dedicated modal instead of an error-only experience. The premium emoji pack lock also opens this modal when tapped.
-- The offer presents **approved quotas only**, no speculative pricing: Free 20k text/2 packs, Plus 25k/8, Golden Ticket 32k/50. Nonapproved page/block/table increases must not be promoted as paid benefits.
+- The offer presents the entire approved plan, including text, custom emoji packs, saved pages, blocks, history, branding, Golden early access and approved Stars prices. Technical table/media quota expansion is not a paid benefit.
 - A link opens `https://t.me/richDonateBot?start=rich_plans_text` for text, `rich_plans_emoji` for custom emoji packs or `rich_plans_limits` for other caps. Telegram `openTelegramLink` is used in the Mini App; the URL is a fallback. These `/start` payloads are **a proposed future contract**, not a live payment integration.
 - The copy discloses that paid plans/prices are not yet available. No paid plan is activated in browser state and no token/payment is processed by Cloudflare.
 - `tests/serverless/subscription-offers.test.mjs` covers classification, UI comparison and deep-link payloads in a mocked DOM. Real Telegram UI and `@richDonateBot` payload handling remain unverified until Telegram Serverless can be deployed.
 
 ## Plan comparison expanded (2026-10-09)
 
-- The plan modal also lists all extra features already proposed in `sups.md`: saved pages Free 12 / Plus 50 / Golden 150, blocks Free 30 / Plus 60 / Golden 120, potential bundled removal of branding, saved templates, page history (suggested latest 5/20), and early access in Golden. **These are roadmap proposals**, not approved paid entitlements.
-- Grouping keeps text+emoji packs separately labeled as approved limits. The proposed features are visibly marked `مقترح`/`Proposed` and no unapproved monthly price appears. Brand-removal for Free remains a separate 99 Stars purchase; it is never implicitly revoked.
-- Page version history and saved template mechanics are **not implemented in Telegram Serverless**. Version history would store recoverable snapshots of a specific saved page, whereas a template would create a separate editable new page. Do not claim either is usable merely because the offer modal now lists it.
+- The plan modal lists owner-approved benefits: saved pages 12/50/150, blocks 30/60/120, active-plan branding removal in Plus/Golden, 0/5/20 history versions per saved page and Golden early access. Saved templates are canceled.
+- Every item is a **plan benefit**, with no proposal labels or feature-level `on activation` badges. Prices are 0/150/350 Stars per 30 days, but purchases are not currently available. The separate permanent Free branding-removal purchase remains 99 Stars.
+- Version history source code and Telegram-side tables are present, but the live Telegram deployment and migration are still pending. Templates are explicitly excluded and have no implementation.
 - The modal remains scrollable, while its exit/link controls stay at its bottom. Cache version is `0.3.83`. No `tgcloud` deploy.
 
 ## Owner decision: remove templates, implement other plan benefits (2026-10-09)
@@ -77,3 +77,7 @@ Implementation in source:
 - Limits are read in Telegram Serverless paths from trusted subscription state. Cloudflare Mini App maintains strict Free gateway validation until a Serverless-authenticated account entitlement transport exists; never accept client-submitted plan tiers to bypass it.
 - Golden early-access eligibility is exposed as a policy helper, but no experimental feature has been specifically designated.
 - **Operational blockers:** No proof of full Node suite / Telegram integration; new Serverless tables require schema review/migration; `tgcloud` is deliberately not deployed; no payment flow or paid plans live. Cloudflare Pages is the only automatic deployment allowed.
+
+## Final terminology for plan UI (2026-10-09)
+
+All compared features are approved membership benefits. The Mini App must **not** display `مقترح`, `Proposed`, or a repeated `عند التفعيل` tag. Explain purchase unavailability separately once. New Serverless features still require migration and deployment; source code alone is not a live paid service.

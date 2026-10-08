@@ -3,8 +3,8 @@
 (() => {
   "use strict";
   const BOT = "richDonateBot";
-  // Only text and emoji pack allowances are approved paid-plan policy.
-  // All Plus/Golden values below in proposed fields are roadmap ideas, NOT entitlements.
+  // All plan benefits are approved by the owner. Billing and entitlement
+  // activation remain unavailable until trusted Telegram-side rollout.
   const OFFERS = Object.freeze([
     { name: "Free", text: 20000, emojiPacks: 2,
       pages: 12, blocks: 30, rights: "separate", price:0,
@@ -21,15 +21,15 @@
       heading: "وصلت إلى حد الباقة",
       text: "وصلت إلى حد النص المتاح في الخطة المجانية.",
       emojiPacks: "وصلت إلى حد حزم الإيموجي المميزة في الخطة المجانية.",
-      other: "وصلت إلى أحد حدود المحرر الحالية. زيادة هذا الحد بالاشتراك مو معتمدة بعد.",
+      other: "وصلت إلى أحد حدود المحرر الحالية. قارن حدود الباقات لمعرفة التفاصيل.",
       usage: "استخدامك: {actual} من {limit}",
       plans: "مقارنة الخطط",
       chars: "{count} حرف",
       packs: "{count} حزمة إيموجي",
       current: "خطتك الحالية",
-      planned: "قيد التجهيز",
-      approvedGroup: "الحدود المعتمدة",
-      roadmapGroup: "مميزات الاشتراك بعد التفعيل",
+      planned: "الشراء غير متاح حالياً",
+      approvedGroup: "حدود الباقة",
+      roadmapGroup: "مميزات الباقة",
       textQuotaLabel: "عدد الأحرف",
       packQuotaLabel: "حزم الإيموجي",
       pages: "الصفحات المحفوظة",
@@ -37,19 +37,17 @@
       rights: "إزالة الحقوق",
       history: "سجل نسخ الصفحة",
       earlyAccess: "الوصول المبكر للميزات",
-      featureProposed: "عند التفعيل",
       currentLimit: "الحد الحالي",
       notIncluded: "غير مشمول",
       separatePurchase: "شراء منفصل بـ٩٩ نجمة",
       couldInclude: "مشمولة بالاشتراك",
       lastVersions: "آخر {count} نسخ",
       lastVersionsMany: "آخر {count} نسخة",
-      earlyProposed: "مشمولة عند التفعيل",
-      roadmapNotice: "تم اعتماد هذه الحدود والمميزات ضمن خطة التنفيذ، لكن ما تتفعّل للمستخدم إلا بعد ربط الدفع والاستحقاقات الموثوقة. سجل النسخ مخزّن على Serverless بعد النشر.",
+      earlyProposed: "مشمولة",
+      roadmapNotice: "هذه المميزات مشمولة بالخطط المعتمدة، لكن تفعيل الاشتراكات المدفوعة يحتاج اكتمال نظام الدفع ونشر تحديث Serverless.",
       priceLabel: "السعر الشهري",
       monthlyPrice: "{count} نجمة / ٣٠ يوم",
       freePrice: "مجاناً",
-      scheduling: "الجدولة: فكرة مستقبلية غير معتمدة أو مفعّلة حالياً.",
 
       notice: "الأسعار المعتمدة للخطط ظاهرة للمقارنة فقط. Plus وGolden Ticket بعدُها مو متاحتين للبيع، وفتح البوت ما يعني إتمام شراء.",
       link: "افتح بوت التبرع لمعرفة الخطط",
@@ -60,15 +58,15 @@
       heading: "Plan limit reached",
       text: "You've reached the Free plan's text limit.",
       emojiPacks: "You've reached the Free plan's custom emoji pack limit.",
-      other: "You've reached an editor limit. Higher limits for this feature have not been approved as paid benefits.",
+      other: "You've reached an editor limit. Compare the plans to see their included limits.",
       usage: "Used: {actual} of {limit}",
       plans: "Compare plans",
       chars: "{count} characters",
       packs: "{count} custom emoji packs",
       current: "Current plan",
-      planned: "In preparation",
-      approvedGroup: "Approved limits",
-      roadmapGroup: "Benefits on launch",
+      planned: "Purchase not available yet",
+      approvedGroup: "Plan limits",
+      roadmapGroup: "Included benefits",
       textQuotaLabel: "Text",
       packQuotaLabel: "Emoji packs",
       pages: "Saved pages",
@@ -76,19 +74,17 @@
       rights: "Remove branding",
       history: "Page version history",
       earlyAccess: "Early feature access",
-      featureProposed: "On launch",
       currentLimit: "Current limit",
       notIncluded: "Not included",
       separatePurchase: "Separate 99 Stars purchase",
       couldInclude: "Included with subscription",
       lastVersions: "Last {count} versions",
       lastVersionsMany: "Last {count} versions",
-      earlyProposed: "Included on launch",
-      roadmapNotice: "These benefits are approved for implementation, but remain inactive until verified subscription billing is available. Version history requires a Serverless deployment.",
+      earlyProposed: "Included",
+      roadmapNotice: "All listed benefits are included in the approved plans. Paid subscriptions require verified billing and the Telegram Serverless deployment.",
       priceLabel: "Monthly price",
       monthlyPrice: "{count} Stars / 30 days",
       freePrice: "Free",
-      scheduling: "Scheduling is a future idea, not an approved or active entitlement.",
 
       notice: "Listed plan prices are informational only. Plus and Golden Ticket are not yet available for purchase, and opening the bot does not make a payment.",
       link: "Open donation bot to see plans",
@@ -159,13 +155,10 @@
     head.append(textArea, closeButton);
     modal.append(head, element("h3", "rich-subscription-section-title", tr("plans")));
     const list = element("div", "rich-subscription-plans");
-    function featureRow(target, label, value, { proposed = false } = {}) {
-      const row = element("div", "rich-subscription-feature" + (proposed ? " is-proposed" : ""));
+    function featureRow(target, label, value) {
+      const row = element("div", "rich-subscription-feature");
       row.append(element("span", "rich-subscription-feature-label", tr(label)));
-      const detail = element("span", "rich-subscription-feature-value");
-      detail.append(element("span", "", value));
-      if (proposed) detail.append(element("small", "rich-subscription-feature-status", tr("featureProposed")));
-      row.append(detail);
+      row.append(element("span", "rich-subscription-feature-value", value));
       target.append(row);
     }
     for (const [index, plan] of OFFERS.entries()) {
@@ -181,18 +174,17 @@
       item.append(approved);
       item.append(element("small", "rich-subscription-group-title rich-subscription-roadmap-title", tr("roadmapGroup")));
       const roadmap = element("div", "rich-subscription-features");
-      featureRow(roadmap, "pages", format(plan.pages), { proposed: index > 0 });
-      featureRow(roadmap, "blocks", format(plan.blocks), { proposed: index > 0 });
-      featureRow(roadmap, "priceLabel", index === 0 ? tr("freePrice") : tr("monthlyPrice", { count: format(plan.price) }), { proposed: index > 0 });
-      featureRow(roadmap, "rights", index === 0 ? tr("separatePurchase") : tr("couldInclude"), { proposed: index > 0 });
-      featureRow(roadmap, "history", plan.history ? tr(plan.history > 10 ? "lastVersionsMany" : "lastVersions", { count: format(plan.history) }) : tr("notIncluded"), { proposed: plan.history > 0 });
-      featureRow(roadmap, "earlyAccess", plan.earlyAccess ? tr("earlyProposed") : tr("notIncluded"), { proposed: plan.earlyAccess });
+      featureRow(roadmap, "pages", format(plan.pages));
+      featureRow(roadmap, "blocks", format(plan.blocks));
+      featureRow(roadmap, "priceLabel", index === 0 ? tr("freePrice") : tr("monthlyPrice", { count: format(plan.price) }));
+      featureRow(roadmap, "rights", index === 0 ? tr("separatePurchase") : tr("couldInclude"));
+      featureRow(roadmap, "history", plan.history ? tr(plan.history > 10 ? "lastVersionsMany" : "lastVersions", { count: format(plan.history) }) : tr("notIncluded"));
+      featureRow(roadmap, "earlyAccess", plan.earlyAccess ? tr("earlyProposed") : tr("notIncluded"));
       item.append(roadmap);
       list.append(item);
     }
     modal.append(list,
       element("p", "rich-subscription-notice", tr("roadmapNotice")),
-      element("p", "rich-subscription-notice rich-subscription-scheduling", tr("scheduling")),
       element("p", "rich-subscription-notice", tr("notice")));
     const actions = element("div", "rich-subscription-actions");
     const cta = element("a", "rich-subscription-cta", tr("link"));

@@ -71,7 +71,7 @@ test('text limit opens factual comparison and specific donation-bot deep link', 
   const text=planContent.join(' ');
   assert.match(text,/Plus/);
   assert.match(text,/Golden Ticket/);
-  assert.match(text,/قيد التجهيز/);
+  assert.match(text,/الشراء غير متاح حالياً/);
   assert.match(text,/مو متاحتين للبيع/);
   // All owner-approved plan benefits are shown, but not sold before billing.
   assert.match(text,/الصفحات المحفوظة/);
@@ -81,11 +81,11 @@ test('text limit opens factual comparison and specific donation-bot deep link', 
   assert.match(text,/إزالة الحقوق/);
   assert.match(text,/آخر ٥ نسخ/);
   assert.match(text,/آخر ٢٠ نسخة/);
-  assert.match(text,/عند التفعيل/);
-  assert.match(text,/فكرة مستقبلية غير معتمدة/);
+  assert.match(text,/مشمولة بالاشتراك/);
+  assert.doesNotMatch(text,/مقترح|عند التفعيل|فكرة مستقبلية|القوالب/);
   assert.match(text,/١٥٠ نجمة/);
   assert.match(text,/٣٥٠ نجمة/);
-  assert.doesNotMatch(text,/القوالب المحفوظة/);
+  assert.doesNotMatch(text,/قيد التجهيز|قيد الدراسة/);
   let prevented = false;
   anchor.handlers.click({preventDefault(){prevented = true;}});
   assert.equal(prevented,true);

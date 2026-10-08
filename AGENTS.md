@@ -204,7 +204,7 @@ Read [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rol
 
 - Cloudflare-only informational UI: `app/miniapp_static/subscription_offers.js` and `subscription_offers.css`, loaded by `editor.html` before `app.js` and `apple_emoji_picker.js`.
 - On a verified quota error from the API/bridge (`editor limit exceeded: characters`, `EDITOR_LIMIT_CHARACTERS`, `PAGE_LIMIT`, blocks/tables, or `custom_emoji_pack_limit`), call `window.RichSubscriptionOffers.showForError(error)` or `.show('emojiPacks', {actual,limit})` when the add-pack tab is locked. Do not upsell on unrelated validation, connectivity or server errors.
-- Show only **approved plan differences**: visible text Free 20,000 / Plus 25,000 / Golden 32,000; emoji packs 2 / 8 / 50. Other quota extensions and pricing are **not approved**, so generic limit dialogs must explicitly avoid promising an upgrade fixes them.
+- Show **all approved plan differences**, including text (20k/25k/32k), emoji packs (2/8/50), saved pages (12/50/150), blocks (30/60/120), page history (0/5/20), branding removal during Plus/Golden, Golden early access, and 30-day prices 0/150/350 Stars. Do not promote unapproved technical table/media limits.
 - CTA is a Telegram **deep link**, not an invoice: `https://t.me/richDonateBot?start=rich_plans_text`, `rich_plans_emoji`, or `rich_plans_limits` (all Telegram-safe payloads). `@richDonateBot` must independently implement these `/start` parameters when managed-bot support is available. For now, the UI tells users paid plans are in preparation. Do not fabricate Stars prices, pretend payment occurred or claim the bot recognizes the payload yet.
 - Keep the locked emoji-pack add tab tappable so users can inspect plan comparison. Developers with unlimited quota should never see the pack-limit offer unless the trusted server returns a true limit error.
 - UI copy is Arabic and English with English fallback for other supported locales until translations are supplied. Preserve Telegram initData gating; no billing code, tokens, or Cloudflare bot backend.
@@ -212,9 +212,9 @@ Read [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rol
 
 ## Plan roadmap presentation (2026-10-09)
 
-- User requested all benefits from `sups.md` be visible in the Mini App offer comparison. `subscription_offers.js` now lists saved pages (12/50/150), blocks (30/60/120), branding removal, templates, per-page version history (suggested 5/20), and early access; each unapproved Plus/Golden perk is explicitly tagged `Proposed`/`مقترح`.
-- The approval boundary does not change: **only text quotas 20k/25k/32k and emoji packs 2/8/50 have approved plan figures**; pricing and all other proposed paid benefits require a separate decision, implementation and verified billing. Do not add entitlement access from marketing markup. Do not imply saved templates or history exist before implementing them in Telegram Serverless.
-- Free currently supports 12 saved pages, 30 blocks, and separate 99 Stars branding removal (subject to its existing entitlement); proposals for paid tiers cannot silently modify these limits. Keep the display updated when `sups.md` decisions change.
+- `subscription_offers.js` shows **approved plan benefits** directly without `Proposed`/`مقترح` or per-feature activation tags: saved pages 12/50/150, blocks 30/60/120, branding removal, version history 0/5/20 per page, Golden early access, prices 0/150/350 Stars.
+- The owner approved the full listed plan policy. Purchase **availability** is a separate question: until authenticated Telegram Serverless billing and migration are live, the app must disclose that paid subscriptions cannot yet be purchased. Never create an entitlement from marketing UI/client-supplied plan parameters. Saved templates were explicitly canceled.
+- Free retains 12 saved pages, 30 blocks, and separate permanent 99-Star branding removal. Approved Plus/Golden tiers have their own limits after trusted subscription activation. Do not loosen Free gateway validation based on a browser claim.
 
 ## Approved editor subscription scope — templates removed (2026-10-09)
 
@@ -225,3 +225,9 @@ Read [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rol
 - Brand-removal lifetime entitlement purchased for 99 Stars always overrides the included temporary plan benefit and must survive Plus/Golden expiry. Early-access policy grants eligibility only; don't invent or activate experimental features without a flag.
 - `@richDonateBot` has **not** yet issued verified editor subscriptions; code includes a trusted read-only entitlement resolver, not the payment flow. Cloudflare Mini App still performs conservative Free quota gateway checks (20k/30 blocks) until authenticated entitlement transport is designed. Avoid representing paid limits as live.
 - The Cloudflare subscription offer popup shows approved future plan features/prices, explicitly says purchasing is currently unavailable, and contains no saved template. Cloudflare production branch remains `serverless-cleanup`, auto-deploy without `[CF-Pages-Skip]`.
+
+## Owner correction: no per-feature proposal labels (2026-10-09)
+
+- Plus/Golden benefits and prices are **approved features of their plans**, not suggestions. Never render `مقترح`, `Proposed`, `is-proposed`, `عند التفعيل` or similar qualifiers next to every benefit in the Mini App comparison.
+- An honest **single availability note** remains mandatory: paid subscription purchases and Telegram Serverless entitlement activation are not live until billing, migrations and integration tests are complete. This does not change which benefits belong to each plan.
+- No templates. Scheduling is outside the plan comparison until separately approved.

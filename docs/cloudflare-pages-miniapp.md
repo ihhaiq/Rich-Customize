@@ -238,7 +238,7 @@ Deployment checks: confirm Pages deployment is successful; verify `/miniapp/stat
 
 ## Subscription quota presentation (2026-10-09)
 
-`editor.html` loads `subscription_offers.js` and `subscription_offers.css`. When saving text above 20k, `app.js` calls the offer UI for recognized quota errors only. When the Free plan's two custom emoji pack slots are full, the add-pack tab stays tappable and shows the same comparison modal. Other quota errors are informational, as page/block/table paid expansion is **not approved**.
+`editor.html` loads `subscription_offers.js` and `subscription_offers.css`. Recognized text/emoji/page/block limit errors open the approved plan comparison. Paid page and block allowances are approved, but Cloudflare must continue to fail closed for nonverified entitlements until an authenticated Serverless bridge for paid plans is available. Table/media technical quotas are separate.
 
 Each modal shows Free / Plus / Golden Ticket approved text+pack limits and a Telegram deep link to `@richDonateBot` with payload `rich_plans_text`, `rich_plans_emoji`, or `rich_plans_limits`. Payment is explicitly **not live**. Test the live link inside Telegram and confirm which bot receives `/start` after official managed-bot support is established; Cloudflare does not process the payment.
 
@@ -247,3 +247,5 @@ Each modal shows Free / Plus / Golden Ticket approved text+pack limits and a Tel
 The Mini App quota modal lists the approved post-launch plan comparison including pages, blocks, active-plan branding removal, history, Golden early access and 150/350-Star 30-day prices. Saved templates are omitted by user decision. No Stars invoice or paid plan activation is handled by Cloudflare.
 
 These features remain source-staged until trusted Telegram Serverless subscriptions are enabled. The Cloudflare gateway must still use conservative Free validation while authenticated paid entitlements are unavailable on the gateway; the app does not claim Plus/Golden are available for purchase.
+
+**Plan-label rule:** Owner-approved plan benefits must appear without `مقترح`, `Proposed`, or repeated `عند التفعيل` labels; one separate availability notice says paid subscriptions are not yet purchasable. Templates were canceled. Version `0.3.85` refreshes the plan modal assets.
