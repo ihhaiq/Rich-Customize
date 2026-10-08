@@ -425,7 +425,7 @@ function emptyPageSaveError(){
   error.code="EMPTY_PAGE";
   return error;
 }
-function markDirty(){dirty=true;mutationVersion+=1;updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));scheduleHistory();scheduleOfflineDraft()}
+function markDirty(){updatePublishValidity();dirty=true;mutationVersion+=1;updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));scheduleHistory();scheduleOfflineDraft()}
 function snapshot(){return current?JSON.stringify({title:pageTitle.value,blocks:current.blocks}):null}
 function pushHistory(){if(!current)return;const raw=snapshot();if(history[history.length-1]===raw)return;history.push(raw);if(history.length>60)history.shift();future=[];syncHistory()}
 function scheduleHistory(){clearTimeout(historyTimer);historyTimer=setTimeout(pushHistory,260)}
@@ -604,6 +604,7 @@ function renderBlocks(){
     else editor=mediaEditor(block);
     main.appendChild(editor);const tools=document.createElement("div");tools.className="block-tools";const more=document.createElement("button");more.type="button";more.className="mini-btn";MiniAppIcons.mount(more,"more");more.setAttribute("aria-label",mt("block.settings",{name:info(block.type).label}));more.addEventListener("click",e=>{e.stopPropagation();selectBlock(block.id);openBlockMenu(block)});tools.appendChild(more);row.append(main,tools);article.appendChild(row);article.addEventListener("click",()=>selectBlock(block.id));blocksEl.appendChild(article);
   });
+  updatePublishValidity();
 }
 
 function menuButton(icon,label,desc,handler,extra=""){
@@ -640,7 +641,7 @@ function openSlashMenu(query="",types=null){
   items.forEach((item,index)=>slashItems.appendChild(menuButton(item.icon,item.label,item.desc,()=>addBlock(item.type),index===0?"active":"")));slashMenu.classList.remove("hidden");
 }
 
-function closeSheets(){pagesPanel.classList.add("hidden");sendPanel.classList.add("hidden");backdrop.classList.add("hidden")}
+function closeSheets(){pagesPanel.classList.add("hidden");sendPanel.classList.add("hidden");sendIssuesPanel.classList.add("hidden");backdrop.classList.add("hidden")}
 function showSheet(panel){closeSheets();backdrop.classList.remove("hidden");panel.classList.remove("hidden")}
 
 function renderPagesList(pages){
@@ -796,6 +797,7 @@ function publishErrorMessage(error){
   if(code==="PUBLISH_CONTENT_INVALID")return mt("send.error_content_invalid");
   if(code==="BRIDGE_TIMEOUT"||code==="BRIDGE_EXPIRED")return mt("send.error_bridge_retry");
   if(code==="RATE_LIMITED")return mt("send.error_bridge_busy");
+  if(code==="PUBLISH_CONTENT_INVALID"&&publishIssues.length)return mt("send.issues_hint");
   return mt("send.error_generic");
 }
 
@@ -804,9 +806,77 @@ function destinationShouldDisappear(error){
   return /^(PUBLISH_CHAT_UNAVAILABLE|PUBLISH_CHAT_MIGRATED|PUBLISH_RIGHTS_MISSING|PUBLISH_FORBIDDEN)$/.test(code);
 }
 
+const sendIssuesBtn=$("sendIssuesBtn");
+const sendIssuesPanel=$("sendIssuesPanel");
+let publishIssues=[];
+function issueLabel(issue){
+  const top=current?.blocks?.[issue.index];
+  const kind=top?.type||issue.kind||"block";
+  const label=BLOCKS.find(item=>item.type===kind)?.label||kind;
+  return mt("send.issues_block",{index:issue.index+1,name:label})
+    +(issue.path.length>1?mt("send.issues_nested",{path:issue.path.slice(1).join(" › ")}):"");
+}
+function updatePublishValidity(){
+  publishIssues=window.RichPublishValidation?.checkPage
+    ?window.RichPublishValidation.checkPage({blocks:current?.blocks||[]})
+    :[{code:"validation_unavailable",kind:"page",index:-1,path:[]}];
+  const blocked=publishIssues.length>0;
+  const send=$("sendBtn");
+  send.disabled=blocked;
+  send.setAttribute("aria-disabled",String(blocked));
+  sendIssuesBtn.classList.toggle("hidden",!blocked);
+  sendIssuesBtn.textContent=blocked?mt("send.issues_button",{count:publishIssues.length}):"";
+  send.title=blocked?publishIssues.map(issue=>issueLabel(issue)+": "+mt("send.problem."+issue.code)).join("\n"):mt("editor.send");
+  const grouped=new Map();
+  publishIssues.forEach(issue=>{
+    if(issue.index<0)return;
+    const previous=grouped.get(issue.index)||[];
+    previous.push(issue);
+    grouped.set(issue.index,previous);
+  });
+  blocksEl.querySelectorAll(":scope > .block").forEach((el,i)=>{
+    const issues=grouped.get(i)||[];
+    el.classList.toggle("has-publish-error",issues.length>0);
+    el.querySelectorAll(".block-publish-error").forEach(child=>child.remove());
+    if(issues.length){
+      const hint=document.createElement("div");
+      hint.className="block-publish-error";
+      hint.textContent=issues.map(issue=>mt("send.problem."+issue.code)).join(" · ");
+      el.appendChild(hint);
+    }
+  });
+}
+function openPublishIssues(){
+  updatePublishValidity();
+  if(!publishIssues.length)return;
+  $("sendIssuesTitle").textContent=mt("send.issues_title");
+  $("sendIssuesHint").textContent=mt("send.issues_hint");
+  const list=$("sendIssuesList");
+  list.innerHTML="";
+  for(const issue of publishIssues){
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.className="send-issue";
+    const title=document.createElement("strong");
+    title.textContent=issue.index<0?mt("send.issues_title"):issueLabel(issue);
+    const description=document.createElement("small");
+    description.textContent=mt("send.problem."+issue.code);
+    btn.append(title,description);
+    btn.addEventListener("click",()=>{
+      closeSheets();
+      if(issue.topId)selectBlock(issue.topId);
+      const target=blocksEl.querySelectorAll(":scope > .block")[issue.index];
+      target?.scrollIntoView({block:"center",behavior:"smooth"});
+    });
+    list.appendChild(btn);
+  }
+  showSheet(sendIssuesPanel);
+}
+
 async function openSendPanel(){
   commitPendingComposerText();
-  if(!current?.blocks?.length){toast(mt("send.add_content"));return}
+  updatePublishValidity();
+  if(publishIssues.length){openPublishIssues();return}
   try{showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}))}
 }
 async function sendTo(dest,button){
@@ -817,6 +887,8 @@ async function sendTo(dest,button){
   document.querySelectorAll("#destinations .sheet-item").forEach(item=>{item.disabled=true});
   button.textContent=mt("send.sending");
   try{
+    updatePublishValidity();
+    if(publishIssues.length){const error=new Error(mt("send.issues_title"));error.code="PUBLISH_CONTENT_INVALID";openPublishIssues();throw error}
     const body={kind:dest.kind};
     if(dest.kind==="chat")body.chat_id=dest.chat_id;
     if(dirty||!current.page_id){
@@ -859,6 +931,7 @@ undoBtn.onclick=undo;redoBtn.onclick=redo;
 $("pagesBtn").onclick=loadPages;
 $("newPageBtn").onclick=async()=>{if(dirty){toast(mt("editor.unsaved"));return}newDraft()};
 $("sendBtn").onclick=openSendPanel;
+sendIssuesBtn.onclick=openPublishIssues;
 backdrop.onclick=closeSheets;
 $("startWritingBtn").onclick=()=>addBlock("paragraph");
 $("startPhotoBtn").onclick=()=>addBlock("photo");

@@ -1,6 +1,7 @@
 import { json, readJson, handleError, HttpError } from '../../_lib/http.js';
 import { miniAppUser } from '../../_lib/telegram-auth.js';
 import { validatePagePayload } from '../../_lib/pages.js';
+import '../../../app/miniapp_static/publish_validation.js';
 import {
   queueDocumentBridgeRequest,
   queueTextBridgeRequest,
@@ -35,7 +36,22 @@ export async function onRequestPost(context) {
     // They are never inserted into or written back to rich_pages.
     if (Array.isArray(payload.blocks)) {
       const content = validatePagePayload(payload, null, user.id);
-      if (!content.blocks.length) throw new HttpError(400, 'Page must contain at least one block');
+      const issues = globalThis.RichPublishValidation.checkPage({ blocks: content.blocks });
+      if (issues.length) {
+        return json({
+          ok: false,
+          error: {
+            code: 'PUBLISH_CONTENT_INVALID',
+            message: 'Fix invalid blocks before publishing.',
+            issues: issues.map(issue => ({
+              index: issue.index,
+              path: issue.path,
+              kind: issue.kind,
+              reason: issue.code,
+            })),
+          },
+        }, 400);
+      }
 
       const title = String(payload.title || 'Untitled').trim().slice(0, 64);
       if (!title) throw new HttpError(400, 'Page title is required');

@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="/miniapp/static/style.css?v=0.3.50">
   <link rel="stylesheet" href="/miniapp/static/miniapp_icons.css?v=0.3.36">
   <link rel="stylesheet" href="/miniapp/static/media_upload.css?v=0.3.53">
+  <link rel="stylesheet" href="/miniapp/static/send_validation.css?v=0.3.80">
   <link rel="stylesheet" href="/miniapp/static/live_preview.css?v=0.3.20">
   <link rel="stylesheet" href="/miniapp/static/math_live_preview.css?v=0.3.32">
 
@@ -97,11 +98,12 @@
     </main>
 
     <aside id="blockMenu" class="popup-menu block-menu hidden" aria-label="Block actions" data-i18n-label="editor.block_actions"><div id="blockMenuTitle" class="menu-head">Block actions</div><div id="blockActions" class="menu-list"></div></aside>
-    <div class="bottom-actions"><button id="deleteSelectedBtn" class="fab fab-ghost" type="button" aria-label="Discard changes and close editor" title="Discard changes and close editor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M9.5 7V5.2c0-.66.54-1.2 1.2-1.2h2.6c.66 0 1.2.54 1.2 1.2V7M7 7l.7 12a2 2 0 0 0 2 1.9h4.6a2 2 0 0 0 2-1.9L17 7"/></svg></button><button id="sendBtn" class="fab fab-send" type="button" aria-label="Send via Telegram"><svg class="telegram-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M23.91 3.79 20.3 20.84c-.27 1.2-.98 1.49-1.99.93l-5.5-4.05-2.65 2.55c-.29.29-.54.54-1.11.54l.4-5.6L19.65 6c.44-.4-.1-.62-.68-.22L6.36 13.72.93 12.02c-1.18-.37-1.2-1.18.25-1.75L22.4 2.09c.98-.37 1.84.22 1.51 1.7Z"/></svg></button></div>
+    <div class="bottom-actions"><button id="deleteSelectedBtn" class="fab fab-ghost" type="button" aria-label="Discard changes and close editor" title="Discard changes and close editor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M9.5 7V5.2c0-.66.54-1.2 1.2-1.2h2.6c.66 0 1.2.54 1.2 1.2V7M7 7l.7 12a2 2 0 0 0 2 1.9h4.6a2 2 0 0 0 2-1.9L17 7"/></svg></button><button id="sendIssuesBtn" class="send-issues-btn hidden" type="button" aria-controls="sendIssuesPanel"></button><button id="sendBtn" class="fab fab-send" type="button" disabled aria-label="Send via Telegram"><svg class="telegram-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M23.91 3.79 20.3 20.84c-.27 1.2-.98 1.49-1.99.93l-5.5-4.05-2.65 2.55c-.29.29-.54.54-1.11.54l.4-5.6L19.65 6c.44-.4-.1-.62-.68-.22L6.36 13.72.93 12.02c-1.18-.37-1.2-1.18.25-1.75L22.4 2.09c.98-.37 1.84.22 1.51 1.7Z"/></svg></button></div>
   </section>
 
   <div id="backdrop" class="backdrop hidden"></div>
   <aside id="pagesPanel" class="sheet hidden" aria-label="Saved pages" data-i18n-label="pages.title"><div class="sheet-handle"></div><div class="sheet-header"><div><strong><span data-miniapp-icon="page"></span><span data-i18n="pages.title">Saved pages</span></strong><small data-i18n="pages.subtitle">Open a page or start a new one</small></div><button id="newPageBtn" class="soft-btn" type="button"><span data-miniapp-icon="add"></span><span data-i18n="pages.new">New</span></button></div><div id="pages" class="sheet-list"></div><div id="emptyPages" class="empty hidden" data-i18n="pages.empty">You have no saved pages.</div></aside>
+  <aside id="sendIssuesPanel" class="sheet hidden" aria-label="Publishing issues"><div class="sheet-handle"></div><div class="sheet-header"><div><strong id="sendIssuesTitle"></strong><small id="sendIssuesHint"></small></div></div><div id="sendIssuesList" class="send-issues-list"></div></aside>
   <aside id="sendPanel" class="sheet hidden" aria-label="Send destinations" data-i18n-label="send.title"><div class="sheet-handle"></div><div class="sheet-header"><div><strong data-i18n="send.title">Send message</strong><small data-i18n="send.subtitle">Choose the chat where you want to publish</small></div></div><div id="destinations" class="sheet-list"></div></aside>
   <div id="toast" class="toast" role="status"></div>
 
@@ -112,7 +114,8 @@
   <script src="/miniapp/static/miniapp_icons.js?v=0.3.36"></script>
   <script src="/miniapp/static/loading_overlay.js?v=0.3.46"></script>
   <script src="/miniapp/static/error_reporter.js?v=0.3.48"></script>
-  <script src="/miniapp/static/app.js?v=0.3.76"></script>
+  <script src="/miniapp/static/publish_validation.js?v=0.3.80"></script>
+  <script src="/miniapp/static/app.js?v=0.3.80"></script>
   <script src="/miniapp/static/resume_session.js?v=0.3.45"></script>
   <script src="/miniapp/static/session_guard.js?v=0.3.51"></script>
 

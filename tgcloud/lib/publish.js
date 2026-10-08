@@ -700,11 +700,25 @@ async function publishBridgePageContent({
     : undefined;
 
   const includeBranding = await shouldIncludeBranding(userId);
-  const richMessage = buildInputRichMessage(page.blocks || [], {
-    userId,
-    sourcePageId: id,
-    includeBranding,
-  });
+  let richMessage;
+  try {
+    richMessage = buildInputRichMessage(page.blocks || [], {
+      userId,
+      sourcePageId: id,
+      includeBranding,
+    });
+  } catch (error) {
+    const detail = publishErrorDetail(error);
+    if (/no reusable (file_id|media)/i.test(detail)) {
+      throw publishFailure('PUBLISH_MEDIA_INVALID',
+        'A media block has not been uploaded to Telegram. Upload or remove it before sending.', error);
+    }
+    if (/unsupported rich block type|block has no|missing (type|coordinates)|invalid native rich block/i.test(detail)) {
+      throw publishFailure('PUBLISH_CONTENT_INVALID',
+        'One of the message blocks is incomplete. Fix it before sending.', error);
+    }
+    throw error;
+  }
   if (
     id == null
     && (!Array.isArray(richMessage?.blocks) || !richMessage.blocks.some(richBlockHasContent))

@@ -1,0 +1,8 @@
+.fab-send:disabled{opacity:.32;filter:grayscale(1);cursor:not-allowed;box-shadow:none}
+.bottom-actions>.send-issues-btn{pointer-events:auto;max-width:min(62vw,300px);padding:9px 12px;border:1px solid color-mix(in srgb,var(--danger) 55%,transparent);border-radius:16px;background:color-mix(in srgb,var(--panel) 95%,transparent);color:var(--danger);font-size:12px;font-weight:700;text-align:right;box-shadow:0 5px 16px rgba(0,0,0,.18)}
+.send-issues-list{display:grid;gap:8px;padding:4px 0 14px}
+.send-issue{width:100%;display:grid;gap:5px;padding:12px;text-align:start;background:var(--panel2);border:1px solid var(--line);border-radius:14px}
+.send-issue strong{font-size:13px;color:var(--danger)}
+.send-issue small{font-size:12px;color:var(--text);line-height:1.5}
+.block.has-publish-error{border-color:color-mix(in srgb,var(--danger) 50%,transparent)}
+.block-publish-error{margin-top:6px;font-size:12px;color:var(--danger);line-height:1.5}
