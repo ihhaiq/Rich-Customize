@@ -76,12 +76,10 @@ test('text limit opens factual comparison and specific donation-bot deep link', 
   // All owner-approved plan benefits are shown, but not sold before billing.
   assert.match(text,/الصفحات المحفوظة/);
   assert.match(text,/البلوكات/);
-  assert.match(text,/سجل نسخ الصفحة/);
   assert.match(text,/الوصول المبكر/);
   assert.match(text,/إزالة الحقوق/);
-  assert.match(text,/آخر ٥ نسخ/);
-  assert.match(text,/آخر ٢٠ نسخة/);
   assert.match(text,/مشمولة بالاشتراك/);
+  assert.doesNotMatch(text,/سجل نسخ الصفحة|Page version history|آخر ٥ نسخ|آخر ٢٠ نسخة/);
   assert.doesNotMatch(text,/مقترح|عند التفعيل|فكرة مستقبلية|القوالب/);
   assert.match(text,/١٥٠/);
   assert.match(text,/٣٥٠/);
