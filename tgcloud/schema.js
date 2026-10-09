@@ -30,18 +30,6 @@ export const editorSubscriptions = table('editor_subscriptions', {
   expiresIdx: index('idx_editor_subscriptions_expires').on(t.status, t.expiresAt),
 }));
 
-// Dedicated per-page history; never overload full-backup page_snapshots.
-export const editorPageVersions = table('editor_page_versions', {
-  versionId: text('version_id').primaryKey(),
-  ownerId: integer('owner_id').notNull(),
-  pageId: text('page_id').notNull(),
-  revision: integer('revision').notNull(),
-  payload: json('payload').notNull().default({}),
-  createdAt: integer('created_at').notNull(),
-}, (t) => ({
-  ownerPageIdx: index('idx_editor_page_versions_owner_page').on(t.ownerId, t.pageId, t.createdAt),
-}));
-
 export const developerStates = table('developer_states', {
   userId: integer('user_id').primaryKey(),
   state: text('state').notNull(),
