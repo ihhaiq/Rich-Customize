@@ -16,7 +16,6 @@ import {
 import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { safePlanLimit } from 'lib/subscription-policy';
-import { archivePreviousPageVersion } from 'lib/page-version-history';
 import { allowBridgeRequest } from 'lib/request-guard';
 import { validateStoredButtons } from 'lib/button-validation';
 import {
@@ -819,10 +818,6 @@ async function handleSave(message, id, envelope) {
     throw new BridgeError('PAGE_CONFLICT', 'Page changed while SAVE_PAGE was being applied. Reload the latest version.');
   }
   const saved = await getOwnedPage(input.ownerId, input.pageId);
-  if (saved) {
-    try { await archivePreviousPageVersion(input.ownerId, existing, saved); }
-    catch (error) { await logError('page_history.miniapp_save', error, { userId:input.ownerId }); }
-  }
   return {
     status: 'saved',
     user_id: input.ownerId,
