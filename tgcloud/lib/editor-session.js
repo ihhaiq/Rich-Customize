@@ -14,7 +14,6 @@ import {
 } from 'lib/miniapp-sync';
 import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
-import { archivePreviousPageVersion } from 'lib/page-version-history';
 
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
@@ -137,8 +136,6 @@ async function syncSavedPageSession(userId, session) {
   const saved = await db.select().from(richPages)
     .where(eq(richPages.pageId, pageId)).get();
   if (saved) {
-    try { await archivePreviousPageVersion(userId, page, saved); }
-    catch(error){await logError('page_history.autosync',error,{userId});}
     try {
       await enqueuePageUpsertSync(saved);
       await flushMiniAppSyncOutbox({ limit:1 });
@@ -150,27 +147,6 @@ async function syncSavedPageSession(userId, session) {
     }
   }
   return { status:'synced', changed:true, page:saved || page };
-}
-
-// Only persisted pages owned by this user may give legacy text quota headroom.
-// Refresh only the current saved-page draft after a deliberate history restore.
-// Writing editor_sessions directly avoids interpreting the restore as an edit
-// and accidentally auto-syncing an older stale session back over the page.
-export async function refreshRestoredEditorDraft(userId, page) {
-  const owner=Number(userId);
-  if (!page || Number(page.ownerId)!==owner) return false;
-  const active=await db.select().from(editorSessions)
-    .where(eq(editorSessions.userId,owner)).get();
-  if (!active || String(active.currentPageId||'')!==String(page.pageId)) return false;
-  await db.update(editorSessions).set({
-    blocks:clone(page.blocks||[]),
-    messageButtons:clone(page.buttons||[]),
-    buttonsPerRow:normalizedButtonsPerRow(page.buttonsPerRow),
-    buttonsAlign:normalizedButtonsAlign(page.buttonsAlign),
-    currentPageTitle:String(page.title||''),
-    undoStack:[],redoStack:[],
-  }).where(eq(editorSessions.userId,owner)).run();
-  return true;
 }
 
 export async function trustedEditorQuotaBaseline(userId, session) {
