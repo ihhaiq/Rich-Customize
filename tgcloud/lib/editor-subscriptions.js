@@ -40,7 +40,6 @@ export async function getEditorPlanLimits(userId) {
   return {
     plan: entitlement.plan,
     limits: entitlement.limits,
-    history: planBenefit(entitlement,'history'),
     brandingIncluded: planBenefit(entitlement,'brandingIncluded'),
     earlyAccess: planBenefit(entitlement,'earlyAccess'),
   };
