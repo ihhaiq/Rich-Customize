@@ -18,7 +18,6 @@ import {
   rememberEditorState,
   syncSavedEditorPage,
   updateEditorSession,
-  refreshRestoredEditorDraft,
 } from 'lib/editor-session';
 import {
   buildPageDeleteConfirmationKeyboard,
@@ -38,7 +37,6 @@ import {
 import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { safePlanLimit } from 'lib/subscription-policy';
-import { archivePreviousPageVersion, listSavedPageVersions, restoreSavedPageVersion } from 'lib/page-version-history';
 
 function languageCode(source) {
   return source?.from?.language_code || 'en';
@@ -229,8 +227,6 @@ async function persistPage(userId, title, session, existingId = null) {
     }
     const saved = await getPage(existingId);
     if (saved) {
-      try { await archivePreviousPageVersion(userId, existing, saved); }
-      catch(error){await logError('page_history.editor_save',error,{userId});}
       try {
         await enqueuePageUpsertSync(saved);
         await flushMiniAppSyncOutbox({ limit: 1 });
@@ -475,79 +471,6 @@ export async function handleEditorPageCallback(query) {
       callback_query_id: query.id,
       text: pagesCopy(code).sortDone,
     });
-    return true;
-  }
-
-  if (data.startsWith('r:phistory:')) {
-    const id=data.slice('r:phistory:'.length);
-    const history=await listSavedPageVersions(query.from.id,id);
-    if (history.status==='upgrade_required') {
-      await api.answerCallbackQuery({callback_query_id:query.id,
-        text:code==='ar'?'سجل النسخ متاح في Plus وGolden Ticket بعد التفعيل.':'Version history requires an active Plus or Golden subscription.',
-        show_alert:true});
-      await api.sendMessage({chat_id:query.from.id,
-        text:code==='ar'?'سجل نسخ الصفحة ضمن باقات الاشتراك. الباقات المدفوعة بعدُها قيد التجهيز.':'Page history will be available with paid plans after launch.',
-        reply_markup:{inline_keyboard:[[{text:'@richDonateBot',url:'https://t.me/richDonateBot?start=rich_plans_history'}]]}});
-      return true;
-    }
-    if (history.status!=='ok'||!history.versions.length) {
-      await api.answerCallbackQuery({callback_query_id:query.id,
-        text:code==='ar'?'ماكو نسخ قديمة متوفرة لهذه الصفحة.':'No previous versions are available for this page.',show_alert:true});
-      return true;
-    }
-    await editCallbackMessage(query,{
-      text:(code==='ar'?'سجل نسخ الصفحة: ':'Page history: ')+history.title
-        +'\n'+(code==='ar'?'اختار النسخة لعرض خيارات الاستعادة:':'Select a version to restore:'),
-      reply_markup:{inline_keyboard:[
-        ...history.versions.map(v=>[{
-          text:'#'+v.revision+' • '+new Date(v.createdAt*1000).toLocaleString(code==='ar'?'ar-IQ':'en-GB'),
-          callback_data:'r:phrestore:'+id+':'+v.revision+':'+history.currentRevision,
-        }]),
-        [{text:code==='ar'?'رجوع':'Back',callback_data:'r:pages'}],
-      ]},
-    });
-    await api.answerCallbackQuery({callback_query_id:query.id});
-    return true;
-  }
-
-  if (data.startsWith('r:phrestore:')) {
-    const [, ,pageId,historyRev,currentRev]=data.split(':');
-    const history=await listSavedPageVersions(query.from.id,pageId);
-    if (history.status!=='ok'||Number(currentRev)!==history.currentRevision
-      ||!history.versions.some(v=>v.revision===Number(historyRev))) {
-      await api.answerCallbackQuery({callback_query_id:query.id,
-        text:code==='ar'?'نسخة الصفحة تغيرت، افتح السجل من جديد.':'Page changed. Reopen history.',show_alert:true});
-      return true;
-    }
-    await editCallbackMessage(query,{
-      text:code==='ar'?'تريد تستعيد النسخة #'+historyRev+'؟ راح تنحفظ نسختك الحالية بالسجل قبل الاستعادة.':'Restore version #'+historyRev+'? Your current version will be archived.',
-      reply_markup:{inline_keyboard:[
-        [{text:code==='ar'?'استعادة النسخة':'Restore version',
-          callback_data:'r:phrestoreok:'+pageId+':'+historyRev+':'+currentRev,style:'success'}],
-        [{text:code==='ar'?'إلغاء':'Cancel',callback_data:'r:phistory:'+pageId}],
-      ]},
-    });
-    await api.answerCallbackQuery({callback_query_id:query.id});
-    return true;
-  }
-
-  if (data.startsWith('r:phrestoreok:')) {
-    const [, ,pageId,historyRev,currentRev]=data.split(':');
-    const restored=await restoreSavedPageVersion(query.from.id,pageId,historyRev,currentRev);
-    if (restored.status!=='restored') {
-      await api.answerCallbackQuery({callback_query_id:query.id,
-        text:code==='ar'?'تعذر الاستعادة ('+restored.status+'). حدث الصفحة وجرّب مرة ثانية.':'Could not restore: '+restored.status,
-        show_alert:true});
-      return true;
-    }
-    const newPage=await getPage(pageId);
-    if(newPage)await refreshRestoredEditorDraft(query.from.id,newPage);
-    await renderPagesScreen(query.from.id,code,0,{
-      fallbackChatId:query.message?.chat?.id,
-      fallbackMessageId:query.message?.message_id,
-    });
-    await api.answerCallbackQuery({callback_query_id:query.id,
-      text:code==='ar'?'✅ تمت استعادة النسخة':'✅ Version restored'});
     return true;
   }
 
@@ -901,8 +824,6 @@ async function receiveRename(message, session, code) {
   try {
     const renamed = await getPage(pageId);
     if (renamed) {
-      try { await archivePreviousPageVersion(userId,page,renamed); }
-      catch(error){await logError('page_history.rename',error,{userId});}
       await enqueuePageUpsertSync(renamed);
       await flushMiniAppSyncOutbox({ limit: 1 });
     }
