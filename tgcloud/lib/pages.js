@@ -147,10 +147,6 @@ export function buildPagesRichMessage(
           style: 'danger',
         }),
         buttonCell({
-          text: '🕘',
-          callback_data: 'r:phistory:' + pageId,
-        }),
-        buttonCell({
           text: '✏️',
           callback_data: 'r:prename:' + pageId + ':' + pageIndex,
         }),
