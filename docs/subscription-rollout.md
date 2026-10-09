@@ -54,25 +54,23 @@ Review any old tests expecting 25k for free; update them only when the new free 
 ## Mini App upgrade information on limits (2026-10-09)
 
 - Quota-limit API failures in the Mini App now open a dedicated modal instead of an error-only experience. The premium emoji pack lock also opens this modal when tapped.
-- The offer presents the entire approved plan, including text, custom emoji packs, saved pages, blocks, history, branding, Golden early access and approved Stars prices. Technical table/media quota expansion is not a paid benefit.
+- The offer presents the entire approved plan, including text, custom emoji packs, saved pages, blocks, branding, Golden early access and approved Stars prices. Technical table/media quota expansion is not a paid benefit.
 - A link opens `https://t.me/richDonateBot?start=rich_plans_text` for text, `rich_plans_emoji` for custom emoji packs or `rich_plans_limits` for other caps. Telegram `openTelegramLink` is used in the Mini App; the URL is a fallback. These `/start` payloads are **a proposed future contract**, not a live payment integration.
 - The copy discloses that paid plans/prices are not yet available. No paid plan is activated in browser state and no token/payment is processed by Cloudflare.
 - `tests/serverless/subscription-offers.test.mjs` covers classification, UI comparison and deep-link payloads in a mocked DOM. Real Telegram UI and `@richDonateBot` payload handling remain unverified until Telegram Serverless can be deployed.
 
 ## Plan comparison expanded (2026-10-09)
 
-- The plan modal lists owner-approved benefits: saved pages 12/50/150, blocks 30/60/120, active-plan branding removal in Plus/Golden, 0/5/20 history versions per saved page and Golden early access. Saved templates are canceled.
+- The plan modal lists owner-approved benefits: saved pages 12/50/150, blocks 30/60/120, active-plan branding removal in Plus/Golden and Golden early access. Saved templates are canceled.
 - Every item is a **plan benefit**, with no proposal labels or feature-level `on activation` badges. Prices are 0/150/350 Stars per 30 days, but purchases are not currently available. The separate permanent Free branding-removal purchase remains 99 Stars.
-- Version history source code and Telegram-side tables are present, but the live Telegram deployment and migration are still pending. Templates are explicitly excluded and have no implementation.
 - The modal remains scrollable, while its exit/link controls stay at its bottom. Cache version is `0.3.83`. No `tgcloud` deploy.
 
 ## Owner decision: remove templates, implement other plan benefits (2026-10-09)
 
-Approved plan configuration is now Free/Plus/Golden: **20k/25k/32k text**, **2/8/50 emoji packs**, **12/50/150 pages**, **30/60/120 blocks**, **0/5/20 historical versions per saved page**, **0/150/350 Stars per 30 days**, included active-plan branding removal on Plus/Golden and Golden early-access eligibility. **Saved templates have been cancelled and are not included in the app.**
+Approved plan configuration is now Free/Plus/Golden: **20k/25k/32k text**, **2/8/50 emoji packs**, **12/50/150 pages**, **30/60/120 blocks**, **0/150/350 Stars per 30 days**, included active-plan branding removal on Plus/Golden and Golden early-access eligibility. **Saved templates have been cancelled and are not included in the app.**
 
 Implementation in source:
-- Telegram-only `editor_subscriptions` and `editor_page_versions` schema tables. `lib/editor-subscriptions.js` reads an owner-verified active entitlement, rejects expired/inactive/untrusted sources. There is **no editor-subscription payment issuance yet**.
-- Saved-page history generated for meaningful saved changes on manual editor save, auto-sync, Mini App RCB1 SAVE and rename, with ownership, history count, revision CAS checks and restoration entry through the `🕘` control in saved pages. Restore archives the outgoing version.
+- Telegram-only `editor_subscriptions` schema table. `lib/editor-subscriptions.js` reads an owner-verified active entitlement, rejects expired/inactive/untrusted sources. There is **no editor-subscription payment issuance yet**.
 - Active Plus/Golden entitlement suppresses the branding footer while active; independently purchased permanent 99-Star removal remains after downgrade or expiry.
 - Limits are read in Telegram Serverless paths from trusted subscription state. Cloudflare Mini App maintains strict Free gateway validation until a Serverless-authenticated account entitlement transport exists; never accept client-submitted plan tiers to bypass it.
 - Golden early-access eligibility is exposed as a policy helper, but no experimental feature has been specifically designated.
@@ -83,6 +81,12 @@ Implementation in source:
 All compared features are approved membership benefits. The Mini App must **not** display `مقترح`, `Proposed`, or a repeated `عند التفعيل` tag. Explain purchase unavailability separately once. New Serverless features still require migration and deployment; source code alone is not a live paid service.
 
 ## Pricing-first offer UI (2026-10-09)
-- Replace old large multi-section cards with compact pricing-first plan cards. Free is free, Plus 150 Stars per 30 days, Golden Ticket 350 Stars per 30 days. Show a single ungrouped benefit grid within each card (text, emoji packs, pages, blocks, branding removal, history, early access where included). No templates.
+- Replace old large multi-section cards with compact pricing-first plan cards. Free is free, Plus 150 Stars per 30 days, Golden Ticket 350 Stars per 30 days. Show a single ungrouped benefit grid within each card (text, emoji packs, pages, blocks, branding removal, early access where included). No templates.
 - Remove repetitive explanatory disclaimers beneath the cards. Keep only one availability notice in Arabic: `الباقات في الإصدار التجريبي وغير متاحة للبيع حالياً.` An English fallback conveys the same thing. Retain the donation-bot deep link but do not treat it as a live invoice.
 - Editor cache version for subscription UI is `0.3.86`; Cloudflare auto-deploy from `serverless-cleanup` remains authorized, Telegram Serverless stays deferred.
+
+## Owner change (2026-10-09)
+
+- The previously planned saved-page version archive and restore feature has been withdrawn from Plus and Golden. Its Telegram menu entry, storage definition, save hooks and pricing-card benefit were removed from source.
+- Preserve normal page revision numbers used for concurrency and Mini App synchronization. In-session undo/redo and full backup/import are separate capabilities and remain available.
+- Do not drop an existing production history table or delete historical user rows automatically; assess storage cleanup separately if a migration was previously applied.
