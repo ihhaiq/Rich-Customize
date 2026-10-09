@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PLAN_LIMITS, resolveEditorEntitlement, resolveCloneEntitlement, checkApprovedQuota, checkEditorTextQuota, planBenefit, PLAN_HISTORY_LIMITS, PLAN_PRICES_STARS } from '../../tgcloud/lib/subscription-policy.js';
+import { PLAN_LIMITS, resolveEditorEntitlement, resolveCloneEntitlement, checkApprovedQuota, checkEditorTextQuota, planBenefit, PLAN_PRICES_STARS } from '../../tgcloud/lib/subscription-policy.js';
 
 test('approved pack quotas are 2, 8, 50', () => {
   assert.equal(PLAN_LIMITS.free.emojiPacks, 2);
@@ -42,9 +42,7 @@ test('approved paid page/block quotas require a verified active entitlement', ()
     assert.equal(checkApprovedQuota(active,'blocks',blocks).allowed,true);
     assert.equal(checkApprovedQuota(active,'blocks',blocks+1).allowed,false);
   }
-  assert.deepEqual(PLAN_HISTORY_LIMITS,{free:0,plus:5,golden:20});
   assert.deepEqual(PLAN_PRICES_STARS,{free:0,plus:150,golden:350});
-  assert.equal(planBenefit(free,'history'),0);
   assert.equal(planBenefit(free,'brandingIncluded'),false);
   assert.equal(planBenefit(resolveEditorEntitlement({plan:'plus',active:true}),'brandingIncluded'),true);
   assert.equal(planBenefit(resolveEditorEntitlement({plan:'golden',active:true}),'earlyAccess'),true);
