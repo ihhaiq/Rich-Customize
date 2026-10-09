@@ -7,14 +7,11 @@
   // activation remain unavailable until trusted Telegram-side rollout.
   const OFFERS = Object.freeze([
     { name: "Free", text: 20000, emojiPacks: 2,
-      pages: 12, blocks: 30, rights: "separate", price:0,
-      history: 0, earlyAccess: false },
+      pages: 12, blocks: 30, rights: "separate", price:0, earlyAccess: false },
     { name: "Plus", text: 25000, emojiPacks: 8,
-      pages: 50, blocks: 60, rights: "included", price:150,
-      history: 5, earlyAccess: false },
+      pages: 50, blocks: 60, rights: "included", price:150, earlyAccess: false },
     { name: "Golden Ticket", text: 32000, emojiPacks: 50,
-      pages: 150, blocks: 120, rights: "included", price:350,
-      history: 20, earlyAccess: true },
+      pages: 150, blocks: 120, rights: "included", price:350, earlyAccess: true },
   ]);
   const strings = {
     ar: {
@@ -35,14 +32,11 @@
       pages: "الصفحات المحفوظة",
       blocks: "البلوكات",
       rights: "إزالة الحقوق",
-      history: "سجل نسخ الصفحة",
       earlyAccess: "الوصول المبكر للميزات",
       currentLimit: "الحد الحالي",
       notIncluded: "غير مشمول",
       separatePurchase: "شراء منفصل بـ٩٩ نجمة",
       couldInclude: "مشمولة بالاشتراك",
-      lastVersions: "آخر {count} نسخ",
-      lastVersionsMany: "آخر {count} نسخة",
       earlyProposed: "مشمولة",
       roadmapNotice: "",
       priceLabel: "السعر الشهري",
@@ -72,14 +66,11 @@
       pages: "Saved pages",
       blocks: "Blocks",
       rights: "Remove branding",
-      history: "Page version history",
       earlyAccess: "Early feature access",
       currentLimit: "Current limit",
       notIncluded: "Not included",
       separatePurchase: "Separate 99 Stars purchase",
       couldInclude: "Included with subscription",
-      lastVersions: "Last {count} versions",
-      lastVersionsMany: "Last {count} versions",
       earlyProposed: "Included",
       roadmapNotice: "",
       priceLabel: "Monthly price",
@@ -191,10 +182,6 @@
       perk(benefits, "blocks", format(plan.blocks));
       perk(benefits, "rights",
         index === 0 ? tr("separatePurchase") : tr("couldInclude"));
-      perk(benefits, "history",
-        plan.history ? tr(plan.history > 10 ? "lastVersionsMany" : "lastVersions", {
-          count: format(plan.history),
-        }) : tr("notIncluded"), { included:plan.history > 0 });
       if (plan.earlyAccess) {
         perk(benefits, "earlyAccess", tr("earlyProposed"));
       }
