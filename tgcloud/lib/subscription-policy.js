@@ -12,7 +12,6 @@ export const PLAN_LIMITS = Object.freeze({
 export const APPROVED_LIMITS = Object.freeze(['text', 'emojiPacks', 'pages', 'blocks']);
 export const PLAN_PRICES_STARS = Object.freeze({ free:0, plus:150, golden:350 });
 export const PLAN_PERIOD_DAYS = 30;
-export const PLAN_HISTORY_LIMITS = Object.freeze({ free:0, plus:5, golden:20 });
 export const PLAN_NAMES = Object.freeze(['free', 'plus', 'golden']);
 
 export function normalizePlan(value) {
@@ -56,7 +55,6 @@ export function checkEditorTextQuota(entitlement, count, { previousCount = 0 } =
 export function planBenefit(entitlement, key) {
   const developer = entitlement?.unlimitedProductQuotas === true;
   const plan = developer ? 'golden' : normalizePlan(entitlement?.plan);
-  if (key === 'history') return developer ? 50 : PLAN_HISTORY_LIMITS[plan];
   if (key === 'brandingIncluded') return developer || plan !== 'free';
   if (key === 'earlyAccess') return developer || plan === 'golden';
   throw new Error('Unsupported benefit ' + key);
