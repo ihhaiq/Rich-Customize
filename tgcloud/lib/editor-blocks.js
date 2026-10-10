@@ -390,16 +390,29 @@ export function editorQuotaUsage(blocks) {
       const kind = String(block.type || '');
       usage.nestingDepth = Math.max(usage.nestingDepth, level);
       for (const key of ['rich_text', 'quote_rich_text', 'credit_rich_text', 'caption_rich_text',
-        'summary_rich_text', 'text']) {
+        'summary_rich_text', 'text', 'caption', 'summary', 'credit']) {
         usage.nestingDepth = Math.max(usage.nestingDepth, level + formattingDepth(effective[key]));
       }
       if (kind === 'table') {
         const rows = Array.isArray(effective.cells) ? effective.cells : Array.isArray(effective.rows) ? effective.rows : [];
         const height = tableDimensions(rows.filter(Array.isArray)).height;
         usage.blocks += height; // Each logical row counts toward block budget.
+        for (const row of rows) for (const cell of Array.isArray(row) ? row : []) {
+          if (cell && typeof cell === 'object') {
+            usage.nestingDepth = Math.max(usage.nestingDepth,
+              level + formattingDepth(cell.rich_text ?? cell.text));
+          }
+        }
       }
       if (kind === 'list') {
-        usage.blocks += Array.isArray(effective.items) ? effective.items.length : 0;
+        const items = Array.isArray(effective.items) ? effective.items : [];
+        usage.blocks += items.length;
+        for (const item of items) {
+          if (item && typeof item === 'object') {
+            usage.nestingDepth = Math.max(usage.nestingDepth,
+              level + formattingDepth(item.rich_text ?? item.text));
+          }
+        }
       }
       if (MEDIA_BLOCK_TYPES.has(kind)) usage.mediaAttachments += 1;
       visit(quotaChildren(block), level + 1);
