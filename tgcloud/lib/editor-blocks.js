@@ -61,8 +61,9 @@ export const DETAILS_CHILD_TYPES = Object.freeze([
 export const EDITOR_SESSION_TTL_SECONDS = 2 * 60 * 60;
 export const MAX_PAGE_BLOCKS = 30;
 export const MAX_VISIBLE_CHARACTERS = PLAN_LIMITS.free.text;
-export const MAX_TABLE_COLUMNS = 25;
-export const MAX_TABLE_ROWS = 50;
+// Telegram Rich Messages accept at most 20 table columns. The editor caps rows at 26.
+export const MAX_TABLE_COLUMNS = 20;
+export const MAX_TABLE_ROWS = 26;
 export const MAX_SAVED_PAGES = 12;
 export const BLOCK_SCROLL_SIZE = 8;
 
@@ -540,8 +541,8 @@ export function setRichMessageDirection(blocks, isRtl) {
   return list;
 }
 
-export function validateTableRows(rows, userId = null) {
-  if (isDeveloper(userId)) return { ok: true };
+// Hard table limits apply to every account, including developers.
+export function validateTableRows(rows, _userId = null) {
   const list = Array.isArray(rows) ? rows.filter((row) => Array.isArray(row)) : [];
   if (list.length > MAX_TABLE_ROWS) {
     return {
@@ -564,32 +565,45 @@ export function validateTableRows(rows, userId = null) {
 }
 
 export function validateEditorLimits(blocks, userId = null, { previousBlocks = null, entitlement = null } = {}) {
-  if (isDeveloper(userId)) return { ok: true };
   const list = Array.isArray(blocks) ? blocks : [];
-  // entitlement is a trusted server-only value; browser/client data is never
-  // accepted as a plan or active subscription.
-  const trustedEntitlement = entitlement || resolveEditorEntitlement();
-  const blockLimit = safePlanLimit(trustedEntitlement, 'blocks');
-  const actualBlocks = editorBlockCount(list);
-  if (blockLimit != null && actualBlocks > blockLimit) {
-    return { ok: false, code: 'blocks', limit: blockLimit, actual: actualBlocks };
-  }
+  // Developers bypass subscription quotas, never the Rich Message transport
+  // limits. A 400 from Telegram must not escape as a callback failure.
+  if (!isDeveloper(userId)) {
+    // entitlement is a trusted server-only value; browser/client data is never
+    // accepted as a plan or active subscription.
+    const trustedEntitlement = entitlement || resolveEditorEntitlement();
+    const blockLimit = safePlanLimit(trustedEntitlement, 'blocks');
+    const actualBlocks = editorBlockCount(list);
+    if (blockLimit != null && actualBlocks > blockLimit) {
+      return { ok: false, code: 'blocks', limit: blockLimit, actual: actualBlocks };
+    }
 
-  const characters = visibleCharacterCount(list);
-  const previousCount = Array.isArray(previousBlocks) ? visibleCharacterCount(previousBlocks) : 0;
-  const quota = checkEditorTextQuota(
-    trustedEntitlement, characters, { previousCount },
-  );
-  if (!quota.allowed) {
-    return { ok: false, code: 'characters', limit: quota.limit, actual: characters };
+    const characters = visibleCharacterCount(list);
+    const previousCount = Array.isArray(previousBlocks) ? visibleCharacterCount(previousBlocks) : 0;
+    const quota = checkEditorTextQuota(
+      trustedEntitlement, characters, { previousCount },
+    );
+    if (!quota.allowed) {
+      return { ok: false, code: 'characters', limit: quota.limit, actual: characters };
+    }
   }
 
   const visit = (items) => {
     for (const block of Array.isArray(items) ? items : []) {
       if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
       if (String(block.type || '') === 'table') {
-        const result = validateTableRows(tableRows(block));
-        if (!result.ok) return result;
+        const data = block.data && typeof block.data === 'object' ? block.data : {};
+        // Imported/native tables can retain stale editable rows. Validate both
+        // representations so a user cannot preview one width but send another.
+        const sources = [
+          ...(Array.isArray(data.rows) ? [data.rows] : []),
+          ...(Array.isArray(data.native_data?.cells) ? [data.native_data.cells] : []),
+        ];
+        if (!sources.length) sources.push(tableRows(block));
+        for (const rows of sources) {
+          const result = validateTableRows(rows);
+          if (!result.ok) return result;
+        }
       }
       const nested = visit(quotaChildren(block));
       if (nested && !nested.ok) return nested;
