@@ -2,14 +2,14 @@
 // Foundation only: payment verification, entitlement persistence and runtime
 // integration must be completed before enabling paid tiers.
 export const PLAN_LIMITS = Object.freeze({
-  free: Object.freeze({ text: 20000, pages: 12, blocks: 30, emojiPacks: 2, tableColumns: 8 }),
-  plus: Object.freeze({ text: 25000, pages: 50, blocks: 60, emojiPacks: 8, tableColumns: 12 }),
-  golden: Object.freeze({ text: 32000, pages: 150, blocks: 120, emojiPacks: 50, tableColumns: 20 }),
+  free: Object.freeze({ text: 20000, pages: 12, blocks: 50, emojiPacks: 2, tableColumns: 8, nestingDepth: 4, mediaAttachments: 10 }),
+  plus: Object.freeze({ text: 25000, pages: 50, blocks: 200, emojiPacks: 8, tableColumns: 12, nestingDepth: 8, mediaAttachments: 25 }),
+  golden: Object.freeze({ text: 32768, pages: 150, blocks: 500, emojiPacks: 50, tableColumns: 20, nestingDepth: 16, mediaAttachments: 50 }),
 });
 
 // Owner-approved plan benefits. They remain inaccessible until a server-verified
 // active subscription exists; this constant does not authorize payments.
-export const APPROVED_LIMITS = Object.freeze(['text', 'emojiPacks', 'pages', 'blocks', 'tableColumns']);
+export const APPROVED_LIMITS = Object.freeze(['text', 'emojiPacks', 'pages', 'blocks', 'tableColumns', 'nestingDepth', 'mediaAttachments']);
 export const PLAN_PRICES_STARS = Object.freeze({ free:0, plus:150, golden:350 });
 export const PLAN_PERIOD_DAYS = 30;
 export const PLAN_NAMES = Object.freeze(['free', 'plus', 'golden']);
@@ -48,8 +48,9 @@ export function checkEditorTextQuota(entitlement, count, { previousCount = 0 } =
   if (!Number.isSafeInteger(previousCount) || previousCount < 0) throw new Error('Invalid previous character count');
   if (entitlement?.unlimitedProductQuotas === true) return { allowed:true, limit:null, actual:count, legacy:false };
   const limit=PLAN_LIMITS[normalizePlan(entitlement?.plan)].text;
-  const legacy=previousCount>limit && count<=previousCount;
-  return { allowed:count<=limit||legacy, limit, actual:count, legacy };
+  // A legacy saved page is publish-only at its trusted persisted snapshot.
+  // It must not be re-saved or modified under a grandfathered text allowance.
+  return { allowed:count<=limit, limit, actual:count, legacy:false };
 }
 
 export function planBenefit(entitlement, key) {
