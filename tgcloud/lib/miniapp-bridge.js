@@ -36,6 +36,7 @@ import {
   sendMiniAppFullSnapshot,
 } from 'lib/miniapp-sync';
 import { DEVELOPER_IDS } from 'lib/developer-access';
+import { receiveScheduleRelayControl } from 'lib/scheduled-publish';
 
 export const MINIAPP_BRIDGE_CHAT_ID = -1003993506865;
 export const MINIAPP_BRIDGE_BOT_USERNAME = 'richminiappsbot';
@@ -1059,6 +1060,12 @@ async function replayCompletedMutation(message, id, action, result) {
 }
 
 export async function handleMiniAppBridgeMessage(message, context = {}) {
+  const scheduleSource=commandSource(message);
+  if (/^\\/rcb_schedule_(ack|due)@richcustomizebot\\b/i.test(scheduleSource)) {
+    if (!isBridgeOrigin(message)) return false;
+    await authorizeBridgeMessage(message,'schedule_due');
+    return receiveScheduleRelayControl(scheduleSource);
+  }
   if (await handleSyncControl(message)) return true;
   const action = bridgeAction(message);
   if (!action) return false;

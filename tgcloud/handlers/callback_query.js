@@ -13,6 +13,7 @@ import { handlePageNavigationCallback } from 'lib/page-navigation';
 import { handleEditorPageCallback } from 'lib/editor-pages';
 import { handleEditorButtonCallback } from 'lib/editor-buttons';
 import { handlePublishCallback } from 'lib/publish';
+import { handleScheduleCancelCallback } from 'lib/scheduled-publish';
 import { guardEditorCallback, isEditorSessionCallback } from 'lib/editor-guard';
 import { handleShowcaseCallback } from 'lib/showcase';
 import { handleLegalCallback } from 'lib/legal';
@@ -55,6 +56,7 @@ export default async function (query, ctx = {}) {
     if (await handleLegalCallback(query)) return;
     if (await handleBrandingCallback(query)) return;
     if (await handleManagedBotCallback(query)) return;
+    if (await handleScheduleCancelCallback(query)) return;
     if (await guardEditorCallback(query)) return;
 
     const data = String(query.data || '');

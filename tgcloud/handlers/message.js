@@ -30,6 +30,7 @@ import { handleEditorCoreMessage, isForwardedRichMessage } from 'lib/editor-core
 import { handleEditorPageMessage } from 'lib/editor-pages';
 import { handleEditorButtonMessage } from 'lib/editor-buttons';
 import { loadEditorSession } from 'lib/editor-session';
+import { handleScheduledTimeMessage, showScheduledPosts } from 'lib/scheduled-publish';
 import {
   allowMessageRequest,
   claimUpdate,
@@ -104,6 +105,9 @@ export default async function (message, ctx = {}) {
     if (await handleMiniAppShortcut(message)) return;
     if (await handleShowcaseMessage(message)) return;
 
+    if (message?.chat?.type==='private' && matchesCommand(command,'scheduled')){
+      await showScheduledPosts(message);return;
+    }
     if (matchesCommand(command, 'editor')) {
       await openEditor(message.chat.id, languageCode, message.from?.id);
       return;
@@ -120,6 +124,7 @@ export default async function (message, ctx = {}) {
         && await handleEditorCoreMessage(message, {autoOpen:true, confirmReplace:true})
       ) return;
 
+      if (await handleScheduledTimeMessage(message)) return;
       if (await handlePremiumEmojiMessage(message)) return;
       if (await handleEditorBlockMessage(message)) return;
       if (await handleEditorButtonMessage(message)) return;

@@ -143,6 +143,7 @@ export const editorSessions = table('editor_sessions', {
   postSelectedChatIds: json('post_selected_chat_ids').notNull().default([]),
   postSilent: integer('post_silent').notNull().default(0),
   postProtected: integer('post_protected').notNull().default(0),
+  postSchedulePending: integer('post_schedule_pending').notNull().default(0),
   lastActivityAt: integer('last_activity_at').notNull(),
 }, (t) => ({
   activityIdx: index('idx_editor_sessions_activity').on(t.lastActivityAt),
@@ -347,4 +348,30 @@ export const marketingCampaignAttribution = table('marketing_campaign_attributio
   updatedAt: integer('updated_at').notNull(),
 }, (t) => ({
   sourceIdx: index('idx_marketing_campaign_source').on(t.source),
+}));
+
+ 
+// Scheduled post contents and destination states remain on Telegram Serverless.
+export const scheduledPosts = table('scheduled_posts', {
+  jobId: text('job_id').primaryKey(),
+  ownerId: integer('owner_id').notNull(),
+  revision: integer('revision').notNull().default(1),
+  runAt: integer('run_at').notNull(),
+  status: text('status').notNull().default('registering'),
+  snapshot: json('snapshot').notNull(),
+  leaseUntil: integer('lease_until').notNull().default(0),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  ownerIdx: index('idx_scheduled_posts_owner').on(t.ownerId, t.createdAt),
+}));
+export const scheduledPostDestinations = table('scheduled_post_destinations', {
+  key: text('key').primaryKey(),
+  jobId: text('job_id').notNull(),
+  chatId: integer('chat_id').notNull(),
+  status: text('status').notNull().default('pending'),
+  sentMessageId: integer('sent_message_id'),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({
+  jobIdx: index('idx_scheduled_destinations_job').on(t.jobId),
 }));

@@ -113,7 +113,7 @@ async function inspectPublishAccess(chatId,userId){
     return {ok:false,reason:'lookup',error};
   }
 }
-async function canPublish(chatId,userId){return Boolean((await inspectPublishAccess(chatId,userId)).ok);}
+export async function canPublish(chatId,userId){return Boolean((await inspectPublishAccess(chatId,userId)).ok);}
 async function eligible(userId){
   const out=[];
   for(const chat of await listChats(userId)){
@@ -153,6 +153,7 @@ function settingsRich(n,silent,protectedValue,c,body=null){
     [cell(richButton(silent?cc.silentOn:cc.silentOff,{callback_data:'r:pt:silent',style:silent?'success':'primary'}),2)],
     [cell(richButton(protectedValue?cc.protectedOn:cc.protectedOff,{callback_data:'r:pt:protected',style:protectedValue?'success':'primary'}),2)],
     [cell(richButton(cc.send(n),{callback_data:'r:postconfirm',style:'success'}),2)],
+    [cell(richButton(resolveLanguage(c)==='ar'?'جدولة المنشور':'Schedule post',{callback_data:'r:postschedule',style:'primary'}),2)],
   ];
   return {blocks:[{type:'paragraph',text},{type:'table',cells:rows,is_bordered:true,is_compact:true}]};
 }
@@ -210,7 +211,7 @@ function friendly(languageCode){return tr(resolveLanguage(languageCode),'Publish
 
 export async function handlePublishCallback(query){
   const data=String(query?.data||'');
-  const relevant=data==='r:post'||data==='r:postlist'||data==='r:postsettings'||data==='r:postconfirm'||data==='r:postsend'||data.startsWith('r:postchat:')||data.startsWith('r:pt:');
+  const relevant=data==='r:post'||data==='r:postlist'||data==='r:postsettings'||data==='r:postconfirm'||data==='r:postsend'||data==='r:postschedule'||data.startsWith('r:postchat:')||data.startsWith('r:pt:');
   if(!relevant)return false;
   const userId=query?.from?.id,c=code(query),cc=copy(c);
   const existing=await loadEditorSession(userId,{touch:false});if(!existing)return false;
@@ -259,6 +260,22 @@ export async function handlePublishCallback(query){
       if(option==='silent')silent=!silent;else if(option==='protected')protectedValue=!protectedValue;else{await api.answerCallbackQuery({callback_query_id:query.id,text:cc.invalidChat,show_alert:true});return true;}
       await updateEditorSession(userId,{postSilent:silent?1:0,postProtected:protectedValue?1:0});
       await editRich(query,settingsRich(selected.length,silent,protectedValue,c),backKeyboard('r:postlist',c));await api.answerCallbackQuery({callback_query_id:query.id});return true;
+    });
+  }
+  if(data==='r:postschedule'){
+    return withPublishUiLock(query,async()=>{
+      const latest=await loadEditorSession(userId);
+      if(!latest||!Array.isArray(latest.blocks)||!latest.blocks.length){
+        await api.answerCallbackQuery({callback_query_id:query.id,text:cc.emptyContent,show_alert:true});return true;
+      }
+      const ids=[...new Set((latest.postSelectedChatIds||[]).map(Number))];
+      if(!ids.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.needChat,show_alert:true});return true;}
+      await updateEditorSession(userId,{postSchedulePending:1});
+      await api.answerCallbackQuery({callback_query_id:query.id,text:resolveLanguage(c)==='ar'?'أرسل تاريخ ووقت الجدولة في الخاص':'Send the date and time in private chat'});
+      await api.sendMessage({chat_id:userId,text:resolveLanguage(c)==='ar'
+        ?'أرسل موعد الجدولة بصيغة YYYY-MM-DD HH:mm حسب توقيت بغداد، مثال: 2026-10-12 18:00. المدة القصوى ٤ أيام. للإلغاء /cancel.'
+        :'Send scheduled date as YYYY-MM-DD HH:mm (Baghdad UTC+3), at most 4 days ahead. /cancel to cancel.'});
+      return true;
     });
   }
   if(data==='r:postconfirm'){
@@ -578,7 +595,7 @@ function shouldForgetDestination(code) {
   ]).has(String(code || ''));
 }
 
-async function sendRichMessageSafe(payload) {
+export async function sendRichMessageSafe(payload) {
   const original = payload?.rich_message || {};
   let verified = original;
 
