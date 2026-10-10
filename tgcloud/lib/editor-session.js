@@ -2,6 +2,7 @@ import { db } from 'sdk';
 import { and, eq, lt } from 'sdk/db';
 import { editorSessions, maintenanceLocks, richPages } from 'schema';
 import { validateEditorLimits } from 'lib/editor-blocks';
+import { isLegacySavedPage } from 'lib/saved-page-policy';
 import {
   EDITOR_SESSION_TTL_SECONDS,
   normalizeBlockScrollOffset,
@@ -105,8 +106,12 @@ async function syncSavedPageSession(userId, session) {
     return { status:'unchanged', changed:false, page };
   }
 
+  const entitlement = await getEditorEntitlement(userId);
+  if (isLegacySavedPage(page, userId, entitlement)) {
+    return { status:'legacy_read_only', changed:false, page };
+  }
   const quota = validateEditorLimits(session.blocks || [], userId, {
-    previousBlocks: page.blocks || [], entitlement:await getEditorEntitlement(userId),
+    entitlement,
   });
   if (!quota.ok) return { status:'quota_exceeded', changed:false, limit:quota };
   const stamp = Math.max(nowSeconds(), Number(page.updatedAt || 0) + 1);
