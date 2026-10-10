@@ -598,10 +598,12 @@ export function validateEditorLimits(blocks, userId = null, { previousBlocks = n
   const list = Array.isArray(blocks) ? blocks : [];
   // Developers bypass subscription quotas, never the Rich Message transport
   // limits. A 400 from Telegram must not escape as a callback failure.
-  if (!isDeveloper(userId)) {
-    // entitlement is a trusted server-only value; browser/client data is never
-    // accepted as a plan or active subscription.
-    const trustedEntitlement = entitlement || resolveEditorEntitlement();
+  const developer = isDeveloper(userId);
+  // Entitlement is server verified. Caller-controlled plan names are never
+  // trusted here.
+  const trustedEntitlement = entitlement || resolveEditorEntitlement();
+  if (!developer) {
+    // Subscription caps are separate from Telegram's hard transport limits.
     const blockLimit = safePlanLimit(trustedEntitlement, 'blocks');
     const actualBlocks = editorBlockCount(list);
     if (blockLimit != null && actualBlocks > blockLimit) {
@@ -631,8 +633,18 @@ export function validateEditorLimits(blocks, userId = null, { previousBlocks = n
         ];
         if (!sources.length) sources.push(tableRows(block));
         for (const rows of sources) {
+          // Telegram's 20-column and our 26-row caps always run first.
           const result = validateTableRows(rows);
           if (!result.ok) return result;
+          // An 8-column Free table must not accidentally inherit Telegram's
+          // 20-column maximum. Developers bypass plan quotas, not API limits.
+          if (!developer) {
+            const planLimit = safePlanLimit(trustedEntitlement, 'tableColumns');
+            const actual = tableDimensions(Array.isArray(rows) ? rows.filter(Array.isArray) : []).width;
+            if (actual > planLimit) {
+              return { ok: false, code: 'table_columns', limit: planLimit, actual };
+            }
+          }
         }
       }
       const nested = visit(quotaChildren(block));
