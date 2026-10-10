@@ -35,6 +35,7 @@ let lastPageOpenAt = 0;
 const PAGE_OPEN_COOLDOWN_MS = 700;
 const TABLE_MAX_ROWS = 26;
 const TABLE_MAX_COLUMNS = 20;
+let activeTableColumnLimit = 8; // UI precheck; Serverless verifies the real entitlement.
 const pageCache = new Map();
 let currentUserId=0;
 let mutationVersion=0;
@@ -635,13 +636,19 @@ function openBlockMenu(block){
     });
     rowAction.disabled=rows.length>=TABLE_MAX_ROWS||width>TABLE_MAX_COLUMNS;
     blockActions.appendChild(rowAction);
-    const columnAction=menuButton("add",mt("table.add_column"),`${width}/${TABLE_MAX_COLUMNS}`,()=>{
-      if(width>=TABLE_MAX_COLUMNS||rows.length>TABLE_MAX_ROWS)return;
+    const columnAction=menuButton("add",mt("table.add_column"),`${width}/${activeTableColumnLimit}`,()=>{
+      if(width>=activeTableColumnLimit){
+        if(activeTableColumnLimit<TABLE_MAX_COLUMNS){
+          window.RichSubscriptionOffers?.show?.("tableColumns",{actual:width+1,limit:activeTableColumnLimit});
+        }else toast("وصلت للحد الأقصى: 20 عموداً لكل جدول.");
+        return;
+      }
+      if(rows.length>TABLE_MAX_ROWS)return;
       if(!rows.length)rows.push([]);
       rows.forEach(r=>r.push(""));
       rebuildTableHtml(block);renderBlocks();markDirty();hideMenus()
     });
-    columnAction.disabled=width>=TABLE_MAX_COLUMNS||rows.length>TABLE_MAX_ROWS;
+    columnAction.disabled=rows.length>TABLE_MAX_ROWS;
     blockActions.appendChild(columnAction);
     blockActions.appendChild(menuButton("border",block.data.is_bordered===false?mt("table.show_borders"):mt("table.hide_borders"),"",()=>{block.data.is_bordered=block.data.is_bordered===false;rebuildTableHtml(block);renderBlocks();markDirty();hideMenus()}));
     blockActions.appendChild(menuButton("stripe",block.data.is_striped?mt("table.unstriped"):mt("table.striped"),"",()=>{block.data.is_striped=block.data.is_striped?null:true;rebuildTableHtml(block);renderBlocks();markDirty();hideMenus()}));
@@ -985,6 +992,7 @@ async function boot(){
   try{
     const meData=await api("/miniapp/api/me");
     currentUserId=Number(meData?.user?.id||0);
+    activeTableColumnLimit=Math.min(TABLE_MAX_COLUMNS,Math.max(1,Number(meData?.limits?.table_columns)||8));
     window.RichMiniAppAccess={
       userId:currentUserId,
       isDeveloper:Boolean(meData?.is_developer),
