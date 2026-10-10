@@ -15,6 +15,11 @@ export async function onRequestGet(context) {
       is_developer:developer,
       limits:{
         custom_emoji_packs:packAccess.limit,
+        // Paid editor entitlements are not yet bridged to Cloudflare.
+        // Until verified entitlement data is available here, the Mini App
+        // treats regular users as Free. Serverless is authoritative on save.
+        table_columns:developer ? 20 : 8,
+        table_rows:26,
       },
       custom_emoji_packs:packAccess.packNames,
       custom_emoji_pack_count:packAccess.packCount,
