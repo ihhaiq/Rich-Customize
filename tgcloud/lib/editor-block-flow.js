@@ -214,6 +214,13 @@ async function clearInputMessages(session, triggerMessage) {
 function limitText(result, code) {
   const locale = resolveLanguage(code);
   if (result.code === 'table_columns') return t(locale, 'limits.table_columns', { limit: result.limit });
+
+  if (result.code === 'nesting_depth') return locale === 'ar'
+    ? 'وصلت للحد الأقصى لمستويات التداخل في باقتك: ' + result.limit
+    : 'Maximum nesting levels for your plan: ' + result.limit;
+  if (result.code === 'media_attachments') return locale === 'ar'
+    ? 'وصلت للحد الأقصى لمرفقات الوسائط بالرسالة: ' + result.limit
+    : 'Maximum media attachments per message: ' + result.limit;
   if (result.code === 'table_rows') return t(locale, 'limits.table_rows', { limit: result.limit });
   const copy = prompts(code);
   return result.code === 'blocks'
