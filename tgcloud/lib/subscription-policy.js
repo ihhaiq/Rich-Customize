@@ -2,14 +2,14 @@
 // Foundation only: payment verification, entitlement persistence and runtime
 // integration must be completed before enabling paid tiers.
 export const PLAN_LIMITS = Object.freeze({
-  free: Object.freeze({ text: 20000, pages: 12, blocks: 30, emojiPacks: 2 }),
-  plus: Object.freeze({ text: 25000, pages: 50, blocks: 60, emojiPacks: 8 }),
-  golden: Object.freeze({ text: 32000, pages: 150, blocks: 120, emojiPacks: 50 }),
+  free: Object.freeze({ text: 20000, pages: 12, blocks: 30, emojiPacks: 2, tableColumns: 8 }),
+  plus: Object.freeze({ text: 25000, pages: 50, blocks: 60, emojiPacks: 8, tableColumns: 12 }),
+  golden: Object.freeze({ text: 32000, pages: 150, blocks: 120, emojiPacks: 50, tableColumns: 20 }),
 });
 
 // Owner-approved plan benefits. They remain inaccessible until a server-verified
 // active subscription exists; this constant does not authorize payments.
-export const APPROVED_LIMITS = Object.freeze(['text', 'emojiPacks', 'pages', 'blocks']);
+export const APPROVED_LIMITS = Object.freeze(['text', 'emojiPacks', 'pages', 'blocks', 'tableColumns']);
 export const PLAN_PRICES_STARS = Object.freeze({ free:0, plus:150, golden:350 });
 export const PLAN_PERIOD_DAYS = 30;
 export const PLAN_NAMES = Object.freeze(['free', 'plus', 'golden']);
