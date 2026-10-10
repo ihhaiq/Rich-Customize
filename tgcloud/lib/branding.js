@@ -151,7 +151,7 @@ export async function handleBrandingCallback(query) {
     return true;
   }
 
-  const invoiceLink = await createBrandingRemovalInvoiceLink();
+  const invoiceLink = 'https://t.me/richDonateBot?start=cart_branding';
   await api.sendMessage({
     chat_id: userId,
     text: [

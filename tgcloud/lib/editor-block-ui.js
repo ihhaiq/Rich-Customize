@@ -308,7 +308,7 @@ export function buildEditorToolsKeyboard(languageCode) {
         text: resolveLanguage(languageCode) === 'ar'
           ? 'إزالة الحقوق — 99 ⭐️'
           : tr(resolveLanguage(languageCode), 'Remove branding — 99 ⭐️'),
-        callback_data: 'r:branding',
+        url: 'https://t.me/richDonateBot?start=cart_branding',
       }],
       [
         { text: copy.pages, callback_data: 'r:pages' },
