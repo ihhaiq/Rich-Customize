@@ -34,6 +34,12 @@ export function explainOperationalError(error) {
   if (/RICH_MESSAGE_EMOJI_INVALID|CUSTOM_EMOJI_INVALID|EMOJI_ID_INVALID/i.test(value))
     return guide('RICH_EMOJI_INVALID','expected','أحد الإيموجيات الخاصة غير صالح. أعد اختياره أو استعمل إيموجي عادي.','A custom emoji is invalid. Re-select it or use a standard emoji.',
       'رفض تليكرام معرّف إيموجي مخصص أو لا يملك المستهدف صلاحية استخدامه.','تحقق من ID الإيموجي وصلاحيات الوجهة، واستعمل بديله العادي عند الإمكان.');
+  if (/LEGACY_PAGE_READ_ONLY/i.test(value))
+    return guide('LEGACY_PAGE_READ_ONLY','expected',
+      'هذه صفحة محفوظة قديمة، مسموح تنشرها كما هي لكن ما تگدر تعدلها. افتح مسودة جديدة حتى تنشئ محتوى جديد.',
+      'This saved legacy page can be republished unchanged, but cannot be edited. Start a new draft.',
+      'النسخة المحفوظة تتجاوز واحدة أو أكثر من حدود الباقة الجديدة.',
+      'لا تسمح بالتعديل أو التسمية أو المزامنة؛ استعمل النسخة المخزونة لإعادة النشر.');
   if (/EDITOR_LIMIT:|editor limit exceeded|quota exceeded/i.test(value))
     return guide('EDITOR_LIMIT_REACHED','expected',
       'المحتوى يتجاوز حدود المحرر أو باقتك. قلل المحتوى أو راجع حدود الاشتراك.',
