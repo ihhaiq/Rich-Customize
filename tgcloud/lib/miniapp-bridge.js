@@ -17,6 +17,7 @@ import {
 import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { safePlanLimit } from 'lib/subscription-policy';
+import { isLegacySavedPage } from 'lib/saved-page-policy';
 import { allowBridgeRequest } from 'lib/request-guard';
 import { validateStoredButtons } from 'lib/button-validation';
 import {
@@ -777,7 +778,18 @@ async function handleSave(message, id, envelope) {
     throw new BridgeError('PAGE_CONFLICT', 'Page was changed after the Mini App loaded it. Reload the latest version.');
   }
 
-  await validatePageInput(documentPayload, { previousBlocks: existing.blocks || [] });
+  if (isLegacySavedPage(existing, input.ownerId, await getEditorEntitlement(input.ownerId))) {
+    if (!samePageContent(existing, input)) {
+      throw new BridgeError('LEGACY_PAGE_READ_ONLY',
+        'This saved legacy page may be published unchanged, but it cannot be edited.', { alert: true });
+    }
+    return {
+      status:'saved', user_id:input.ownerId, page_id:input.pageId,
+      updated_at:Number(existing.updatedAt), revision:Number(existing.revision || 1),
+      sync_seq:Number(existing.syncSeq || 0),
+    };
+  }
+  await validatePageInput(documentPayload);
   const stamp = Math.max(now(), Number(existing.updatedAt || 0) + 1);
   const version = await nextPageSyncVersion(existing.revision || 1);
   const updated = await db.update(richPages).set({
