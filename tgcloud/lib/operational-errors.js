@@ -28,6 +28,9 @@ export function explainOperationalError(error) {
   if (/message to edit not found|message can't be edited|message_id_invalid|message to delete not found|message can.t be deleted/i.test(value))
     return guide('MESSAGE_TARGET_UNAVAILABLE','expected','الرسالة القديمة ما عادت قابلة للتعديل. افتح المحرر من جديد.','The old message cannot be edited. Reopen the editor.',
       'الرسالة المستهدفة محذوفة أو انتهت إمكانية تعديلها.','أنشئ رسالة واجهة جديدة وحدّث معرّف الرسالة داخل الجلسة.');
+  if (/STICKERSET_INVALID|STICKERSET_NOT_FOUND|STICKER_SET_INVALID|sticker set not found/i.test(value))
+    return guide('EMOJI_PACK_UNAVAILABLE','expected','رابط حزمة الإيموجي غير صالح أو انحذفت الحزمة.','The emoji pack link is invalid or the pack was removed.',
+      'حزمة الملصقات غير موجودة أو لم يعد الوصول إليها متاحاً.','اطلب رابطاً صالحاً وتأكد من اسم مجموعة الملصقات.');
   if (/RICH_MESSAGE_EMOJI_INVALID|CUSTOM_EMOJI_INVALID|EMOJI_ID_INVALID/i.test(value))
     return guide('RICH_EMOJI_INVALID','expected','أحد الإيموجيات الخاصة غير صالح. أعد اختياره أو استعمل إيموجي عادي.','A custom emoji is invalid. Re-select it or use a standard emoji.',
       'رفض تليكرام معرّف إيموجي مخصص أو لا يملك المستهدف صلاحية استخدامه.','تحقق من ID الإيموجي وصلاحيات الوجهة، واستعمل بديله العادي عند الإمكان.');
