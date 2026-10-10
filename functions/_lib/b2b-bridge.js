@@ -538,6 +538,8 @@ export async function sendScheduleBridgeAck(env, label, jobId, revision) {
   if (!['SCHEDULE_REGISTERED', 'SCHEDULE_CANCELED', 'SCHEDULE_REJECTED'].includes(label)) {
     throw new HttpError(400, 'Invalid schedule acknowledgement');
   }
+  const db = requireBridgeDb(env);
+  await reserveBridgeSlot(db, env);
   return telegramJson(env, 'sendMessage', {
     chat_id: bridgeChatId(env),
     text: '/rcb_schedule_ack@' + targetUsername(env) + '\n' + JSON.stringify({

@@ -122,7 +122,14 @@ export async function handleScheduledTimeMessage(message){
     return true;
   }
   const targets=(session.postSelectedChatIds||[]).map(Number);
-  const outcome=await createScheduledPublish(id,session,targets,runAt);
+  let outcome;
+  try {
+    outcome=await createScheduledPublish(id,session,targets,runAt);
+  } catch (error) {
+    await logError('schedule.create',error,{userId:id});
+    await api.sendMessage({chat_id:id,text:'تعذر حفظ طلب الجدولة مؤقتاً. حاول مجدداً. لم يتم تأكيد جدولة المنشور.'});
+    return true;
+  }
   if(!outcome.ok){
     const text=outcome.code==='SCHEDULE_PLAN_LIMIT'
       ?'وصلت حد الجدولة لباقتك: '+outcome.limit+' محادثات لكل منشور مجدول. قلل الوجهات أو راجع الباقات.'

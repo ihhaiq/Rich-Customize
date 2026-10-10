@@ -1,6 +1,6 @@
 # AGENTS.md — Rich Customize
 
-Work on `serverless-cleanup`. Active runtime is Telegram Serverless JavaScript; Cloudflare is Mini App-only.
+Work on `serverless-cleanup`. Active editor runtime is Telegram Serverless JavaScript; Cloudflare hosts the Mini App bridge plus a separate ID-only Cron reminder Worker for scheduled posts, NOT the main bot.
 Read [docs/README.md](docs/README.md), [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rollout.md). Archived material is historical, never implementation authority.
 
 ## Layout and runtime
@@ -8,7 +8,8 @@ Read [docs/README.md](docs/README.md), [sups.md](sups.md) and [docs/subscription
 - `tgcloud/handlers/*.js`: flat Telegram update handlers.
 - `tgcloud/lib/**/*.js`: editor, renderer, page delivery, publishing, quotas, localization and compatibility.
 - `app/miniapp_static/**`: active browser UI.
-- `functions/**`, `cloudflare/d1/**`: Mini App authentication, bridge, upload and support state.
+- `functions/**`, `cloudflare/d1/**`: Mini App authentication, bridge, upload, support and scheduled-reminder metadata (never post contents).
+- `workers/schedule-reminders/**`: separate Cron-only Worker using existing D1 and B2B relay credentials.
 - `tests/serverless/*.test.mjs`: active JS suite, `npm test` from root; Node 24.
 - `docs/archive/**`: old plans and Python tests as text, not active runtime/tests.
 - Billing is maintained in `ihhaiq/richDonate` on `main`; no active `subscription-bot/` project in this repository.
