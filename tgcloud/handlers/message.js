@@ -216,6 +216,10 @@ export default async function (message, ctx = {}) {
         console.warn('Could not send safe error notice to user', feedbackError);
       }
     }
+    // A deterministic user-actionable failure should not replay an editor
+    // mutation or send the same warning repeatedly. Payment notifications are
+    // different: they must remain retryable until fulfillment is persisted.
+    if (guide.expected && !message?.successful_payment) return;
     await releaseUpdate(updateId);
     throw error;
   } finally {
