@@ -1,5 +1,5 @@
 import { api } from 'sdk';
-import { savedPageQueryResult, normalizePageCode } from 'lib/page-delivery';
+import { savedPageQueryResult, resolveSavedPageReference, ambiguousPageQueryResult } from 'lib/page-delivery';
 import { claimUpdate, releaseUpdate } from 'lib/request-guard';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
@@ -10,23 +10,24 @@ export default async function (query, ctx = {}) {
 
   try {
     const raw = String(query?.query || '').trim();
-    const first = raw ? raw.split(/\s+/, 1)[0] : '';
-    const pageId = first ? normalizePageCode(first) : null;
-    if (!pageId) {
+    const language = await resolveUserLanguage(query?.from);
+    const resolved = await resolveSavedPageReference(raw, query?.from?.id);
+    if (resolved.status !== 'found') {
       await api.answerInlineQuery({
         inline_query_id: query.id,
-        results: [],
+        results: resolved.status === 'ambiguous' ? [ambiguousPageQueryResult(language)] : [],
         cache_time: 0,
         is_personal: true,
       });
       return;
     }
+    const pageId = resolved.pageId;
 
     let result = null;
     try {
       result = await savedPageQueryResult(
         pageId,
-        await resolveUserLanguage(query?.from),
+        language,
       );
     } catch (error) {
       console.error('Failed to render inline saved page', error);

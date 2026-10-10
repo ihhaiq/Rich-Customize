@@ -1,5 +1,5 @@
 import { api } from 'sdk';
-import { guestPageCodes, savedPageQueryResult } from 'lib/page-delivery';
+import { guestPageCodes, guestPageReference, resolveSavedPageReference, ambiguousPageQueryResult, savedPageQueryResult } from 'lib/page-delivery';
 import { rememberGuestMessage } from 'lib/guest-messages';
 import {
   allowMessageRequest,
@@ -18,17 +18,14 @@ export default async function (message, ctx = {}) {
     if (!await allowMessageRequest(message)) return;
     if (!message?.guest_query_id) return;
 
-    const pageIds = guestPageCodes(message);
-    if (!pageIds.length) return;
-
-    let result = null;
-    for (const pageId of pageIds) {
-      result = await savedPageQueryResult(
-        pageId,
-        await resolveUserLanguage(message?.from),
-      );
-      if (result) break;
-    }
+    const language = await resolveUserLanguage(message?.from);
+    const resolved = await resolveSavedPageReference(
+      guestPageReference(message), message?.from?.id, guestPageCodes(message),
+    );
+    if (resolved.status === 'missing') return;
+    const result = resolved.status === 'ambiguous'
+      ? ambiguousPageQueryResult(language)
+      : await savedPageQueryResult(resolved.pageId, language);
     if (!result) return;
 
     const sent = await api.answerGuestQuery({

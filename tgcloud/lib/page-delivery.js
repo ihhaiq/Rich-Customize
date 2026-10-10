@@ -70,3 +70,45 @@ export function guestPageCodes(message) {
 export function guestPageCode(message) {
   return guestPageCodes(message)[0] || null;
 }
+
+export function normalizePageTitle(value) {
+  return String(value || '').normalize('NFC').trim().replace(/\s+/g, ' ');
+}
+
+export function guestPageReference(message) {
+  const raw = String(message?.text || message?.caption || '');
+  // Remove only the summoned bot's mention, leaving mentions in page names intact.
+  return normalizePageTitle(raw.replace(/@RichCustomizebot\b/gi, ''));
+}
+
+export async function resolveSavedPageReference(reference, userId, codeCandidates = null) {
+  const title = normalizePageTitle(reference);
+  if (!title) return { status: 'missing' };
+  const id = Number(userId);
+  if (Number.isSafeInteger(id) && id > 0) {
+    const pages = await db.select().from(richPages).where(eq(richPages.ownerId, id)).all();
+    const matches = pages.filter(page => normalizePageTitle(page.title) === title);
+    if (matches.length > 1) return { status: 'ambiguous' };
+    if (matches.length === 1) return { status: 'found', pageId: String(matches[0].pageId) };
+  }
+  const candidates = codeCandidates || [normalizePageCode(title.split(/\s+/, 1)[0])];
+  for (const candidate of candidates) {
+    const code = normalizePageCode(candidate);
+    if (code && await getPage(code)) return { status: 'found', pageId: code };
+  }
+  return { status: 'missing' };
+}
+
+export function ambiguousPageQueryResult(languageCode) {
+  const ar = resolveLanguage(languageCode).startsWith('ar');
+  const text = ar
+    ? 'عندك أكثر من صفحة بنفس الاسم. استعمل كود الصفحة حتى تحدد المطلوبة.'
+    : 'More than one of your pages has this name. Use the page code to choose the right one.';
+  return {
+    type: 'article',
+    id: 'ambiguous-page-name',
+    title: ar ? 'اسم الصفحة مكرر' : 'Duplicate page name',
+    description: text,
+    input_message_content: { message_text: text },
+  };
+}
