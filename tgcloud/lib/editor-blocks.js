@@ -395,17 +395,47 @@ export function tableRows(block) {
   return [];
 }
 
-function rowWidth(row) {
+// Account for both horizontal and vertical cell spans. Simple row-length
+// checks miss columns occupied by a rowspan from an earlier row.
+function tableDimensions(rows) {
+  const occupiedUntil = [];
   let width = 0;
-  for (const raw of Array.isArray(row) ? row : []) {
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      const parsed = Number.parseInt(String(raw.colspan || 1), 10);
-      width += Math.max(1, Number.isFinite(parsed) ? parsed : 1);
-    } else {
-      width += 1;
+  let height = rows.length;
+  const span = (raw, key) => {
+    const parsed = Number.parseInt(String(raw?.[key] ?? 1), 10);
+    return Math.max(1, Number.isFinite(parsed) ? parsed : 1);
+  };
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    let column = 0;
+    for (let i = 0; i < occupiedUntil.length; i += 1) {
+      if (occupiedUntil[i] > rowIndex) width = Math.max(width, i + 1);
+    }
+    for (const raw of rows[rowIndex]) {
+      const colspan = span(raw, 'colspan');
+      const rowspan = span(raw, 'rowspan');
+      // Find the first uninterrupted free range of the requested width.
+      for (;;) {
+        let collision = -1;
+        for (let i = column; i < column + colspan && i <= MAX_TABLE_COLUMNS; i += 1) {
+          if ((occupiedUntil[i] || 0) > rowIndex) {
+            collision = i;
+            break;
+          }
+        }
+        if (collision < 0) break;
+        column = collision + 1;
+      }
+      const right = column + colspan;
+      width = Math.max(width, right);
+      height = Math.max(height, rowIndex + rowspan);
+      if (right > MAX_TABLE_COLUMNS) return { width, height };
+      for (let i = column; i < right; i += 1) {
+        occupiedUntil[i] = Math.max(occupiedUntil[i] || 0, rowIndex + rowspan);
+      }
+      column = right;
     }
   }
-  return width;
+  return { width, height };
 }
 
 function cellText(raw) {
@@ -544,21 +574,21 @@ export function setRichMessageDirection(blocks, isRtl) {
 // Hard table limits apply to every account, including developers.
 export function validateTableRows(rows, _userId = null) {
   const list = Array.isArray(rows) ? rows.filter((row) => Array.isArray(row)) : [];
-  if (list.length > MAX_TABLE_ROWS) {
+  const { width, height } = tableDimensions(list);
+  if (height > MAX_TABLE_ROWS) {
     return {
       ok: false,
       code: 'table_rows',
       limit: MAX_TABLE_ROWS,
-      actual: list.length,
+      actual: height,
     };
   }
-  const widest = Math.max(0, ...list.map(rowWidth));
-  if (widest > MAX_TABLE_COLUMNS) {
+  if (width > MAX_TABLE_COLUMNS) {
     return {
       ok: false,
       code: 'table_columns',
       limit: MAX_TABLE_COLUMNS,
-      actual: widest,
+      actual: width,
     };
   }
   return { ok: true };
