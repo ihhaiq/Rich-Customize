@@ -15,7 +15,7 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
     records[name] = [];
     tables[name] = new Proxy({ _name: name }, { get: (target, prop) => prop === '_name' ? target._name : { table: name, key: prop } });
   }
-  const keys = { editorSessions: 'userId', maintenanceLocks: 'name', richPages: 'pageId', usageUsers: 'userId', editorSubscriptions: 'userId' };
+  const keys = { editorSessions: 'userId', maintenanceLocks: 'name', richPages: 'pageId', usageUsers: 'userId', editorSubscriptions: 'userId', managedBotOrders: 'orderId', managedBotPayments: 'chargeId', managedBotLicenses: 'licenseId' };
   const clone = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
   const db = {
     select() {
@@ -65,7 +65,7 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
   const apiState = { pack: null };
   const eq = (column, value) => row => row[column.key] === value;
   const lt = (column, value) => row => row[column.key] < value;
-  const mocks = { sdk: { api, db, InputFile: class InputFile {} }, 'sdk/db': { eq, lt, asc: column => column, desc: column => column, gte: (column, value) => row => row[column.key] >= value, sql: () => null, and: (...parts) => row => parts.every(p => p(row)) }, schema: tables };
+  const mocks = { sdk: { api, db, InputFile: class InputFile {} }, 'sdk/db': { eq, lt, asc: column => column, desc: column => column, gt: (column, value) => row => row[column.key] > value, gte: (column, value) => row => row[column.key] >= value, sql: () => null, and: (...parts) => row => parts.every(p => p(row)) }, schema: tables };
   const modules = new Map();
   const load = (name) => {
     if (modules.has(name)) return modules.get(name);
