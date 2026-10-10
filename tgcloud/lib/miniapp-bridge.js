@@ -456,6 +456,7 @@ function pageForWire(row) {
     created_at: Number(row.createdAt || 0),
     updated_at: Number(row.updatedAt || 0),
     revision: Math.max(1, Number(row.revision || 1)),
+    quota_version: Math.max(1, Number(row.quotaVersion || 1)),
     sync_seq: Math.max(0, Number(row.syncSeq || 0)),
   };
 }
@@ -727,6 +728,7 @@ async function handleCreate(message, id, envelope) {
       buttonsAlign: input.buttonsAlign,
       createdAt: stamp,
       updatedAt: stamp,
+      quotaVersion:2,
       revision: version.revision,
       syncSeq: version.syncSeq,
     }).run();
