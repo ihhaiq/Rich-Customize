@@ -211,6 +211,11 @@ function detailRows(scope, error, context) {
     ['الإجراء المقترح', sanitize(explanation.action).slice(0, 650)],
     ['الخطأ التقني', errorSummary(error)],
   ];
+  const stack = error?.stack || error?.cause?.stack;
+  if (stack) {
+    const location = sanitize(String(stack)).split('\\n').slice(0, 4).join(' | ').slice(0, 500);
+    if (location) rows.push(['الموضع البرمجي', location]);
+  }
   const updateId = safeId(context?.updateId);
   const chatId = safeId(context?.chatId);
   if (updateId != null) rows.push(['Update ID', updateId]);
