@@ -9,6 +9,7 @@ import {
 import { resolveLanguage, tr } from 'lib/i18n';
 import { shouldIncludeBranding } from 'lib/branding';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
+import { legacyPagePublishOptions } from 'lib/saved-page-policy';
 
 const PAGE_CODE_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -33,8 +34,8 @@ export async function savedPageQueryResult(pageId, languageCode = 'en') {
       userId: page.ownerId,
       sourcePageId: String(page.pageId),
       includeBranding,
-      previousBlocks: page.blocks || [],
       entitlement:await getEditorEntitlement(page.ownerId),
+      ...legacyPagePublishOptions(page, page.ownerId, await getEditorEntitlement(page.ownerId)),
     },
   );
   const replyMarkup = preparedButtons.length
