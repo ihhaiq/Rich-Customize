@@ -123,3 +123,26 @@ test('unverified plan claims remain Free', async () => {
   assert.equal(h.blocks.validateEditorLimits([table(h,12)],999999,{entitlement:verified}).ok,true);
   assert.equal(h.blocks.validateEditorLimits([table(h,13)],999999,{entitlement:verified}).limit,12);
 });
+
+test('legacy policy version freezes all pre-rollout pages, not just oversized content', async () => {
+  const h=await harness({extraModules:{legacy:'lib/saved-page-policy'}});
+  const page={
+    pageId:'old-small', ownerId:999999,title:'Old', quotaVersion:1,
+    blocks:[text(h)],buttons:[],buttonsPerRow:1,buttonsAlign:'center',
+  };
+  assert.equal(h.legacy.CURRENT_PAGE_QUOTA_VERSION,2);
+  assert.equal(h.legacy.isLegacySavedPage(page,999999),true);
+  assert.equal(h.legacy.legacyPagePublishOptions(page,999999).technicalOnly,true);
+  assert.equal(h.legacy.isLegacySavedPage({...page,quotaVersion:2},999999),false);
+  assert.equal(h.legacy.isLegacySavedPage({...page,quotaVersion:2,blocks:[table(h,9)]},999999),true);
+});
+
+test('new policy version has a persistent schema default for older pages', async () => {
+  const fs=await import('node:fs');
+  const schema=fs.readFileSync(new URL('../../tgcloud/schema.js',import.meta.url),'utf8');
+  const pages=fs.readFileSync(new URL('../../tgcloud/lib/editor-pages.js',import.meta.url),'utf8');
+  const bridge=fs.readFileSync(new URL('../../tgcloud/lib/miniapp-bridge.js',import.meta.url),'utf8');
+  assert.match(schema,/quotaVersion:\s*integer\('quota_version'\)\.notNull\(\)\.default\(1\)/);
+  assert.match(pages,/quotaVersion:\s*2,/);
+  assert.match(bridge,/quotaVersion:\s*2,/);
+});
