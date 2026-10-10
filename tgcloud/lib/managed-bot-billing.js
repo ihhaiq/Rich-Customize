@@ -1,5 +1,6 @@
 import { api, db } from 'sdk';
 import { and, eq, gt } from 'sdk/db';
+import { logError } from 'lib/error-log';
 import {
   managedBotLicenses,
   managedBotOrders,
@@ -135,14 +136,38 @@ export async function handleManagedBotPreCheckout(query) {
   return true;
 }
 
+async function reportUnverifiedManagedPayment(message, reason) {
+  await logError('payment.fulfillment', new Error(reason), {
+    userId: message?.from?.id,
+    chatId: message?.chat?.id,
+    extra: 'product=managed_bot; payment_received=1',
+  });
+  if (message?.chat?.id) {
+    try {
+      await api.sendMessage({
+        chat_id: message.chat.id,
+        text: 'وصل إشعار دفع لكن تعذر التحقق من الطلب وإصدار الترخيص تلقائياً. إذا انخصمت النجوم لا تدفع مرة ثانية؛ تواصل مع الدعم واحتفظ بإيصال تليكرام.',
+      });
+    } catch (error) {
+      console.warn('Could not notify owner of unverified managed-bot payment', error);
+    }
+  }
+}
+
 export async function handleManagedBotSuccessfulPayment(message) {
   const payment = message?.successful_payment;
   const parsed = parseManagedBotPayload(payment?.invoice_payload);
   if (!parsed) return false;
-  if (!validPaymentShape(payment, parsed.plan, payment.invoice_payload)) return true;
+  if (!validPaymentShape(payment, parsed.plan, payment.invoice_payload)) {
+    await reportUnverifiedManagedPayment(message, 'MANAGED_PAYMENT_FIELDS_INVALID');
+    return true;
+  }
 
   const userId = Number(message?.from?.id);
-  if (!Number.isSafeInteger(userId)) return true;
+  if (!Number.isSafeInteger(userId)) {
+    await reportUnverifiedManagedPayment(message, 'MANAGED_PAYMENT_USER_INVALID');
+    return true;
+  }
   const chargeId = String(payment.telegram_payment_charge_id);
   const existingPayment = await db.select().from(managedBotPayments)
     .where(eq(managedBotPayments.chargeId, chargeId)).get();
@@ -158,7 +183,10 @@ export async function handleManagedBotSuccessfulPayment(message) {
   if (!order || !['pending', 'paid'].includes(String(order.status))
       || order.invoicePayload !== payment.invoice_payload
       || Number(order.amount) !== parsed.plan.amount
-      || String(order.currency) !== MANAGED_BOT_CURRENCY) return true;
+      || String(order.currency) !== MANAGED_BOT_CURRENCY) {
+    await reportUnverifiedManagedPayment(message, 'MANAGED_PAYMENT_ORDER_NOT_VERIFIABLE');
+    return true;
+  }
 
   const paidAt = Number(existingPayment?.paidAt) || stamp();
   const licenseId = 'mbl_' + order.orderId;
@@ -222,6 +250,7 @@ export async function handleManagedBotSuccessfulPayment(message) {
     } catch (notificationError) {
       // The license has been persisted: an inaccessible chat cannot undo a payment.
       console.warn('Managed bot license issued but receipt could not be delivered', notificationError);
+      await logError('payment.receipt', notificationError, { userId, chatId: message.chat.id, extra: 'product=managed_bot; license_issued=1' });
     }
   }
   return true;
