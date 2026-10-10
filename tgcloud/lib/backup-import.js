@@ -78,6 +78,10 @@ function normalizePage(pageId, page, fallbackTime) {
     buttonsAlign,
     createdAt,
     updatedAt,
+    // External archives do not prove a page was created under current rules.
+    // Preserve existing database versions on conflict; newly imported pages
+    // default to the publish-only legacy version.
+    quotaVersion:1,
   };
 }
 
@@ -365,6 +369,7 @@ export async function pagesObjectFromDatabase() {
       buttons_align: String(row.buttonsAlign || 'center'),
       created_at: Number(row.createdAt),
       updated_at: Number(row.updatedAt),
+      quota_version: Number(row.quotaVersion || 1),
     };
   }
   return pages;
