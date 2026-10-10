@@ -630,11 +630,15 @@ function openBlockMenu(block){
     const rows=block.data.rows||(block.data.rows=[]);
     const width=Math.max(0,...rows.map(row=>row.reduce((sum,raw)=>sum+Math.max(1,Number(raw?.colspan)||1),0)));
     const rowAction=menuButton("add",mt("table.add_row"),`${rows.length}/${TABLE_MAX_ROWS}`,()=>{
-      if(rows.length>=TABLE_MAX_ROWS||width>TABLE_MAX_COLUMNS)return;
+      if(rows.length>=TABLE_MAX_ROWS){toast("وصلت للحد الأقصى: 26 صفاً لكل جدول.");return}
+      if(width>activeTableColumnLimit){
+        window.RichSubscriptionOffers?.show?.("tableColumns",{actual:width,limit:activeTableColumnLimit});
+        return;
+      }
       const cols=Math.max(1,...rows.map(r=>r.length));rows.push(Array(cols).fill(""));
       rebuildTableHtml(block);renderBlocks();markDirty();hideMenus()
     });
-    rowAction.disabled=rows.length>=TABLE_MAX_ROWS||width>TABLE_MAX_COLUMNS;
+    // Keep the action tappable so hitting the cap explains why it cannot add.
     blockActions.appendChild(rowAction);
     const columnAction=menuButton("add",mt("table.add_column"),`${width}/${activeTableColumnLimit}`,()=>{
       if(width>=activeTableColumnLimit){
