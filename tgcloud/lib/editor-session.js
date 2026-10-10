@@ -76,13 +76,7 @@ function hasRealSavedDraftMutation(current, payload) {
 }
 
 function savedPageMatchesSession(page, session) {
-  if (!page || !session) return false;
-  return (
-    stable(page.blocks || []) === stable(session.blocks || [])
-    && stable(page.buttons || []) === stable(session.messageButtons || [])
-    && normalizedButtonsPerRow(page.buttonsPerRow) === normalizedButtonsPerRow(session.buttonsPerRow)
-    && normalizedButtonsAlign(page.buttonsAlign) === normalizedButtonsAlign(session.buttonsAlign)
-  );
+  return isSavedPageUnchanged(page, session);
 }
 
 async function syncSavedPageSession(userId, session) {
