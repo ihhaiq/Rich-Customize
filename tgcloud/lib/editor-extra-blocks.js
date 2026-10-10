@@ -1430,11 +1430,24 @@ function richButtonCell(text, callbackData, style = null, extra = {}) {
   };
 }
 
-function tablePreviewPayload(block, userId) {
-  const rich = buildSingleBlockRichMessage(block, { userId });
-  const payload = Array.isArray(rich?.blocks) ? rich.blocks[0] : null;
-  if (!payload) throw new Error('table preview payload is missing');
-  return clone(payload);
+function tablePreviewPayload(block, userId, languageCode) {
+  try {
+    const rich = buildSingleBlockRichMessage(block, { userId });
+    const payload = Array.isArray(rich?.blocks) ? rich.blocks[0] : null;
+    if (!payload) throw new Error('table preview payload is missing');
+    return clone(payload);
+  } catch (error) {
+    const problem = /^EDITOR_LIMIT:(table_rows|table_columns):\d+:(\d+)$/.exec(
+      String(error?.message || error),
+    );
+    if (!problem) throw error;
+    // Keep settings reachable for legacy oversized tables; never send their
+    // rejected table payload merely to display the settings panel.
+    return {
+      type: 'paragraph',
+      text: t(localeOf(languageCode), 'limits.' + problem[1], { limit: Number(problem[2]) }),
+    };
+  }
 }
 
 function tableRichMessage(block, blocks) {
@@ -1487,7 +1500,7 @@ function tableOptionsRichMessage(block, languageCode, userId) {
     ],
   ];
   return tableRichMessage(block, [
-    tablePreviewPayload(block, userId),
+    tablePreviewPayload(block, userId, languageCode),
     compactSettingsTable(rows),
   ]);
 }
@@ -1524,7 +1537,7 @@ function tableCellPickerRichMessage(block, action, languageCode, userId) {
   ]);
 
   return tableRichMessage(block, [
-    tablePreviewPayload(block, userId),
+    tablePreviewPayload(block, userId, languageCode),
     compactSettingsTable(pickerRows),
   ]);
 }
@@ -1554,7 +1567,7 @@ function tableDisplayRichMessage(block, languageCode, userId) {
   );
 
   return tableRichMessage(block, [
-    tablePreviewPayload(block, userId),
+    tablePreviewPayload(block, userId, languageCode),
     compactSettingsTable([
       [
         toggle('is_bordered', t(locale, 'table.borders')),
