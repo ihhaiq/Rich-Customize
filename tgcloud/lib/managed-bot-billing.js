@@ -143,63 +143,87 @@ export async function handleManagedBotSuccessfulPayment(message) {
 
   const userId = Number(message?.from?.id);
   if (!Number.isSafeInteger(userId)) return true;
+  const chargeId = String(payment.telegram_payment_charge_id);
   const existingPayment = await db.select().from(managedBotPayments)
-    .where(eq(managedBotPayments.chargeId, String(payment.telegram_payment_charge_id))).get();
-  if (existingPayment) return true;
+    .where(eq(managedBotPayments.chargeId, chargeId)).get();
+  // A retry can find a persisted payment even though license creation failed
+  // afterwards. Never stop solely because the payment charge was recorded.
+  if (existingPayment && (
+    String(existingPayment.orderId) !== String(parsed.orderId)
+    || Number(existingPayment.userId) !== userId
+  )) throw new Error('managed_bot_payment_charge_collision');
 
   const order = await db.select().from(managedBotOrders)
     .where(and(eq(managedBotOrders.orderId, parsed.orderId), eq(managedBotOrders.userId, userId))).get();
-  if (!order || order.status !== 'pending' || order.invoicePayload !== payment.invoice_payload) return true;
+  if (!order || !['pending', 'paid'].includes(String(order.status))
+      || order.invoicePayload !== payment.invoice_payload
+      || Number(order.amount) !== parsed.plan.amount
+      || String(order.currency) !== MANAGED_BOT_CURRENCY) return true;
 
-  const paidAt = stamp();
-  // Derive the license identity from the order so concurrent delivery of the
-  // same invoice cannot create two licenses for one purchase.
+  const paidAt = Number(existingPayment?.paidAt) || stamp();
   const licenseId = 'mbl_' + order.orderId;
   const expiresAt = parsed.plan.durationMs == null
     ? MANAGED_BOT_PERMANENT_EXPIRES_AT
     : paidAt + parsed.plan.durationMs;
 
-  const paymentRows = await db.insert(managedBotPayments).values({
-    chargeId: String(payment.telegram_payment_charge_id),
-    orderId: order.orderId,
-    userId,
-    amount: parsed.plan.amount,
-    currency: MANAGED_BOT_CURRENCY,
-    paidAt,
-  }).onConflictDoNothing({ target: managedBotPayments.chargeId }).returning({
-    chargeId: managedBotPayments.chargeId,
-  }).run();
-  if (!Array.isArray(paymentRows) || !paymentRows.length) return true;
+  let newPayment = false;
+  if (!existingPayment) {
+    const inserted = await db.insert(managedBotPayments).values({
+      chargeId, orderId: order.orderId, userId,
+      amount: parsed.plan.amount, currency: MANAGED_BOT_CURRENCY, paidAt,
+    }).onConflictDoNothing({ target: managedBotPayments.chargeId }).returning({
+      chargeId: managedBotPayments.chargeId,
+    }).run();
+    newPayment = Array.isArray(inserted) && inserted.length > 0;
+    if (!newPayment) {
+      // Concurrent notifications: verify ownership before continuing.
+      const persisted = await db.select().from(managedBotPayments)
+        .where(eq(managedBotPayments.chargeId, chargeId)).get();
+      if (!persisted || String(persisted.orderId) !== String(order.orderId)
+          || Number(persisted.userId) !== userId) throw new Error('managed_bot_payment_charge_conflict');
+    }
+  }
 
-  await db.insert(managedBotLicenses).values({
+  const createdLicense = await db.insert(managedBotLicenses).values({
     licenseId,
     ownerId: userId,
     planId: parsed.plan.id,
     status: 'active',
     expiresAt,
     version: 1,
-    sourcePaymentId: String(payment.telegram_payment_charge_id),
+    sourcePaymentId: chargeId,
     createdAt: paidAt,
     updatedAt: paidAt,
-  }).onConflictDoNothing({ target: managedBotLicenses.licenseId }).run();
+  }).onConflictDoNothing({ target: managedBotLicenses.licenseId })
+    .returning({ licenseId: managedBotLicenses.licenseId }).run();
+
   await db.update(managedBotOrders).set({
     status: 'paid',
     licenseId,
     paidAt,
   }).where(eq(managedBotOrders.orderId, order.orderId)).run();
 
-  await api.sendMessage({
-    chat_id: message.chat.id,
-    text: [
-      '✅ تم الدفع وإصدار الترخيص.',
-      '',
-      'رقم الترخيص: ' + licenseId,
-      parsed.plan.durationMs == null ? 'المدة: دائم' : 'المدة: شهر واحد',
-      '',
-      'افتح «بوتاتي» واربط البوت الذي أنشأته عبر BotFather.',
-    ].join('\n'),
-    reply_markup: { inline_keyboard: [[{ text: 'فتح بوتاتي', url: 'https://t.me/RichCustomizebot/editor?startapp=managed_bots' }]] },
-  });
+  // Avoid duplicate payment receipts on retries, but inform the owner if
+  // an earlier failed attempt has just been recovered into a real license.
+  if (newPayment || (Array.isArray(createdLicense) && createdLicense.length > 0)) {
+    try {
+      await api.sendMessage({
+        chat_id: message.chat.id,
+        text: [
+          '✅ تم الدفع وإصدار الترخيص.',
+          '',
+          'رقم الترخيص: ' + licenseId,
+          parsed.plan.durationMs == null ? 'المدة: دائم' : 'المدة: شهر واحد',
+          '',
+          'افتح «بوتاتي» واربط البوت الذي أنشأته عبر BotFather.',
+        ].join('\\n'),
+        reply_markup: { inline_keyboard: [[{ text: 'فتح بوتاتي', url: 'https://t.me/RichCustomizebot/editor?startapp=managed_bots' }]] },
+      });
+    } catch (notificationError) {
+      // The license has been persisted: an inaccessible chat cannot undo a payment.
+      console.warn('Managed bot license issued but receipt could not be delivered', notificationError);
+    }
+  }
   return true;
 }
 
