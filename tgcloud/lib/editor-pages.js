@@ -38,6 +38,7 @@ import {
 import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { safePlanLimit } from 'lib/subscription-policy';
+import { assertWritableSavedPage, isLegacySavedPage, isSavedPageUnchanged } from 'lib/saved-page-policy';
 
 function languageCode(source) {
   return source?.from?.language_code || 'en';
@@ -189,7 +190,15 @@ async function persistPage(userId, title, session, existingId = null) {
   if (existingId) {
     const existing = await getPage(existingId);
     if (!existing || Number(existing.ownerId) !== Number(userId)) return null;
-    await assertQuota(existing.blocks || []);
+    const entitlement = await getEditorEntitlement(userId);
+    if (isLegacySavedPage(existing, userId, entitlement)) {
+      if (String(existing.title || '') === cleanedTitle
+          && isSavedPageUnchanged(existing, session)) return String(existingId);
+      const error = new Error('LEGACY_PAGE_READ_ONLY');
+      error.code = 'LEGACY_PAGE_READ_ONLY';
+      throw error;
+    }
+    await assertQuota();
     stamp = Math.max(stamp, Number(existing.updatedAt || 0) + 1);
     const version = await nextPageSyncVersion(existing.revision || 1);
     const changed = await db.update(richPages).set({
@@ -271,9 +280,9 @@ async function restorePage(userId, pageId, snapshot) {
     const pageLimit = safePlanLimit(await getEditorEntitlement(userId), 'pages');
     if (pageLimit != null && await ownerPageCount(userId) >= pageLimit) return false;
     const blocks = clone(snapshot.blocks || []);
-    if (!validateEditorLimits(blocks, userId, {
-      previousBlocks:blocks, entitlement:await getEditorEntitlement(userId),
-    }).ok) return false;
+    // Restoring the exact server-held deleted snapshot does not edit its
+    // content. Quotas apply only if the restored page is subsequently edited.
+    // Telegram's transport limits still apply whenever it is published.
     const stamp = nowSeconds();
     const version = await nextPageSyncVersion(snapshot.revision || 1);
     await db.insert(richPages).values({
@@ -521,6 +530,14 @@ export async function handleEditorPageCallback(query) {
       await api.answerCallbackQuery({ callback_query_id: query.id, text: c.missing, show_alert: true });
       return true;
     }
+    if (isLegacySavedPage(page, query.from.id, await getEditorEntitlement(query.from.id))) {
+      await api.answerCallbackQuery({ callback_query_id:query.id,
+        text:resolveLanguage(code)==='ar'
+          ? 'هذه صفحة قديمة تتجاوز حدود باقتك؛ يمكن نشرها كما هي لكن لا يمكن تعديلها.'
+          : 'This legacy page is publish-only. Editing is unavailable.',
+        show_alert:true });
+      return true;
+    }
     await updateEditorSession(query.from.id, {
       state: 'renaming_page',
       renamePageId: pageId,
@@ -730,6 +747,13 @@ async function receiveSaveName(message, session, code) {
         await api.sendMessage({ chat_id: message.chat.id, text: limitText(error.editorLimit, code) });
         return true;
       }
+      if (error?.code === 'LEGACY_PAGE_READ_ONLY') {
+        await api.sendMessage({chat_id:message.chat.id,text:resolveLanguage(code)==='ar'
+          ? 'الصفحة القديمة متاحة للنشر كما هي، لكن تعديلها أو حفظ نسخة معدّلة منها غير مسموح.'
+          : 'This legacy page can be republished unchanged, but cannot be edited.'});
+        return true;
+      }
+
       if (error?.pageLimit || error?.pageBusy) {
         await clearPromptAndInput(latest, message);
         const restored = await updateEditorSession(userId, {
@@ -792,6 +816,13 @@ async function receiveRename(message, session, code) {
     return true;
   }
 
+  if (isLegacySavedPage(page, userId, await getEditorEntitlement(userId))) {
+    await updateEditorSession(userId, { state:'managing', renamePageId:null });
+    await api.sendMessage({chat_id:message.chat.id,text:resolveLanguage(code)==='ar'
+      ? 'هذه الصفحة القديمة للنشر فقط؛ لا يمكن تغيير اسمها أو محتواها.'
+      : 'This legacy page is publish-only and cannot be renamed.'});
+    return true;
+  }
   const ownerLock = await acquireOwnerPageLock(userId);
   if (!ownerLock) {
     await api.sendMessage({chat_id:message.chat.id,text:code==='ar'?'الصفحات مشغولة حالياً، جرّب مرة ثانية.':'Pages are busy. Try again.'});
