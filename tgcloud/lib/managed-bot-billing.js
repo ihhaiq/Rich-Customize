@@ -216,7 +216,7 @@ export async function handleManagedBotSuccessfulPayment(message) {
           parsed.plan.durationMs == null ? 'المدة: دائم' : 'المدة: شهر واحد',
           '',
           'افتح «بوتاتي» واربط البوت الذي أنشأته عبر BotFather.',
-        ].join('\\n'),
+        ].join('\n'),
         reply_markup: { inline_keyboard: [[{ text: 'فتح بوتاتي', url: 'https://t.me/RichCustomizebot/editor?startapp=managed_bots' }]] },
       });
     } catch (notificationError) {
