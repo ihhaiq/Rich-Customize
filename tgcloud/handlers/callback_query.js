@@ -6,7 +6,7 @@ import { handleDeveloperCallback } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
-import { normalizePublishError, publishFailureMessage } from 'lib/publish-errors';
+import { explainOperationalError, userOperationalError } from 'lib/operational-errors';
 import { handleBrandingCallback } from 'lib/branding';
 import { handleManagedBotCallback } from 'lib/managed-bot-billing';
 import { handleEditorBlockCallback } from 'lib/editor-block-flow';
@@ -117,21 +117,18 @@ export default async function (query, ctx = {}) {
     await api.answerCallbackQuery({ callback_query_id: query.id });
   } catch (error) {
     failed = true;
-    const detail = String(error?.description || error?.message || error || '');
-    if (/query is too old|query_id_invalid|query has expired|query id is invalid/i.test(detail)) {
-      // This Telegram answer has expired; retrying it only generates noise.
-      console.warn('Expired Telegram callback answer', query?.data);
+    const guide = explainOperationalError(error);
+    if (guide.silent) {
+      console.warn('Harmless callback response rejected by Telegram', guide.code);
       return;
     }
     try {
       if (query?.id) {
-        const normalized = normalizePublishError(error, { kind: 'chat' });
-        const locale = String(query?.from?.language_code || 'ar');
-        const notice = normalized.code === 'PUBLISH_FAILED'
-          ? (locale.startsWith('ar') ? 'تعذر إكمال العملية. حاول مرة ثانية.' : 'Could not complete this action. Try again.')
-          : publishFailureMessage(normalized, locale);
+        const notice = userOperationalError(error, query?.from?.language_code || 'ar');
         await api.answerCallbackQuery({
-          callback_query_id: query.id, text: notice.slice(0, 200), show_alert: true,
+          callback_query_id: query.id,
+          text: notice.slice(0, 200),
+          show_alert: true,
         });
       }
     } catch (alertError) {
@@ -143,6 +140,9 @@ export default async function (query, ctx = {}) {
       threadId: query?.message?.message_thread_id,
       callbackData: query?.data,
     });
+    // An expected Telegram rejection should not replay the callback. Unknown
+    // failures still propagate so we do not conceal application defects.
+    if (guide.expected) return;
     await releaseUpdate(updateId);
     throw error;
   } finally {
