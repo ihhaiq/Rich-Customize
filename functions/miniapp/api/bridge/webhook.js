@@ -13,6 +13,8 @@ import {
   sendBridgeSyncFailure,
   sendBridgeFullSyncNotice,
 } from '../../../_lib/b2b-bridge.js';
+import { handleScheduleBridgeEvent, parseScheduleBridgeEvent } from '../../../_lib/scheduling-reminders.js';
+import { sendScheduleBridgeAck } from '../../../_lib/b2b-bridge.js';
 import {
   applyFullPageSnapshot,
   applyPageMirrorSync,
@@ -89,6 +91,26 @@ export async function onRequestPost(context) {
 
   const source = responseText(message);
   const parsed = fields(source);
+  // Main-bot-originated schedule events are trusted only after the pinned
+  // sender and exact bridge chat checks above. No page contents enter D1.
+  if (/^\\/rcb_schedule_(register|cancel|result)@richminiappsbot\\b/i.test(source)) {
+    const event = parseScheduleBridgeEvent(source);
+    if (!event) return json({ ok: true, ignored: 'invalid_schedule_event' });
+    try {
+      const outcome = await handleScheduleBridgeEvent(db, event);
+      if (event.type !== 'result') {
+        const label = outcome.ok
+          ? event.type === 'register' ? 'SCHEDULE_REGISTERED' : 'SCHEDULE_CANCELED'
+          : 'SCHEDULE_REJECTED';
+        await sendScheduleBridgeAck(context.env, label, event.jobId, event.revision)
+          .catch(error => console.warn('Schedule ACK could not be sent', String(error?.message || error).slice(0, 120)));
+      }
+      return json({ ok: true, schedule_event: event.type, accepted: outcome.ok });
+    } catch (error) {
+      console.error('Schedule webhook error', String(error?.message || error).slice(0, 120));
+      return text('Schedule store unavailable', 503);
+    }
+  }
 
   if (message.document?.file_id) {
     let syncPayload = null;

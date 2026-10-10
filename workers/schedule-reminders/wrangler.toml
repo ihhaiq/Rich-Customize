@@ -1,0 +1,14 @@
+# A separate Cloudflare Worker which SENDS REMINDERS ONLY.
+# Before deployment replace the D1 ID with the existing Pages DB ID,
+# and configure B2B_BOT_TOKEN as a Worker secret. Do NOT create a second DB.
+name = "rich-customize-schedule-reminders"
+main = "./worker.js"
+compatibility_date = "2026-10-10"
+
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "REPLACE_WITH_EXISTING_DB_NAME"
+database_id = "REPLACE_WITH_EXISTING_D1_DATABASE_ID"

@@ -47,3 +47,13 @@
 - أضيفت اختبارات policy مستقلة.
 - **غير منفذ:** واجهة المستخدم، قاعدة الوظائف، مجدول الوقت، إرسال المؤجلات، إلغاء وتعديل المهام، ترجمات البوت والتطبيق المصغر، وتجارب Telegram الحية.
 - لا schema migration ولا push للإنتاج ضمن هذه المرحلة.
+
+## اعتماد معماري جديد — Cloudflare reminder relay (2026-10-10)
+
+- Cloudflare يستعمل D1 لتخزين `{job_id, revision, run_at, status, attempts}` فقط، **ولا يحتفظ بالمحتوى أو قائمة الوجهات**.
+- يرسل المحرر من Telegram Serverless عبر نفس مجموعة RCB1 أمر `/rcb_schedule_register@Richminiappsbot` يتضمن ID والموعد والإصدار؛ webhook الحالي يتحقق من توقيع Telegram ومرسل البوت المثبت قبل الحفظ. عند الإلغاء يرسل `/rcb_schedule_cancel@Richminiappsbot`.
+- Worker مستقل صغير بـ Cron كل دقيقة ويقرأ D1 ويرسل عبر حساب relay الموجود `/rcb_schedule_due@RichCustomizebot` مع ID والإصدار. لا يشغّل بوت المحرر، ولا يتلقى توكن المحرر.
+- المحرر يتحقق من job_id في قاعدة بياناته، ويمنع النشر المبكر أو المتكرر أو بعد الإلغاء، ثم يرسل `/rcb_schedule_result@Richminiappsbot` بالحالة النهائية.
+- Cloudflare يعيد المحاولة عند غياب تأكيد النتيجة، لكن المحرر يمنع إعادة إرسال أي وجهة سبق إرسالها. Cron دقته دقيقة تقريباً، ولا وعد بالتنفيذ في ثانية محددة.
+- بروتوكول Cloudflare / webhook وWorker ومخطط D1 مكتوبان في هذه المرحلة؛ **لا يصبح النظام عاملاً حتى يُكمل المحرر حفظ وظائفه واستهلاك أوامر due وack ويرفع Worker ويطبق D1 migration**.
+- Cloudflare Pages لا يشغّل `scheduled()` عبر ملفات `functions/` مباشرة؛ يجب نشر Worker مستقل وضبط D1 binding لنفس DB وSecret `B2B_BOT_TOKEN` الموجود على Pages. ملف `workers/schedule-reminders/wrangler.toml` يحتاج ضبط المعرفات من مالك الحساب.

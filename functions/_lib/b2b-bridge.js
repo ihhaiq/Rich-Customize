@@ -533,6 +533,22 @@ function command(env, action) {
   return '/' + name + '@' + targetUsername(env);
 }
 
+// Reuse the pinned RCB1 relay token and bridge-group configuration for schedule ACKs.
+export async function sendScheduleBridgeAck(env, label, jobId, revision) {
+  if (!['SCHEDULE_REGISTERED', 'SCHEDULE_CANCELED', 'SCHEDULE_REJECTED'].includes(label)) {
+    throw new HttpError(400, 'Invalid schedule acknowledgement');
+  }
+  return telegramJson(env, 'sendMessage', {
+    chat_id: bridgeChatId(env),
+    text: '/rcb_schedule_ack@' + targetUsername(env) + '\n' + JSON.stringify({
+      protocol: B2B_PROTOCOL,
+      request_id: 'ack_' + String(jobId) + '_' + Number(revision),
+      job_id: String(jobId), revision: Number(revision), status: label,
+    }),
+    disable_notification: true,
+  });
+}
+
 export async function sendOneWayBridgeEvent(context, {
   action,
   userId,
