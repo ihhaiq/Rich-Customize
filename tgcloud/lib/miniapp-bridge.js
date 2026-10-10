@@ -667,6 +667,7 @@ async function handlePage(message, id, ownerId, idValue) {
     action: 'page',
     ...pageForWire(row),
     user_id: Number(ownerId),
+    legacy_read_only:isLegacySavedPage(row, ownerId, await getEditorEntitlement(ownerId)),
   };
   await sendJson(
     message,
