@@ -2,7 +2,7 @@ import { db } from 'sdk';
 import { and, eq, lt } from 'sdk/db';
 import { editorSessions, maintenanceLocks, richPages } from 'schema';
 import { validateEditorLimits } from 'lib/editor-blocks';
-import { isLegacySavedPage } from 'lib/saved-page-policy';
+import { isLegacySavedPage, isSavedPageUnchanged } from 'lib/saved-page-policy';
 import {
   EDITOR_SESSION_TTL_SECONDS,
   normalizeBlockScrollOffset,
@@ -345,6 +345,42 @@ export async function updateEditorSession(userId, changes, { touch = true } = {}
     ? await loadEditorSession(id, { touch:false })
     : null;
   const shouldAutoSync = hasRealSavedDraftMutation(currentForMutation, payload);
+
+  // Every session write that carries block or button content passes through
+  // the same server-side quota gate. This covers edits that skip the explicit
+  // per-handler checks (undo/redo, reorder, media, details, imported messages).
+  // Hydrating an identical persisted legacy page is allowed; editing it is not.
+  if (SAVED_DRAFT_FIELDS.some(field => Object.hasOwn(payload, field))) {
+    const entitlement = await getEditorEntitlement(id);
+    const targetId = Object.hasOwn(payload, 'currentPageId')
+      ? String(payload.currentPageId || '') : String(currentForMutation?.currentPageId || '');
+    const stored = targetId
+      ? await db.select().from(richPages).where(eq(richPages.pageId, targetId)).get()
+      : null;
+    const page = stored && Number(stored.ownerId) === id ? stored : null;
+    const prospective = {
+      blocks: payload.blocks ?? currentForMutation?.blocks ?? [],
+      messageButtons: payload.messageButtons ?? currentForMutation?.messageButtons ?? [],
+      buttonsPerRow: payload.buttonsPerRow ?? currentForMutation?.buttonsPerRow ?? 1,
+      buttonsAlign: payload.buttonsAlign ?? currentForMutation?.buttonsAlign ?? 'center',
+    };
+    const identicalLegacy = page && isLegacySavedPage(page, id, entitlement)
+      && isSavedPageUnchanged(page, prospective);
+    if (page && isLegacySavedPage(page, id, entitlement) && !identicalLegacy) {
+      const error = new Error('LEGACY_PAGE_READ_ONLY');
+      error.code = 'LEGACY_PAGE_READ_ONLY';
+      throw error;
+    }
+    if (!identicalLegacy) {
+      const result = validateEditorLimits(prospective.blocks, id, { entitlement });
+      if (!result.ok) {
+        const error = new Error('EDITOR_LIMIT:' + result.code + ':' + result.actual + ':' + result.limit);
+        error.code = 'EDITOR_LIMIT';
+        error.editorLimit = result;
+        throw error;
+      }
+    }
+  }
 
   if (Array.isArray(payload.blocks)) {
     payload.blocks = JSON.parse(JSON.stringify(payload.blocks));
