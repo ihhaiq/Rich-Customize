@@ -72,3 +72,21 @@ test('nested tables are checked, including imported native tables inside details
   assert.equal(blocks.validateEditorLimits([nested], 999999).code, 'table_columns');
   assert.throws(() => renderer.buildSingleBlockRichMessage(nested, { userId: 999999 }), /EDITOR_LIMIT:table_columns/);
 });
+
+test('rowspan occupancy cannot hide a twenty-first column or twenty-seventh row', async () => {
+  const { blocks, renderer } = await harness();
+  const mergedWidth = blocks.makeBlock('table', {
+    rows: [
+      [{ text: 'A', colspan: 1, rowspan: 2 }, ...row(19)],
+      row(20),
+    ],
+  });
+  const mergedHeight = blocks.makeBlock('table', {
+    rows: Array.from({ length: 26 }, (_, i) => i === 25
+      ? [{ text: 'Last', rowspan: 2 }]
+      : [{ text: String(i) }]),
+  });
+  assert.equal(blocks.validateEditorLimits([mergedWidth], 999999).code, 'table_columns');
+  assert.equal(blocks.validateEditorLimits([mergedHeight], 999999).code, 'table_rows');
+  assert.throws(() => renderer.buildSingleBlockRichMessage(mergedWidth, { userId: 999999 }), /EDITOR_LIMIT:table_columns/);
+});
