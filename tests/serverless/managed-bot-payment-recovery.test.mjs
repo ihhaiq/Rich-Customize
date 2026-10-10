@@ -51,3 +51,20 @@ test('a charge ID collision for another order never grants a license',async()=>{
   await assert.rejects(h.billing.handleManagedBotSuccessfulPayment(message),/charge_collision/);
   assert.equal(h.records.managedBotLicenses.length,0);
 });
+
+test('invalid payment amounts are not fulfilled and the owner gets a support notice',async()=>{
+  const h=await fixture();
+  const altered={...message,successful_payment:{...message.successful_payment,total_amount:51}};
+  await h.billing.handleManagedBotSuccessfulPayment(altered);
+  assert.equal(h.records.managedBotPayments.length,0);
+  assert.equal(h.records.managedBotLicenses.length,0);
+  const notice=h.calls.find(c=>c.method==='sendMessage');
+  assert.match(notice.args.text,/لا تدفع مرة ثانية/);
+});
+test('payment with missing order is not silently ignored',async()=>{
+  const h=await fixture();
+  h.records.managedBotOrders.length=0;
+  await h.billing.handleManagedBotSuccessfulPayment(message);
+  assert.equal(h.records.managedBotLicenses.length,0);
+  assert.equal(h.calls.filter(c=>c.method==='sendMessage').length,1);
+});
