@@ -16,7 +16,16 @@
   function haptic(kind="light"){try{const feedback=window.Telegram?.WebApp?.HapticFeedback;if(!feedback)return;if(kind==="selection")feedback.selectionChanged?.();else feedback.impactOccurred?.(kind);}catch(_){}}
   function blockFromTarget(target){const block=target?.closest?.(".block");if(!block?.dataset?.id)return null;if(target.closest?.(BLOCK_EXCLUSIVE_SELECTOR))return null;return block;}
   function nativeControlTarget(target,pressEl=null){if(pressEl?.classList?.contains("block"))return false;return Boolean(target.closest?.('input,textarea,select,video,audio,a,[contenteditable="true"],[data-inline-rich-button],[data-no-long-press]'));}
-  function pressTargetFrom(target){const block=blockFromTarget(target);if(block)return block;const el=target.closest?.(PRESS_SELECTOR);if(!el||el.disabled||el.getAttribute?.("aria-disabled")==="true")return null;return el;}
+  function pressTargetFrom(target){
+    // Editable table cells own their touch gestures: the WebView must pan the
+    // scroll region, not trigger the block long-press / selection menu.
+    if(target.closest?.(".table-preview"))return null;
+    const block=blockFromTarget(target);
+    if(block)return block;
+    const el=target.closest?.(PRESS_SELECTOR);
+    if(!el||el.disabled||el.getAttribute?.("aria-disabled")==="true")return null;
+    return el;
+  }
   function clearTimer(){if(longTimer!==null){clearTimeout(longTimer);longTimer=null;}}
   function addRipple(el,clientX,clientY){if(PERFORMANCE_MODE||!el||el.classList.contains("block"))return;const rect=el.getBoundingClientRect();if(!rect.width||!rect.height)return;const ripple=document.createElement("span");ripple.className="press-ripple";ripple.style.left=`${clientX-rect.left}px`;ripple.style.top=`${clientY-rect.top}px`;el.appendChild(ripple);ripple.addEventListener("animationend",()=>ripple.remove(),{once:true});setTimeout(()=>ripple.remove(),700);}
   function release(el,withPop=true){if(!el)return;el.classList.remove("is-pressed","long-pressing");if(!withPop)return;el.classList.remove("press-release");if(PERFORMANCE_MODE){requestAnimationFrame(()=>el.classList.add("press-release"));setTimeout(()=>el.classList.remove("press-release"),220);}else{void el.offsetWidth;el.classList.add("press-release");setTimeout(()=>el.classList.remove("press-release"),380);}}
@@ -30,5 +39,10 @@
   function endPointer(event,cancelled=false){if(!active||(event.pointerId!==undefined&&event.pointerId!==active.pointerId))return;const state=active;active=null;clearTimer();if(state.longPressed){release(state.el,false);return;}release(state.el,!cancelled&&!state.moved);if(!cancelled&&!state.moved)haptic("selection");}
   document.addEventListener("pointerup",event=>endPointer(event,false),{passive:true});document.addEventListener("pointercancel",event=>endPointer(event,true),{passive:true});
   document.addEventListener("click",event=>{if(Date.now()>suppressClickUntil||!suppressTarget)return;if(suppressTarget===event.target||suppressTarget.contains(event.target)){event.preventDefault();event.stopImmediatePropagation();suppressClickUntil=0;suppressTarget=null;}},true);
-  document.addEventListener("contextmenu",event=>{const block=event.target.closest?.(".block");if(!block)return;if(Date.now()<=suppressContextUntil||!event.target.closest?.(BLOCK_EXCLUSIVE_SELECTOR))event.preventDefault();});
+  document.addEventListener("contextmenu",event=>{
+    if(event.target.closest?.(".table-preview"))return; // Input context menu is valid while editing.
+    const block=event.target.closest?.(".block");
+    if(!block)return;
+    if(Date.now()<=suppressContextUntil||!event.target.closest?.(BLOCK_EXCLUSIVE_SELECTOR))event.preventDefault();
+  });
 })();
