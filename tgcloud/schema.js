@@ -12,6 +12,8 @@ export const richPages = table('rich_pages', {
   updatedAt: integer('updated_at').notNull(),
   revision: integer('revision').notNull().default(1),
   syncSeq: integer('sync_seq').notNull().default(0),
+  // 1 = existing page (publish only); 2 = new page under unified quotas.
+  quotaVersion: integer('quota_version').notNull().default(1),
 }, (t) => ({
   ownerUpdatedIdx: index('idx_rich_pages_owner_updated').on(t.ownerId, t.updatedAt),
 }));
