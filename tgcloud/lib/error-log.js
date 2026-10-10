@@ -18,9 +18,13 @@ function sanitize(value) {
 
 function errorSummary(error) {
   const name = sanitize(error?.name || 'Error');
-  const code = error?.code == null ? '' : ' [' + sanitize(error.code) + ']';
-  const message = sanitize(error?.description || error?.message || error || 'Unknown error');
-  return (name + code + ': ' + message).slice(0, 1800);
+  const rawCode = error?.code ?? error?.error_code ?? error?.response?.error_code;
+  const code = rawCode == null ? '' : ' [' + sanitize(rawCode) + ']';
+  const message = sanitize(error?.description || error?.response?.description || error?.message || error || 'Unknown error');
+  const cause = error?.cause
+    ? sanitize(error.cause?.description || error.cause?.message || error.cause).slice(0, 350)
+    : '';
+  return (name + code + ': ' + message + (cause && !message.includes(cause) ? ' | cause: ' + cause : '')).slice(0, 1800);
 }
 
 function safeId(value) {
@@ -196,6 +200,8 @@ function detailRows(scope, error, context) {
   const chatId = safeId(context?.chatId);
   if (updateId != null) rows.push(['Update ID', updateId]);
   if (chatId != null) rows.push(['Chat ID', chatId]);
+  const threadId = safeId(context?.threadId);
+  if (threadId != null) rows.push(['Topic ID', threadId]);
   if (context?.callbackData) rows.push(['Callback', sanitize(context.callbackData).slice(0, 220)]);
   if (context?.extra) rows.push(['السياق', sanitize(context.extra).slice(0, 420)]);
   return rows;
@@ -303,7 +309,12 @@ export async function logError(scope, error, context = {}) {
     const scopeText = sanitize(scope || 'unknown');
     const summary = errorSummary(error);
     const stamp = now();
-    const fingerprint = (scopeText + '|' + summary).slice(0, 1200);
+    // Avoid conflating identical errors raised by different users or destinations.
+    const fingerprint = [
+      scopeText, summary, safeId(context?.chatId) ?? '',
+      safeId(context?.userId) ?? '', safeId(context?.threadId) ?? '',
+      sanitize(context?.callbackData || '').slice(0, 80),
+    ].join('|').slice(0, 1200);
     if (
       config.lastErrorKey === fingerprint
       && stamp - Number(config.lastErrorAt || 0) < DUPLICATE_COOLDOWN_SECONDS
