@@ -34,6 +34,30 @@ export function explainOperationalError(error) {
   if (/RICH_MESSAGE_EMOJI_INVALID|CUSTOM_EMOJI_INVALID|EMOJI_ID_INVALID/i.test(value))
     return guide('RICH_EMOJI_INVALID','expected','أحد الإيموجيات الخاصة غير صالح. أعد اختياره أو استعمل إيموجي عادي.','A custom emoji is invalid. Re-select it or use a standard emoji.',
       'رفض تليكرام معرّف إيموجي مخصص أو لا يملك المستهدف صلاحية استخدامه.','تحقق من ID الإيموجي وصلاحيات الوجهة، واستعمل بديله العادي عند الإمكان.');
+  if (/EDITOR_LIMIT:|editor limit exceeded|quota exceeded/i.test(value))
+    return guide('EDITOR_LIMIT_REACHED','expected',
+      'المحتوى يتجاوز حدود المحرر أو باقتك. قلل المحتوى أو راجع حدود الاشتراك.',
+      'The editor or your plan limit was exceeded. Reduce content or check plan limits.',
+      'تجاوز حجم الصفحة أو عدد البلوكات أو عنصر من العناصر الحد المسموح.',
+      'اعرض الحد الفعلي للمستخدم واحتفظ بمحتواه حتى يقدر يعدله.');
+  if (/no reusable (?:file_id|media)|wrong file identifier|file_id.*missing/i.test(value))
+    return guide('EDITOR_MEDIA_MISSING','expected','ملف داخل الصفحة ما عاد صالحاً. أعد رفعه أو احذفه.',
+      'A file in the page is unavailable. Re-upload or remove it.',
+      'بلوك ميديا لا يحتوي معرّف ملف صالحاً لإعادة استخدامه.','تحقق من file_id في البلوك قبل الإرسال أو المعاينة.');
+  if (/map coordinates are missing|list block has no items|table block has no cells|block has no children|rich message has no blocks|unsupported rich block type|invalid native rich block payload/i.test(value))
+    return guide('EDITOR_BLOCK_INVALID','expected','أحد بلوكات الرسالة ناقص أو غير صالح. راجعه قبل النشر.',
+      'A message block is incomplete or invalid. Edit it before publishing.',
+      'بلوك فارغ أو بنية محتوى غير مدعومة أو بيانات أساسية ناقصة.',
+      'تحقق من بيانات البلوك وحدد نوعه ومسار العنصر المرفوض داخل المحرر.');
+  if (/Invalid UTF-8|Invalid Huffman|Truncated stored block|Invalid deflate|Invalid ZIP|ZIP.*invalid|Unexpected end of deflate/i.test(value))
+    return guide('BACKUP_CORRUPT','expected','ملف النسخة غير صالح أو تالف. اختر نسخة ZIP أو JSON سليمة.',
+      'The backup file is corrupt or invalid. Select a valid ZIP or JSON file.',
+      'ملف الاستيراد تالف أو يحتوي بيانات مضغوطة/نصية غير صالحة.',
+      'افحص صيغة وحجم الملف، وارفضه دون تعديل قاعدة البيانات.');
+  if (/PAGE_NOT_FOUND|page does not exist/i.test(value))
+    return guide('PAGE_NOT_FOUND','expected','الصفحة غير موجودة أو انحذفت. حدّث قائمة صفحاتك.',
+      'The page no longer exists. Refresh your saved pages.',
+      'معرّف الصفحة لم يعد مرتبطاً بصفحة محفوظة.','أعد تحميل الصفحات ولا تنفذ العملية على معرّف قديم.');
   const normalized = normalizePublishError(error, { kind:'chat' });
   if (normalized.code !== 'PUBLISH_FAILED') {
     const actions = {
