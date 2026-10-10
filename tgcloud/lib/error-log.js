@@ -1,6 +1,7 @@
 import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { legacyStates } from 'schema';
+import { explainOperationalError } from 'lib/operational-errors';
 
 const NAMESPACE = 'error_log';
 const MAX_ERROR_TEXT = 3500;
@@ -13,7 +14,10 @@ function now() {
 function sanitize(value) {
   return String(value ?? '')
     .replace(/\b\d{5,}:[A-Za-z0-9_-]{20,}\b/g, '[redacted-token]')
-    .replace(/bot\d{5,}:[A-Za-z0-9_-]{20,}/gi, 'bot[redacted-token]');
+    .replace(/bot\d{5,}:[A-Za-z0-9_-]{20,}/gi, 'bot[redacted-token]')
+    .replace(/(Bearer\s+)[^\s"'<>]+/gi, '$1[redacted]')
+    .replace(/([?&](?:token|api_key|access_token|secret)=)[^&#\s]+/gi, '$1[redacted]')
+    .replace(/\b((?:password|secret|api_key|authorization)\s*[:=]\s*)[^\s,;}"']{6,}/gi, '$1[redacted]');
 }
 
 function errorSummary(error) {
@@ -158,6 +162,10 @@ function errorTypeTitle(scope) {
     channel_post: 'خطأ منشور قناة',
     edited_channel_post: 'خطأ تعديل منشور قناة',
     my_chat_member: 'خطأ صلاحيات أو عضوية البوت',
+    pre_checkout_query: 'خطأ التحقق من الدفع',
+    'payment.pre_checkout': 'خطأ التحقق من الدفع',
+    'request_guard.claim': 'خطأ حماية الطلبات',
+    'editor.premium_emoji.pack': 'خطأ تحميل حزمة إيموجي',
     'welcome.idle_rich_fallback': 'خطأ رسالة الترحيب',
     'welcome.start_rich_fallback': 'خطأ /start',
     'editor.home_rich_fallback': 'خطأ واجهة المحرر',
@@ -192,9 +200,16 @@ function tableCell(text, header = false) {
 }
 
 function detailRows(scope, error, context) {
+  const explanation = explainOperationalError(error);
   const rows = [
     ['المصدر', sanitize(scope || 'unknown')],
-    ['الخطأ', errorSummary(error)],
+    ['التصنيف', sanitize(explanation.code)],
+    ['نوع الخطأ', explanation.kind === 'internal' ? 'خلل تقني يحتاج مراجعة'
+      : explanation.kind === 'temporary' ? 'خطأ مؤقت'
+        : explanation.kind === 'benign' ? 'حدث غير مؤثر' : 'رفض أو مدخلات غير مقبولة'],
+    ['السبب المفهوم', sanitize(explanation.reason).slice(0, 650)],
+    ['الإجراء المقترح', sanitize(explanation.action).slice(0, 650)],
+    ['الخطأ التقني', errorSummary(error)],
   ];
   const updateId = safeId(context?.updateId);
   const chatId = safeId(context?.chatId);
