@@ -251,6 +251,7 @@ async function persistPage(userId, title, session, existingId = null) {
       buttonsAlign: String(session.buttonsAlign || 'center'),
       createdAt: stamp,
       updatedAt: stamp,
+      quotaVersion:2,
       revision: version.revision,
       syncSeq: version.syncSeq,
     }).run();
@@ -295,6 +296,7 @@ async function restorePage(userId, pageId, snapshot) {
       buttonsAlign: String(snapshot.buttonsAlign || 'center'),
       createdAt: Number(snapshot.createdAt || stamp),
       updatedAt: stamp,
+      quotaVersion: Math.max(1, Number(snapshot.quotaVersion || 1)),
       revision: version.revision,
       syncSeq: version.syncSeq,
     }).run();
