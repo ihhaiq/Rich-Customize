@@ -20,6 +20,7 @@ import { EXPECTED_PUBLISH_FAILURES, publishFailure, normalizePublishError,
   shouldForgetDestination, publishFailureMessage } from 'lib/publish-errors';
 import { shouldIncludeBranding } from 'lib/branding';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
+import { isLegacySavedPage, isSavedPageUnchanged, legacyPagePublishOptions } from 'lib/saved-page-policy';
 import { recordMarketingPublish } from 'lib/marketing-campaign';
 
 const ADMIN = new Set(['administrator', 'creator']);
@@ -308,17 +309,28 @@ export async function handlePublishCallback(query){
       const latest=await loadEditorSession(userId);if(!latest)return true;
       if(!Array.isArray(latest.blocks)||!latest.blocks.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.emptyContent,show_alert:true});return true;}
       const selected=(latest.postSelectedChatIds||[]).map(Number);if(!selected.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.needChat,show_alert:true});return true;}
-      await api.answerCallbackQuery({callback_query_id:query.id,text:cc.sending});
       const registered=new Map((await listChats(userId)).map(x=>[Number(x.chatId),x]));
-      const prepared=await prepareMessageButtons(latest.messageButtons||[]);
       const includeBranding=await shouldIncludeBranding(userId);
       const quotaSavedPage=latest.currentPageId
         ? await db.select().from(richPages).where(eq(richPages.pageId,String(latest.currentPageId))).get()
         : null;
-      const previousBlocks=quotaSavedPage && Number(quotaSavedPage.ownerId)===Number(userId)
-        ? quotaSavedPage.blocks || [] : null;
-      const succeeded=[],failed=[],reasons=[];
+      const savedPage = quotaSavedPage && Number(quotaSavedPage.ownerId)===Number(userId)
+        ? quotaSavedPage : null;
       const entitlement=await getEditorEntitlement(userId);
+      const legacy = savedPage && isLegacySavedPage(savedPage,userId,entitlement);
+      if (legacy && !isSavedPageUnchanged(savedPage,latest)) {
+        await api.answerCallbackQuery({callback_query_id:query.id,show_alert:true,text:
+          resolveLanguage(c)==='ar'
+            ? 'هذه الصفحة القديمة للنشر كما هي فقط. افتحها من صفحاتك من جديد حتى تنشر النسخة المحفوظة.'
+            : 'This legacy page can only be published unchanged. Reopen its saved version.'});
+        return true;
+      }
+      await api.answerCallbackQuery({callback_query_id:query.id,text:cc.sending});
+      const publishBlocks = legacy ? savedPage.blocks : latest.blocks;
+      const publishButtons = legacy ? savedPage.buttons : latest.messageButtons;
+      const publishButtonsPerRow = legacy ? savedPage.buttonsPerRow : latest.buttonsPerRow;
+      const publishedButtons=await prepareMessageButtons(publishButtons || []);
+      const succeeded=[],failed=[],reasons=[];
       for(const chatId of [...new Set(selected.filter(Number.isSafeInteger))]){
         const title=String(registered.get(chatId)?.title||chatId);
         try{
@@ -327,8 +339,8 @@ export async function handlePublishCallback(query){
             if(access.reason==='rights')throw publishFailure('PUBLISH_RIGHTS_MISSING','Missing administrator rights');
             throw access.error || new Error('Could not verify destination access');
           }
-          const markup=prepared.length?buildMessageButtonsKeyboard(prepared,{buttonsPerRow:Number(latest.buttonsPerRow||1),sourcePageId:latest.currentPageId||null}):undefined;
-          await sendRichMessageSafe({chat_id:chatId,rich_message:buildInputRichMessage(latest.blocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,previousBlocks,entitlement}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
+          const markup=publishedButtons.length?buildMessageButtonsKeyboard(publishedButtons,{buttonsPerRow:Number(publishButtonsPerRow||1),sourcePageId:latest.currentPageId||null}):undefined;
+          await sendRichMessageSafe({chat_id:chatId,rich_message:buildInputRichMessage(publishBlocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,entitlement,technicalOnly:Boolean(legacy)}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
           succeeded.push(title);
         }catch(error){
           failed.push(title);
@@ -596,7 +608,7 @@ async function publishBridgePageContent({
       sourcePageId: id,
       includeBranding,
       entitlement:await getEditorEntitlement(userId),
-      ...(id != null ? { previousBlocks: page.blocks || [] } : {}),
+      ...(id != null ? legacyPagePublishOptions(page, userId, await getEditorEntitlement(userId)) : {}),
     });
   } catch (error) {
     const detail = publishErrorDetail(error);
