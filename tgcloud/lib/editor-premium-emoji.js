@@ -6,6 +6,8 @@ import { blockPage, buildBlockEditorKeyboard, buildEditorKeyboard, buildEditorTo
 import { acquireEditorMutationLock, releaseEditorMutationLock, loadEditorSession, updateEditorSession, resetEditorTransientState } from 'lib/editor-session';
 import { buildSingleBlockRichMessage } from 'lib/editor-renderer';
 import { resolveLanguage, resolveUserLanguage, t } from 'lib/i18n';
+import { explainOperationalError } from 'lib/operational-errors';
+import { logError } from 'lib/error-log';
 import { richTextToHtml, plainRichText } from 'lib/rich-text';
 import { emojiTargets, applyEmojiTarget } from 'lib/editor-emoji-targets';
 import {
@@ -281,7 +283,19 @@ export async function handlePremiumEmojiMessage(message) {
     if (!name) { flow.error = 'invalid'; await saveFlow(session, flow, locale); return true; }
     let set;
     try { set = await api.getStickerSet({ name }); }
-    catch { flow.error = 'load_failed'; await saveFlow(session, flow, locale); return true; }
+    catch (error) {
+      const guide = explainOperationalError(error);
+      if (!guide.expected) {
+        await logError('editor.premium_emoji.pack', error, {
+          userId: message.from.id,
+          chatId: message.chat.id,
+          extra: 'pack=' + String(name).slice(0, 100),
+        });
+      }
+      flow.error = guide.code === 'EMOJI_PACK_UNAVAILABLE' ? 'invalid' : 'load_failed';
+      await saveFlow(session, flow, locale);
+      return true;
+    }
     const emojis = customEmojiPack(set);
     if (!emojis) { flow.error = 'invalid'; await saveFlow(session, flow, locale); return true; }
     Object.assign(flow, { stage: 'pack', title: String(set.title || name), emojis, selected: [], more: false, page: 0 });
