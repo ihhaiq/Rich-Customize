@@ -226,7 +226,7 @@ export function blockEditorRichMessage(block, blocks, languageCode, userId = nul
       ],
     };
   } catch (error) {
-    const problem = /^EDITOR_LIMIT:(table_rows|table_columns):\\d+:(\\d+)$/.exec(
+    const problem = /^EDITOR_LIMIT:(table_rows|table_columns):\d+:(\d+)$/.exec(
       String(error?.message || error),
     );
     // Do not send a malformed table back to Telegram merely to open its edit
