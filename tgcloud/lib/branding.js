@@ -1,6 +1,7 @@
 import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { brandingEntitlements } from 'schema';
+import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { planBenefit } from 'lib/subscription-policy';
 
@@ -95,6 +96,25 @@ export async function handleBrandingSuccessfulPayment(message) {
 
   const userId = Number(message?.from?.id);
   if (!Number.isSafeInteger(userId) || !validPaymentShape(payment)) {
+    await logError('payment.fulfillment', new Error('BRANDING_PAYMENT_INVALID_SHAPE'), {
+      userId: message?.from?.id, chatId: message?.chat?.id,
+      extra: 'product=branding; payment_received=1',
+    });
+    if (message?.chat?.id) {
+      try {
+        await api.sendMessage({chat_id:message.chat.id,
+          text:'وصل إشعار دفع لكن تعذر التحقق منه تلقائياً. إذا انخصمت النجوم لا تدفع مرة ثانية؛ احتفظ بإيصال تليكرام وتواصل مع الدعم.'});
+      } catch (noticeError) {
+        console.warn('Could not notify user of unverified branding payment', noticeError);
+      }
+    }
+    return true;
+  }
+
+  const existing = await db.select().from(brandingEntitlements)
+    .where(eq(brandingEntitlements.userId, userId)).get();
+  if (Number(existing?.rightsRemoved || 0) === 1
+      && String(existing?.telegramPaymentChargeId || '') === String(payment.telegram_payment_charge_id)) {
     return true;
   }
 
@@ -121,15 +141,21 @@ export async function handleBrandingSuccessfulPayment(message) {
     },
   }).run();
 
-  await api.sendMessage({
-    chat_id: message.chat.id,
-    text: [
-      '✅ تم الدفع.',
-      '',
-      'انشالت حقوق Rich Customize من حسابك بالكامل.',
-      'من هسه المعاينات والصفحات والمنشورات الجديدة تطلع بدون التذييل.',
-    ].join('\n'),
-  });
+  try {
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      text: [
+        '✅ تم الدفع.',
+        '',
+        'انشالت حقوق Rich Customize من حسابك بالكامل.',
+        'من هسه المعاينات والصفحات والمنشورات الجديدة تطلع بدون التذييل.',
+      ].join('\n'),
+    });
+  } catch (notificationError) {
+    await logError('payment.receipt', notificationError, {
+      userId, chatId: message?.chat?.id, extra:'product=branding; rights_removed=1',
+    });
+  }
   return true;
 }
 
