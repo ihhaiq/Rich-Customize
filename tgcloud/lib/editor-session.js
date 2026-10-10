@@ -294,6 +294,7 @@ export async function createEditorSession(userId, chatId, managementMessageId) {
       postSelectedChatIds: [],
       postSilent: 0,
       postProtected: 0,
+      postSchedulePending: 0,
       lastActivityAt: stamp,
     },
   }).run();

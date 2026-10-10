@@ -46,7 +46,7 @@ export async function handleScheduleBridgeEvent(db, event, now = Math.floor(Date
   } else if (type === 'result') {
     const updated = await db.prepare(
       "UPDATE schedule_reminders SET status=?, next_attempt_at=0,updated_at=? "+
-      "WHERE job_id=? AND revision=? AND status IN ('pending','dispatching','awaiting_ack')"
+      "WHERE job_id=? AND revision=? AND status IN ('pending','dispatching','awaiting_ack','exhausted')"
     ).bind(event.status, now, jobId, revision).run();
     return { ok: true, changed: updated.meta?.changes || 0 };
   } else return { ok: false, code: 'INVALID_ACTION' };
@@ -63,7 +63,12 @@ export function scheduleDueCommand(jobId, revision, attempt) {
   });
 }
 
-export async function dispatchDueReminders(db, deliver, now = Math.floor(Date.now() / 1000), limit = 50) {
+export async function dispatchDueReminders(db, deliver, now = Math.floor(Date.now() / 1000), limit = 10) {
+  // Expired final attempts need a visible terminal status for diagnosis.
+  await db.prepare(
+    "UPDATE schedule_reminders SET status='exhausted',updated_at=? "+
+    "WHERE status='awaiting_ack' AND attempts>=8 AND next_attempt_at<=?"
+  ).bind(now, now).run();
   const rows = await db.prepare(
     "SELECT job_id,revision,run_at,attempts FROM schedule_reminders "+
     "WHERE status IN ('pending','dispatching','awaiting_ack') AND run_at<=? AND next_attempt_at<=? "+

@@ -35,4 +35,4 @@ There is no billing backend on Cloudflare. Do not recreate the archived scaffold
 Run `npm test` from the root. Focused CI is [a1-quota-tests.yml](../.github/workflows/a1-quota-tests.yml).
 Local mock/unit successes do not prove real Telegram payments, D1 concurrency, quota boundaries or production deployment.
 Complete new quota enforcement, entitlement event handling, downgrade rules and controlled integration testing before claiming full rollout.
-Templates and saved page history are cancelled. Scheduling has a design/policy-only draft in [scheduling.md](scheduling.md): Free 2 destinations; proposed Plus 5 and Golden 15 pending approval. No timed runner or live scheduling.
+Templates and saved page history are cancelled. Scheduling code now includes a Telegram Serverless job store, editor workflow and B2B Cloudflare reminder Worker, but deployment/migrations and live acceptance are NOT complete. Free 2 destinations; proposed Plus 5 and Golden 15 pending approval. See [scheduling.md](scheduling.md).

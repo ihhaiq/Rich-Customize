@@ -305,7 +305,7 @@ async function guardPageOpenBurst(db, userId, pageId) {
   }
 }
 
-async function reserveBridgeSlot(db, env) {
+export async function reserveBridgeSlot(db, env) {
   await ensureBridgeSchema(db);
   const currentMs = Date.now();
   const interval = minSendIntervalMs(env);

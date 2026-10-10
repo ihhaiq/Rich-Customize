@@ -4,6 +4,13 @@
 رتّب الإدخالات من الأحدث إلى الأقدم، وحدّث السجل مع تغييرات الكود أو الواجهة أو المخطط أو الاختبارات أو الوثائق.
 الرفع إلى GitHub لا يعني نشر Telegram Serverless أو Cloudflare؛ اذكر حالة النشر صراحةً.
 
+## 2026-10-10 — ربط جدولة المحرر بالتذكير B2B (قيد اختبارات التكامل)
+- **شنو تغيّر:** إضافة تخزين مهام المنشورات ومحتواها ووجهاتها على Serverless، واستقبال DUE/ACK من relay المُتحقق منه، وزر جدولة في إعدادات النشر، وإدخال موعد بغداد، وأمر /scheduled مع الإلغاء، وCAS/lease لمنع إرسال الوجهات المكررة. ربط Worker بالـ throttle المشتركة مع B2B وتقليل الحمل إلى 10 تذكيرات بالدورة.
+- **السبب:** تكملة مسار Cloudflare reminders دون نقل إرسال المنشورات إلى Cloudflare.
+- **الملفات:** `tgcloud/lib/scheduled-publish.js`، `tgcloud/lib/publish.js`، `tgcloud/lib/miniapp-bridge.js`، `tgcloud/schema.js`، `tgcloud/handlers/message.js`، `tgcloud/handlers/callback_query.js`، `tgcloud/lib/editor-session.js`، `functions/_lib/b2b-bridge.js`، `functions/_lib/scheduling-reminders.js`، `workers/schedule-reminders/worker.js`، `docs/scheduling.md`، `sups.md`، `AGENTS.md`، `log.md`.
+- **الفحص:** فحص نحوي سريع لدوال الملفات المعدلة ببيئة JavaScript مع إزالة الاستيرادات؛ لم يجر اختبار Telegram Serverless أو D1 حي، ولم يثبت اختبار التكامل الطرفي. GitHub Actions كان يُبلغ الفشل في تشغيلات سابقة.
+- **النشر:** GitHub فقط. لم تُنفَّذ migrations أو tgcloud push أو نشر Worker. يجب تنفيذ الاختبارات قبل الإطلاق.
+
 ## 2026-10-10 — تجهيز توقيت المهام على Cloudflare عبر RCB1 (غير منشور)
 - **شنو تغيّر:** تطوير استقبال REGISTER/CANCEL/RESULT من المحرر داخل webhook الحالي بعد التحقق من هوية B2B، وتخزين ID/الموعد/الإصدار في D1 فقط. تجهيز Worker Cron كل دقيقة لإرسال DUE من Relay Bot بالمهمة المستحقة، مع retries وACK، من دون استضافة بوت المحرر على Cloudflare.
 - **السبب:** حدود تشغيل المهام المؤجلة على Telegram Serverless؛ Cloudflare للتذكير فقط.
