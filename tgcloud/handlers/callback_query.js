@@ -134,12 +134,14 @@ export default async function (query, ctx = {}) {
     } catch (alertError) {
       console.warn('Could not report failed callback to user', alertError);
     }
-    await logError('callback_query', error, {
-      updateId, userId: query?.from?.id,
-      chatId: query?.message?.chat?.id,
-      threadId: query?.message?.message_thread_id,
-      callbackData: query?.data,
-    });
+    if (!['EDITOR_LIMIT_REACHED','LEGACY_PAGE_READ_ONLY'].includes(guide.code)) {
+      await logError('callback_query', error, {
+        updateId, userId: query?.from?.id,
+        chatId: query?.message?.chat?.id,
+        threadId: query?.message?.message_thread_id,
+        callbackData: query?.data,
+      });
+    }
     // An expected Telegram rejection should not replay the callback. Unknown
     // failures still propagate so we do not conceal application defects.
     if (guide.expected) return;
