@@ -59,7 +59,7 @@ export const DETAILS_CHILD_TYPES = Object.freeze([
 ]);
 
 export const EDITOR_SESSION_TTL_SECONDS = 2 * 60 * 60;
-export const MAX_PAGE_BLOCKS = 30;
+export const MAX_PAGE_BLOCKS = PLAN_LIMITS.free.blocks;
 export const MAX_VISIBLE_CHARACTERS = PLAN_LIMITS.free.text;
 // Telegram Rich Messages accept at most 20 table columns. The editor caps rows at 26.
 export const MAX_TABLE_COLUMNS = 20;
@@ -336,35 +336,81 @@ function blockChildren(block) {
 function quotaChildren(block) {
   const data = block?.data;
   if (!data || typeof data !== 'object' || Array.isArray(data)) return [];
+  // A native import may retain editable child caches. Count only the effective
+  // representation (native_data) to avoid charging twice.
+  const native = data.native && data.native_data && typeof data.native_data === 'object'
+    ? data.native_data : null;
   const result = [];
-  if (String(block?.type || '') === 'details' && Array.isArray(data.children)) {
-    for (const child of data.children) {
-      if (child && typeof child === 'object' && !Array.isArray(child)) result.push(child);
+  const source = native || data;
+  for (const key of native ? ['blocks'] : ['children', 'media_children']) {
+    if (Array.isArray(source[key])) {
+      result.push(...source[key].filter(child => child && typeof child === 'object' && !Array.isArray(child)));
     }
   }
-  if (Array.isArray(data.items)) {
-    for (const item of data.items) {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-      if (!Array.isArray(item.blocks)) continue;
-      for (const child of item.blocks) {
-        if (child && typeof child === 'object' && !Array.isArray(child)) result.push(child);
-      }
+  if (Array.isArray(source.items)) {
+    for (const item of source.items) {
+      if (Array.isArray(item?.blocks)) result.push(...item.blocks.filter(child => child && typeof child === 'object' && !Array.isArray(child)));
     }
   }
   return result;
 }
 
-export function editorBlockCount(blocks) {
-  let count = 0;
-  const visit = (items) => {
+const MEDIA_BLOCK_TYPES = new Set(['photo', 'video', 'animation', 'audio', 'document', 'voice', 'voice_note']);
+const MAX_RICH_BLOCKS = 500;
+const MAX_RICH_NESTING = 16;
+const MAX_RICH_MEDIA = 50;
+const MAX_RICH_TEXT = 32768;
+const RICH_TEXT_FORMATS = new Set([
+  'bold', 'italic', 'underline', 'strikethrough', 'spoiler', 'code',
+  'pre', 'preformatted', 'url', 'text_link', 'blockquote', 'custom_emoji_parent',
+]);
+function formattingDepth(value, depth = 0) {
+  if (!value || typeof value !== 'object') return depth;
+  if (Array.isArray(value)) {
+    return value.reduce((max, child) => Math.max(max, formattingDepth(child, depth)), depth);
+  }
+  const next = depth + (RICH_TEXT_FORMATS.has(String(value.type || '')) ? 1 : 0);
+  let max = next;
+  for (const key of ['text', 'children', 'content', 'nodes']) {
+    if (value[key] && typeof value[key] === 'object') {
+      max = Math.max(max, formattingDepth(value[key], next));
+    }
+  }
+  return max;
+}
+export function editorQuotaUsage(blocks) {
+  const usage = { blocks: 0, nestingDepth: 0, mediaAttachments: 0, text: visibleCharacterCount(blocks) };
+  const visit = (items, level = 1) => {
     for (const block of Array.isArray(items) ? items : []) {
       if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
-      count += 1;
-      visit(quotaChildren(block));
+      usage.blocks += 1;
+      const data = block?.data && typeof block.data === 'object' ? block.data : {};
+      const effective = data.native && data.native_data && typeof data.native_data === 'object'
+        ? data.native_data : data;
+      const kind = String(block.type || '');
+      usage.nestingDepth = Math.max(usage.nestingDepth, level);
+      for (const key of ['rich_text', 'quote_rich_text', 'credit_rich_text', 'caption_rich_text',
+        'summary_rich_text', 'text']) {
+        usage.nestingDepth = Math.max(usage.nestingDepth, level + formattingDepth(effective[key]));
+      }
+      if (kind === 'table') {
+        const rows = Array.isArray(effective.cells) ? effective.cells : Array.isArray(effective.rows) ? effective.rows : [];
+        const height = tableDimensions(rows.filter(Array.isArray)).height;
+        usage.blocks += height; // Each logical row counts toward block budget.
+      }
+      if (kind === 'list') {
+        usage.blocks += Array.isArray(effective.items) ? effective.items.length : 0;
+      }
+      if (MEDIA_BLOCK_TYPES.has(kind)) usage.mediaAttachments += 1;
+      visit(quotaChildren(block), level + 1);
     }
   };
   visit(blocks);
-  return count;
+  return usage;
+}
+
+export function editorBlockCount(blocks) {
+  return editorQuotaUsage(blocks).blocks;
 }
 
 function nativeVisibleText(value, key = null) {
@@ -594,30 +640,37 @@ export function validateTableRows(rows, _userId = null) {
   return { ok: true };
 }
 
-export function validateEditorLimits(blocks, userId = null, { previousBlocks = null, entitlement = null } = {}) {
+export function validateEditorLimits(blocks, userId = null, { previousBlocks = null, entitlement = null, technicalOnly = false } = {}) {
   const list = Array.isArray(blocks) ? blocks : [];
-  // Developers bypass subscription quotas, never the Rich Message transport
-  // limits. A 400 from Telegram must not escape as a callback failure.
   const developer = isDeveloper(userId);
-  // Entitlement is server verified. Caller-controlled plan names are never
-  // trusted here.
   const trustedEntitlement = entitlement || resolveEditorEntitlement();
-  if (!developer) {
-    // Subscription caps are separate from Telegram's hard transport limits.
-    const blockLimit = safePlanLimit(trustedEntitlement, 'blocks');
-    const actualBlocks = editorBlockCount(list);
-    if (blockLimit != null && actualBlocks > blockLimit) {
-      return { ok: false, code: 'blocks', limit: blockLimit, actual: actualBlocks };
-    }
+  const usage = editorQuotaUsage(list);
 
-    const characters = visibleCharacterCount(list);
-    const previousCount = Array.isArray(previousBlocks) ? visibleCharacterCount(previousBlocks) : 0;
-    const quota = checkEditorTextQuota(
-      trustedEntitlement, characters, { previousCount },
-    );
-    if (!quota.allowed) {
-      return { ok: false, code: 'characters', limit: quota.limit, actual: characters };
+  // Telegram transport limits apply to every account and every path.
+  for (const [code, actual, limit] of [
+    ['blocks', usage.blocks, MAX_RICH_BLOCKS],
+    ['characters', usage.text, MAX_RICH_TEXT],
+    ['nesting_depth', usage.nestingDepth, MAX_RICH_NESTING],
+    ['media_attachments', usage.mediaAttachments, MAX_RICH_MEDIA],
+  ]) {
+    if (actual > limit) return { ok: false, code, limit, actual };
+  }
+
+  if (!developer && !technicalOnly) {
+    for (const [code, key, actual] of [
+      ['blocks', 'blocks', usage.blocks],
+      ['nesting_depth', 'nestingDepth', usage.nestingDepth],
+      ['media_attachments', 'mediaAttachments', usage.mediaAttachments],
+    ]) {
+      const limit = safePlanLimit(trustedEntitlement, key);
+      if (actual > limit) return { ok: false, code, limit, actual };
     }
+    // Historical text allowances are no longer writable: old saved content
+    // can be sent unchanged only through the trusted saved-page publish path.
+    const quota = checkEditorTextQuota(trustedEntitlement, usage.text, {
+      previousCount: Array.isArray(previousBlocks) ? visibleCharacterCount(previousBlocks) : 0,
+    });
+    if (!quota.allowed) return { ok: false, code: 'characters', limit: quota.limit, actual: usage.text };
   }
 
   const visit = (items) => {
@@ -625,25 +678,18 @@ export function validateEditorLimits(blocks, userId = null, { previousBlocks = n
       if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
       if (String(block.type || '') === 'table') {
         const data = block.data && typeof block.data === 'object' ? block.data : {};
-        // Imported/native tables can retain stale editable rows. Validate both
-        // representations so a user cannot preview one width but send another.
         const sources = [
           ...(Array.isArray(data.rows) ? [data.rows] : []),
           ...(Array.isArray(data.native_data?.cells) ? [data.native_data.cells] : []),
         ];
         if (!sources.length) sources.push(tableRows(block));
         for (const rows of sources) {
-          // Telegram's 20-column and our 26-row caps always run first.
-          const result = validateTableRows(rows);
-          if (!result.ok) return result;
-          // An 8-column Free table must not accidentally inherit Telegram's
-          // 20-column maximum. Developers bypass plan quotas, not API limits.
-          if (!developer) {
-            const planLimit = safePlanLimit(trustedEntitlement, 'tableColumns');
+          const hard = validateTableRows(rows);
+          if (!hard.ok) return hard;
+          if (!developer && !technicalOnly) {
+            const limit = safePlanLimit(trustedEntitlement, 'tableColumns');
             const actual = tableDimensions(Array.isArray(rows) ? rows.filter(Array.isArray) : []).width;
-            if (actual > planLimit) {
-              return { ok: false, code: 'table_columns', limit: planLimit, actual };
-            }
+            if (actual > limit) return { ok: false, code: 'table_columns', limit, actual };
           }
         }
       }
