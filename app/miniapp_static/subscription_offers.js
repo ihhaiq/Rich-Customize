@@ -6,12 +6,12 @@
   // All plan benefits are approved by the owner. Billing and entitlement
   // activation remain unavailable until trusted Telegram-side rollout.
   const OFFERS = Object.freeze([
-    { name: "Free", text: 20000, emojiPacks: 2, tableColumns: 8,
-      pages: 12, blocks: 30, rights: "separate", price:0, earlyAccess: false },
-    { name: "Plus", text: 25000, emojiPacks: 8, tableColumns: 12,
-      pages: 50, blocks: 60, rights: "included", price:150, earlyAccess: false },
-    { name: "Golden Ticket", text: 32000, emojiPacks: 50, tableColumns: 20,
-      pages: 150, blocks: 120, rights: "included", price:350, earlyAccess: true },
+    { name: "Free", text: 20000, emojiPacks: 2, tableColumns: 8, media:10, nesting:4,
+      pages: 12, blocks: 50, rights: "separate", price:0, earlyAccess: false },
+    { name: "Plus", text: 25000, emojiPacks: 8, tableColumns: 12, media:25, nesting:8,
+      pages: 50, blocks: 200, rights: "included", price:150, earlyAccess: false },
+    { name: "Golden Ticket", text: 32768, emojiPacks: 50, tableColumns: 20, media:50, nesting:16,
+      pages: 150, blocks: 500, rights: "included", price:350, earlyAccess: true },
   ]);
   const strings = {
     ar: {
@@ -31,6 +31,8 @@
       textQuotaLabel: "عدد الأحرف",
       packQuotaLabel: "حزم الإيموجي",
       tableColumnsLabel: "أعمدة الجدول",
+      mediaLimitLabel:"المرفقات بالرسالة",
+      nestingLimitLabel:"مستويات التداخل",
       pages: "الصفحات المحفوظة",
       blocks: "البلوكات",
       rights: "إزالة الحقوق",
@@ -67,6 +69,8 @@
       textQuotaLabel: "Text",
       packQuotaLabel: "Emoji packs",
       tableColumnsLabel: "Table columns",
+      mediaLimitLabel:"Media per message",
+      nestingLimitLabel:"Nesting levels",
       pages: "Saved pages",
       blocks: "Blocks",
       rights: "Remove branding",
@@ -183,6 +187,8 @@
       perk(benefits, "textQuotaLabel", format(plan.text));
       perk(benefits, "packQuotaLabel", format(plan.emojiPacks));
       perk(benefits, "tableColumnsLabel", format(plan.tableColumns));
+      perk(benefits, "mediaLimitLabel", format(plan.media));
+      perk(benefits, "nestingLimitLabel", format(plan.nesting));
       perk(benefits, "pages", format(plan.pages));
       perk(benefits, "blocks", format(plan.blocks));
       perk(benefits, "rights",
