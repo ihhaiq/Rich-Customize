@@ -93,7 +93,7 @@ export async function onRequestPost(context) {
   const parsed = fields(source);
   // Main-bot-originated schedule events are trusted only after the pinned
   // sender and exact bridge chat checks above. No page contents enter D1.
-  if (/^\\/rcb_schedule_(register|cancel|result)@richminiappsbot\\b/i.test(source)) {
+  if (/^\/rcb_schedule_(register|cancel|result)@richminiappsbot\b/i.test(source)) {
     const event = parseScheduleBridgeEvent(source);
     if (!event) return json({ ok: true, ignored: 'invalid_schedule_event' });
     try {
