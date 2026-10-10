@@ -64,3 +64,18 @@ test('unknown failures have a safe fallback without revealing technical text', (
   assert.doesNotMatch(userOperationalError(e, 'ar'), /SECRET_INTERNAL_DATABASE_MESSAGE/);
   assert.match(userOperationalError(e, 'en'), /contact support/i);
 });
+
+test('editor validation failures are actionable and never shown as raw exceptions', () => {
+  for (const [message, code] of [
+    ['EDITOR_LIMIT:blocks:31:30', 'EDITOR_LIMIT_REACHED'],
+    ['native photo block has no reusable file_id', 'EDITOR_MEDIA_MISSING'],
+    ['table block has no cells', 'EDITOR_BLOCK_INVALID'],
+    ['Invalid Huffman code', 'BACKUP_CORRUPT'],
+    ['PAGE_NOT_FOUND', 'PAGE_NOT_FOUND'],
+  ]) {
+    const result = explainOperationalError(new Error(message));
+    assert.equal(result.code, code);
+    assert.equal(result.expected, true);
+    assert.notEqual(userOperationalError(new Error(message), 'ar'), message);
+  }
+});
