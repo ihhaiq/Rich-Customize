@@ -197,12 +197,16 @@ export default async function (message, ctx = {}) {
   } catch (error) {
     failed = true;
     const guide = explainOperationalError(error);
-    await logError('message', error, {
-      updateId,
-      userId: message?.from?.id,
-      chatId: message?.chat?.id,
-      threadId: message?.message_thread_id,
-    });
+    // Normal plan quota rejections and old-page editing attempts are
+    // expected user actions, not production incident alerts.
+    if (!['EDITOR_LIMIT_REACHED','LEGACY_PAGE_READ_ONLY'].includes(guide.code)) {
+      await logError('message', error, {
+        updateId,
+        userId: message?.from?.id,
+        chatId: message?.chat?.id,
+        threadId: message?.message_thread_id,
+      });
+    }
     // Avoid leaking exception text, tokens or technical details to users.
     // Keep the bot silent in groups and in bridge-bot conversations.
     if (message?.chat?.type === 'private' && !message?.from?.is_bot && !guide.silent) {
