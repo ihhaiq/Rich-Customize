@@ -64,7 +64,7 @@ Root `sups.md` is the approved product specification, dated 2026-10-10:
 Do NOT claim these new numbers are enforced merely because they appear in docs/donation UI.
 Editor runtime still has older caps; [rollout](docs/subscription-rollout.md) tracks remaining work.
 `editor-subscriptions.js` accepts active unexpired records from `richdonate:verified`; complete trusted payment event issuance/ACK remains pending.
-Templates and saved page history are cancelled; scheduling is deferred.
+Templates and saved page history are cancelled. Scheduling has a policy-only draft in `lib/schedule-policy.js`; see `docs/scheduling.md`. No real timer/worker or user-visible scheduling exists yet. Free allows 2 destinations per scheduled post; Plus=5 and Golden=15 are provisional.
 Operational `page_snapshots`, revision CAS and session undo/redo remain required.
 
 Preserve old saved content over the free text cap without allowing expansion. Trusted baseline must come from owner-verified stored pages, never unsaved session blocks.
