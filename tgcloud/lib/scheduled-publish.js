@@ -6,7 +6,8 @@ import { scheduledPosts, scheduledPostDestinations, editorSessions, richPages } 
 import { loadEditorSession, updateEditorSession } from 'lib/editor-session';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { validateScheduleRequest } from 'lib/schedule-policy';
-import { canPublish, sendRichMessageSafe } from 'lib/publish';
+import { inspectPublishAccess, sendRichMessageSafe } from 'lib/publish';
+import { isDefinitePublishRejection, normalizePublishError } from 'lib/publish-errors';
 import { buildInputRichMessage } from 'lib/editor-renderer';
 import { prepareMessageButtons, buildMessageButtonsKeyboard } from 'lib/page-buttons';
 import { shouldIncludeBranding } from 'lib/branding';
@@ -231,7 +232,15 @@ export async function executeScheduledDue(jobId,revision){
       .returning({key:scheduledPostDestinations.key}).run();
     if(!Array.isArray(grabbed)||!grabbed.length)continue;
     try{
-      if(!await canPublish(target.chatId,job.ownerId))throw new Error('PUBLISH_RIGHTS_MISSING');
+      const access=await inspectPublishAccess(target.chatId,job.ownerId);
+      if(!access.ok){
+        if(access.reason==='rights'){
+          const denied=new Error('Publishing permissions missing');
+          denied.code='PUBLISH_RIGHTS_MISSING';
+          throw denied;
+        }
+        throw access.error || new Error('Could not verify destination access');
+      }
       const result=await sendRichMessageSafe({
         chat_id:target.chatId,rich_message:job.snapshot.richMessage,
         ...(job.snapshot.replyMarkup?{reply_markup:job.snapshot.replyMarkup}:{}),
@@ -244,11 +253,16 @@ export async function executeScheduledDue(jobId,revision){
     }catch(error){
       // Once a network send may have started, outcome cannot always be proven.
       // Never retry an ambiguous send automatically and risk duplicates.
-      const definite=String(error?.message||'').includes('PUBLISH_RIGHTS_MISSING');
+      const definite=isDefinitePublishRejection(error);
+      const normalized=normalizePublishError(error,{kind:'chat'});
       await db.update(scheduledPostDestinations).set({
         status:definite?'failed':'uncertain',updatedAt:now(),
       }).where(eq(scheduledPostDestinations.key,target.key)).run();
-      await logError('schedule.delivery',error,{userId:job.ownerId,chatId:target.chatId,extra:'job='+jobId});
+      await logError('schedule.delivery',error,{
+        userId:job.ownerId,chatId:target.chatId,
+        extra:'job='+jobId+'; classification='+String(normalized.code||'PUBLISH_FAILED')
+          +'; outcome='+(definite?'failed':'uncertain'),
+      });
     }
   }
   const results=await db.select().from(scheduledPostDestinations)
