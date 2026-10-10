@@ -618,10 +618,12 @@ export function setRichMessageDirection(blocks, isRtl) {
 }
 
 // Hard table limits apply to every account, including developers.
-export function validateTableRows(rows, _userId = null) {
+export function validateTableRows(rows, _userId = null, { technicalOnly = false } = {}) {
   const list = Array.isArray(rows) ? rows.filter((row) => Array.isArray(row)) : [];
   const { width, height } = tableDimensions(list);
-  if (height > MAX_TABLE_ROWS) {
+  // 26 rows is an editor product rule, not an official Telegram row ceiling.
+  // Trusted saved legacy posts can be resent with their original row count.
+  if (!technicalOnly && height > MAX_TABLE_ROWS) {
     return {
       ok: false,
       code: 'table_rows',
@@ -684,7 +686,7 @@ export function validateEditorLimits(blocks, userId = null, { previousBlocks = n
         ];
         if (!sources.length) sources.push(tableRows(block));
         for (const rows of sources) {
-          const hard = validateTableRows(rows);
+          const hard = validateTableRows(rows, null, { technicalOnly });
           if (!hard.ok) return hard;
           if (!developer && !technicalOnly) {
             const limit = safePlanLimit(trustedEntitlement, 'tableColumns');
