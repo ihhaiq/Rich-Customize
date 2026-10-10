@@ -422,6 +422,49 @@ function validateRenderedTables(blocks) {
   }
 }
 
+function validateRenderedPayloadLimits(payloads) {
+  let blocks = 0, media = 0, depth = 0, chars = 0;
+  const mediaTypes = new Set(['photo','video','animation','audio','voice_note','document']);
+  const textLength = value => {
+    if (typeof value === 'string') return value.length;
+    if (Array.isArray(value)) return value.reduce((n, x) => n + textLength(x), 0);
+    if (!value || typeof value !== 'object') return 0;
+    // RichText nesting: text is the single body-bearing field.
+    return textLength(value.text ?? value.children ?? value.content ?? '');
+  };
+  function visit(items, level) {
+    for (const item of Array.isArray(items) ? items : []) {
+      if (!item || typeof item !== 'object') continue;
+      blocks += 1;
+      depth = Math.max(depth, level);
+      if (mediaTypes.has(item.type)) media += 1;
+      if (item.type === 'table' && Array.isArray(item.cells)) {
+        blocks += item.cells.length;
+        for (const row of item.cells) {
+          for (const cell of Array.isArray(row) ? row : []) chars += textLength(cell.text);
+        }
+      } else if (item.type === 'list' && Array.isArray(item.items)) {
+        blocks += item.items.length;
+        for (const listItem of item.items) {
+          if (Array.isArray(listItem?.blocks)) visit(listItem.blocks, level + 1);
+          else chars += textLength(listItem?.text);
+        }
+      } else {
+        chars += textLength(item.text) + textLength(item.summary) + textLength(item.caption) + textLength(item.credit);
+      }
+      if (Array.isArray(item.blocks)) visit(item.blocks, level + 1);
+      if (blocks > 500 || media > 50 || depth > 16 || chars > 32768) break;
+    }
+  }
+  visit(payloads, 1);
+  for (const [code, actual, limit] of [
+    ['blocks', blocks, 500], ['media_attachments', media, 50],
+    ['nesting_depth', depth, 16], ['characters', chars, 32768],
+  ]) {
+    if (actual > limit) throw new Error('EDITOR_LIMIT:' + code + ':' + actual + ':' + limit);
+  }
+}
+
 export function buildInputRichMessage(
   blocks,
   {
@@ -432,12 +475,13 @@ export function buildInputRichMessage(
     includeBranding = false,
     previousBlocks = null,
     entitlement = null,
+    technicalOnly = false,
   } = {},
 ) {
   if (!Array.isArray(blocks) || !blocks.length) {
     throw new Error('The rich message has no blocks');
   }
-  const limit = validateEditorLimits(blocks, userId, { previousBlocks, entitlement });
+  const limit = validateEditorLimits(blocks, userId, { previousBlocks, entitlement, technicalOnly });
   if (!limit.ok) {
     throw new Error('EDITOR_LIMIT:' + limit.code + ':' + limit.actual + ':' + limit.limit);
   }
@@ -453,6 +497,9 @@ export function buildInputRichMessage(
   payloads.push(...navigationButtonBlock(navigationButtons));
   if (includeBranding) payloads.push(brandingFooterBlock());
   validateRenderedTables(payloads);
+  // System-generated navigation/branding is part of the final Telegram
+  // message. Reject technical overflows after adding these blocks as well.
+  validateRenderedPayloadLimits(payloads);
   const direction = richMessageDirection(ordered);
   return {
     blocks: resolveInlinePageCallbacks(
