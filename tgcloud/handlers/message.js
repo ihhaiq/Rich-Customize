@@ -26,6 +26,7 @@ import { sendMarketingCampaignSummary, sendMarketingLanding } from 'lib/marketin
 import { handleMiniAppBridgeMessage } from 'lib/miniapp-bridge';
 import { handleMiniAppUserPickerShared } from 'lib/miniapp-user-picker';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
+import { guardLegacyEditorMessage } from 'lib/editor-guard';
 import { handlePremiumEmojiMessage } from 'lib/editor-premium-emoji';
 import { handleEditorCoreMessage, isForwardedRichMessage } from 'lib/editor-core';
 import { handleEditorPageMessage } from 'lib/editor-pages';
@@ -126,6 +127,7 @@ export default async function (message, ctx = {}) {
       ) return;
 
       if (await handleScheduledTimeMessage(message)) return;
+      if (await guardLegacyEditorMessage(message)) return;
       if (await handlePremiumEmojiMessage(message)) return;
       if (await handleEditorBlockMessage(message)) return;
       if (await handleEditorButtonMessage(message)) return;
