@@ -1,3 +1,7 @@
+# مرجع مؤرشف
+
+هذا الملف يخص الهيكل القديم، وليس تعليمات تشغيل للنسخة الحالية.
+
 # Subscription bot workspace
 
 This directory is for a second Telegram bot deployed separately from the editor, but maintained in the same repository.

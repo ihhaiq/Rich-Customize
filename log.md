@@ -63,3 +63,10 @@
 
 ### طريقة توثيق التعديلات القادمة
 لكل مهمة منتهية، أضف إدخالاً جديداً **في الأعلى** يتضمن: **التاريخ، شنو تغيّر، السبب، الملفات المتأثرة، الاختبارات (نجحت/لم تُشغّل)، وحالة النشر**. لا توثق نجاح اختبار أو نشر لم يحدث، ولا تدرج أسراراً أو بيانات مستخدمين أو توكنات. تحديث هذا الملف نفسه لا يحتاج إدخالاً متكرراً مستقلاً.
+ 
+
+## 2026-10-10 — Repository cleanup
+- Archived obsolete Python editor docs/tests and retired subscription scaffold.
+- Rewrote active documentation around `tgcloud/`, current quotas, and canceled features.
+- Fixed CI to run the existing Node regression suite.
+- Validation: 99 editor tests passed; runtime/SQL files were not changed.

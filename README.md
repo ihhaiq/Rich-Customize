@@ -10,10 +10,10 @@ Rich Customize now runs on Telegram Serverless JavaScript. The Python/Aiogram ru
 
 Authoritative application state and bot behavior live in:
 
-- `schema.js`
-- `handlers/*.js`
-- `lib/*.js`
-- `lib/lang/*.js`
+- `tgcloud/schema.js`
+- `tgcloud/handlers/*.js`
+- `tgcloud/lib/*.js`
+- `tgcloud/lib/lang/*.js`
 
 Telegram Serverless is the source of truth for:
 
@@ -43,9 +43,9 @@ Cloudflare is limited to:
 - relaying B2B requests through `@Richminiappsbot`
 - receiving the relay webhook
 - forwarding Mini App media uploads to Telegram
-- keeping short-lived bridge correlation/identity state in D1
+- keeping bridge correlation/identity, advisory page mirrors and transitional emoji-pack state in D1
 
-Cloudflare D1 must not store page bodies, saved-page CRUD state, managed chats, popup content, or page-mutation state.
+Telegram Serverless remains authoritative for pages and page mutations. D1's existing owner-scoped page mirrors are advisory precheck inputs; its existing emoji packs are transitional storage. Do not introduce a second authoritative page database or silently delete existing support data.
 
 The D1 binding name must be exactly:
 
@@ -159,7 +159,7 @@ The developer panel remains Arabic-only by design.
 `/dev` is controlled by numeric Telegram IDs in:
 
 ```text
-lib/developer-access.js
+tgcloud/lib/developer-access.js
 ```
 
 Do not replace or erase local developer IDs during pull/deploy workflows.
@@ -171,10 +171,11 @@ Telegram Serverless:
 ```bash
 npx tgcloud status
 npx tgcloud diff
-npx tgcloud migrate
 npx tgcloud push
 npx tgcloud webhook sync
 ```
+
+Run `npm install` and `npm test` before deployment. Review schema separately; run `npx tgcloud migrate` only when reviewed schema changes require it. A GitHub update does not prove live deployment.
 
 Cloudflare deploys from the `serverless-cleanup` branch through the configured Git integration.
 
@@ -211,3 +212,9 @@ Rules for cleanup:
 - keep `main` only as a historical behavioral reference; new work targets `serverless-cleanup`
 
 Obsolete Python/Aiogram files under `app/**/*.py` were removed in the cleanup pass. `app/miniapp_static/` remains the active Mini App frontend.
+
+## Documentation and tests
+
+Start with [docs/README.md](docs/README.md), [ROADMAP.md](ROADMAP.md) and [sups.md](sups.md). Changes go in [log.md](log.md).
+Active tests are [tests/serverless/](tests/serverless/) and run with `npm test`. The 58 Python-era tests are preserved as `.py.txt` in `docs/archive/python-tests/`; they are historical references, not runnable tests for this branch.
+The payment bot is maintained in [ihhaiq/richDonate](https://github.com/ihhaiq/richDonate). The former `subscription-bot/` scaffold is archived.

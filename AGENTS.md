@@ -1,246 +1,89 @@
-# AGENTS.md — Rich Customize Serverless
-
-This branch is the active JavaScript implementation of Rich Customize.
-
-The Python/Aiogram migration is complete. Work on this branch must target Telegram Serverless + Cloudflare Mini App only.
-
-## Authoritative references
-
-Use:
-
-1. https://core.telegram.org/bots/serverless
-2. https://core.telegram.org/bots/api
-
-Do not reintroduce Railway/PostgreSQL/Redis/Aiogram architecture into this branch.
-
-## Runtime layout
-
-Telegram Serverless:
-
-- `schema.js`
-- `handlers/*.js`
-- `lib/**/*.js`
-
-Mini App frontend:
-
-- `app/miniapp_static/**`
-
-Cloudflare Pages Functions:
-
-- `functions/**`
-
-Cloudflare support SQL:
-
-- `cloudflare/d1/schema.sql`
-- `cloudflare/d1/cleanup-legacy.sql`
-
-## Serverless rules
-
-- isolated V8 runtime
-- bare runtime imports only: `sdk`, `sdk/db`, `schema`, `lib/...`
-- no filesystem access
-- no npm dependency resolution inside handlers
-- Bot API calls use `api.<method>({...})`
-- await all DB calls
-- schema changes belong in root `schema.js`
-- `tgcloud push` deploys code; `tgcloud migrate` applies DB schema changes
-- never commit credentials, tokens, `.tgcloud/` or `node_modules/`
-
-## Source-of-truth boundaries
-
-Telegram Serverless is authoritative for:
-
-- `rich_pages`
-- editor/session state
-- managed publish destinations
-- publish permission checks
-- native user-picker state
-- usage stats
-- error-log configuration
-- compatibility state required by published messages/imports
-
-Cloudflare D1 is transient only:
-
-- `miniapp_bridge_pending`
-- `miniapp_bridge_identity`
-
-Never add page bodies, managed chats, popup bodies, user-picker page mutations, or a parallel page database to D1.
-
-The D1 binding name is exactly `DB`. Bridge tables auto-initialize when the binding exists.
-
-## RCB1 bridge
-
-Expected bridge:
-
-- relay bot: `@Richminiappsbot`
-- main bot: `@RichCustomizebot`
-- bridge chat: `-1003993506865`
-- protocol: `RCB1`
-
-Commands:
-
-```text
-rcb_ping
-rcb_pages
-rcb_page
-rcb_create
-rcb_save
-rcb_delete
-rcb_destinations
-rcb_publish
-rcb_user_picker
-rcb_err
-```
-
-Serverless temporarily accepts `rcb_client_error` as a legacy alias.
-
-Rules:
-
-- accept bridge commands only from the configured private bridge chat
-- require bot sender + expected relay username
-- require exact command target `@RichCustomizebot`
-- pair numeric relay ID only through initial PING
-- preserve request deduplication and rate limits
-- SAVE/DELETE require revision tokens
-- PUBLISH and USER_PICKER must not be stale-retried
-- client error reports must not include page content, tokens or initData
-- Bot-to-Bot Communication Mode must be enabled for bridge delivery
-
-## Mini App rules
-
-- verify Telegram `initData` before enabling the editor
-- fetch the user's saved pages on every startup
-- keep the editor blocked until startup succeeds
-- do not autosave; explicit Save is authoritative
-- preserve resume behavior for native Telegram pickers
-- startup failure uses the blocking X state: `صار حادث` / `حاول فدشوية`
-- API/client failures report through `/miniapp/api/client-error` and `rcb_err`
-- avoid heavy blur/glow; keep the UI restrained and native-like
-
-## Publishing rules
-
-- never call `sendRichMessage` with an empty block list
-- stale publish panels must fail before send
-- telemetry/logging failures must never convert a successful Telegram publish into a failed publish result
-- user-picker completion must remain retry-safe
-
-## Localization
-
-Supported locales:
-
-`ar`, `en`, `es`, `de`, `it`, `pt`, `nl`, `pl`, `uk`, `ru`, `tr`, `ur`, `hi`, `id`, `ja`, `ko`, `vi`, `th`, `zh-hans`, `zh-hant`.
-
-Removed: `fr`, `fa`, `ku`, `he`.
-
-Keep locale catalogs split under `lib/lang/`. Developer panel is Arabic-only.
-
-## Developer access
-
-Developer IDs live in `lib/developer-access.js`.
-
-Do not overwrite or remove configured local developer IDs during cleanup or deploy preparation.
-
-Developer usage exemptions must use `isDeveloper` with a trusted Telegram user ID.
-Pass the authenticated actor to content validators and the stored page owner to
-saved-page rendering (including inline/guest navigation). Never trust a client
-`is_developer`, `user_id`, or limits override to grant the exemption.
-
-Developers bypass product quotas for blocks, visible text, table size, slideshow
-item count, saved pages, premium emoji packs and per-user request windows across
-editing, saving, previewing, publishing and syncing. Keep authentication,
-ownership/revision checks, deduplication, mutation locks, global bridge backpressure,
-transport-size bounds and Telegram API limits intact. Frontend checks are advisory;
-Cloudflare and Serverless must independently enforce the same owner policy.
-
-This branch currently has no scheduled-publishing implementation or scheduled-post
-quota. Any future scheduler must apply the same developer exemption to its product
-horizon/count quotas without bypassing Telegram's scheduling constraints.
-
-## Cleanup phase
-
-Current work is cleanup/stabilization before new feature development.
-
-Cleanup policy:
-
-- remove obsolete Python files whose behavior is already replaced by active JavaScript
-- `app/miniapp_static/` is active and must stay
-- do not delete compatibility tables/data simply because old Python files are removed
-- do not remove uncertain files without a separate audit
-- after every deletion batch, verify active JS imports and deployment paths
-- do not start unrelated feature work during cleanup unless explicitly requested
-
-The obsolete `app/**/*.py` implementation has been removed. Do not recreate Python runtime files in this branch.
-
-## A1 subscription quota migration (October 2026)
-
-Read [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rollout.md) before changing subscription limits.
-**Implemented/staged on serverless-cleanup, not automatically deployed to tgcloud:**
-
-- Text quota policy: free 20,000, Plus 25,000, Golden 32,000 visible UTF-16 units, using `tgcloud/lib/subscription-policy.js`. Plus/Golden remain **not purchasable or active** until a verified payment-backed entitlement source exists; no client-supplied plan is trusted. Developer is exempt only when `isDeveloper(authenticatedTelegramUserId)` is true.
-- Preserve existing page content above the free ceiling: an authorized UPDATE may retain or **decrease** its actual stored character count, but cannot increase it. Never grant this exemption to CREATE or arbitrary unsaved payloads. The baseline is trusted `rich_pages.blocks` or a verified owner-specific mirror (read is advisory); Serverless always rechecks before mutation. Unsaved direct publishing has no grandfather exception. Existing saved-page delivery is allowed to render already stored content.
-- `functions/_lib/pages.js` is the Cloudflare **gateway** validator. The `PUT` route fetches an owner-scoped mirror via `functions/_lib/quota-baseline.js`; the mirror revision or updated_at MUST match the client's base revision. Missing, stale or mismatched mirrors **fail closed at free 20k**. Do not forward 20k–25k updates on trust that an older deployed Serverless will check the quota. The authoritative `tgcloud/lib/miniapp-bridge.js` still rechecks against stored blocks after ownership/revision checks. Never trust `previousBlocks`, `plan` or a developer flag from HTTP/RCB1 JSON.
-- Counts should agree across `tgcloud/lib/editor-blocks.js` and `functions/_lib/pages.js`, including nested details/lists, native blocks, table cells and rich content. Do not include system branding/footer in the **user content** quota; do separately respect Telegram message-size limits.
-- Free custom emoji pack quota is **2** (Plus 8/Golden 50 are policy only). Current Mini App packs are persisted in **Cloudflare D1**: `miniapp_custom_emoji_packs` and a legacy `miniapp_custom_emoji_primary_pack`; migration backfills legacy records without dropping either table. Nondeveloper pack insertion must use a single conditional atomic SQLite write. Do **not** mistake this transitional D1 storage for a paid-entitlement authority or silently migrate/delete user packs. Future move to Serverless requires its own approved migration.
-- Existing unapproved numeric caps (pages, blocks, tables, slideshow) remain unchanged. Preserve saved over-limit content and snapshots; ensure downgrades never delete/clip stored material.
-- For local verification use `node --experimental-vm-modules --test tests/serverless/subscription-policy.test.mjs tests/serverless/a1-quotas.test.mjs tests/serverless/a1-integration.test.mjs tests/serverless/developer-limits.test.mjs tests/serverless/a1-emoji-packs.test.mjs`. Full suite is recommended when available. Do not claim tests ran unless actually run.
-- The user explicitly authorized **automatic Cloudflare Pages deployment for every update** on production branch `serverless-cleanup`. Do NOT add `[CF-Pages-Skip]` to new commit messages unless the user reverses this direction. Cloudflare must remain Mini App-only, with GitHub push triggering build; verify deployment state separately. Never merge `main` or issue `tgcloud push`, `tgcloud migrate`, `tgcloud webhook sync` without explicit authorization; Telegram Serverless stays on the existing version until the user can publish later.
-
-## A1 test evidence and CI caveat (2026-10-09)
-
-- Keep `.github/workflows/a1-quota-tests.yml` as the focused no-deployment A1 CI job (five test files including `a1-integration.test.mjs`).
-- First run https://github.com/ihhaiq/Rich-Customize/actions/runs/37844480265 reported failure **without executing steps**, runner duration 0 ms. Investigate GitHub Actions runner/permissions/annotations rather than interpreting this as a Node test failure.
-- A separate isolated JS/V8 test executed 20 policy assertions against `tgcloud/lib/subscription-policy.js` and the three A1 emoji-pack test functions with their mocked D1: all passed. **These are not Node test-suite results, not real SQLite/D1 concurrency tests, and not production acceptance.**
-- The next agent must rerun `node --experimental-vm-modules --test tests/serverless/subscription-policy.test.mjs tests/serverless/a1-quotas.test.mjs tests/serverless/a1-integration.test.mjs tests/serverless/developer-limits.test.mjs tests/serverless/a1-emoji-packs.test.mjs` on an available runner/local checkout before claiming A1 tests complete.
-- Cloudflare Pages **is approved for auto-deploy** from `serverless-cleanup` even for documentation/tests. Telegram Serverless and `main` are NOT approved for deploy/change. A Cloudflare deploy does not mean the new tgcloud renderer/bridge code is live.
-
-## A1 concurrency/integration review (2026-10-09)
-
-- `tgcloud/lib/editor-extra-blocks.js` must obtain any old-text quota allowance via `trustedEditorQuotaBaseline(userId, session)` in `editor-session.js`; NEVER pass unsaved `session.blocks` as its own old-content proof. The helper verifies actual stored `rich_pages` owner.
-- Manual bot page saves and automatic page synchronization now use revision/owner-scoped conditional UPDATE, rejecting mid-flight conflicting writes instead of overwriting them. The Mini App bridge already uses revision CAS. Cross-session stale **editor session opened before an external edit** still needs separate revision tracking to fully detect all conflicts; do not claim otherwise.
-- Cloudflare gateway legacy `PUT` can allow unchanged/reduced over-quota text only when the owner-scoped D1 page mirror matches the submitted base revision/updated_at; if mirror is absent/stale, new quota applies. Never relax create/direct publish.
-- Tests `tests/serverless/a1-integration.test.mjs` cover mirror matching, untrusted drafts, saved-page delivery and CAS source invariants. GitHub Actions runner availability and end-to-end Telegram B2B+Cloudflare D1 still require verification; do not claim a live cross-platform pass until `tgcloud` is deployed.
-
-## Subscription limit offers in the Mini App (2026-10-09)
-
-- Cloudflare-only informational UI: `app/miniapp_static/subscription_offers.js` and `subscription_offers.css`, loaded by `editor.html` before `app.js` and `apple_emoji_picker.js`.
-- On a verified quota error from the API/bridge (`editor limit exceeded: characters`, `EDITOR_LIMIT_CHARACTERS`, `PAGE_LIMIT`, blocks/tables, or `custom_emoji_pack_limit`), call `window.RichSubscriptionOffers.showForError(error)` or `.show('emojiPacks', {actual,limit})` when the add-pack tab is locked. Do not upsell on unrelated validation, connectivity or server errors.
-- Show **all approved plan differences**, including text (20k/25k/32k), emoji packs (2/8/50), saved pages (12/50/150), blocks (30/60/120), branding removal during Plus/Golden, Golden early access, and 30-day prices 0/150/350 Stars. Do not promote unapproved technical table/media limits.
-- CTA is a Telegram **deep link**, not an invoice: `https://t.me/richDonateBot?start=rich_plans_text`, `rich_plans_emoji`, or `rich_plans_limits` (all Telegram-safe payloads). `@richDonateBot` must independently implement these `/start` parameters when managed-bot support is available. For now, the UI tells users paid plans are in preparation. Do not fabricate Stars prices, pretend payment occurred or claim the bot recognizes the payload yet.
-- Keep the locked emoji-pack add tab tappable so users can inspect plan comparison. Developers with unlimited quota should never see the pack-limit offer unless the trusted server returns a true limit error.
-- UI copy is Arabic and English with English fallback for other supported locales until translations are supplied. Preserve Telegram initData gating; no billing code, tokens, or Cloudflare bot backend.
-- Test entry: `node --test tests/serverless/subscription-offers.test.mjs`. Cloudflare Pages auto-deploy is authorized from `serverless-cleanup`, **tgcloud deployment remains deferred**.
-
-## Plan roadmap presentation (2026-10-09)
-
-- `subscription_offers.js` shows **approved plan benefits** directly without `Proposed`/`مقترح` or per-feature activation tags: saved pages 12/50/150, blocks 30/60/120, branding removal, Golden early access, prices 0/150/350 Stars.
-- The owner approved the full listed plan policy. Purchase **availability** is a separate question: until authenticated Telegram Serverless billing and migration are live, the app must disclose that paid subscriptions cannot yet be purchased. Never create an entitlement from marketing UI/client-supplied plan parameters. Saved templates were explicitly canceled.
-- Free retains 12 saved pages, 30 blocks, and separate permanent 99-Star branding removal. Approved Plus/Golden tiers have their own limits after trusted subscription activation. Do not loosen Free gateway validation based on a browser claim.
-
-## Approved editor subscription scope — templates removed (2026-10-09)
-
-- The owner approved Free/Plus/Golden saved-page limits **12/50/150**, block limits **30/60/120**, monthly 30-day prices **0/150/350 Stars**, active-paid branding removal, and Golden early-access entitlement. **Saved templates are excluded and must not be advertised or implemented.**
-- `tgcloud/lib/subscription-policy.js` is the pure policy source. `tgcloud/lib/editor-subscriptions.js` reads `editor_subscriptions` from Telegram Serverless; a paid plan is active only when status=active, source=`richdonate:verified`, and expiry is in the future. Developer unlimited quota remains tied to the authenticated developer ID. **Never trust HTTP client plan, `is_developer`, current timestamp, source or Stripe/Stars metadata supplied by a browser.**
-- **Owner canceled saved-page version history on 2026-10-09.** Do not reintroduce `editor_page_versions`, paid historical versions or restore-from-version controls. Keep normal saving, revision conflict protection, operational backups and in-session undo/redo.
-- `page_snapshots` are operational backups, not paid page history. Do not repurpose or delete them. No destructive cleanup or schema migrations without review. `tgcloud push/migrate/webhook sync` remains deferred until the user has a computer.
-- Brand-removal lifetime entitlement purchased for 99 Stars always overrides the included temporary plan benefit and must survive Plus/Golden expiry. Early-access policy grants eligibility only; don't invent or activate experimental features without a flag.
-- `@richDonateBot` has **not** yet issued verified editor subscriptions; code includes a trusted read-only entitlement resolver, not the payment flow. Cloudflare Mini App still performs conservative Free quota gateway checks (20k/30 blocks) until authenticated entitlement transport is designed. Avoid representing paid limits as live.
-- The Cloudflare subscription offer popup shows approved future plan features/prices, explicitly says purchasing is currently unavailable, and contains no saved template. Cloudflare production branch remains `serverless-cleanup`, auto-deploy without `[CF-Pages-Skip]`.
-
-## Owner correction: no per-feature proposal labels (2026-10-09)
-
-- Plus/Golden benefits and prices are **approved features of their plans**, not suggestions. Never render `مقترح`, `Proposed`, `is-proposed`, `عند التفعيل` or similar qualifiers next to every benefit in the Mini App comparison.
-- An honest **single availability note** remains mandatory: paid subscription purchases and Telegram Serverless entitlement activation are not live until billing, migrations and integration tests are complete. This does not change which benefits belong to each plan.
-- No templates. Scheduling is outside the plan comparison until separately approved.
-
-## Pricing-first plan cards (2026-10-09)
-- Owner requested a visual redesign of Mini App plan offers: show plan name and **prominent approved monthly price** (Free, 150 Stars/30 days, 350 Stars/30 days), then present all approved benefits in a single compact two-column feature list. **Never split a plan card into quotas and benefits.**
-- The ONLY note below comparison cards should be: `الباقات في الإصدار التجريبي وغير متاحة للبيع حالياً.` (English fallback: Subscriptions are in beta and not available for purchase yet). Remove extra explanatory paragraphs; do not claim payment is currently enabled.
-- No saved templates, no future scheduling. Preserve `@richDonateBot` Telegram deep links for learning about plans, not direct payment. New appearance files: `subscription_offers.js`/`subscription_offers.css`, cache key 0.3.86.
-
-## Mandatory change log — log.md
-
-- On EVERY completed code, UI, schema, tests, or documentation change, update root `log.md` in the same work session/patch. This applies to agents and contributors in all future tasks.
-- Add newest entry first. Record **date, what changed, why, affected files, tests (passed/failed/not run), and separate GitHub, Telegram Serverless, and Cloudflare deployment state**. Combine commits for one task into a single truthful entry when appropriate.
-- Document fixes, feature cancellations, migrations and important behavior changes as well as new features. Do not claim deployment or tests that did not happen.
-- Never store credentials, tokens, payment information or private user content in the log. Pure changelog maintenance does not need an additional recursive entry.
-- A GitHub push to `serverless-cleanup` can trigger Cloudflare Pages automatically; this is separate from `tgcloud push`, and should be recorded as unverified until checked.
+# AGENTS.md — Rich Customize
+
+Work on `serverless-cleanup`. Active runtime is Telegram Serverless JavaScript; Cloudflare is Mini App-only.
+Read [docs/README.md](docs/README.md), [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rollout.md). Archived material is historical, never implementation authority.
+
+## Layout and runtime
+- `tgcloud/schema.js`: persistent schema.
+- `tgcloud/handlers/*.js`: flat Telegram update handlers.
+- `tgcloud/lib/**/*.js`: editor, renderer, page delivery, publishing, quotas, localization and compatibility.
+- `app/miniapp_static/**`: active browser UI.
+- `functions/**`, `cloudflare/d1/**`: Mini App authentication, bridge, upload and support state.
+- `tests/serverless/*.test.mjs`: active JS suite, `npm test` from root; Node 24.
+- `docs/archive/**`: old plans and Python tests as text, not active runtime/tests.
+- Billing is maintained in `ihhaiq/richDonate` on `main`; no active `subscription-bot/` project in this repository.
+
+Use SDK `api`, `db`, `fetch`, `InputFile` in the isolated V8 runtime. No filesystem/npm runtime dependencies.
+Prefer relative project imports ending in `.js`; existing `schema`/`lib/...` module-name imports are supported.
+Await DB calls. Code deployment and schema migration are separate. Do not reintroduce Aiogram, Railway, PostgreSQL or Redis runtime.
+
+## Data and authorization
+Telegram Serverless owns `rich_pages`, editor sessions, publish destinations/permissions, user-picker state, usage, error configuration and compatibility.
+D1 retains existing bridge correlation/identity, owner-scoped advisory page mirrors and transitional emoji packs. It must not become a second authoritative page database or billing store.
+Binding is `DB`. Do not silently remove/migrate existing packs or mirrors.
+Authenticate Telegram initData before UI access and on the server. No client owner/plan/developer flag can grant access.
+Check owner and revision before page changes; preserve CAS, request deduplication, mutation locks and global backpressure.
+Do not delete compatibility tables, old callbacks or imported state because their original Python implementation is gone.
+
+## RCB1 Mini App bridge
+Relay: `@Richminiappsbot`; main: `@RichCustomizebot`; private bridge chat: `-1003993506865`; protocol: `RCB1`.
+Preserve exact bridge chat, target username and sender checks. Numeric relay identity is pinned via PING.
+Bot-to-Bot Mode is required. Commands include ping/pages/page/create/save/delete/destinations/publish/user_picker/err.
+Keep legacy `rcb_client_error` compatibility. SAVE/DELETE require revision tokens.
+Never stale-retry PUBLISH or USER_PICKER. Errors must exclude tokens, initData, page contents and payment secrets.
+
+## Editor and publication
+Fetch user pages at every Mini App startup; block editing until startup succeeds.
+Preserve native-picker resume and explicit Save; local drafts are not authoritative saved pages.
+Startup failure retains the blocking X state and localized retry behavior.
+Never send an empty rich message. Telemetry failure must not turn successful Telegram publication into a failed publish result.
+Saved rendering uses authenticated stored owner and quota baseline, including inline/guest/page navigation.
+Content sync must not overwrite a saved page's name with a stale session title.
+Exact normalized own-page names can be called in inline/guest; duplicate names refuse selection. Shared page-code behavior is preserved.
+Save/rename/restore and Mini App create/save reject normalized names used by another page of the same owner; updating the same page is allowed.
+Owner mutation locks have leases; unit tests do not prove exactly-once or full production concurrency.
+
+## Developer access and localization
+IDs: `tgcloud/lib/developer-access.js`. Preserve configured local IDs.
+Only `isDeveloper` on a trusted Telegram actor grants internal product quota exemptions.
+Authentication, ownership, revision checks, deduplication, locks, transport bounds and Telegram API limits still apply.
+Supported locales: ar/en/es/de/it/pt/nl/pl/uk/ru/tr/ur/hi/id/ja/ko/vi/th/zh-hans/zh-hant.
+Removed locales: fr/fa/ku/he. Catalogs: `tgcloud/lib/lang/`; developer panel Arabic-only.
+Arabic copy uses the owner's wording, including «تليكرام».
+
+## Subscriptions: approved specification versus current runtime
+Root `sups.md` is the approved product specification, dated 2026-10-10:
+- Text: 20000/25000/32768.
+- Total nested blocks/items: 50/200/500.
+- Depth: 4/8/16; media per message: 10/25/50; columns per table: 8/12/20.
+- Saved pages: 12/50/150; emoji packs: 2/8/50.
+- Plus 150 Stars, Golden 350 per 30 days; manual renewal.
+- Branding: separate permanent 99-Star purchase, or included while Plus/Golden is active.
+- Golden early access has no named experimental features yet.
+
+Do NOT claim these new numbers are enforced merely because they appear in docs/donation UI.
+Editor runtime still has older caps; [rollout](docs/subscription-rollout.md) tracks remaining work.
+`editor-subscriptions.js` accepts active unexpired records from `richdonate:verified`; complete trusted payment event issuance/ACK remains pending.
+Templates and saved page history are cancelled; scheduling is deferred.
+Operational `page_snapshots`, revision CAS and session undo/redo remain required.
+
+Preserve old saved content over the free text cap without allowing expansion. Trusted baseline must come from owner-verified stored pages, never unsaved session blocks.
+Cloudflare PUT may use a matching owner-specific mirror; missing/stale mirrors fail closed to Free.
+Serverless independently rechecks. Unsaved direct publication has no grandfather exception.
+Final Telegram message limits include branding/generated text/blocks. Developer cannot bypass Telegram limits.
+Do not assume `String.length`, Unicode characters and UTF-8 byte counts are identical.
+The branding button deep-links to `https://t.me/richDonateBot?start=cart_branding`; old paid receipts/branding rights must remain valid.
+The welcome «بوتاتي» button is removed; legacy runtime/data were not deleted.
+
+## Cleanup and change log
+- Every completed code, test, schema, UI or documentation change updates root `log.md` in the same batch.
+- Record date, change, reason, files, actual tests and GitHub versus deployment state. Never log secrets/private content.
+- Root `log.md` is the only active change history. `PROJECT-LOG.md` is a pointer to its archived baseline.
+- Remove/move only files proven obsolete; validate imports, links and tests. Keep uncertain runtime modules and SQL until a separate dependency/data audit.
+- No unrelated feature work during cleanup. Do not change financial behavior just to tidy files.
+
+## Deployment
+User authorized Cloudflare Pages Git auto-deploy from `serverless-cleanup`; no `[CF-Pages-Skip]` unless reversed. Verify deployment separately.
+User runs Telegram CLI locally; supplying commands or pushing GitHub does not prove Telegram deployment.
+For this cleanup: no `tgcloud push`, `migrate`, webhook changes, production data cleanup or architecture change.
+Review schema and diff before any separately authorized production action. Never commit `.tgcloud/`, tokens, `.env` or `node_modules/`.

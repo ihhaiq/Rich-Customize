@@ -34,5 +34,7 @@ test('donor entitlement and plan UI no longer advertise saved-page history', () 
   const source=read('app/miniapp_static/subscription_offers.js');
   assert.doesNotMatch(source,/lastVersions|plan\.history|سجل نسخ الصفحة|Page version history/);
   const pages=read('tgcloud/lib/pages.js');
-  assert.doesNotMatch(pages,/🕘/);
+  // The clock marks the updated-at column; it is not a saved-history action.
+  assert.doesNotMatch(pages,/r:phistory|r:phrestore|سجل نسخ الصفحة|Page version history/);
 });
+

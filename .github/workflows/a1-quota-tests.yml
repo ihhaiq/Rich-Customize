@@ -24,14 +24,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - name: Run A1 and developer regression tests
-        run: |
-          node --experimental-vm-modules --test \
-            tests/serverless/subscription-policy.test.mjs \
-            tests/serverless/a1-quotas.test.mjs \
-            tests/serverless/a1-integration.test.mjs \
-            tests/serverless/page-version-history.test.mjs \
-            tests/serverless/subscription-offers.test.mjs \
-            tests/serverless/developer-limits.test.mjs \
-            tests/serverless/a1-emoji-packs.test.mjs
+          node-version: '24'
+      - name: Run Serverless regression tests
+        run: npm test

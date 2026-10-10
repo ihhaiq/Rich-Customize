@@ -1,6 +1,6 @@
 # Rich Customize — Architecture Map
 
-> Branch: `serverless-cleanup` · Reviewed against repository documentation: 2026-10-08
+> Branch: `serverless-cleanup` · Reviewed against repository documentation: 2026-10-10
 > This describes the documented design, not an independent live-production audit.
 
 ## System overview
@@ -10,7 +10,7 @@ Telegram users
    |
    +--> @RichCustomizebot
    |      Telegram Serverless JS
-   |      schema.js / handlers/ / lib/
+   |      tgcloud/schema.js / tgcloud/handlers/ / tgcloud/lib/
    |      authoritative pages, sessions, permissions, publishing
    |
    +--> Mini App (app/miniapp_static/)
@@ -18,7 +18,7 @@ Telegram users
           v
       Cloudflare Pages + Functions (functions/)
           |   validates Telegram initData
-          |   D1 (DB): transient bridge state only
+          |   D1 (DB): bridge/support state and transitional emoji packs
           v
       @Richminiappsbot (relay)
           |
@@ -32,10 +32,10 @@ Telegram users
 ## Ownership boundaries
 | Component | Paths | Responsibility |
 | --- | --- | --- |
-| Telegram Serverless | `schema.js`, `handlers/*.js`, `lib/**/*.js` | Authoritative page and editor data, permissions, publication, compatibility and operational state |
+| Telegram Serverless | `tgcloud/schema.js`, `tgcloud/handlers/*.js`, `tgcloud/lib/**/*.js` | Authoritative page and editor data, permissions, publication, compatibility and operational state |
 | Mini App | `app/miniapp_static/**` | Browser UI and local unsaved edits; explicitly saved changes go through the bridge |
 | Cloudflare Functions | `functions/**` | Authentication validation, relay transport, webhook and upload handling |
-| Cloudflare D1 | `cloudflare/d1/schema.sql` | Short-lived request correlation and identity; binding name `DB` |
+| Cloudflare D1 | `cloudflare/d1/schema.sql` | Request correlation, identity, page mirrors used for prechecks, and transitional emoji-pack storage; binding `DB`. Saved page truth remains Serverless |
 | Documentation | `docs/**`, root Markdown | Architecture and planning; not an executable source of truth |
 
 ## Data invariants
@@ -60,4 +60,4 @@ The documented bridge uses `@Richminiappsbot` as relay and `@RichCustomizebot` a
 2. Trace affected data flow across Serverless, bridge and Cloudflare.
 3. Identify security, ownership, retry, size and data-loss risks.
 4. Test the relevant paths and document actual verification.
-5. Update this file and add a decision entry to `PROJECT-LOG.md` only for confirmed architectural changes.
+5. Update this file and add a decision entry to `log.md` only for confirmed architectural changes.

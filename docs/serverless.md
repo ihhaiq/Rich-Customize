@@ -6,8 +6,8 @@ Primary reference: https://core.telegram.org/bots/serverless
 
 - Isolated V8 runtime.
 - Built-in persistent SQLite-backed database.
-- Root `schema.js`, `lib/**/*.js`, and one-level `handlers/*.js` are deployed.
-- Use bare imports only.
+- `tgcloud/schema.js`, `tgcloud/lib/**/*.js`, and one-level `tgcloud/handlers/*.js` are deployed. Run CLI from the repository root.
+- Prefer project-relative imports ending in `.js`; existing module-name imports (`schema`, `lib/...`) are still present. SDK imports use `sdk` and `sdk/db`.
 - The Serverless SDK supplies `api`, `db`, `fetch`, `InputFile`, and `BotApiError`.
 - `api.getFileContent(file_id)` returns a `Uint8Array`; Bot API downloads are capped at 20 MB.
 - `InputFile` uploads raw bytes through Bot API methods.
@@ -39,7 +39,7 @@ The old backup format `rich-customize-json-backup-v1` remains supported so Railw
 
 ## Mini App B2B bridge
 
-The active Mini App integration keeps pages, managed publish destinations and native user-picker mutations in Telegram Serverless. Cloudflare hosts the frontend and B2B relay only; D1 keeps short-lived request correlation/identity metadata.
+The active Mini App integration keeps pages, managed publish destinations and native user-picker mutations in Telegram Serverless. Cloudflare hosts the frontend and B2B relay only; D1 keeps bridge/support metadata and transitional emoji-pack storage. Owner-specific page mirrors are precheck inputs, never the authoritative saved-page database.
 
 Serverless bridge commands are accepted only from `@Richminiappsbot` in private bridge chat `-1003993506865`, addressed to `@RichCustomizebot` with protocol `RCB1`. Numeric relay identity is paired only by the initial PING.
 

@@ -11,7 +11,7 @@ Cloudflare is responsible only for:
 - forwarding Mini App media uploads to Telegram to obtain reusable `file_id` values;
 - storing short-lived B2B correlation/identity metadata.
 
-Cloudflare D1 is **not** a page database and is not a managed-chat database.
+Telegram Serverless remains authoritative for pages and managed chats. D1 also contains transitional owner-specific page mirrors used by quota-baseline checks; these mirrors are not an independent source of truth.
 
 ## Architecture
 
@@ -41,7 +41,7 @@ The single canonical schema is:
 cloudflare/d1/schema.sql
 ```
 
-It creates only:
+The original bridge schema creates:
 
 - `miniapp_bridge_pending` — short-lived request correlation/status;
 - `miniapp_bridge_identity` — pinned numeric main-bot identity.
@@ -162,7 +162,7 @@ Telegram Serverless is authoritative for:
 - user-picker pending state and `users_shared` handling;
 - page ownership and revision checks.
 
-Cloudflare must never reconstruct a parallel copy of those tables.
+Cloudflare must not treat its transitional page mirrors as authoritative page storage.
 
 The old server-side discard rollback was removed after autosave was removed. The trash/close flow now discards only unsaved local WebView changes; an explicit Save is never silently undone.
 
@@ -221,8 +221,8 @@ Review/apply them with:
 
 ```bash
 npx tgcloud diff
-npx tgcloud push
 npx tgcloud migrate
+npx tgcloud push
 npx tgcloud webhook sync
 ```
 
@@ -244,7 +244,7 @@ Each modal shows Free / Plus / Golden Ticket approved text+pack limits and a Tel
 
 ## Plan comparison without saved templates (2026-10-09)
 
-The Mini App quota modal lists the approved post-launch plan comparison including pages, blocks, active-plan branding removal, history, Golden early access and 150/350-Star 30-day prices. Saved templates are omitted by user decision. No Stars invoice or paid plan activation is handled by Cloudflare.
+The Mini App quota modal lists the approved post-launch plan comparison including pages, blocks, active-plan branding removal and Golden early access and 150/350-Star 30-day prices. Saved templates are omitted by user decision. No Stars invoice or paid plan activation is handled by Cloudflare.
 
 These features remain source-staged until trusted Telegram Serverless subscriptions are enabled. The Cloudflare gateway must still use conservative Free validation while authenticated paid entitlements are unavailable on the gateway; the app does not claim Plus/Golden are available for purchase.
 
@@ -252,3 +252,7 @@ These features remain source-staged until trusted Telegram Serverless subscripti
 
 ## Subscription UI styling revision 2026-10-09
 The subscription comparison is a pricing-first compact card layout: price (Stars/30 days) stands out beside plan name; approved entitlements are shown in one simple grid without separate headings for quotas and features. A single notice below the cards says plans are in beta and unavailable for sale. Deep links to `@richDonateBot` remain informational. No templates or billing activation from Cloudflare.
+
+## Current documentation
+
+The approved limits and canceled features are recorded in [sups.md](../sups.md). Saved-page version history and templates are canceled; scheduling is deferred. [Subscription rollout](subscription-rollout.md) distinguishes approved benefits from enforced runtime limits. Earlier deployment notes above describe their dated rollout stage.
