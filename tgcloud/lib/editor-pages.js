@@ -512,6 +512,24 @@ export async function handleEditorPageCallback(query) {
       });
       return true;
     }
+    if (result.status === 'legacy_read_only') {
+      await api.answerCallbackQuery({
+        callback_query_id:query.id,
+        text:resolveLanguage(code)==='ar'
+          ? 'هذه الصفحة القديمة للنشر فقط؛ ما تگدر تحفظ تعديلات عليها.'
+          : 'This legacy saved page is publish-only. Edits are not allowed.',
+        show_alert:true,
+      });
+      return true;
+    }
+    if (result.status === 'quota_exceeded') {
+      await api.answerCallbackQuery({
+        callback_query_id:query.id,
+        text:limitText(result.limit,code),
+        show_alert:true,
+      });
+      return true;
+    }
 
     await api.answerCallbackQuery({
       callback_query_id:query.id,
