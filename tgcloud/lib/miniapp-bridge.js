@@ -1061,7 +1061,7 @@ async function replayCompletedMutation(message, id, action, result) {
 
 export async function handleMiniAppBridgeMessage(message, context = {}) {
   const scheduleSource=commandSource(message);
-  if (/^\\/rcb_schedule_(ack|due)@richcustomizebot\\b/i.test(scheduleSource)) {
+  if (/^\/rcb_schedule_(ack|due)@richcustomizebot\b/i.test(scheduleSource)) {
     if (!isBridgeOrigin(message)) return false;
     await authorizeBridgeMessage(message,'schedule_due');
     return receiveScheduleRelayControl(scheduleSource);
