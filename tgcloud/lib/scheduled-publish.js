@@ -5,6 +5,7 @@ import { and, eq } from 'sdk/db';
 import { scheduledPosts, scheduledPostDestinations, editorSessions, richPages } from 'schema';
 import { loadEditorSession, updateEditorSession } from 'lib/editor-session';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
+import { isLegacySavedPage, isSavedPageUnchanged } from 'lib/saved-page-policy';
 import { validateScheduleRequest } from 'lib/schedule-policy';
 import { inspectPublishAccess, sendRichMessageSafe } from 'lib/publish';
 import { isDefinitePublishRejection, normalizePublishError } from 'lib/publish-errors';
@@ -65,15 +66,19 @@ export async function createScheduledPublish(ownerId, session, selected, runAt){
   const page=session.currentPageId
     ? await db.select().from(richPages).where(eq(richPages.pageId,String(session.currentPageId))).get()
     : null;
-  const previousBlocks=page && Number(page.ownerId)===userId?page.blocks||[]:null;
-  const richMessage=buildInputRichMessage(session.blocks,{
+  const savedPage=page && Number(page.ownerId)===userId?page:null;
+  const legacy=Boolean(savedPage && isLegacySavedPage(savedPage,userId,entitlement));
+  if(legacy && !isSavedPageUnchanged(savedPage,session)) {
+    return {ok:false,code:'LEGACY_PAGE_READ_ONLY'};
+  }
+  const richMessage=buildInputRichMessage(legacy?savedPage.blocks:session.blocks,{
     userId,sourcePageId:session.currentPageId||null,
     includeBranding:await shouldIncludeBranding(userId),
-    previousBlocks,entitlement,
+    entitlement,technicalOnly:legacy,
   });
-  const buttons=await prepareMessageButtons(session.messageButtons||[]);
+  const buttons=await prepareMessageButtons(legacy?savedPage.buttons||[]:session.messageButtons||[]);
   const markup=buttons.length?buildMessageButtonsKeyboard(buttons,{
-    buttonsPerRow:Number(session.buttonsPerRow||1),
+    buttonsPerRow:Number((legacy?savedPage.buttonsPerRow:session.buttonsPerRow)||1),
     sourcePageId:session.currentPageId||null,
   }):null;
   const stamp=now(),jobId=newJobId();
