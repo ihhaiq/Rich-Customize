@@ -6,11 +6,11 @@
   // All plan benefits are approved by the owner. Billing and entitlement
   // activation remain unavailable until trusted Telegram-side rollout.
   const OFFERS = Object.freeze([
-    { name: "Free", text: 20000, emojiPacks: 2,
+    { name: "Free", text: 20000, emojiPacks: 2, tableColumns: 8,
       pages: 12, blocks: 30, rights: "separate", price:0, earlyAccess: false },
-    { name: "Plus", text: 25000, emojiPacks: 8,
+    { name: "Plus", text: 25000, emojiPacks: 8, tableColumns: 12,
       pages: 50, blocks: 60, rights: "included", price:150, earlyAccess: false },
-    { name: "Golden Ticket", text: 32000, emojiPacks: 50,
+    { name: "Golden Ticket", text: 32000, emojiPacks: 50, tableColumns: 20,
       pages: 150, blocks: 120, rights: "included", price:350, earlyAccess: true },
   ]);
   const strings = {
@@ -18,6 +18,7 @@
       heading: "وصلت إلى حد الباقة",
       text: "وصلت إلى حد النص المتاح في الخطة المجانية.",
       emojiPacks: "وصلت إلى حد حزم الإيموجي المميزة في الخطة المجانية.",
+      tableColumns: "وصلت إلى حد أعمدة الجدول المسموح بها في باقتك.",
       other: "وصلت إلى أحد حدود المحرر الحالية. قارن حدود الباقات لمعرفة التفاصيل.",
       usage: "استخدامك: {actual} من {limit}",
       plans: "مقارنة الخطط",
@@ -29,6 +30,7 @@
       freeTier: "مجاني",
       textQuotaLabel: "عدد الأحرف",
       packQuotaLabel: "حزم الإيموجي",
+      tableColumnsLabel: "أعمدة الجدول",
       pages: "الصفحات المحفوظة",
       blocks: "البلوكات",
       rights: "إزالة الحقوق",
@@ -52,6 +54,7 @@
       heading: "Plan limit reached",
       text: "You've reached the Free plan's text limit.",
       emojiPacks: "You've reached the Free plan's custom emoji pack limit.",
+      tableColumns: "You've reached the table column limit for your plan.",
       other: "You've reached an editor limit. Compare the plans to see their included limits.",
       usage: "Used: {actual} of {limit}",
       plans: "Compare plans",
@@ -63,6 +66,7 @@
       freeTier: "Free",
       textQuotaLabel: "Text",
       packQuotaLabel: "Emoji packs",
+      tableColumnsLabel: "Table columns",
       pages: "Saved pages",
       blocks: "Blocks",
       rights: "Remove branding",
@@ -118,7 +122,7 @@
     if (event.key === "Escape") close();
   }
   function show(kind = "other", { actual, limit } = {}) {
-    if (!["text", "emojiPacks", "other"].includes(kind)) kind = "other";
+    if (!["text", "emojiPacks", "tableColumns", "other"].includes(kind)) kind = "other";
     if (typeof document === "undefined" || !document.body) return false;
     if (overlay) close();
     returnFocus = document.activeElement;
@@ -178,6 +182,7 @@
       const benefits = element("div", "rich-subscription-perks");
       perk(benefits, "textQuotaLabel", format(plan.text));
       perk(benefits, "packQuotaLabel", format(plan.emojiPacks));
+      perk(benefits, "tableColumnsLabel", format(plan.tableColumns));
       perk(benefits, "pages", format(plan.pages));
       perk(benefits, "blocks", format(plan.blocks));
       perk(benefits, "rights",
@@ -220,6 +225,7 @@
     const value = [error?.code, error?.message].filter(Boolean).join(" ");
     if (/custom_emoji_pack_limit|emoji\.pack_limit_reached/i.test(value)) return "emojiPacks";
     if (/editor limit exceeded:\s*characters|EDITOR_LIMIT[_:]CHARACTERS|limits\.characters/i.test(value)) return "text";
+    if (/EDITOR_LIMIT[_:]TABLE_COLUMNS|editor limit exceeded:\s*table_columns/i.test(value)) return "tableColumns";
     if (/editor limit exceeded:\s*(?:blocks|table_rows|table_columns)|EDITOR_LIMIT[_:](?:BLOCKS|TABLE_ROWS|TABLE_COLUMNS)|\bPAGE_LIMIT\b|page limit reached/i.test(value)) return "other";
     return null;
   }
