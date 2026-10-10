@@ -4,10 +4,10 @@ import { plainRichText } from '../../tgcloud/lib/rich-text.js';
 import { validateStoredButtons } from '../../tgcloud/lib/button-validation.js';
 import { HttpError } from './http.js';
 
-export const MAX_PAGE_BLOCKS = 30;
+export const MAX_PAGE_BLOCKS = 500; // Telegram transport ceiling; subscription quotas are checked by Serverless
 export const MAX_VISIBLE_CHARACTERS = PLAN_LIMITS.free.text;
-export const MAX_TABLE_ROWS = 50;
-export const MAX_TABLE_COLUMNS = 25;
+export const MAX_TABLE_ROWS = 26;
+export const MAX_TABLE_COLUMNS = 20;
 export const MAX_BUTTONS = 100;
 
 function clone(value) {
@@ -230,21 +230,16 @@ export function validatePagePayload(payload, current = null, userId = null) {
     throw new HttpError(400, 'blocks must be a list of objects');
   }
 
-  const blockCount = countBlocks(blocks);
-  if (!developer && blockCount > MAX_PAGE_BLOCKS) {
-    throw new HttpError(400, 'editor limit exceeded: blocks (' + blockCount + '/' + MAX_PAGE_BLOCKS + ')');
+  // Cloudflare can only enforce Telegram's technical maxima. It must not
+  // guess a subscription tier from a browser parameter: verified Free/Plus/
+  // Golden quotas are enforced by Telegram Serverless on every mutation.
+  const transportBlocks = countBlocks(blocks);
+  if (transportBlocks > MAX_PAGE_BLOCKS) {
+    throw new HttpError(400, 'editor limit exceeded: blocks (' + transportBlocks + '/' + MAX_PAGE_BLOCKS + ')');
   }
-
   const characterCount = visibleCharacterText(blocks).length;
-  const previousCount = Array.isArray(current?.blocks) ? visibleCharacterText(current.blocks).length : 0;
-  const quota = checkEditorTextQuota(
-    resolveEditorEntitlement({ developer }), characterCount, { previousCount },
-  );
-  // Never forward over-quota content using an unverified gateway fallback.
-  // During phased deployment, Serverless may still run the former 25k policy.
-  if (!quota.allowed) {
-    throw new HttpError(400,
-      'editor limit exceeded: characters (' + characterCount + '/' + quota.limit + ')');
+  if (characterCount > 32768) {
+    throw new HttpError(400, 'editor limit exceeded: characters (' + characterCount + '/32768)');
   }
 
   for (const block of blocks) {
@@ -253,14 +248,14 @@ export function validatePagePayload(payload, current = null, userId = null) {
       const item = stack.pop();
       if (String(item?.type || '') === 'table') {
         const rows = tableRows(item);
-        if (!developer && rows.length > MAX_TABLE_ROWS) {
+        if (rows.length > MAX_TABLE_ROWS) {
           throw new HttpError(
             400,
             'editor limit exceeded: table_rows (' + rows.length + '/' + MAX_TABLE_ROWS + ')',
           );
         }
         const widest = Math.max(0, ...rows.map(rowWidth));
-        if (!developer && widest > MAX_TABLE_COLUMNS) {
+        if (widest > MAX_TABLE_COLUMNS) {
           throw new HttpError(
             400,
             'editor limit exceeded: table_columns (' + widest + '/' + MAX_TABLE_COLUMNS + ')',
