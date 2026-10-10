@@ -81,7 +81,6 @@ function savedPageMatchesSession(page, session) {
     && stable(page.buttons || []) === stable(session.messageButtons || [])
     && normalizedButtonsPerRow(page.buttonsPerRow) === normalizedButtonsPerRow(session.buttonsPerRow)
     && normalizedButtonsAlign(page.buttonsAlign) === normalizedButtonsAlign(session.buttonsAlign)
-    && String(page.title || page.pageId) === String(session.currentPageTitle || page.title || page.pageId)
   );
 }
 
@@ -112,11 +111,8 @@ async function syncSavedPageSession(userId, session) {
   if (!quota.ok) return { status:'quota_exceeded', changed:false, limit:quota };
   const stamp = Math.max(nowSeconds(), Number(page.updatedAt || 0) + 1);
   const version = await nextPageSyncVersion(page.revision || 1);
-  const title = String(session.currentPageTitle || page.title || pageId).trim().slice(0, 64)
-    || String(page.title || pageId);
 
   const changed = await db.update(richPages).set({
-    title,
     blocks: clone(session.blocks || []),
     buttons: clone(session.messageButtons || []),
     buttonsPerRow: normalizedButtonsPerRow(session.buttonsPerRow),

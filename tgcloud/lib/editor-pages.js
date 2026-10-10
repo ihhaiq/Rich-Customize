@@ -1,3 +1,4 @@
+import { assertUniquePageTitle, acquireOwnerPageLock, releaseOwnerPageLock } from 'lib/page-names';
 import { api, db } from 'sdk';
 import { and, eq, lt } from 'sdk/db';
 import { maintenanceLocks, richPages } from 'schema';
@@ -155,29 +156,6 @@ async function ownerPageCount(ownerId) {
   return db.$count(richPages, eq(richPages.ownerId, Number(ownerId)));
 }
 
-async function acquireOwnerPageLock(ownerId) {
-  const stamp = nowSeconds();
-  await db.delete(maintenanceLocks).where(lt(maintenanceLocks.expiresAt, stamp)).run();
-  const name = 'pages:owner:' + Number(ownerId);
-  const expiresAt = stamp + 15;
-  const rows = await db.insert(maintenanceLocks)
-    .values({ name, expiresAt })
-    .onConflictDoNothing({ target: maintenanceLocks.name })
-    .returning({ name: maintenanceLocks.name })
-    .run();
-  return Array.isArray(rows) && rows.length > 0 ? { name, expiresAt } : null;
-}
-
-async function releaseOwnerPageLock(lock) {
-  if (!lock?.name || !Number.isSafeInteger(Number(lock.expiresAt))) return;
-  await db.delete(maintenanceLocks)
-    .where(and(
-      eq(maintenanceLocks.name, String(lock.name)),
-      eq(maintenanceLocks.expiresAt, Number(lock.expiresAt)),
-    ))
-    .run();
-}
-
 async function allocatePageId() {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const id = pageCode();
@@ -198,7 +176,15 @@ async function persistPage(userId, title, session, existingId = null) {
     }
   }
 
+  const ownerLock = await acquireOwnerPageLock(userId);
+  if (!ownerLock) {
+    const error = new Error('PAGE_BUSY');
+    error.pageBusy = true;
+    throw error;
+  }
+  try {
   const cleanedTitle = String(title || '').trim().slice(0, 64) || 'Untitled page';
+  await assertUniquePageTitle(userId, cleanedTitle, existingId);
   let stamp = nowSeconds();
   if (existingId) {
     const existing = await getPage(existingId);
@@ -238,13 +224,6 @@ async function persistPage(userId, title, session, existingId = null) {
   }
 
   await assertQuota();
-  const ownerLock = await acquireOwnerPageLock(userId);
-  if (!ownerLock) {
-    const error = new Error('PAGE_BUSY');
-    error.pageBusy = true;
-    throw error;
-  }
-  try {
     const pageLimit = safePlanLimit(await getEditorEntitlement(userId), 'pages');
     if (pageLimit != null && await ownerPageCount(userId) >= pageLimit) {
       const error = new Error('PAGE_LIMIT');
@@ -287,6 +266,8 @@ async function restorePage(userId, pageId, snapshot) {
   if (!ownerLock) return false;
   try {
     if (await getPage(pageId)) return false;
+    try { await assertUniquePageTitle(userId, String(snapshot.title || pageId).trim().slice(0,64), pageId); }
+    catch (error) { if (error.pageNameExists) return false; throw error; }
     const pageLimit = safePlanLimit(await getEditorEntitlement(userId), 'pages');
     if (pageLimit != null && await ownerPageCount(userId) >= pageLimit) return false;
     const blocks = clone(snapshot.blocks || []);
@@ -739,6 +720,12 @@ async function receiveSaveName(message, session, code) {
         id = await persistPage(userId, title, { ...latest, currentPageId: null }, null);
       }
     } catch (error) {
+      if (error?.pageNameExists) {
+        await api.sendMessage({chat_id:message.chat.id,text:resolveLanguage(code)==='ar'
+          ? 'عندك صفحة ثانية بنفس الاسم. اختار اسم مختلف.'
+          : 'You already have another page with this name. Choose a different name.'});
+        return true;
+      }
       if (error?.editorLimit) {
         await api.sendMessage({ chat_id: message.chat.id, text: limitText(error.editorLimit, code) });
         return true;
@@ -805,6 +792,13 @@ async function receiveRename(message, session, code) {
     return true;
   }
 
+  const ownerLock = await acquireOwnerPageLock(userId);
+  if (!ownerLock) {
+    await api.sendMessage({chat_id:message.chat.id,text:code==='ar'?'الصفحات مشغولة حالياً، جرّب مرة ثانية.':'Pages are busy. Try again.'});
+    return true;
+  }
+  try {
+    await assertUniquePageTitle(userId, title, pageId);
   const renameVersion = await nextPageSyncVersion(page.revision || 1);
   const renamedAt = Math.max(nowSeconds(), Number(page.updatedAt || 0) + 1);
   const renamedRows=await db.update(richPages).set({
@@ -850,6 +844,13 @@ async function receiveRename(message, session, code) {
     },
   );
   return true;
+  } catch (error) {
+    if (!error.pageNameExists) throw error;
+    await api.sendMessage({chat_id:message.chat.id,text:code==='ar'
+      ? 'عندك صفحة ثانية بنفس الاسم. اختار اسم مختلف.'
+      : 'You already have another page with this name. Choose a different name.'});
+    return true;
+  } finally { await releaseOwnerPageLock(ownerLock); }
 }
 
 async function receiveSearch(message, session, code) {

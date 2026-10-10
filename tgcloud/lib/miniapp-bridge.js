@@ -1,3 +1,4 @@
+import { assertUniquePageTitle, acquireOwnerPageLock as acquireCreateLock, releaseOwnerPageLock as releaseCreateLock } from 'lib/page-names';
 import { managedPage } from 'lib/managed-pages';
 import { listManagedBotLicensesForBridge } from 'lib/managed-bot-billing';
 import { api, db, InputFile } from 'sdk';
@@ -609,30 +610,6 @@ function samePageContent(row, input) {
   );
 }
 
-async function acquireCreateLock(ownerId) {
-  const stamp = now();
-  await db.delete(maintenanceLocks).where(lt(maintenanceLocks.expiresAt, stamp)).run();
-  const name = 'miniapp:create:' + Number(ownerId);
-  const expiresAt = stamp + CREATE_LOCK_SECONDS;
-  const inserted = await db.insert(maintenanceLocks).values({
-    name,
-    expiresAt,
-  }).onConflictDoNothing({
-    target: maintenanceLocks.name,
-  }).returning({
-    name: maintenanceLocks.name,
-  }).run();
-  return Array.isArray(inserted) && inserted.length ? { name, expiresAt } : null;
-}
-
-async function releaseCreateLock(lock) {
-  if (!lock?.name) return;
-  await db.delete(maintenanceLocks).where(and(
-    eq(maintenanceLocks.name, String(lock.name)),
-    eq(maintenanceLocks.expiresAt, Number(lock.expiresAt)),
-  )).run();
-}
-
 async function handlePing(message, id, senderBotId) {
   const result = {
     protocol: BRIDGE_PROTOCOL,
@@ -734,6 +711,7 @@ async function handleCreate(message, id, envelope) {
       }
     }
 
+    await assertUniquePageTitle(input.ownerId, input.title);
     const stamp = now();
     const version = await nextPageSyncVersion(0);
     await db.insert(richPages).values({
@@ -774,6 +752,10 @@ async function handleSave(message, id, envelope) {
     throw new BridgeError('BASE_REVISION_REQUIRED', 'base_revision is required for SAVE_PAGE.');
   }
 
+  const lock = await acquireCreateLock(input.ownerId);
+  if (!lock) throw new BridgeError('PAGE_BUSY', 'Pages are busy. Retry shortly.');
+  try {
+  await assertUniquePageTitle(input.ownerId, input.title, input.pageId);
   const existing = await getOwnedPage(input.ownerId, input.pageId);
   if (!existing) throw new BridgeError('PAGE_NOT_FOUND', 'Page does not exist or does not belong to this user.');
   const revisionMatches = baseRevision
@@ -827,6 +809,7 @@ async function handleSave(message, id, envelope) {
     sync_seq: version.syncSeq,
     sync_event: buildPageUpsertSync(saved, id),
   };
+  } finally { await releaseCreateLock(lock); }
 }
 
 async function handleDestinations(message, id, ownerId) {
@@ -1249,7 +1232,7 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
       }
     }
 
-    if (error?.alert || !(error instanceof BridgeError)) {
+    if (error?.alert || (!(error instanceof BridgeError) && !error?.pageNameExists)) {
       const errorCode = String(error?.code || '');
       await logBridgeError(
         errorCode === 'RATE_LIMITED' ? 'miniapp_bridge.rate_limit'

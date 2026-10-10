@@ -124,7 +124,7 @@ const CATEGORIES = {
 
 function toast(text,duration=1900){const el=$("toast");el.textContent=text;el.classList.add("show");clearTimeout(el._timer);const ms=Math.max(1200,Number(duration)||1900);el._timer=setTimeout(()=>el.classList.remove("show"),ms)}
 function headers(){return {"X-Telegram-Init-Data":tg?.initData||"","Content-Type":"application/json"}}
-function apiError(data,fallback){const error=new Error(data?.error?.message||fallback||"Request failed");if(data?.error?.code)error.code=data.error.code;return error}
+function apiError(data,fallback){const duplicate=data?.error?.code==="PAGE_NAME_EXISTS";const nameMessage=String(document.documentElement.lang||"ar").startsWith("ar")?"عندك صفحة ثانية بنفس الاسم. اختار اسم مختلف.":"You already have another page with this name. Choose a different name.";const error=new Error(duplicate?nameMessage:(data?.error?.message||fallback||"Request failed"));if(data?.error?.code)error.code=data.error.code;return error}
 function shouldReportApiError(error){
   const status=Number(error?.status||0);
   if(status>=400&&status<500)return false;
@@ -132,7 +132,7 @@ function shouldReportApiError(error){
   const code=String(error?.code||"").toUpperCase();
   if(/^HTTP_4\d\d$/.test(code))return false;
   if(/^(INVALID_|EMPTY_)/.test(code))return false;
-  if(/^PAGE_(NOT_FOUND|CONFLICT|LIMIT|BUSY)$/.test(code))return false;
+  if(/^PAGE_(NOT_FOUND|CONFLICT|LIMIT|BUSY|NAME_EXISTS)$/.test(code))return false;
   if(/^PUBLISH_(CHAT_UNAVAILABLE|CHAT_MIGRATED|PRIVATE_UNAVAILABLE|BOT_BLOCKED|RIGHTS_MISSING|RATE_LIMITED|CONTENT_TOO_LARGE|MEDIA_INVALID|BUTTON_INVALID|CONTENT_INVALID|FORBIDDEN)$/.test(code))return false;
   if(/^(BASE_REVISION_REQUIRED|DOCUMENT_REQUIRED|DOCUMENT_TOO_LARGE|USER_MISMATCH|PAGE_MISMATCH)$/.test(code))return false;
   return true;
@@ -484,7 +484,7 @@ async function saveNow(){
     recordPerf("page_save_failed",performance.now()-perfStarted);
     if(current===doc){
       dirty=true;persistOfflineDraftNow();
-      updateSaveState(Number(error?.status)===409?mt("save.offline_conflict"):mt("save.failed"))
+      updateSaveState(error?.code==="PAGE_NAME_EXISTS"?error.message:(Number(error?.status)===409?mt("save.offline_conflict"):mt("save.failed")))
     }
     throw error
   }
