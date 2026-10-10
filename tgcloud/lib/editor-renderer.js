@@ -3,7 +3,7 @@ import {
   anchorNavigationRichText,
 } from 'lib/editor-anchors';
 import { dataRichText, plainRichText } from 'lib/rich-text';
-import { richMessageDirection, validateEditorLimits } from 'lib/editor-blocks';
+import { richMessageDirection, validateEditorLimits, validateTableRows } from 'lib/editor-blocks';
 import { brandingFooterBlock } from 'lib/branding';
 
 const INPUT_NATIVE_TYPE_ALIASES = Object.freeze({
@@ -401,6 +401,27 @@ function navigationButtonBlock(buttons) {
   }];
 }
 
+// Validate the actual outgoing payload, including imported native tables and
+// tables nested inside lists/details. The editable cache is not always the
+// structure ultimately sent to the Bot API.
+function validateRenderedTables(blocks) {
+  for (const block of Array.isArray(blocks) ? blocks : []) {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
+    if (block.type === 'table') {
+      const result = validateTableRows(block.cells);
+      if (!result.ok) {
+        throw new Error('EDITOR_LIMIT:' + result.code + ':' + result.actual + ':' + result.limit);
+      }
+    }
+    if (Array.isArray(block.blocks)) validateRenderedTables(block.blocks);
+    if (Array.isArray(block.items)) {
+      for (const item of block.items) {
+        if (Array.isArray(item?.blocks)) validateRenderedTables(item.blocks);
+      }
+    }
+  }
+}
+
 export function buildInputRichMessage(
   blocks,
   {
@@ -431,6 +452,7 @@ export function buildInputRichMessage(
   payloads.push(...ordered.flatMap((block) => renderBlockPayloads(block)));
   payloads.push(...navigationButtonBlock(navigationButtons));
   if (includeBranding) payloads.push(brandingFooterBlock());
+  validateRenderedTables(payloads);
   const direction = richMessageDirection(ordered);
   return {
     blocks: resolveInlinePageCallbacks(
