@@ -219,6 +219,13 @@ function limitText(result, languageCode) {
   if (result.code === 'characters') return t(locale, 'limits.characters', { limit: result.limit });
   if (result.code === 'table_rows') return t(locale, 'limits.table_rows', { limit: result.limit });
   if (result.code === 'table_columns') return t(locale, 'limits.table_columns', { limit: result.limit });
+
+  if (result.code === 'nesting_depth') return locale === 'ar'
+    ? 'وصلت للحد الأقصى لمستويات التداخل في باقتك: ' + result.limit
+    : 'Maximum nesting levels for your plan: ' + result.limit;
+  if (result.code === 'media_attachments') return locale === 'ar'
+    ? 'وصلت للحد الأقصى لمرفقات الوسائط بالرسالة: ' + result.limit
+    : 'Maximum media attachments per message: ' + result.limit;
   return tr(locale, 'The content exceeds an editor limit.');
 }
 
