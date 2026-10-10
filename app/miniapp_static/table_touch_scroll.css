@@ -1,0 +1,120 @@
+/* Editable Rich Message tables: bounded, independently scrollable surfaces.
+   Keep the header row visible; never compress 20 columns into the phone width.
+   Scoped to the main editor, not the read-only Telegram table renderer. */
+html:root .table-editor-surface {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+html:root .table-editor-surface .table-preview {
+  box-sizing: border-box !important;
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  max-height: min(54dvh, 440px);
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  scrollbar-width: thin;
+  scroll-padding-top: 49px;
+  position: relative;
+  isolation: isolate;
+}
+html:root .table-editor-surface .table-edit-grid {
+  width: max-content !important;
+  min-width: 100% !important;
+  max-width: none !important;
+  table-layout: fixed;
+  border-spacing: 0;
+  border-collapse: separate;
+}
+html:root .table-editor-surface .table-edit-cell {
+  box-sizing: border-box;
+  position: relative;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  height: 49px;
+  padding: 0;
+  border: 0;
+  border-inline-end: 1px solid var(--line, rgba(255,255,255,.14));
+  border-bottom: 1px solid var(--line, rgba(255,255,255,.14));
+  touch-action: pan-x pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: text;
+}
+html:root .table-editor-surface .table-edit-grid thead th {
+  position: sticky !important;
+  top: 0;
+  z-index: 5;
+  background: var(--panel, #192b3d) !important;
+  box-shadow: 0 2px 0 rgba(0,0,0,.24);
+  font-weight: 650;
+}
+html:root .table-editor-surface .table-edit-grid tbody td {
+  background: transparent;
+}
+html:root .table-editor-surface .table-edit-cell .table-cell-input {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 100%;
+  min-height: 48px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 9px 10px;
+  outline: 0;
+  text-overflow: ellipsis;
+  text-align: start;
+  font-size: 14px;
+  touch-action: pan-x pan-y;
+}
+html:root .table-editor-surface .table-edit-cell:not(.is-editing)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: transparent;
+  touch-action: pan-x pan-y;
+}
+html:root .table-editor-surface .table-edit-cell.is-editing {
+  background: color-mix(in srgb, var(--tg-theme-link-color, #62a7ed) 10%, transparent);
+}
+html:root .table-editor-surface .table-edit-cell.is-editing .table-cell-input {
+  -webkit-user-select: text;
+  user-select: text;
+  text-overflow: clip;
+}
+html:root .table-editor-surface .table-edit-cell:focus-visible {
+  outline: 2px solid var(--tg-theme-link-color, #62a7ed);
+  outline-offset: -2px;
+}
+html:root .table-editor-surface .table-scroll-hint {
+  margin-top: 6px;
+  padding: 1px 3px;
+  color: var(--muted, #a4aebb);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: start;
+  opacity: .82;
+}
+@media (max-width: 440px) {
+  html:root .table-editor-surface .table-preview {
+    max-height: min(50dvh, 390px);
+  }
+  html:root .table-editor-surface .table-edit-cell {
+    width: 100px;
+    min-width: 100px;
+    max-width: 100px;
+  }
+}
