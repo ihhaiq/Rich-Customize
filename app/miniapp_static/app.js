@@ -412,9 +412,19 @@ window.RichMiniAppPerf=Object.freeze({
   flush:()=>flushPerf(),
 });
 
+function legacyPageNotice(){
+  return String(document.documentElement.lang||"ar").startsWith("ar")
+    ?"هذه صفحة قديمة للنشر فقط. ما تگدر تعدلها؛ افتح مسودة جديدة."
+    :"This saved legacy page is publish-only. Start a new draft to edit.";
+}
+function canEditCurrent(){
+  if(current?.legacy_read_only){toast(legacyPageNotice(),3500);return false}
+  return true;
+}
 function newDraft({preserveOffline=false}={}){
   if(!preserveOffline)clearOfflineDraft();
   current={page_id:null,title:mt("editor.untitled"),blocks:[],buttons:[],buttons_per_row:1,buttons_align:"center"};
+  pageTitle.disabled=false;slashInput.disabled=false;
   pageTitle.value=current.title;selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
   mutationVersion+=1;
   renderBlocks();updateSaveState(mt("editor.unsaved"));pushHistory();hideMenus();closeSheets();
@@ -441,6 +451,7 @@ function redo(){if(!future.length)return;const next=future.pop();history.push(ne
 
 async function saveNow(){
   if(!current||!dirty)return current;
+  if(!canEditCurrent()){const error=new Error(legacyPageNotice());error.code="LEGACY_PAGE_READ_ONLY";throw error}
   if(!hasSavablePageContent()){
     persistOfflineDraftNow();
     updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));
@@ -533,14 +544,14 @@ function applyText(block,value){
 function blockText(block){const d=block.data||{};return d.text??d.quote_text??""}
 
 function addBlock(type,at=insertIndex,initialText=""){
-  if(!current)return;
+  if(!current||!canEditCurrent())return;
   const block=defaultBlock(type);if(initialText&&["paragraph","heading","footer","preformatted","blockquote","pullquote","mathematical_expression"].includes(type))applyText(block,initialText);
   const index=Number.isInteger(at)?Math.max(0,Math.min(at,current.blocks.length)):current.blocks.length;
   current.blocks.splice(index,0,block);normalizePositions();selectedBlockId=block.id;insertIndex=index+1;slashInput.value="";hideMenus();renderBlocks();markDirty();pushHistory();
   requestAnimationFrame(()=>{const target=blocksEl.querySelector(`[data-id="${block.id}"] textarea,[data-id="${block.id}"] input,[data-id="${block.id}"] [contenteditable="true"]`);target?.scrollIntoView({block:"center",behavior:"smooth"})});
 }
-function deleteBlock(id){const i=current.blocks.findIndex(b=>b.id===id);if(i<0)return;current.blocks.splice(i,1);normalizePositions();selectedBlockId=null;renderBlocks();hideMenus();markDirty();pushHistory()}
-function moveBlock(id,delta){const i=current.blocks.findIndex(b=>b.id===id),j=i+delta;if(i<0||j<0||j>=current.blocks.length)return;[current.blocks[i],current.blocks[j]]=[current.blocks[j],current.blocks[i]];normalizePositions();renderBlocks();markDirty();pushHistory()}
+function deleteBlock(id){if(!canEditCurrent())return;const i=current.blocks.findIndex(b=>b.id===id);if(i<0)return;current.blocks.splice(i,1);normalizePositions();selectedBlockId=null;renderBlocks();hideMenus();markDirty();pushHistory()}
+function moveBlock(id,delta){if(!canEditCurrent())return;const i=current.blocks.findIndex(b=>b.id===id),j=i+delta;if(i<0||j<0||j>=current.blocks.length)return;[current.blocks[i],current.blocks[j]]=[current.blocks[j],current.blocks[i]];normalizePositions();renderBlocks();markDirty();pushHistory()}
 function selectBlock(id){selectedBlockId=id;const i=current.blocks.findIndex(b=>b.id===id);insertIndex=i<0?null:i+1;blocksEl.querySelectorAll(".block").forEach(el=>el.classList.toggle("selected",el.dataset.id===id))}
 
 function textEditor(block){
@@ -607,7 +618,12 @@ function renderBlocks(){
     else if(block.type==="table")editor=tableEditor(block);
     else if(block.type==="divider"){editor=document.createElement("div");editor.className="divider-line"}
     else editor=mediaEditor(block);
-    main.appendChild(editor);const tools=document.createElement("div");tools.className="block-tools";const more=document.createElement("button");more.type="button";more.className="mini-btn";MiniAppIcons.mount(more,"more");more.setAttribute("aria-label",mt("block.settings",{name:info(block.type).label}));more.addEventListener("click",e=>{e.stopPropagation();selectBlock(block.id);openBlockMenu(block)});tools.appendChild(more);row.append(main,tools);article.appendChild(row);article.addEventListener("click",()=>selectBlock(block.id));blocksEl.appendChild(article);
+    main.appendChild(editor);
+    if(current?.legacy_read_only){
+      main.querySelectorAll("input,textarea,select,button").forEach(control=>{control.disabled=true});
+      main.querySelectorAll("[contenteditable]").forEach(control=>{control.contentEditable="false"});
+    }
+    const tools=document.createElement("div");tools.className="block-tools";const more=document.createElement("button");more.type="button";more.className="mini-btn";MiniAppIcons.mount(more,"more");more.setAttribute("aria-label",mt("block.settings",{name:info(block.type).label}));more.addEventListener("click",e=>{e.stopPropagation();selectBlock(block.id);openBlockMenu(block)});tools.appendChild(more);row.append(main,tools);article.appendChild(row);article.addEventListener("click",()=>selectBlock(block.id));blocksEl.appendChild(article);
   });
   updatePublishValidity();
 }
@@ -619,6 +635,7 @@ function separator(){const el=document.createElement("div");el.className="menu-s
 function hideMenus(){slashMenu.classList.add("hidden");blockMenu.classList.add("hidden")}
 
 function openBlockMenu(block){
+  if(!canEditCurrent())return;
   slashMenu.classList.add("hidden");blockActions.innerHTML="";blockMenuTitle.textContent=info(block.type).label;
   if(block.type==="heading"){
     for(let level=1;level<=6;level++)blockActions.appendChild(menuButton("heading",mt("heading.level",{level}),"",()=>{block.data.size=level;applyText(block,blockText(block));renderBlocks();markDirty();hideMenus()}));blockActions.appendChild(separator());
@@ -710,10 +727,12 @@ function applyOpenedPage(page,pageId){
   current=copySessionValue(page);
   current.blocks=(current.blocks||[]).sort((a,b)=>(a.position||0)-(b.position||0));
   pageTitle.value=current.title||pageId;
+  pageTitle.disabled=Boolean(current.legacy_read_only);
+  slashInput.disabled=Boolean(current.legacy_read_only);
   selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
   mutationVersion+=1;
   slashInput.value="";autoGrow(slashInput);
-  renderBlocks();updateSaveState(mt("save.saved"));pushHistory();closeSheets();
+  renderBlocks();updateSaveState(current.legacy_read_only?legacyPageNotice():mt("save.saved"));pushHistory();closeSheets();
 }
 function hasUnsavedEditorWork(){
   return Boolean(dirty||String(slashInput?.value||"").trim());
@@ -741,6 +760,7 @@ function discardCurrentSessionForPageOpen(){
   try{window.RichMiniAppResume?.clear?.()}catch(_){}
   current=null;
   pageTitle.value=mt("editor.untitled");
+  pageTitle.disabled=false;slashInput.disabled=false;
   renderBlocks();
   syncHistory();
   updateSaveState(mt("editor.unsaved"));
@@ -910,6 +930,7 @@ async function openSendPanel(){
   try{showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}))}
 }
 async function sendTo(dest,button){
+  if(current?.legacy_read_only&&dirty){toast(legacyPageNotice(),3500);return}
   if(publishRunning){toast(mt("send.already_sending"));return}
   publishRunning=true;
   const perfStarted=performance.now();
