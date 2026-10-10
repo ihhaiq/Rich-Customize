@@ -213,7 +213,7 @@ function detailRows(scope, error, context) {
   ];
   const stack = error?.stack || error?.cause?.stack;
   if (stack) {
-    const location = sanitize(String(stack)).split('\\n').slice(0, 4).join(' | ').slice(0, 500);
+    const location = sanitize(String(stack)).split('\n').slice(0, 4).join(' | ').slice(0, 500);
     if (location) rows.push(['الموضع البرمجي', location]);
   }
   const updateId = safeId(context?.updateId);
