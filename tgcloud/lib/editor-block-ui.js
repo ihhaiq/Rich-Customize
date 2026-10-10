@@ -225,13 +225,21 @@ export function blockEditorRichMessage(block, blocks, languageCode, userId = nul
         { type:'paragraph', text:t(locale, 'common.choose_action') },
       ],
     };
-  } catch {
+  } catch (error) {
+    const problem = /^EDITOR_LIMIT:(table_rows|table_columns):\\d+:(\\d+)$/.exec(
+      String(error?.message || error),
+    );
+    // Do not send a malformed table back to Telegram merely to open its edit
+    // controls. Preserve the block and explain which dimension needs fixing.
+    const notice = problem
+      ? t(locale, 'limits.' + problem[1], { limit: Number(problem[2]) })
+      : blockLabel(block?.type, languageCode);
     return {
       is_rtl: ['ar', 'ur'].includes(locale),
       blocks: [
         { type:'paragraph', text:header },
         { type:'divider' },
-        { type:'paragraph', text:blockLabel(block?.type, languageCode) },
+        { type:'paragraph', text:notice },
         { type:'divider' },
         { type:'paragraph', text:t(locale, 'common.choose_action') },
       ],
