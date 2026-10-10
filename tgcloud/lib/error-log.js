@@ -164,6 +164,8 @@ function errorTypeTitle(scope) {
     my_chat_member: 'خطأ صلاحيات أو عضوية البوت',
     pre_checkout_query: 'خطأ التحقق من الدفع',
     'payment.pre_checkout': 'خطأ التحقق من الدفع',
+    'payment.fulfillment': 'تنبيه فشل تحقق دفعة مستلمة',
+    'payment.receipt': 'خطأ إرسال إشعار الدفع',
     'request_guard.claim': 'خطأ حماية الطلبات',
     'editor.premium_emoji.pack': 'خطأ تحميل حزمة إيموجي',
     'welcome.idle_rich_fallback': 'خطأ رسالة الترحيب',
