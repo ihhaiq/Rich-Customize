@@ -1,6 +1,7 @@
 import { api, BotApiError } from 'sdk';
 import { getLegacyState, setLegacyState } from 'lib/backup-import';
 import { isRtlLocale, resolveLanguage, resolveUserLanguage, t } from 'lib/i18n';
+import { logError } from 'lib/error-log';
 
 const DEFAULT_SHOWCASE_MEDIA_CHANNEL_ID = -1004433851299;
 const SUPPORTED_MEDIA = Object.freeze(['photo', 'video', 'animation', 'audio', 'voice']);
