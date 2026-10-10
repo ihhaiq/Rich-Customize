@@ -16,6 +16,8 @@ import {
 import { recordOperation } from 'lib/usage-stats';
 import { resolveLanguage, resolveUserLanguage, t as i18nT, tr } from 'lib/i18n';
 import { logError } from 'lib/error-log';
+import { EXPECTED_PUBLISH_FAILURES, publishFailure, normalizePublishError,
+  shouldForgetDestination, publishFailureMessage } from 'lib/publish-errors';
 import { shouldIncludeBranding } from 'lib/branding';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { recordMarketingPublish } from 'lib/marketing-campaign';
@@ -100,7 +102,7 @@ async function rememberPanel(userId,chatId,messageId,selected){
 async function panel(userId){return db.select().from(managedPublishPanels).where(eq(managedPublishPanels.userId,Number(userId))).get();}
 export async function clearPublishPanel(userId){await db.delete(managedPublishPanels).where(eq(managedPublishPanels.userId,Number(userId))).run();}
 
-async function inspectPublishAccess(chatId,userId){
+export async function inspectPublishAccess(chatId,userId){
   try{
     const me=await api.getMe();
     const botMember=await api.getChatMember({chat_id:Number(chatId),user_id:me.id});
@@ -117,7 +119,13 @@ export async function canPublish(chatId,userId){return Boolean((await inspectPub
 async function eligible(userId){
   const out=[];
   for(const chat of await listChats(userId)){
-    if(await canPublish(chat.chatId,userId))out.push(chat);else await removeUserChat(userId,chat.chatId);
+    const access=await inspectPublishAccess(chat.chatId,userId);
+    if(access.ok){out.push(chat);continue;}
+    if(access.reason==='rights'){await removeUserChat(userId,chat.chatId);continue;}
+    // Transient lookup failures must not delete stored destinations.
+    const failure=normalizePublishError(access.error,{kind:'chat'});
+    if(shouldForgetDestination(failure.code))await removeUserChat(userId,chat.chatId);
+    else out.push(chat);
   }
   return out;
 }
@@ -207,7 +215,6 @@ async function refreshPanel(userId, languageCode='en'){
   });
   if(!locked.acquired)console.warn('Skipped publish panel refresh because the message is busy',p.chatId,p.messageId);
 }
-function friendly(languageCode){return tr(resolveLanguage(languageCode),'Publishing failed for this chat.');}
 
 export async function handlePublishCallback(query){
   const data=String(query?.data||'');
@@ -236,7 +243,16 @@ export async function handlePublishCallback(query){
       const latest=await loadEditorSession(userId);if(!latest)return true;
       const id=Number(data.slice('r:postchat:'.length));if(!Number.isSafeInteger(id)){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.invalidChat,show_alert:true});return true;}
       const registered=(await listChats(userId)).find(x=>Number(x.chatId)===id);
-      if(!registered||!await canPublish(id,userId)){await removeUserChat(userId,id);await api.answerCallbackQuery({callback_query_id:query.id,text:cc.unavailable,show_alert:true});return true;}
+      if(!registered){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.unavailable,show_alert:true});return true;}
+      const access=await inspectPublishAccess(id,userId);
+      if(!access.ok){
+        const failure=access.reason==='rights'
+          ? publishFailure('PUBLISH_RIGHTS_MISSING','Missing administrator rights')
+          : normalizePublishError(access.error,{kind:'chat'});
+        if(shouldForgetDestination(failure.code))await removeUserChat(userId,id);
+        await api.answerCallbackQuery({callback_query_id:query.id,text:publishFailureMessage(failure,resolveLanguage(c)),show_alert:true});
+        return true;
+      }
       const selected=(latest.postSelectedChatIds||[]).map(Number),index=selected.indexOf(id);let notice;
       if(index>=0){selected.splice(index,1);notice=cc.selectedOff;}else{selected.push(id);notice=cc.selectedOn;}
       await renderPicker(query,selected);await api.answerCallbackQuery({callback_query_id:query.id,text:notice});return true;
@@ -302,31 +318,42 @@ export async function handlePublishCallback(query){
       const previousBlocks=quotaSavedPage && Number(quotaSavedPage.ownerId)===Number(userId)
         ? quotaSavedPage.blocks || [] : null;
       const succeeded=[],failed=[],reasons=[];
-      for(const chatId of selected){
+      const entitlement=await getEditorEntitlement(userId);
+      for(const chatId of [...new Set(selected.filter(Number.isSafeInteger))]){
         const title=String(registered.get(chatId)?.title||chatId);
-        if(!await canPublish(chatId,userId)){await removeUserChat(userId,chatId);failed.push(title);continue;}
         try{
+          const access=await inspectPublishAccess(chatId,userId);
+          if(!access.ok){
+            if(access.reason==='rights')throw publishFailure('PUBLISH_RIGHTS_MISSING','Missing administrator rights');
+            throw access.error || new Error('Could not verify destination access');
+          }
           const markup=prepared.length?buildMessageButtonsKeyboard(prepared,{buttonsPerRow:Number(latest.buttonsPerRow||1),sourcePageId:latest.currentPageId||null}):undefined;
-          await sendRichMessageSafe({chat_id:chatId,rich_message:buildInputRichMessage(latest.blocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,previousBlocks,entitlement:await getEditorEntitlement(userId)}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
+          await sendRichMessageSafe({chat_id:chatId,rich_message:buildInputRichMessage(latest.blocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,previousBlocks,entitlement}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
           succeeded.push(title);
         }catch(error){
           failed.push(title);
-          reasons.push(friendly(c));
-          await logError('publish.send', error, {
-            userId,
-            chatId,
-            callbackData: query?.data,
-            extra: 'target_chat=' + chatId,
-          });
+          const normalized=normalizePublishError(error,{kind:'chat'});
+          if(reasons.length<3)reasons.push(title+': '+publishFailureMessage(normalized,resolveLanguage(c)));
+          if(shouldForgetDestination(normalized.code)){
+            try{await removeUserChat(userId,chatId);}catch(cleanupError){console.warn('Could not forget inaccessible chat',cleanupError);}
+          }
+          if(!EXPECTED_PUBLISH_FAILURES.has(String(normalized.code||''))){
+            await logError('publish.send',error,{
+              userId,chatId,callbackData:query?.data,
+              extra:'target_chat='+chatId+'; normalized_code='+String(normalized.code||'PUBLISH_FAILED'),
+            });
+          }else console.warn('Publish rejected by Telegram',normalized.code,chatId);
         }
       }
-      if(succeeded.length){
-        await recordOperation('publish',true,succeeded.length);
-        try{await recordMarketingPublish(userId);}catch(error){console.warn('Could not record campaign conversion',error);}
-      }
-      if(failed.length)await recordOperation('publish',false,failed.length);
+      try{
+        if(succeeded.length){
+          await recordOperation('publish',true,succeeded.length);
+          try{await recordMarketingPublish(userId);}catch(error){console.warn('Could not record campaign conversion',error);}
+        }
+        if(failed.length)await recordOperation('publish',false,failed.length);
+      }catch(statsError){console.warn('Could not record publish stats',statsError);}
       const lines=[cc.result,'✅ '+cc.ok+succeeded.length,'❌ '+cc.fail+failed.length,...succeeded.slice(0,10).map(x=>'✅ '+x),...failed.slice(0,10).map(x=>'❌ '+x)];
-      if(reasons.length)lines.push('',cc.reason+reasons[0]);if(succeeded.length+failed.length>20)lines.push(cc.shortened);lines.push('',cc.again);
+      if(reasons.length)lines.push('',cc.reason+reasons.join('\n'));if(succeeded.length+failed.length>20)lines.push(cc.shortened);lines.push('',cc.again);
       const ui=await withEditorMessageLock(query.message.chat.id,query.message.message_id,async()=>{
         await editRich(query,settingsRich(selected.length,Boolean(latest.postSilent),Boolean(latest.postProtected),c,lines.join('\n')),backKeyboard('r:postlist',c));
       });
@@ -432,167 +459,6 @@ function isRichEmojiInvalid(error) {
   return /RICH_MESSAGE_EMOJI_INVALID/i.test(
     String(error?.description || error?.message || error || ''),
   );
-}
-
-function publishErrorDetail(error) {
-  return String(error?.description || error?.message || error || '').trim();
-}
-
-function publishFailure(code, message, cause, extra = {}) {
-  const failure = new Error(String(message || 'Publishing failed.'));
-  failure.code = String(code || 'PUBLISH_FAILED');
-  if (cause) failure.cause = cause;
-  Object.assign(failure, extra || {});
-  return failure;
-}
-
-function publishRetryAfter(error, detail) {
-  const direct = Number(
-    error?.parameters?.retry_after
-    ?? error?.response?.parameters?.retry_after
-    ?? error?.retry_after
-    ?? error?.retryAfter,
-  );
-  if (Number.isFinite(direct) && direct > 0) return Math.ceil(direct);
-  const match = String(detail || '').match(/retry after\s+(\d+)/i);
-  return match ? Math.max(1, Number(match[1]) || 1) : null;
-}
-
-function normalizePublishError(error, { kind = 'private' } = {}) {
-  const existingCode = String(error?.code || '');
-  if (existingCode.startsWith('PUBLISH_')) return error;
-
-  const detail = publishErrorDetail(error);
-  const retryAfter = publishRetryAfter(error, detail);
-
-  if (/too many requests|retry after/i.test(detail)) {
-    return publishFailure(
-      'PUBLISH_RATE_LIMITED',
-      retryAfter
-        ? 'Telegram is temporarily rate limiting publishing. Retry after ' + retryAfter + ' seconds.'
-        : 'Telegram is temporarily rate limiting publishing. Try again shortly.',
-      error,
-      retryAfter ? { retry_after: retryAfter } : {},
-    );
-  }
-
-  if (/bot was blocked by the user|bot blocked by user/i.test(detail)) {
-    return publishFailure(
-      'PUBLISH_BOT_BLOCKED',
-      'The bot is blocked in the destination private chat.',
-      error,
-    );
-  }
-
-  if (/user is deactivated|user not found/i.test(detail) && String(kind) === 'private') {
-    return publishFailure(
-      'PUBLISH_PRIVATE_UNAVAILABLE',
-      'The private chat is no longer available to the bot.',
-      error,
-    );
-  }
-
-  if (
-    /chat not found|peer_id_invalid|channel_private|bot was kicked|bot is not a member|not a member of the channel|chat_id_empty/i.test(detail)
-  ) {
-    return publishFailure(
-      String(kind) === 'chat' ? 'PUBLISH_CHAT_UNAVAILABLE' : 'PUBLISH_PRIVATE_UNAVAILABLE',
-      String(kind) === 'chat'
-        ? 'The bot can no longer access this chat.'
-        : 'The bot can no longer access your private chat.',
-      error,
-    );
-  }
-
-  if (
-    error?.parameters?.migrate_to_chat_id
-    || /group chat was migrated|migrate_to_chat_id/i.test(detail)
-  ) {
-    const migratedTo = Number(error?.parameters?.migrate_to_chat_id || 0) || null;
-    return publishFailure(
-      'PUBLISH_CHAT_MIGRATED',
-      'This group moved to a new Telegram chat. Add the new chat again before publishing.',
-      error,
-      migratedTo ? { migrate_to_chat_id: migratedTo } : {},
-    );
-  }
-
-  if (
-    /not enough rights|have no rights|chat_write_forbidden|not an administrator|administrator rights|required to post|can_post_messages/i.test(detail)
-  ) {
-    return publishFailure(
-      'PUBLISH_RIGHTS_MISSING',
-      'Publishing permissions are missing for this chat.',
-      error,
-    );
-  }
-
-  if (/message is too long|rich message.{0,30}too long|message_too_long/i.test(detail)) {
-    return publishFailure(
-      'PUBLISH_CONTENT_TOO_LARGE',
-      'The message is larger than Telegram allows.',
-      error,
-    );
-  }
-
-  if (
-    /wrong file identifier|file_reference_expired|file reference expired|wrong file id|failed to get http url content/i.test(detail)
-  ) {
-    return publishFailure(
-      'PUBLISH_MEDIA_INVALID',
-      'One or more media files are no longer valid on Telegram.',
-      error,
-    );
-  }
-
-  if (
-    /BUTTON_(?:DATA|URL)_INVALID|inline keyboard button|reply markup.{0,30}invalid|button.{0,30}invalid/i.test(detail)
-  ) {
-    return publishFailure(
-      'PUBLISH_BUTTON_INVALID',
-      'One or more message buttons are invalid.',
-      error,
-    );
-  }
-
-  if (
-    /RICH_MESSAGE_|can't parse rich message|can't parse entities|entity.{0,30}invalid|entity bounds/i.test(detail)
-  ) {
-    return publishFailure(
-      'PUBLISH_CONTENT_INVALID',
-      'Telegram rejected part of the rich-message formatting.',
-      error,
-    );
-  }
-
-  return publishFailure(
-    'PUBLISH_FAILED',
-    'Telegram could not publish the message. Try again.',
-    error,
-  );
-}
-
-const EXPECTED_PUBLISH_FAILURES = new Set([
-  'PUBLISH_CHAT_UNAVAILABLE',
-  'PUBLISH_CHAT_MIGRATED',
-  'PUBLISH_PRIVATE_UNAVAILABLE',
-  'PUBLISH_BOT_BLOCKED',
-  'PUBLISH_RIGHTS_MISSING',
-  'PUBLISH_RATE_LIMITED',
-  'PUBLISH_CONTENT_TOO_LARGE',
-  'PUBLISH_MEDIA_INVALID',
-  'PUBLISH_BUTTON_INVALID',
-  'PUBLISH_CONTENT_INVALID',
-  'PUBLISH_FORBIDDEN',
-]);
-
-function shouldForgetDestination(code) {
-  return new Set([
-    'PUBLISH_CHAT_UNAVAILABLE',
-    'PUBLISH_CHAT_MIGRATED',
-    'PUBLISH_RIGHTS_MISSING',
-    'PUBLISH_FORBIDDEN',
-  ]).has(String(code || ''));
 }
 
 export async function sendRichMessageSafe(payload) {
