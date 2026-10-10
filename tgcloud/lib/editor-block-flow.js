@@ -212,6 +212,9 @@ async function clearInputMessages(session, triggerMessage) {
 }
 
 function limitText(result, code) {
+  const locale = resolveLanguage(code);
+  if (result.code === 'table_columns') return t(locale, 'limits.table_columns', { limit: result.limit });
+  if (result.code === 'table_rows') return t(locale, 'limits.table_rows', { limit: result.limit });
   const copy = prompts(code);
   return result.code === 'blocks'
     ? copy.blockLimit(result.limit)
