@@ -19,6 +19,7 @@ import { handleShowcaseMessage } from 'lib/showcase';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
+import { explainOperationalError, userOperationalError } from 'lib/operational-errors';
 import { handleBrandingSuccessfulPayment } from 'lib/branding';
 import { handleManagedBotSuccessfulPayment, sendManagedBotPlans } from 'lib/managed-bot-billing';
 import { sendMarketingCampaignSummary, sendMarketingLanding } from 'lib/marketing-campaign';
@@ -193,11 +194,28 @@ export default async function (message, ctx = {}) {
     }
   } catch (error) {
     failed = true;
+    const guide = explainOperationalError(error);
     await logError('message', error, {
       updateId,
       userId: message?.from?.id,
       chatId: message?.chat?.id,
+      threadId: message?.message_thread_id,
     });
+    // Avoid leaking exception text, tokens or technical details to users.
+    // Keep the bot silent in groups and in bridge-bot conversations.
+    if (message?.chat?.type === 'private' && !message?.from?.is_bot && !guide.silent) {
+      try {
+        const locale = String(message?.from?.language_code || 'ar');
+        const notice = message?.successful_payment
+          ? (locale.startsWith('ar')
+            ? 'واجهنا مشكلة أثناء معالجة إشعار الدفع. إذا انخصمت النجوم لا تعيد الدفع؛ تحقق من الترخيص أو تواصل مع الدعم.'
+            : 'There was a problem processing the payment notification. Do not pay twice; check your entitlement or contact support.')
+          : userOperationalError(error, locale);
+        await api.sendMessage({ chat_id: message.chat.id, text: notice });
+      } catch (feedbackError) {
+        console.warn('Could not send safe error notice to user', feedbackError);
+      }
+    }
     await releaseUpdate(updateId);
     throw error;
   } finally {
