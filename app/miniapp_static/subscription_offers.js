@@ -232,7 +232,7 @@
     if (/custom_emoji_pack_limit|emoji\.pack_limit_reached/i.test(value)) return "emojiPacks";
     if (/editor limit exceeded:\s*characters|EDITOR_LIMIT[_:]CHARACTERS|limits\.characters/i.test(value)) return "text";
     if (/EDITOR_LIMIT[_:]TABLE_COLUMNS|editor limit exceeded:\s*table_columns/i.test(value)) return "tableColumns";
-    if (/editor limit exceeded:\s*(?:blocks|table_rows|table_columns)|EDITOR_LIMIT[_:](?:BLOCKS|TABLE_ROWS|TABLE_COLUMNS)|\bPAGE_LIMIT\b|page limit reached/i.test(value)) return "other";
+    if (/editor limit exceeded:\s*(?:blocks|table_rows|table_columns|nesting_depth|media_attachments)|EDITOR_LIMIT[_:](?:BLOCKS|TABLE_ROWS|TABLE_COLUMNS|NESTING_DEPTH|MEDIA_ATTACHMENTS)|\bPAGE_LIMIT\b|page limit reached/i.test(value)) return "other";
     return null;
   }
   function showForError(error) {
