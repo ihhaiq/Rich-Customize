@@ -40,7 +40,17 @@ export class HttpError extends Error {
 }
 
 export function handleError(error) {
-  if (error instanceof HttpError) return text(error.message, error.status);
+  const status = error instanceof HttpError ? error.status : 500;
+  // Preserve existing user-input errors; never disclose server configuration,
+  // Telegram credentials or internal bridge diagnostics to Mini App clients.
+  if (status < 500) return text(error.message, status);
   console.error('Mini App API failure', error);
-  return text('Internal Server Error', 500);
+  return json({
+    ok: false,
+    error: {
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'تعذر إكمال الطلب بسبب مشكلة بالخدمة. حاول مجدداً بعد قليل. / Service temporarily unavailable. Please retry.',
+    },
+    retryable: [502, 503, 504].includes(status),
+  }, status);
 }
