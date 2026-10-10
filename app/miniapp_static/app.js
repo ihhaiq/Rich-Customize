@@ -593,9 +593,99 @@ function rebuildTableHtml(block){
   block.data.html=`<table${block.data?.is_bordered!==false?" bordered":""}>${trs}</table>`;
   syncNativeTableData(block)
 }
+// Native panning belongs to the table viewport. A cell activates editing on
+// a deliberate tap/keyboard action; swiping across a cell must never focus its
+// text input or trigger Android text-selection handles.
 function tableEditor(block){
-  const wrap=document.createElement("div");wrap.className="table-preview";const table=document.createElement("table");const rows=block.data?.rows||[];
-  rows.forEach((row,ri)=>{const tr=document.createElement("tr");row.forEach((raw,ci)=>{const td=document.createElement("td");const input=document.createElement("input");input.value=typeof raw==="object"?(raw.text||""):String(raw??"");input.placeholder=`${ri+1}:${ci+1}`;input.addEventListener("focus",()=>selectBlock(block.id));input.addEventListener("input",()=>{const old=rows[ri][ci];rows[ri][ci]=typeof old==="object"?{...old,text:input.value}:input.value;rebuildTableHtml(block);markDirty()});td.appendChild(input);tr.appendChild(td)});table.appendChild(tr)});wrap.appendChild(table);return wrap
+  const surface=document.createElement("div");
+  surface.className="table-editor-surface";
+  const viewport=document.createElement("div");
+  viewport.className="table-preview";
+  viewport.dataset.blockId=block.id;
+  viewport.tabIndex=0;
+  viewport.setAttribute("role","region");
+  const lang=String(document.documentElement.lang||"ar").toLowerCase();
+  const ar=lang.startsWith("ar");
+  viewport.setAttribute("aria-label",ar?"جدول قابل للتمرير أفقياً وعمودياً":"Scrollable editable table");
+  const table=document.createElement("table");
+  table.className="table-edit-grid";
+  const rows=Array.isArray(block.data?.rows)?block.data.rows:[];
+  const head=document.createElement("thead");
+  const body=document.createElement("tbody");
+  rows.forEach((row,ri)=>{
+    const tr=document.createElement("tr");
+    (Array.isArray(row)?row:[]).forEach((raw,ci)=>{
+      const cell=document.createElement(ri===0?"th":"td");
+      if(ri===0)cell.scope="col";
+      if(raw&&typeof raw==="object"){
+        if(Number(raw.colspan)>1)cell.colSpan=Number(raw.colspan);
+        if(Number(raw.rowspan)>1)cell.rowSpan=Number(raw.rowspan);
+      }
+      cell.tabIndex=0;
+      cell.className="table-edit-cell";
+      cell.setAttribute("aria-label",ar?`صف ${ri+1}، عمود ${ci+1}`:`Row ${ri+1}, column ${ci+1}`);
+      const input=document.createElement("input");
+      input.className="table-cell-input";
+      input.tabIndex=-1;
+      input.value=raw&&typeof raw==="object"?(typeof raw.text==="string"?raw.text:""):String(raw??"");
+      input.placeholder=`${ri+1}:${ci+1}`;
+      input.addEventListener("focus",()=>{
+        cell.classList.add("is-editing");
+        input.tabIndex=0;
+        selectBlock(block.id);
+      });
+      input.addEventListener("blur",()=>{
+        cell.classList.remove("is-editing");
+        input.tabIndex=-1;
+      });
+      input.addEventListener("input",()=>{
+        const previous=rows[ri][ci];
+        rows[ri][ci]=previous&&typeof previous==="object"
+          ?{...previous,text:input.value}:input.value;
+        rebuildTableHtml(block);
+        markDirty();
+      });
+      // A CSS overlay on the cell intercepts only touches outside edit mode.
+      // Pointer cancellations during a swipe must not be mistaken for taps.
+      let start=null,dragged=false;
+      cell.addEventListener("pointerdown",event=>{
+        if(event.target===input)return;
+        start={x:event.clientX,y:event.clientY};
+        dragged=false;
+      });
+      cell.addEventListener("pointermove",event=>{
+        if(start&&Math.hypot(event.clientX-start.x,event.clientY-start.y)>8)dragged=true;
+      });
+      cell.addEventListener("pointercancel",()=>{dragged=true;start=null});
+      cell.addEventListener("click",event=>{
+        if(event.target!==cell||dragged||input.disabled)return;
+        input.focus({preventScroll:true});
+      });
+      cell.addEventListener("keydown",event=>{
+        if(input.disabled)return;
+        if((event.key==="Enter"||event.key===" ")&&event.target===cell){
+          event.preventDefault();
+          input.focus({preventScroll:true});
+        }
+      });
+      cell.appendChild(input);
+      tr.appendChild(cell);
+    });
+    (ri===0?head:body).appendChild(tr);
+  });
+  table.append(head,body);
+  viewport.appendChild(table);
+  viewport.addEventListener("scroll",()=>{
+    const focused=document.activeElement;
+    if(focused?.classList?.contains("table-cell-input")&&viewport.contains(focused))focused.blur();
+  },{passive:true});
+  const hint=document.createElement("div");
+  hint.className="table-scroll-hint";
+  hint.textContent=ar
+    ?"اسحب الجدول للتمرير يميناً ويساراً أو للأعلى والأسفل، واضغط الخلية للتعديل"
+    :"Swipe the table horizontally or vertically; tap a cell to edit";
+  surface.append(viewport,hint);
+  return surface;
 }
 
 function mediaEditor(block){
@@ -608,6 +698,12 @@ function mediaEditor(block){
 }
 
 function renderBlocks(){
+  // Rebuilding a table after adding a row/column must not jump the viewport
+  // back to the first column or the first row.
+  const oldScroll=new Map();
+  blocksEl.querySelectorAll(".table-preview[data-block-id]").forEach(viewport=>{
+    oldScroll.set(viewport.dataset.blockId,{left:viewport.scrollLeft,top:viewport.scrollTop});
+  });
   blocksEl.innerHTML="";starter.classList.toggle("hidden",!!current?.blocks?.length);
   (current?.blocks||[]).forEach((block,index)=>{
     const article=document.createElement("article");article.className=`block${selectedBlockId===block.id?" selected":""}`;article.dataset.id=block.id;
@@ -624,6 +720,10 @@ function renderBlocks(){
       main.querySelectorAll("[contenteditable]").forEach(control=>{control.contentEditable="false"});
     }
     const tools=document.createElement("div");tools.className="block-tools";const more=document.createElement("button");more.type="button";more.className="mini-btn";MiniAppIcons.mount(more,"more");more.setAttribute("aria-label",mt("block.settings",{name:info(block.type).label}));more.addEventListener("click",e=>{e.stopPropagation();selectBlock(block.id);openBlockMenu(block)});tools.appendChild(more);row.append(main,tools);article.appendChild(row);article.addEventListener("click",()=>selectBlock(block.id));blocksEl.appendChild(article);
+  });
+  blocksEl.querySelectorAll(".table-preview[data-block-id]").forEach(viewport=>{
+    const previous=oldScroll.get(viewport.dataset.blockId);
+    if(previous){viewport.scrollLeft=previous.left;viewport.scrollTop=previous.top}
   });
   updatePublishValidity();
 }
