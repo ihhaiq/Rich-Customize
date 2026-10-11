@@ -15,7 +15,7 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
     records[name] = [];
     tables[name] = new Proxy({ _name: name }, { get: (target, prop) => prop === '_name' ? target._name : { table: name, key: prop } });
   }
-  const keys = { editorSessions: 'userId', maintenanceLocks: 'name', richPages: 'pageId', usageUsers: 'userId', editorSubscriptions: 'userId', managedBotOrders: 'orderId', managedBotPayments: 'chargeId', managedBotLicenses: 'licenseId', brandingEntitlements: 'userId' };
+  const keys = { editorSessions: 'userId', maintenanceLocks: 'name', richPages: 'pageId', usageUsers: 'userId', editorSubscriptions: 'userId', managedBotOrders: 'orderId', managedBotPayments: 'chargeId', managedBotLicenses: 'licenseId', brandingEntitlements: 'userId', forumTopicDefaults: 'chatId' };
   const clone = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
   const db = {
     select() {
@@ -55,6 +55,14 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
   };
   const api = new Proxy({}, { get: (_, method) => async args => {
     calls.push({ method, args: clone(args) });
+    if (method === 'getChat' && apiState.chats?.[String(args?.chat_id)]) {
+      return clone(apiState.chats[String(args.chat_id)]);
+    }
+    if (method === 'getChatMember' && apiState.members?.[String(args?.user_id)]) {
+      return clone(apiState.members[String(args.user_id)]);
+    }
+    if (method === 'getMe' && apiState.me) return clone(apiState.me);
+    if (method === 'sendRichMessage' && apiState.richSendError) throw new Error(apiState.richSendError);
     if (method === 'getStickerSet') {
       if (apiState.error) throw new Error('Sticker set unavailable');
       return clone(apiState.pack);
