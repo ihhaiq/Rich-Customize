@@ -1,3 +1,4 @@
+import { storeGoldenGiftAccess } from '../../../_lib/golden-gift-access.js';
 import { json, handleError, HttpError } from '../../../_lib/http.js';
 import { miniAppUser } from '../../../_lib/telegram-auth.js';
 import {
@@ -34,9 +35,12 @@ async function normalizeDocumentResult(row, payload, env) {
   }
 
   if (row.action === 'pages') {
+    await storeGoldenGiftAccess(env,row.user_id,payload.golden_gift);
     return {
       ok: true,
       beta: '0.4-b2b',
+      Golden_ticket: payload.golden_gift?.Golden_ticket === true && Number(payload.golden_gift?.expires_at)>Math.floor(Date.now()/1000),
+      golden_gift: payload.golden_gift || null,
       pages: Array.isArray(payload.pages) ? payload.pages : [],
     };
   }

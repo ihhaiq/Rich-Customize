@@ -1238,6 +1238,24 @@ async function boot(){
   try{
     waitOverlay?.setMessage(mt("common.loading"),mt("pages.title"));
     const pageData=await api("/miniapp/api/pages");
+    window.RichMiniAppAccess.Golden_ticket=pageData?.Golden_ticket===true;
+    window.RichMiniAppAccess.goldenGift=pageData?.golden_gift||null;
+    if(pageData?.Golden_ticket===true) {
+      window.RichMiniAppAccess.customEmojiPackLimit=50;
+      activeTableColumnLimit=20;
+      toast("🎟 القسيمة الذهبية مفعّلة حتى "+new Date(Number(pageData.golden_gift.expires_at)*1000).toLocaleString());
+      const giftExpires=Number(pageData.golden_gift.expires_at)*1000;
+      const expireGift=()=>{
+        if(Date.now()<giftExpires) return setTimeout(expireGift,Math.min(2147483647,giftExpires-Date.now()));
+        window.RichMiniAppAccess.Golden_ticket=false;
+        if(!window.RichMiniAppAccess.isDeveloper) window.RichMiniAppAccess.customEmojiPackLimit=2;
+        if(!window.RichMiniAppAccess.isDeveloper) activeTableColumnLimit=8;
+        window.dispatchEvent(new CustomEvent("rich-miniapp-access",{detail:window.RichMiniAppAccess}));
+      };
+      expireGift();
+    }
+    window.dispatchEvent(new CustomEvent("rich-miniapp-access",{detail:window.RichMiniAppAccess}));
+    if(pageData?.golden_gift?.available) toast("🎁 عندك قسيمة ذهبية! افتح البوت واضغط قسيمتي الذهبية لتفعيلها خلال ١٢ ساعة.");
     const pages=Array.isArray(pageData?.pages)?pageData.pages:[];
     setPagesSnapshot(pages);
 

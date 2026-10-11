@@ -388,3 +388,21 @@ export const scheduledPostDestinations = table('scheduled_post_destinations', {
 }, (t) => ({
   jobIdx: index('idx_scheduled_destinations_job').on(t.jobId),
 }));
+
+// Monthly gifts are independent of paid subscriptions and permanent branding.
+export const goldenCampaigns = table('golden_campaigns', {
+  month: text('month').primaryKey(),
+  jobId: text('job_id').notNull(),
+  issuedAt: integer('issued_at').notNull(),
+  claimUntil: integer('claim_until').notNull(),
+  duration: integer('duration').notNull(),
+  reminderReady: integer('reminder_ready').notNull().default(0),
+});
+export const goldenClaims = table('golden_claims', {
+  key: text('key').primaryKey(),
+  userId: integer('user_id').notNull(),
+  jobId: text('job_id').notNull(),
+  activatedAt: integer('activated_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  reminderReady: integer('reminder_ready').notNull().default(0),
+}, (t) => ({ ownerIdx: index('idx_golden_claim_owner').on(t.userId) }));

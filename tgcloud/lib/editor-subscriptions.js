@@ -1,3 +1,4 @@
+import { activeGoldenGift } from 'lib/golden-gifts';
 import { db } from 'sdk';
 import { eq } from 'sdk/db';
 import { editorSubscriptions } from 'schema';
@@ -19,6 +20,9 @@ export async function getEditorEntitlement(userId, { now = Math.floor(Date.now()
   const id = Number(userId);
   if (!Number.isSafeInteger(id) || id <= 0) return resolveEditorEntitlement();
   if (isDeveloper(id)) return resolveEditorEntitlement({ developer:true });
+  try {
+    if (await activeGoldenGift(id, now)) return resolveEditorEntitlement({plan:'golden',active:true});
+  } catch { console.warn('Golden gift lookup unavailable; using paid entitlement'); }
   let row;
   try {
     row = await db.select().from(editorSubscriptions)

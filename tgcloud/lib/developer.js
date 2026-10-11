@@ -1,3 +1,4 @@
+import { issueGoldenGift } from 'lib/golden-gifts';
 import { api, BotApiError, db, InputFile } from 'sdk';
 import { and, eq, gte, lt, sql } from 'sdk/db';
 import { developerStates, editorSessions, legacyStates, maintenanceLocks, richPages, usageUsers } from 'schema';
@@ -153,6 +154,7 @@ function panelRichMessage(content, extraButtons = []) {
   }
 
   const mainActions = buttonTableBlock([
+    { text: '🎁 إهداء قسيمة ذهبية للجميع (مرة بالشهر)', callback_data: 'dev:golden:gift', style: 'success' },
     { text: 'فحص قاعدة البيانات', callback_data: 'dev:database:check', style: 'primary' },
     { text: 'تحديث قناة المعاينة', callback_data: 'dev:showcase:refresh', style: 'primary' },
     { text: 'بيانات / إحصائيات', callback_data: 'dev:stats', style: 'primary' },
@@ -933,6 +935,11 @@ export async function handleDeveloperCallback(query) {
     return true;
   }
 
+  if (data === 'dev:golden:gift') {
+    const result = await issueGoldenGift(query.from.id);
+    await api.answerCallbackQuery({callback_query_id:query.id,show_alert:true,text:result.created?'تم منح القسيمة للمستخدمين الحاليين. التفعيل خلال ١٢ ساعة، والمدة ٣٠ يوماً من التفعيل.':'تم استخدام هدية هذا الشهر بالفعل.'});
+    return true;
+  }
   if (data === 'dev:errorlog') {
     await showErrorLogSettings(query, chatId);
     return true;

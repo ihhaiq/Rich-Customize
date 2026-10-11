@@ -9,8 +9,6 @@ import {
 } from '../../../_lib/b2b-bridge.js';
 import {
   claimMirrorBootstrap,
-  listMirrorPages,
-  pageMirrorReady,
   markMirrorBootstrapFailed,
 } from '../../../_lib/page-mirror.js';
 
@@ -28,14 +26,8 @@ export async function onRequestGet(context) {
   try {
     const user = await miniAppUser(context);
     const db = requireBridgeDb(context.env);
-    if (await pageMirrorReady(db)) {
-      return json({
-        ok: true,
-        beta: '0.5-mirror',
-        pages: await listMirrorPages(db, user.id),
-      });
-    }
-
+    // Always refresh gift state from Serverless along with the user's pages.
+    // The advisory page mirror does not contain live entitlement state.
     const bootstrap = await claimMirrorBootstrap(db);
     if (bootstrap.acquired) {
       try {

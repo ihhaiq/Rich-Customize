@@ -1,3 +1,4 @@
+import { goldenGiftAccess } from './golden-gift-access.js';
 import { HttpError } from './http.js';
 import { PLAN_LIMITS } from '../../tgcloud/lib/subscription-policy.js';
 
@@ -110,13 +111,14 @@ export async function customEmojiPackAccess(env, userId, {unlimited = false} = {
   const db = requireDb(env);
   await ensureSchema(db);
   const owner = safeUserId(userId);
+  const giftLimit = (await goldenGiftAccess(env,owner)).Golden_ticket ? PLAN_LIMITS.golden.emojiPacks : REGULAR_CUSTOM_EMOJI_PACK_LIMIT;
 
   if (!unlimited) {
     const stored = await orderedPackNames(db, owner);
     return {
       unlimited:false,
-      limit:REGULAR_CUSTOM_EMOJI_PACK_LIMIT,
-      packNames:stored.slice(0, REGULAR_CUSTOM_EMOJI_PACK_LIMIT),
+      limit:giftLimit,
+      packNames:stored.slice(0, giftLimit),
       packCount:stored.length,
     };
   }
@@ -134,6 +136,7 @@ export async function claimCustomEmojiPack(env, userId, packName, {unlimited = f
   const db = requireDb(env);
   await ensureSchema(db);
   const owner = safeUserId(userId);
+  const giftLimit = (await goldenGiftAccess(env,owner)).Golden_ticket ? PLAN_LIMITS.golden.emojiPacks : REGULAR_CUSTOM_EMOJI_PACK_LIMIT;
   const name = safePackName(packName);
   const stamp = Math.floor(Date.now() / 1000);
 
@@ -145,7 +148,7 @@ export async function claimCustomEmojiPack(env, userId, packName, {unlimited = f
       + 'SELECT ?, ?, ? WHERE ('
       + 'SELECT COUNT(*) FROM miniapp_custom_emoji_packs WHERE user_id = ?'
       + ') < ?'
-    ).bind(owner, name, stamp, owner, REGULAR_CUSTOM_EMOJI_PACK_LIMIT).run();
+    ).bind(owner, name, stamp, owner, giftLimit).run();
     const row = await db.prepare(
       'SELECT pack_name FROM miniapp_custom_emoji_packs WHERE user_id = ? AND pack_name = ?'
     ).bind(owner, name).first();
@@ -165,6 +168,7 @@ export async function deleteCustomEmojiPack(env, userId, packName, {unlimited = 
   const db = requireDb(env);
   await ensureSchema(db);
   const owner = safeUserId(userId);
+  const giftLimit = (await goldenGiftAccess(env,owner)).Golden_ticket ? PLAN_LIMITS.golden.emojiPacks : REGULAR_CUSTOM_EMOJI_PACK_LIMIT;
   const name = safePackName(packName);
 
   if (!unlimited) {
@@ -189,10 +193,11 @@ export async function reorderCustomEmojiPacks(env, userId, names, {unlimited = f
   const db = requireDb(env);
   await ensureSchema(db);
   const owner = safeUserId(userId);
+  const giftLimit = (await goldenGiftAccess(env,owner)).Golden_ticket ? PLAN_LIMITS.golden.emojiPacks : REGULAR_CUSTOM_EMOJI_PACK_LIMIT;
   const requested = Array.isArray(names) ? names.map(safePackName) : [];
   const existing = await orderedPackNames(db, owner);
 
-  if (!unlimited && requested.length > REGULAR_CUSTOM_EMOJI_PACK_LIMIT) {
+  if (!unlimited && requested.length > giftLimit) {
     throw new HttpError(403, 'custom_emoji_pack_limit');
   }
   if (requested.length !== existing.length) {
@@ -218,6 +223,7 @@ export async function pinCustomEmojiPack(env, userId, packName, {unlimited = fal
   const db = requireDb(env);
   await ensureSchema(db);
   const owner = safeUserId(userId);
+  const giftLimit = (await goldenGiftAccess(env,owner)).Golden_ticket ? PLAN_LIMITS.golden.emojiPacks : REGULAR_CUSTOM_EMOJI_PACK_LIMIT;
   const name = safePackName(packName);
   const existing = await orderedPackNames(db, owner);
   if (!existing.includes(name)) throw new HttpError(404, 'custom_emoji_pack_not_found');

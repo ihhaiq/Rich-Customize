@@ -1,3 +1,4 @@
+import { handleGoldenGiftCallback } from 'lib/golden-gifts';
 import { api } from 'sdk';
 import { handlePremiumEmojiCallback } from 'lib/editor-premium-emoji';
 import { handleEditorImportCallback } from 'lib/editor-core';
@@ -52,6 +53,7 @@ export default async function (query, ctx = {}) {
       query.from.language_code = await resolveUserLanguage(query.from);
     }
     if (await handleDeveloperCallback(query)) return;
+    if (await handleGoldenGiftCallback(query)) return;
     if (await handlePageNavigationCallback(query)) return;
     if (await handleShowcaseCallback(query)) return;
     if (await handleLegalCallback(query)) return;

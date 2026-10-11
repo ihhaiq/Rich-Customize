@@ -1,3 +1,4 @@
+import { goldenGiftStatus, receiveGiftReminder } from 'lib/golden-gifts';
 import { assertUniquePageTitle, acquireOwnerPageLock as acquireCreateLock, releaseOwnerPageLock as releaseCreateLock } from 'lib/page-names';
 import { managedPage } from 'lib/managed-pages';
 import { listManagedBotLicensesForBridge } from 'lib/managed-bot-billing';
@@ -645,6 +646,7 @@ async function handlePages(message, id, ownerId) {
     protocol: BRIDGE_PROTOCOL,
     request_id: id,
     action: 'pages',
+    golden_gift: await goldenGiftStatus(ownerId),
     user_id: Number(ownerId),
     pages: rows.map((row) => ({
       page_id: String(row.pageId),
@@ -1083,6 +1085,7 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
   if (/^\/rcb_schedule_(ack|due)@richcustomizebot\b/i.test(scheduleSource)) {
     if (!isBridgeOrigin(message)) return false;
     await authorizeBridgeMessage(message,'schedule_due');
+    if (await receiveGiftReminder(scheduleSource)) return true;
     return receiveScheduleRelayControl(scheduleSource);
   }
   if (await handleSyncControl(message)) return true;

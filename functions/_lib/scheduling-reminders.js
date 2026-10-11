@@ -1,7 +1,7 @@
 // RCB1 schedule reminder protocol. Cloudflare stores IDs/times ONLY, never post contents.
 // Inputs to handleScheduleBridgeEvent MUST be preauthenticated by the Telegram
 // webhook secret, exact bridge-chat check, and pinned main-bot identity.
-export const JOB_ID_RE = /^sch_[a-f0-9]{32}$/;
+export const JOB_ID_RE = /^(?:sch|gft)_[a-f0-9]{32}$/;
 export const SCHEDULE_REMINDER_MAX_AHEAD = 4 * 86400;
 const PROTOCOL = 'RCB1';
 const TARGET_RE = /^\/(rcb_schedule_register|rcb_schedule_cancel|rcb_schedule_result)@richminiappsbot\s+([\s\S]+)$/i;
@@ -23,7 +23,7 @@ export function parseScheduleBridgeEvent(source) {
 export async function handleScheduleBridgeEvent(db, event, now = Math.floor(Date.now() / 1000)) {
   const { type, jobId, revision } = event;
   if (type === 'register') {
-    if (event.runAt > now + SCHEDULE_REMINDER_MAX_AHEAD + 60 || event.runAt < now - 60) {
+    if (event.runAt > now + (jobId.startsWith('gft_') ? 30*86400 : SCHEDULE_REMINDER_MAX_AHEAD) + 60 || event.runAt < now - 60) {
       return { ok: false, code: 'SCHEDULE_TIME_INVALID' };
     }
     // A newer revision (including cancellation) always wins. Same-revision replay
