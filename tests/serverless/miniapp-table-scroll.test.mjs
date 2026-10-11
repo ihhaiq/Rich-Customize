@@ -37,6 +37,15 @@ function fakeDocument(){
       focus(){ focused=el; el.dispatch('focus'); },
       blur(){ if(focused===el) focused=null; el.dispatch('blur'); },
       contains(node){ return el===node || children.some(child=>child.contains?.(node)); },
+      querySelector(selector){
+        if(selector !== '.table-edit-cell.is-selected')return null;
+        const find = node => {
+          if(node.classList?.contains('table-edit-cell')&&node.classList.contains('is-selected'))return node;
+          for(const child of node.children||[]) {const found=find(child);if(found)return found;}
+          return null;
+        };
+        return find(el);
+      },
     };
     return el;
   }
@@ -52,13 +61,18 @@ function buildTableEditor(){
   assert.ok(from >= 0 && to > from, 'tableEditor function is present');
   const isolated = source.slice(from,to);
   const mock=fakeDocument();
-  const events={selected:0,rebuilt:0,dirty:0};
-  const build = new Function('document','selectBlock','rebuildTableHtml','markDirty',
+  const events={selected:0,rebuilt:0,dirty:0,panned:0};
+  const build = new Function(
+    'document','selectBlock','rebuildTableHtml','markDirty',
+    'selectedTableCell','activeTablePanId','syncTableHeaderPan',
     isolated+';return tableEditor;')(
       mock.document,
       ()=>events.selected++,
       ()=>events.rebuilt++,
       ()=>events.dirty++,
+      null,
+      null,
+      ()=>events.panned++,
     );
   return {build,events};
 }
@@ -82,7 +96,7 @@ test('26-row, 20-column editor renders a separately scrollable table with a head
   assert.equal(grid.children[1].children.length,25);
   assert.equal(grid.children[0].children[0].children.length,20);
   assert.equal(grid.children[0].children[0].children[0].tag,'th');
-  assert.match(surface.children[1].textContent,/اسحب الجدول/);
+  assert.match(surface.children[1].textContent,/اسحب للتمرير/);
 });
 
 test('gesture swipes never focus cells; deliberate taps edit, and scrolling leaves edit mode',()=>{
@@ -97,8 +111,13 @@ test('gesture swipes never focus cells; deliberate taps edit, and scrolling leav
   assert.equal(events.selected,0,'swipe must not focus/edit');
   cell.dispatch('pointerdown',{clientX:10,clientY:10});
   cell.dispatch('click',{target:cell});
-  assert.equal(events.selected,1,'tap enters edit mode');
-  assert.equal(cell.classList.contains('is-editing'),true);
+  assert.equal(events.selected,1,'first tap selects the cell');
+  assert.equal(cell.classList.contains('is-selected'),true);
+  assert.equal(cell.classList.contains('is-editing'),false,'first tap must not open keyboard');
+  cell.dispatch('pointerdown',{clientX:10,clientY:10});
+  cell.dispatch('click',{target:cell});
+  assert.equal(events.selected,1,'second tap should not select block again');
+  assert.equal(cell.classList.contains('is-editing'),true,'second tap opens edit mode');
   input.value='changed';
   input.dispatch('input');
   assert.equal(block.data.rows[0][0],'changed');
@@ -106,6 +125,7 @@ test('gesture swipes never focus cells; deliberate taps edit, and scrolling leav
   assert.equal(events.rebuilt,1);
   viewport.dispatch('scroll');
   assert.equal(cell.classList.contains('is-editing'),false);
+  assert.equal(events.panned,1,'horizontal pan must update the top header');
 });
 
 test('gesture CSS overrides previous overflow and block long-press handlers',()=>{
@@ -119,6 +139,32 @@ test('gesture CSS overrides previous overflow and block long-press handlers',()=
   assert.match(css,/touch-action:\s*pan-x pan-y/);
   assert.ok(html.indexOf('table_touch_scroll.css')>html.indexOf('liquid_glass_transparent.css'));
   assert.match(interactions,/target\.closest\?\.\("\.table-preview"\)\)return null/);
+  assert.match(css,/table-pan-active[\\s\\S]*?translate3d\(var\(--table-pan-x/);
+  assert.match(css,/rgba\(19,31,44,\.86\)/);
+  assert.match(app,/function syncTableHeaderPan\(viewport = null\)/);
   assert.match(app,/const oldScroll=new Map\(\)/);
   assert.match(app,/viewport\.scrollLeft=previous\.left;viewport\.scrollTop=previous\.top/);
+});
+
+test('header and upper tools share the active table horizontal displacement',()=>{
+  const source=read('app.js');
+  const start=source.indexOf('function syncTableHeaderPan(viewport = null){');
+  const end=source.indexOf('\n}',start);
+  assert.ok(start>=0&&end>start);
+  const style={};
+  const classes=new Set();
+  const header={
+    style:{setProperty:(key,value)=>{style[key]=value}},
+    classList:{toggle:(key,enabled)=>{if(enabled)classes.add(key);else classes.delete(key)}},
+  };
+  const document={querySelector:selector=>selector==='.editor-head'?header:null};
+  const update=new Function('document',source.slice(start,end+2)+';return syncTableHeaderPan;')(document);
+  update({scrollLeft:-145});
+  assert.equal(style['--table-pan-x'],'145px');
+  assert.equal(classes.has('table-pan-active'),true);
+  update({scrollLeft:0});
+  assert.equal(style['--table-pan-x'],'0px');
+  assert.equal(classes.has('table-pan-active'),false);
+  update();
+  assert.equal(style['--table-pan-x'],'0px');
 });
