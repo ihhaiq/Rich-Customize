@@ -19,7 +19,7 @@ export function publishFailure(code, message, cause, extra = {}) {
 export const EXPECTED_PUBLISH_FAILURES = new Set([
   'PUBLISH_CHAT_UNAVAILABLE','PUBLISH_CHAT_MIGRATED','PUBLISH_PRIVATE_UNAVAILABLE',
   'PUBLISH_BOT_BLOCKED','PUBLISH_RIGHTS_MISSING','PUBLISH_RATE_LIMITED',
-  'PUBLISH_TOPIC_CLOSED','PUBLISH_TOPIC_DELETED','PUBLISH_THREAD_INVALID',
+  'PUBLISH_TOPIC_CLOSED','PUBLISH_TOPIC_DELETED','PUBLISH_THREAD_INVALID','PUBLISH_TOPIC_NOT_SET',
   'PUBLISH_CONTENT_TOO_LARGE','PUBLISH_TABLE_LIMIT','PUBLISH_MEDIA_INVALID',
   'PUBLISH_BUTTON_INVALID','PUBLISH_CONTENT_INVALID','PUBLISH_FORBIDDEN',
 ]);
@@ -75,7 +75,8 @@ export function isDefinitePublishRejection(error) {
 }
 export function publishFailureMessage(error, locale = 'en') {
   const ar = {
-    PUBLISH_TOPIC_CLOSED:'الموضوع المستهدف مغلق. افتح الموضوع أو اختر وجهة ثانية.',
+    PUBLISH_TOPIC_NOT_SET:'هذه المجموعة تستخدم المواضيع، لكن ما محددين موضوع للنشر. خلي أحد مسؤوليها يرسل /default داخل الموضوع المطلوب؛ ما راح نرسل للموضوع العام تلقائياً.',
+    PUBLISH_TOPIC_CLOSED:'الموضوع الافتراضي للمجموعة مغلق. افتحه أو خلي مسؤول يرسل /default بموضوع ثاني. تخطّينا هذه المجموعة فقط.',
     PUBLISH_TOPIC_DELETED:'الموضوع المستهدف محذوف. اختر موضوعاً آخر.',
     PUBLISH_THREAD_INVALID:'الموضوع المستهدف غير موجود أو لم يعد متاحاً.',
     PUBLISH_RIGHTS_MISSING:'البوت ما عنده صلاحية النشر في هذه المحادثة. راجع صلاحياته.',
@@ -93,7 +94,8 @@ export function publishFailureMessage(error, locale = 'en') {
     PUBLISH_FAILED:'تعذر نشر الرسالة لهذه المحادثة. حاول مجدداً.',
   };
   const en = {
-    PUBLISH_TOPIC_CLOSED:'The topic is closed. Open it or choose another destination.',
+    PUBLISH_TOPIC_NOT_SET:'This forum has no default topic. Ask a group admin to send /default inside the desired topic. No automatic General fallback.',
+    PUBLISH_TOPIC_CLOSED:'The default topic is closed. Open it or have an admin send /default in another topic. Only this chat was skipped.',
     PUBLISH_TOPIC_DELETED:'The topic was deleted. Choose another topic.',
     PUBLISH_THREAD_INVALID:'The destination topic is unavailable.',
     PUBLISH_RIGHTS_MISSING:'The bot lacks publishing permissions in this chat.',
