@@ -26,6 +26,7 @@ import { sendMarketingCampaignSummary, sendMarketingLanding } from 'lib/marketin
 import { handleMiniAppBridgeMessage } from 'lib/miniapp-bridge';
 import { handleMiniAppUserPickerShared } from 'lib/miniapp-user-picker';
 import { handleEditorBlockMessage } from 'lib/editor-block-flow';
+import { handleDefaultTopicCommand } from 'lib/forum-topics';
 import { guardLegacyEditorMessage } from 'lib/editor-guard';
 import { handlePremiumEmojiMessage } from 'lib/editor-premium-emoji';
 import { handleEditorCoreMessage, isForwardedRichMessage } from 'lib/editor-core';
@@ -68,6 +69,9 @@ export default async function (message, ctx = {}) {
     if (await handleManagedBotSuccessfulPayment(message)) return;
     if (await handleMiniAppUserPickerShared(message)) return;
     if (!await allowMessageRequest(message)) return;
+    // The only /default entry point is an actual group topic message;
+    // never interpret a forwarded /default in a private editor as an admin action.
+    if (await handleDefaultTopicCommand(message)) return;
     const command = commandName(message?.text);
     const languageCode = await resolveUserLanguage(message?.from);
     if (message?.from && !message.from.language_code) {
