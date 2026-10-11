@@ -11,7 +11,7 @@
 
 ## تعديل إعدادات Worker من المتصفح
 1. افتح [wrangler.toml](https://github.com/ihhaiq/Rich-Customize/blob/serverless-cleanup/workers/schedule-reminders/wrangler.toml) على GitHub، فرع serverless-cleanup.
-2. بالقلم استبدل REPLACE_WITH_EXISTING_DB_NAME باسم D1 واستبدل REPLACE_WITH_EXISTING_D1_DATABASE_ID بمعرفها.
+2. تأكد أن قاعدة D1 المضبوطة هي `rich-customize-miniapp` ومعرفها هو المعرف الذي نسخته من Cloudflare؛ القيم تم تعيينها من قبل صاحب المشروع بالفعل. لا تعِد كتابة الـ UUID إذا لم يتغير.
 3. احفظ في الفرع ذاته. **لا تضع أي توكن داخل GitHub**.
 
 ## ربط Worker بـ GitHub من Cloudflare
@@ -26,13 +26,13 @@
 1. Worker → Settings → Variables and Secrets → Add → Secret.
 2. الاسم B2B_BOT_TOKEN والقيمة **توكن @Richminiappsbot فقط**، لا توكن المحرر. احفظ ثم انشر.
 3. من Bindings تأكد أن DB مرتبط بنفس D1 المذكورة أعلاه.
-4. من Settings → Triggers → Cron Triggers تأكد من * * * * * (مرة كل دقيقة، UTC).
+4. من Settings → Triggers → Cron Triggers تأكد من **وجود مشغّلين منفصلين** يعرفهما `wrangler.toml`: `* * * * *` لتنفيذ المنشورات والمهام المستحقة كل دقيقة، و`0 9 * * *` لبدء فحص الاشتراكات اليومي الساعة 09:00 UTC (12:00 بغداد). لا تضف تكرارات يدوياً إذا ظهرت تلقائياً من الملف.
 5. افحص Observability / Logs بحثاً عن Schedule reminders. فتح عنوان Worker بالمتصفح يعرض 404 عمداً، ولا يثبت أن Cron يعمل.
 
 ## تشغيل Telegram
 الكود أصبح في GitHub ولكن Telegram Serverless لم يُهاجَر أو يُنشر هنا.
 راجع مخطط tgcloud/schema.js وطبقه قبل نشر كود bot المعدّل. اختبر RCB1 ثم /sup وتذكيرات اشتراك تجريبي قبل التشغيل للجميع.
-حد الفحص الحالي عشرة اشتراكات مدفوعة وعشر قسائم كل دقيقة؛ نجاح وصول الجميع في وقتهم يحتاج اختبار ضغط إذا كان العدد كبيراً.
+تبدأ حملة الاشتراكات مرة يومياً فقط. إذا بقي مشتركون أو محاولات إرسال مؤجلة، يسجّل Serverless مهمة متابعة بالمعرّف والمُراجعة في نفس جدول `schedule_reminders`، ويتابعها Worker كل دقيقة **فقط عندما تحين المهمة**. كل دفعة تفحص بحد أقصى 10 اشتراكات مدفوعة و10 قسائم؛ لا يعني ذلك رسالة يومية من Worker لكل مستخدم. الأداء وسقف الإنجاز قبل نهاية اليوم يحتاجان اختبار ضغط مع الأعداد الكبيرة. لا تحتاج ترحيل D1 جديد لهذا التعديل.
 
 المراجع:
 - https://developers.cloudflare.com/workers/ci-cd/builds/
