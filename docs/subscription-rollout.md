@@ -1,38 +1,69 @@
-# Subscription rollout — current status
+# Subscription rollout — current code versus production
 
-Updated 2026-10-10. Specification: [sups.md](../sups.md).
-This ledger describes repository changes, not a production acceptance report.
+Updated 2026-10-11 — branch `serverless-cleanup`.
+Approved product specification: [sups.md](../sups.md). This document
+describes code in GitHub, **not** production deployment or paid entitlement activation.
 
-## Approved versus implemented
-| Area | Approved specification | Repository status |
-| --- | --- | --- |
-| Text | 20000 / 25000 / 32768 | Editor policy still uses 20000 / 25000 / 32000 |
-| Total blocks | 50 / 200 / 500 including nested items | Editor policy still uses 30 / 60 / 120; total-count enforcement needs alignment |
-| Nesting / media / columns | 4/8/16, 10/25/50, 8/12/20 | New per-plan checks remain pending |
-| Saved pages / emoji packs | 12/50/150 and 2/8/50 | Policy foundations exist; paid activation and trusted Mini App propagation remain pending |
-| Prices | Plus 150, Golden 350 Stars per 30 days | Donation cart and Stars receipt flow exist in the separate donation repository |
-| Branding | 99 Stars permanent, or included while paid plan is active | Existing entitlements preserved; editor button opens preselected donation cart |
-| Early access | Golden benefit | No named experimental features yet |
+## Single source of truth
 
-The donation bot comparison reflects the approved table. It is a display, not evidence that editor quotas or entitlements are active.
+All approved numeric quotas are defined in
+[`tgcloud/lib/subscription-policy.js`](../tgcloud/lib/subscription-policy.js)
+as `PLAN_LIMITS`. The front-end comparison reads
+[`app/miniapp_static/plan_catalog.generated.js`](../app/miniapp_static/plan_catalog.generated.js),
+which is generated from the server-side policy, not maintained independently.
+To update quotas: edit the Serverless policy, run `npm run generate:plans`,
+review the diff, and run `npm run test:ci`. The CI `check:plans` fails on drift.
 
-## Existing protections
-- Server-verified owner, subscription source and expiry; no client-provided plan or developer flag.
-- Stored-page compatibility allowance may retain/reduce actual old text, not grow it or authorize new unsaved drafts.
-- Cloudflare legacy precheck requires an owner-specific mirror matching base revision/updated_at; Serverless remains authoritative.
-- Owner/revision CAS for page writes; cross-session stale content tracking still needs additional work.
-- Two free emoji packs in existing D1 storage, atomic insert/backfill; do not delete or automatically migrate user packs.
-- Exact own-name lookup in inline/guest, with ambiguous-name refusal; shared codes retain existing behavior.
-- Duplicate owner titles refused on bot save/rename/restore and Mini App create/save; owner locks have a lease and need real concurrency verification.
+| Limit | Free | Plus | Golden Ticket |
+| --- | ---: | ---: | ---: |
+| Visible text | 20,000 | 25,000 | 32,768 |
+| Total blocks | 50 | 200 | 500 |
+| Nesting depth | 4 | 8 | 16 |
+| Media attachments | 10 | 25 | 50 |
+| Table columns | 8 | 12 | 20 |
+| Saved pages | 12 | 50 | 150 |
+| Emoji packs | 2 | 8 | 50 |
+| Plan price (Stars / 30 days) | 0 | 150 | 350 |
 
-## Billing boundary
-Current payment repository: [ihhaiq/richDonate](https://github.com/ihhaiq/richDonate).
-Its invoices and receipts do not grant editor benefits until an authenticated durable entitlement event is applied and acknowledged.
-Read its [B2B contract](https://github.com/ihhaiq/richDonate/blob/main/docs/editor-b2b-contract.md) before implementing integration.
-There is no billing backend on Cloudflare. Do not recreate the archived scaffold or follow the archived multi-bot hosting plan.
+The technical table maximum is 20 columns × 26 rows even for developer accounts.
+Additional runtime decisions may apply; the server performs authoritative checks.
 
-## Verification and next work
-Run `npm test` from the root. Focused CI is [a1-quota-tests.yml](../.github/workflows/a1-quota-tests.yml).
-Local mock/unit successes do not prove real Telegram payments, D1 concurrency, quota boundaries or production deployment.
-Complete new quota enforcement, entitlement event handling, downgrade rules and controlled integration testing before claiming full rollout.
-Templates and saved page history are cancelled. Scheduling code now includes a Telegram Serverless job store, editor workflow and B2B Cloudflare reminder Worker, but deployment/migrations and live acceptance are NOT complete. Free 2 destinations; proposed Plus 5 and Golden 15 pending approval. See [scheduling.md](scheduling.md).
+## Implemented in repository
+
+- Unified server-side policy and validation entry points in `editor-blocks.js`,
+  `editor-session.js`, page CRUD and publish guards.
+- Legacy stored pages (`quota_version=1`) remain publish-only; new pages use
+  version 2. Import does not silently lift the legacy restriction.
+- The Mini App's Free table UI pre-checks against the authenticated
+  `/miniapp/api/me` response; the server ultimately decides enforcement.
+- Plan comparison displays match generated Serverless policy. Offers remain
+  labelled beta / unavailable for purchase.
+- Static code, plan generation and Serverless unit tests are part of
+  `npm run test:ci`, triggered on Mini App and Serverless changes by
+  `.github/workflows/a1-quota-tests.yml`.
+
+## Not yet an active subscription launch
+
+- Only persisted subscriptions with trusted `richdonate:verified` source and
+  valid expiry grant non-Free entitlements in Serverless. Cross-bot verified
+  purchase activation and renewal still need full production acceptance tests.
+- Cloudflare's Mini App `/me` does **not** receive trusted Plus/Golden
+  entitlements yet; it may show Free editor limits to non-developers even if
+  the server has a different verified entitlement.
+- The comparison's 150/350-Star prices are a specification, not a live sale.
+  No separate billing engine should be created in Cloudflare.
+
+## Safe rollout / limitations
+
+1. Run `npm run test:ci` and inspect GitHub Actions; a locally mocked pass
+   is not equivalent to a real Telegram WebView or a Cloudflare test.
+2. Review `tgcloud schema.js` migrations on a cloned database. In particular
+   `rich_pages.quota_version`, `forum_topic_defaults`, and
+   `scheduled_post_destinations.failure_code` are pending production
+   reconciliation where not already applied.
+3. Apply and verify migrations before deploying code that requires new columns
+   or tables. Do not migrate or `tgcloud push` without owner approval.
+4. Verify Telegram Stars events, concurrent page saves, quota boundaries,
+   downgrade and expiry, and RCB1 synchronization end to end.
+
+Templates and saved-page version history are intentionally excluded from scope.
