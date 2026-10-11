@@ -21,13 +21,20 @@ export async function getDefaultForumTopic(chatId) {
 }
 export async function resolveForumDeliveryOptions(chatId, chat = null) {
   const target=chat || await api.getChat({chat_id:Number(chatId)});
-  if(!forum(target))return {};
   const chosen=await getDefaultForumTopic(chatId);
-  const threadId=safeThread(chosen?.threadId);
-  if(!threadId){
+  if(!forum(target)){
+    if(chosen)throw publishFailure('PUBLISH_THREAD_INVALID',
+      'The destination chat no longer supports forum topics. Clear and reset /default.');
+    return {};
+  }
+  if(!chosen){
     throw publishFailure('PUBLISH_TOPIC_NOT_SET',
       'No default topic is configured for this forum. An administrator must send /default in a topic.');
   }
+  // 0 is an explicit /default in General (never an automatic fallback).
+  if(Number(chosen.threadId)===0)return {};
+  const threadId=safeThread(chosen.threadId);
+  if(!threadId)throw publishFailure('PUBLISH_THREAD_INVALID','The configured default topic is invalid.');
   return {message_thread_id:threadId};
 }
 export async function handleDefaultTopicCommand(message) {
@@ -86,22 +93,23 @@ export async function handleDefaultTopicCommand(message) {
     await reply('الأوامر المتاحة:\n/default — تعيين هذا الموضوع للنشر\n/default status — عرض الموضوع الحالي\n/default clear — إلغاء التعيين وإيقاف النشر');
     return true;
   }
-  if(!threadId || !message?.is_topic_message){
-    await reply('❌ أرسل /default من داخل الموضوع المطلوب، مو من خارج المواضيع. لازم يكون للرسالة message_thread_id صالح.');
-    return true;
-  }
+  // The General topic may omit message_thread_id; accepting /default there
+  // is safe because an admin explicitly invoked it in a verified forum.
+  // Other topics always require a positive thread id.
+  const selectedThreadId=threadId||0;
   const topicTitle=String(message?.reply_to_message?.forum_topic_created?.name
     || message?.reply_to_message?.forum_topic_edited?.name
-    || message?.forum_topic_created?.name || '').trim().slice(0,128);
+    || message?.forum_topic_created?.name || (selectedThreadId===0?'العام (General)':''))
+    .trim().slice(0,128);
   const stamp=Math.floor(Date.now()/1000);
   await db.insert(forumTopicDefaults).values({
-    chatId:Number(chat.id),threadId,topicTitle,
+    chatId:Number(chat.id),threadId:selectedThreadId,topicTitle,
     updatedBy:sentAsGroup?0:actorId,updatedAt:stamp,
   }).onConflictDoUpdate({target:forumTopicDefaults.chatId,set:{
-    threadId,topicTitle,updatedBy:sentAsGroup?0:actorId,updatedAt:stamp,
+    threadId:selectedThreadId,topicTitle,updatedBy:sentAsGroup?0:actorId,updatedAt:stamp,
   }}).run();
   await reply('✅ تم تعيين هذا الموضوع كوجهة النشر الافتراضية للمجموعة.'
-    +'\nمعرّف الموضوع: '+threadId
+    +'\nالموضوع: '+(selectedThreadId===0?'العام (General)':'#'+selectedThreadId)
     +'\nالمنشورات الجديدة راح تنرسل هنا فقط.'
     +'\nإذا الموضوع انغلق أو انحذف، يفشل النشر لهذه المجموعة مع سبب واضح، وتستمر بقية المجموعات.');
   return true;
