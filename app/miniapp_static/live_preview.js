@@ -263,6 +263,12 @@ tableEditor = function(block) {
 // Render the message as one continuous Telegram-like document. Administrative
 // controls appear only on the selected block.
 renderBlocks = function() {
+  // The live renderer overrides app.js renderBlocks; keep per-table pan
+  // positions here, otherwise a cell tool would jump to the first column.
+  const scrollPositions=new Map();
+  blocksEl.querySelectorAll(".telegram-table-contextual[data-block-id]").forEach(viewport=>{
+    scrollPositions.set(viewport.dataset.blockId,{x:viewport.scrollLeft,y:viewport.scrollTop});
+  });
   blocksEl.innerHTML = "";
   starter.classList.toggle("hidden", !!current?.blocks?.length);
   (current?.blocks || []).forEach(block => {
@@ -283,6 +289,10 @@ renderBlocks = function() {
     else editor = mediaEditor(block);
 
     main.appendChild(editor);
+    if(current?.legacy_read_only){
+      main.querySelectorAll("[contenteditable]").forEach(el=>el.contentEditable="false");
+      main.querySelectorAll("input,textarea,select").forEach(el=>el.disabled=true);
+    }
     const tools = document.createElement("div");
     tools.className = "block-tools";
     const more = document.createElement("button");
@@ -301,6 +311,22 @@ renderBlocks = function() {
     article.addEventListener("click", () => selectBlock(block.id));
     blocksEl.appendChild(article);
   });
+  blocksEl.querySelectorAll(".telegram-table-contextual[data-block-id]").forEach(viewport=>{
+    const stored=scrollPositions.get(viewport.dataset.blockId);
+    if(stored){
+      viewport.scrollLeft=stored.x;
+      viewport.scrollTop=stored.y;
+    }else if(viewport.querySelector("table[dir='rtl']")){
+      // Open RTL tables with column one (rightmost) visible.
+      viewport.scrollLeft=Math.max(0,viewport.scrollWidth-viewport.clientWidth);
+    }
+    if(String(activeTablePanId)===String(viewport.dataset.blockId)
+      &&typeof syncTableHeaderPan==="function")syncTableHeaderPan(viewport);
+  });
+  if(activeTablePanId&&!blocksEl.querySelector(`.telegram-table-contextual[data-block-id="${activeTablePanId}"]`)){
+    activeTablePanId=null;
+    if(typeof syncTableHeaderPan==="function")syncTableHeaderPan();
+  }
 };
 
 
