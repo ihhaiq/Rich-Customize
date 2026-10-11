@@ -1,5 +1,6 @@
-// A bounded per-minute Serverless scan, prompted by the existing Cloudflare
-// reminder Worker via the authenticated RCB1 bot-to-bot bridge.
+// Daily expiry-notice campaign: one Cloudflare Cron start signal per UTC day.
+// Large campaigns and temporary 429s continue via existing RCB1 scheduled jobs
+// rather than empty per-minute subscription heartbeats.
 // Only Serverless reads subscriber identities and entitlements.
 import { api, db } from 'sdk';
 import { and, asc, eq, gt, lte } from 'sdk/db';
@@ -128,10 +129,120 @@ async function scan(source,now) {
         eq(subscriptionReminderScans.leaseUntil,lease))).run();
   }
 }
-export async function runSubscriptionReminderTick(now=stamp()) {
-  // The bridge has already authenticated sender, chat and target before this call.
-  await retryDue(now);
-  await scan('paid',now);
-  await scan('gift',now);
+// A single daily scan can exceed Telegram Serverless invocation limits.
+// Reuse the existing D1 schedule-reminders relay for resumable 10+10 batches.
+// The job ID is stable per UTC day and the revision advances after every batch.
+// A separate Serverless cycle lease avoids parallel/duplicate executions.
+const CYCLE_ID='subscription_daily_cycle';
+const NEXT_BATCH_DELAY=75; // Telegram and the RCB1 scheduler get time to settle.
+export const subscriptionCycleJobId=(day)=>
+  'sub_'+Number(day).toString(16).padStart(32,'0');
+async function cycleControl(action,day,revision,extra={}) {
+  await api.sendMessage({
+    chat_id:-1003993506865,disable_notification:true,
+    text:'/rcb_schedule_'+action+'@Richminiappsbot\\n'+JSON.stringify({
+      protocol:'RCB1',
+      request_id:'subscription_'+action+'_'+day+'_'+revision,
+      job_id:subscriptionCycleJobId(day),
+      revision,...extra,
+    }),
+  });
+}
+async function readCycle(now) {
+  const day=today(now);
+  await db.insert(subscriptionReminderScans).values({
+    id:CYCLE_ID,day,cursor:'0',leaseUntil:0,
+  }).onConflictDoNothing({target:subscriptionReminderScans.id}).run();
+  let row=await db.select().from(subscriptionReminderScans)
+    .where(eq(subscriptionReminderScans.id,CYCLE_ID)).get();
+  if(row.day!==day) {
+    await db.update(subscriptionReminderScans).set({day,cursor:'0',leaseUntil:0})
+      .where(and(eq(subscriptionReminderScans.id,CYCLE_ID),
+        eq(subscriptionReminderScans.day,row.day))).run();
+    row=await db.select().from(subscriptionReminderScans)
+      .where(eq(subscriptionReminderScans.id,CYCLE_ID)).get();
+  }
+  return row;
+}
+async function unfinishedScan(source,day) {
+  const row=await db.select().from(subscriptionReminderScans)
+    .where(eq(subscriptionReminderScans.id,source)).get();
+  return !row || row.day!==day || row.cursor!=='DONE';
+}
+async function nextRetry(day) {
+  const due=await db.select().from(subscriptionReminderDeliveries)
+    .where(and(eq(subscriptionReminderDeliveries.day,day),
+      eq(subscriptionReminderDeliveries.status,'retry')))
+    .orderBy(asc(subscriptionReminderDeliveries.nextAttemptAt)).limit(1).all();
+  return due[0]?.nextAttemptAt||0;
+}
+export async function runSubscriptionReminderTick(now=stamp(),options={}) {
+  // The authenticated bridge calls this once daily; due jobs advance the same
+  // daily campaign only while unfinished. No subscriber data leaves Serverless.
+  const day=today(now),isDue=options.jobId!=null;
+  if(isDue && (options.jobId!==subscriptionCycleJobId(day)
+    || !Number.isSafeInteger(options.revision) || options.revision<1))return false;
+  const expected=isDue?String(options.revision):'0';
+  const row=await readCycle(now);
+  if(row.day!==day||row.cursor!==expected||row.leaseUntil>now)return false;
+  const lease=now+120;
+  const claimed=await db.update(subscriptionReminderScans).set({leaseUntil:lease})
+    .where(and(eq(subscriptionReminderScans.id,CYCLE_ID),
+      eq(subscriptionReminderScans.day,day),
+      eq(subscriptionReminderScans.cursor,expected),
+      lte(subscriptionReminderScans.leaseUntil,now))).returning().run();
+  if(!claimed?.length)return false;
+  try {
+    await retryDue(now);
+    await scan('paid',now);
+    await scan('gift',now);
+    const needsScan=(await unfinishedScan('paid',day))||(await unfinishedScan('gift',day));
+    const retryAt=await nextRetry(day);
+    const unfinished=needsScan||Boolean(retryAt);
+    const earliest=now+NEXT_BATCH_DELAY;
+    const runAt=needsScan?earliest:Math.max(earliest,retryAt);
+    // Each UTC day is independent. Never resume yesterday's notices tomorrow.
+    if(unfinished && runAt<(day+1)*86400) {
+      const nextRevision=Number(expected)+1;
+      // Register before advancing the cursor: a definitive relay failure then
+      // leaves the prior D1 due revision retryable (daily-start failures log).
+      await cycleControl('register',day,nextRevision,{run_at:runAt});
+      await db.update(subscriptionReminderScans)
+        .set({cursor:String(nextRevision),leaseUntil:0})
+        .where(and(eq(subscriptionReminderScans.id,CYCLE_ID),
+          eq(subscriptionReminderScans.day,day),
+          eq(subscriptionReminderScans.cursor,expected),
+          eq(subscriptionReminderScans.leaseUntil,lease))).run();
+    } else {
+      await db.update(subscriptionReminderScans).set({cursor:'DONE',leaseUntil:0})
+        .where(and(eq(subscriptionReminderScans.id,CYCLE_ID),
+          eq(subscriptionReminderScans.day,day),
+          eq(subscriptionReminderScans.cursor,expected),
+          eq(subscriptionReminderScans.leaseUntil,lease))).run();
+      if(isDue)await cycleControl('result',day,options.revision,{status:'sent'});
+    }
+  } finally {
+    await db.update(subscriptionReminderScans).set({leaseUntil:0})
+      .where(and(eq(subscriptionReminderScans.id,CYCLE_ID),
+        eq(subscriptionReminderScans.day,day),
+        eq(subscriptionReminderScans.leaseUntil,lease))).run();
+  }
+  return true;
+}
+export async function receiveSubscriptionReminderSchedule(source) {
+  const match=String(source||'').trim()
+    .match(/^\\/rcb_schedule_(ack|due)@richcustomizebot\\s+([\\s\\S]+)$/i);
+  if(!match)return false;
+  let data;try{data=JSON.parse(match[2]);}catch{return false;}
+  if(!/^sub_[a-f0-9]{32}$/.test(String(data?.job_id||'')))return false;
+  if(data.protocol!=='RCB1'||!Number.isSafeInteger(data.revision)||data.revision<1)return true;
+  if(match[1].toLowerCase()==='due') {
+    const day=today(stamp());
+    if(data.job_id!==subscriptionCycleJobId(day)) {
+      // This is a stale batch from a previous UTC day.
+      await cycleControl('result',parseInt(data.job_id.slice(4),16),data.revision,
+        {status:'canceled'});
+    } else await runSubscriptionReminderTick(stamp(),{jobId:data.job_id,revision:data.revision});
+  }
   return true;
 }
