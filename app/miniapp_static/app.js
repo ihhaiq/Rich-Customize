@@ -38,14 +38,13 @@ const TABLE_MAX_COLUMNS = 20;
 let activeTableColumnLimit = 8; // UI precheck; Serverless verifies the real entitlement.
 let selectedTableCell = null;
 let activeTablePanId = null;
-// The page header and tools should follow the same horizontal movement as
-// the table while remaining in normal document flow vertically.
-function syncTableHeaderPan(viewport = null){
-  const header = document.querySelector(".editor-head");
+// Page chrome stays anchored to the screen. Only the table's columns
+// scroll horizontally. Clear stale pan styling from earlier WebView sessions.
+function syncTableHeaderPan(){
+  const header=document.querySelector(".editor-head");
   if(!header)return;
-  const offset = viewport ? -(Number(viewport.scrollLeft)||0) : 0;
-  header.style.setProperty("--table-pan-x", offset+"px");
-  header.classList.toggle("table-pan-active", Math.abs(offset)>1);
+  header.style.removeProperty("--table-pan-x");
+  header.classList.remove("table-pan-active");
 }
 const pageCache = new Map();
 let currentUserId=0;
