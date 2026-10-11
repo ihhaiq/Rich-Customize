@@ -654,6 +654,10 @@ function rebuildTableHtml(block){
 // a deliberate tap/keyboard action; swiping across a cell must never focus its
 // text input or trigger Android text-selection handles.
 function tableEditor(block){
+  // One public rendering route. The Rich renderer registers a table handler;
+  // this built-in implementation remains only as a safe bootstrap fallback.
+  const richTable=window.RichLiveRenderer?.table;
+  if(typeof richTable==="function")return richTable(block);
   const surface=document.createElement("div");
   surface.className="table-editor-surface";
   const viewport=document.createElement("div");
@@ -775,6 +779,10 @@ function mediaEditor(block){
 }
 
 function renderBlocks(){
+  // Never let late-loaded modules overwrite the global render function.
+  // They register a renderer instead, keeping all call sites deterministic.
+  const richRenderer=window.RichLiveRenderer?.render;
+  if(typeof richRenderer==="function")return richRenderer();
   // Rebuilding a table after adding a row/column must not jump the viewport
   // back to the first column or the first row.
   const oldScroll=new Map();
