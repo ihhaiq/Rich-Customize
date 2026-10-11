@@ -237,3 +237,43 @@ test('real live Rich table uses two taps and restores swipe position on rerender
   assert.match(interactions,/\.table-preview,\.telegram-table-contextual/);
   assert.ok(html.includes('live_preview.js'));
 });
+
+
+test('visible enhancedTableEditor selects once and edits only on the next tap',()=>{
+  const source=read('live_preview.js');
+  const start=source.indexOf('  function enhancedTableEditor(block){');
+  const end=source.indexOf('\n  if(typeof tableEditor==="function")tableEditor=enhancedTableEditor;',start);
+  assert.ok(start>=0&&end>start);
+  const mock=fakeDocument(),state={blockId:null,row:-1,col:-1};
+  let chosen=0,selected=0;
+  const document=mock.document;
+  const createRichTableCellEditor=()=>{
+    const div=document.createElement('div');
+    div.className='rich-table-cell-editor';
+    return div;
+  };
+  const selectCell=(block,td,ri,ci)=>{
+    state.blockId=String(block.id);state.row=ri;state.col=ci;chosen++;
+    td.classList.add('table-cell-selected');
+  };
+  const fakePan=()=>{};
+  const make=new Function(
+    'document','state','cellObject','createRichTableCellEditor',
+    'selectCell','selectBlock','attachTablePan','current',
+    source.slice(start,end)+';return enhancedTableEditor;',
+  )(document,state,raw=>typeof raw==='object'?raw:{text:String(raw)},
+    createRichTableCellEditor,selectCell,()=>selected++,fakePan,{legacy_read_only:false});
+  const viewport=make({id:'table-1',data:{rows:[[{text:'A'},{text:'B'}]]}});
+  const td=viewport.children[0].children[0].children[0].children[0];
+  const editor=td.children[0];
+  assert.equal(editor.contentEditable,'false');
+  td.dispatch('click',{target:td,stopPropagation(){}});
+  assert.equal(chosen,1);
+  assert.equal(editor.contentEditable,'false','first tap must not focus rich-text');
+  assert.equal(td.classList.contains('table-cell-selected'),true);
+  td.dispatch('click',{target:td,stopPropagation(){}});
+  assert.equal(editor.contentEditable,'true','second tap starts rich-text editing');
+  assert.equal(td.classList.contains('table-cell-editing'),true);
+  editor.blur();
+  assert.equal(editor.contentEditable,'false','leaving focus restores pan mode');
+});
