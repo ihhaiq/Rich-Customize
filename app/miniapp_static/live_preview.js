@@ -541,11 +541,133 @@ renderBlocks = function() {
     handle.addEventListener("pointerdown",event=>event.stopPropagation());handle.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();state.anchor=handle;state.anchorRect=handle.getBoundingClientRect();haptic();buildMenu();});td.appendChild(handle);
   }
 
+  // Rich live preview is the ACTUAL table editor (it replaces app.js's
+  // tableEditor). Prevent Android WebView from interpreting swipes as editing.
+  function attachTablePan(viewport, block) {
+    let gesture=null, suppressClickUntil=0;
+    const findTouch=(touches,id)=>Array.from(touches||[]).find(t=>t.identifier===id);
+    viewport.addEventListener("touchstart",event=>{
+      if(event.touches?.length!==1||event.target.closest?.(".table-cell-handle"))return;
+      const t=event.touches[0];
+      gesture={id:t.identifier,x:t.clientX,y:t.clientY,
+        left:viewport.scrollLeft,top:viewport.scrollTop,moved:false};
+    },{passive:true});
+    viewport.addEventListener("touchmove",event=>{
+      if(!gesture)return;
+      const t=findTouch(event.touches,gesture.id);
+      if(!t)return;
+      const dx=t.clientX-gesture.x,dy=t.clientY-gesture.y;
+      if(!gesture.moved&&Math.hypot(dx,dy)>7)gesture.moved=true;
+      if(!gesture.moved)return;
+      if(event.cancelable)event.preventDefault();
+      viewport.scrollLeft=gesture.left-dx;
+      viewport.scrollTop=gesture.top-dy;
+      const focus=document.activeElement;
+      if(focus?.classList?.contains("rich-table-cell-editor")&&viewport.contains(focus))focus.blur();
+      activeTablePanId=block.id;
+      if(typeof syncTableHeaderPan==="function")syncTableHeaderPan(viewport);
+    },{passive:false});
+    const finish=event=>{
+      if(!gesture)return;
+      if(gesture.moved){
+        suppressClickUntil=Date.now()+350;
+        if(event.cancelable)event.preventDefault();
+      }
+      gesture=null;
+    };
+    viewport.addEventListener("touchend",finish,{passive:false});
+    viewport.addEventListener("touchcancel",finish,{passive:true});
+    viewport.addEventListener("click",event=>{
+      if(Date.now()<suppressClickUntil){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },true);
+    viewport.addEventListener("scroll",()=>{
+      activeTablePanId=block.id;
+      if(typeof syncTableHeaderPan==="function")syncTableHeaderPan(viewport);
+    },{passive:true});
+  }
+
   function enhancedTableEditor(block){
-    const d=block.data||(block.data={}),wrap=document.createElement("div");wrap.className="telegram-table telegram-table-contextual";if(d.is_bordered===false)wrap.classList.add("no-borders");if(d.is_striped)wrap.classList.add("striped");if(d.is_compact)wrap.classList.add("compact");
-    const table=document.createElement("table"),rows=Array.isArray(d.rows)?d.rows:(d.rows=[]);
-    rows.forEach((row,ri)=>{const tr=document.createElement("tr");row.forEach((raw,ci)=>{const cell=cellObject(raw),td=document.createElement("td");td.dataset.row=String(ri);td.dataset.col=String(ci);if(cell.colspan)td.colSpan=Math.max(1,Number(cell.colspan));if(cell.rowspan)td.rowSpan=Math.max(1,Number(cell.rowspan));td.style.textAlign=cell.align||"left";td.style.verticalAlign=cell.valign||"middle";if(cell.is_header)td.classList.add("table-cell-shaded");
-      const editor=createRichTableCellEditor(cell,`${ri+1}:${ci+1}`,{onFocus:()=>{selectBlock?.(block.id);selectCell(block,td,ri,ci);},onPointerDown:()=>selectCell(block,td,ri,ci),onInput:({text,html})=>{const next=cellObject(rows[ri][ci]);next.text=text;next.html=html;delete next.rich_text;if(!next.valign)next.valign="middle";rows[ri][ci]=next;try{rebuildTableHtml?.(block);}catch(_){}try{markDirty?.();}catch(_){}}});td.appendChild(editor);tr.appendChild(td);});table.appendChild(tr);});wrap.appendChild(table);return wrap;
+    const d=block.data||(block.data={});
+    const wrap=document.createElement("div");
+    wrap.className="telegram-table telegram-table-contextual";
+    wrap.dataset.blockId=String(block.id);
+    wrap.setAttribute("role","region");
+    wrap.setAttribute("aria-label","جدول قابل للتمرير بالاتجاهين");
+    wrap.setAttribute("dir","ltr"); // Consistent scrollLeft range across WebViews
+    if(d.is_bordered===false)wrap.classList.add("no-borders");
+    if(d.is_striped)wrap.classList.add("striped");
+    if(d.is_compact)wrap.classList.add("compact");
+    const table=document.createElement("table");
+    const rtl=String(document.documentElement.lang||"ar").toLowerCase().startsWith("ar");
+    table.setAttribute("dir",rtl?"rtl":"ltr");
+    const rows=Array.isArray(d.rows)?d.rows:(d.rows=[]);
+    const body=document.createElement("tbody");
+    rows.forEach((row,ri)=>{
+      const tr=document.createElement("tr");
+      (Array.isArray(row)?row:[]).forEach((raw,ci)=>{
+        const cell=cellObject(raw),td=document.createElement("td");
+        td.dataset.row=String(ri);td.dataset.col=String(ci);
+        td.tabIndex=0;
+        if(cell.colspan)td.colSpan=Math.max(1,Number(cell.colspan));
+        if(cell.rowspan)td.rowSpan=Math.max(1,Number(cell.rowspan));
+        td.style.textAlign=cell.align||"left";
+        td.style.verticalAlign=cell.valign||"middle";
+        if(cell.is_header)td.classList.add("table-cell-shaded");
+        const editor=createRichTableCellEditor(cell,`${ri+1}:${ci+1}`,{
+          onFocus:()=>{
+            selectBlock?.(block.id);
+            if(state.blockId!==String(block.id)||state.row!==ri||state.col!==ci)
+              selectCell(block,td,ri,ci);
+          },
+          onInput:({text,html})=>{
+            const next=cellObject(rows[ri][ci]);
+            next.text=text;next.html=html;delete next.rich_text;
+            if(!next.valign)next.valign="middle";
+            rows[ri][ci]=next;
+            try{rebuildTableHtml?.(block);}catch(_){}
+            try{markDirty?.();}catch(_){}
+          },
+        });
+        editor.contentEditable="false";
+        editor.setAttribute("aria-readonly","true");
+        editor.tabIndex=-1;
+        editor.addEventListener("blur",()=>{
+          editor.contentEditable="false";
+          editor.setAttribute("aria-readonly","true");
+          td.classList.remove("table-cell-editing");
+        });
+        const edit=()=>{
+          if(current?.legacy_read_only)return;
+          editor.contentEditable="true";
+          editor.setAttribute("aria-readonly","false");
+          td.classList.add("table-cell-editing");
+          editor.focus({preventScroll:true});
+        };
+        const choose=()=>{
+          if(state.blockId===String(block.id)&&state.row===ri&&state.col===ci
+            &&td.classList.contains("table-cell-selected"))edit();
+          else{selectBlock?.(block.id);selectCell(block,td,ri,ci);}
+        };
+        td.addEventListener("click",event=>{
+          if(event.target.closest?.(".table-cell-handle"))return;
+          if(td.classList.contains("table-cell-editing"))return;
+          choose();event.stopPropagation();
+        });
+        td.addEventListener("keydown",event=>{
+          if(event.target!==td||(event.key!=="Enter"&&event.key!==" "))return;
+          event.preventDefault();choose();
+        });
+        td.appendChild(editor);tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    wrap.appendChild(table);
+    attachTablePan(wrap,block);
+    return wrap;
   }
 
   if(typeof tableEditor==="function")tableEditor=enhancedTableEditor;
