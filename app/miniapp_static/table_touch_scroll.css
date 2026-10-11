@@ -87,8 +87,14 @@ html:root .table-editor-surface .table-edit-cell:not(.is-editing)::after {
   background: transparent;
   touch-action: pan-x pan-y;
 }
+html:root .table-editor-surface .table-edit-cell.is-selected {
+  background: color-mix(in srgb, var(--tg-theme-link-color, #62a7ed) 11%, var(--panel, #192b3d)) !important;
+  outline: 2px solid color-mix(in srgb, var(--tg-theme-link-color, #62a7ed) 70%, transparent);
+  outline-offset: -2px;
+  z-index: 1;
+}
 html:root .table-editor-surface .table-edit-cell.is-editing {
-  background: color-mix(in srgb, var(--tg-theme-link-color, #62a7ed) 10%, transparent);
+  background: color-mix(in srgb, var(--tg-theme-link-color, #62a7ed) 16%, var(--panel, #192b3d));
 }
 html:root .table-editor-surface .table-edit-cell.is-editing .table-cell-input {
   -webkit-user-select: text;
@@ -117,4 +123,67 @@ html:root .table-editor-surface .table-scroll-hint {
     min-width: 100px;
     max-width: 100px;
   }
+}
+
+/* The title and editor toolbar follow the active table horizontally. Their
+   vertical positioning still belongs to the normal/sticky editor layout.
+   The table's thead remains in the SAME scroll plane as all other cells. */
+html:root .editor-head {
+  overflow-x: clip;
+}
+html:root .editor-head.table-pan-active > .editor-topbar,
+html:root .editor-head.table-pan-active > .composer-toolbar.floating-toolbar,
+html.tg-desktop:root .editor-head.table-pan-active > .editor-topbar,
+html.tg-desktop:root .editor-head.table-pan-active > .composer-toolbar.floating-toolbar {
+  transform: translate3d(var(--table-pan-x, 0px), 0, 0) !important;
+  transition: none !important;
+}
+
+/* Genuine, restrained glass for table context controls. The old shared glass
+   tint was ~6% opacity: text and zebra rows behind menus remained legible.
+   Use an actual tinted substrate so the background is softened, not printed
+   through the controls. Keep buttons/text fully opaque and skip lite mode. */
+html:root:not(.miniapp-lite-ui) :is(
+  .block-menu,
+  .table-cell-menu,
+  .text-toolbar-menu,
+  .text-heading-submenu,
+  .text-button-submenu
+),
+html.mobile-performance:root:not(.miniapp-lite-ui) :is(
+  .block-menu,
+  .table-cell-menu,
+  .text-toolbar-menu,
+  .text-heading-submenu,
+  .text-button-submenu
+),
+html.tg-desktop:root:not(.miniapp-lite-ui) :is(
+  .block-menu,
+  .table-cell-menu,
+  .text-toolbar-menu,
+  .text-heading-submenu,
+  .text-button-submenu
+) {
+  background:
+    linear-gradient(155deg,
+      rgba(255,255,255,.080) 0%,
+      rgba(255,255,255,.020) 35%,
+      rgba(0,0,0,.070) 100%),
+    rgba(19,31,44,.86) !important;
+  border: 1px solid rgba(231,244,255,.14) !important;
+  border-radius: 20px;
+  box-shadow:
+    0 13px 30px rgba(2,10,20,.25),
+    inset 0 1px 0 rgba(255,255,255,.14),
+    inset 0 -1px 0 rgba(0,0,0,.16) !important;
+  backdrop-filter: blur(19px) saturate(128%) !important;
+  -webkit-backdrop-filter: blur(19px) saturate(128%) !important;
+}
+html:root:not(.miniapp-lite-ui) :is(
+  .block-menu,.table-cell-menu,.text-toolbar-menu
+) :is(.menu-head,.table-menu-head) {
+  background: rgba(23,36,49,.93) !important;
+  border-bottom-color: rgba(231,244,255,.085) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
 }
