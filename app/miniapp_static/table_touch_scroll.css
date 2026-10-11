@@ -187,3 +187,84 @@ html:root:not(.miniapp-lite-ui) :is(
   backdrop-filter: blur(14px) !important;
   -webkit-backdrop-filter: blur(14px) !important;
 }
+
+/* Rich live-preview table is the actual visible implementation. The older
+   .table-preview styles above apply only to app.js's unused basic editor.
+   Android WebView starts selecting text inside contenteditable before it
+   will pan. Own touchmove in live_preview.js and provide a real scrollable
+   viewport + non-editable text until a second deliberate tap. */
+html:root .content-flow .telegram-table.telegram-table-contextual,
+html.tg-desktop:root .content-flow .telegram-table.telegram-table-contextual {
+  box-sizing: border-box !important;
+  display: block;
+  position: relative;
+  isolation: isolate;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  max-height: min(52dvh, 420px);
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  touch-action: none !important;
+  -webkit-overflow-scrolling: auto;
+  direction: ltr !important;
+  scrollbar-width: thin;
+  scroll-padding-top: 42px;
+}
+html:root .content-flow .telegram-table.telegram-table-contextual table,
+html.tg-desktop:root .content-flow .telegram-table.telegram-table-contextual table {
+  box-sizing: border-box;
+  display: table;
+  width: max-content !important;
+  min-width: 100% !important;
+  max-width: none !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  table-layout: fixed !important;
+}
+html:root .telegram-table.telegram-table-contextual td {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 105px !important;
+  height: 42px;
+  touch-action: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+html:root .telegram-table.telegram-table-contextual tbody tr:first-child > td {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 3;
+  background: color-mix(in srgb, var(--tg-rich-surface, #1b2b3a) 88%, var(--tg-theme-link-color, #56a8e9) 12%) !important;
+}
+html:root .telegram-table.telegram-table-contextual .rich-table-cell-editor[contenteditable="false"] {
+  pointer-events: none !important;
+  touch-action: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html:root .telegram-table.telegram-table-contextual .rich-table-cell-editor[contenteditable="true"] {
+  pointer-events: auto !important;
+  touch-action: none !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+html:root .telegram-table.telegram-table-contextual td.table-cell-selected {
+  outline: 2px solid color-mix(in srgb,var(--tg-theme-link-color,#56a8e9) 75%,transparent);
+  outline-offset: -2px;
+}
+html:root .telegram-table.telegram-table-contextual td.table-cell-editing {
+  background: color-mix(in srgb,var(--tg-theme-link-color,#56a8e9) 12%,var(--tg-rich-surface,#1b2b3a));
+}
+@media(max-width:440px) {
+  html:root .content-flow .telegram-table.telegram-table-contextual {
+    max-height: min(50dvh, 380px);
+  }
+  html:root .telegram-table.telegram-table-contextual td {
+    min-width: 96px !important;
+  }
+}
