@@ -5,13 +5,30 @@
   const BOT = "richDonateBot";
   // All plan benefits are approved by the owner. Billing and entitlement
   // activation remain unavailable until trusted Telegram-side rollout.
-  const OFFERS = Object.freeze([
-    { name: "Free", text: 20000, emojiPacks: 2, tableColumns: 8, media:10, nesting:4,
-      pages: 12, blocks: 50, rights: "separate", price:0, earlyAccess: false },
-    { name: "Plus", text: 25000, emojiPacks: 8, tableColumns: 12, media:25, nesting:8,
-      pages: 50, blocks: 200, rights: "included", price:150, earlyAccess: false },
-    { name: "Golden Ticket", text: 32768, emojiPacks: 50, tableColumns: 20, media:50, nesting:16,
-      pages: 150, blocks: 500, rights: "included", price:350, earlyAccess: true },
+  const catalog=window.RichPlanCatalog;
+  // Subscription UI consumes a generated, CI-verified snapshot of the trusted
+  // Serverless entitlement policy; no independently maintained quota numbers.
+  if(!catalog?.limits||!catalog?.prices){
+    console.error("Missing generated Rich plan catalog");
+    return;
+  }
+  const fromPlan=(id,name)=>({
+    name,
+    text:catalog.limits[id].text,
+    emojiPacks:catalog.limits[id].emojiPacks,
+    tableColumns:catalog.limits[id].tableColumns,
+    media:catalog.limits[id].mediaAttachments,
+    nesting:catalog.limits[id].nestingDepth,
+    pages:catalog.limits[id].pages,
+    blocks:catalog.limits[id].blocks,
+    rights:id==="free"?"separate":"included",
+    price:catalog.prices[id],
+    earlyAccess:id==="golden",
+  });
+  const OFFERS=Object.freeze([
+    fromPlan("free","Free"),
+    fromPlan("plus","Plus"),
+    fromPlan("golden","Golden Ticket"),
   ]);
   const strings = {
     ar: {
