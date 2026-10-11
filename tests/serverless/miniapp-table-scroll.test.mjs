@@ -138,7 +138,7 @@ test('gesture CSS overrides previous overflow and block long-press handlers',()=
   assert.match(css,/position:\s*sticky\s*!important/);
   assert.match(css,/touch-action:\s*pan-x pan-y/);
   assert.ok(html.indexOf('table_touch_scroll.css')>html.indexOf('liquid_glass_transparent.css'));
-  assert.match(interactions,/target\.closest\?\.\("\.table-preview"\)\)return null/);
+  assert.match(interactions,/target\.closest\?\.\("\.table-preview,\.telegram-table-contextual"\)\)return null/);
   assert.ok(css.includes('table-pan-active')&&css.includes('translate3d(var(--table-pan-x'));
   assert.match(css,/color-mix\(in srgb, var\(--panel, #192b3d\) 86%, transparent\)/);
   assert.match(app,/function syncTableHeaderPan\(viewport = null\)/);
