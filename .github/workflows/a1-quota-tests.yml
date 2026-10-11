@@ -1,4 +1,4 @@
-name: A1 subscription quotas tests
+name: Rich Editor regression suite
 
 on:
   push:
@@ -7,6 +7,10 @@ on:
     paths:
       - '.github/workflows/a1-quota-tests.yml'
       - 'tgcloud/lib/**'
+      - 'tgcloud/handlers/**'
+      - 'tgcloud/schema.js'
+      - 'app/miniapp_static/**'
+      - 'scripts/**'
       - 'functions/_lib/**'
       - 'tests/serverless/**'
       - 'package.json'
@@ -17,7 +21,7 @@ permissions:
 
 jobs:
   quota-tests:
-    name: Subscription A1 policy and limits
+    name: Serverless and Mini App validation
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -25,5 +29,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Run Serverless regression tests
-        run: npm test
+      - name: Validate plan data, Mini App assets and regression tests
+        run: npm run test:ci
