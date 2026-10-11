@@ -6,3 +6,30 @@
 .send-issue small{font-size:12px;color:var(--text);line-height:1.5}
 .block.has-publish-error{border-color:color-mix(in srgb,var(--danger) 50%,transparent)}
 .block-publish-error{margin-top:6px;font-size:12px;color:var(--danger);line-height:1.5}
+
+/* The send control is always tappable: when preflight fails, it opens
+   the actionable issues panel instead of going silently disabled. */
+.bottom-actions > .fab-send.has-publish-issues{
+  position:relative;
+  outline:1px solid color-mix(in srgb,var(--danger) 50%,transparent);
+  outline-offset:2px;
+}
+.bottom-actions > .fab-send.has-publish-issues::after{
+  content:"";
+  position:absolute;
+  top:2px;
+  right:2px;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  border:2px solid var(--bg);
+  background:var(--danger);
+  pointer-events:none;
+}
+.bottom-actions > .send-issues-btn{
+  pointer-events:auto!important;
+  flex:0 1 auto;
+  min-width:0;
+  line-height:1.4;
+  white-space:normal;
+}
