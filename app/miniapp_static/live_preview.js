@@ -229,7 +229,7 @@ renderBlocks = function() {
   // positions here, otherwise a cell tool would jump to the first column.
   const scrollPositions=new Map();
   blocksEl.querySelectorAll(".telegram-table-contextual[data-block-id]").forEach(viewport=>{
-    scrollPositions.set(viewport.dataset.blockId,{x:viewport.scrollLeft,y:viewport.scrollTop});
+    scrollPositions.set(viewport.dataset.blockId,viewport.scrollLeft);
   });
   blocksEl.innerHTML = "";
   starter.classList.toggle("hidden", !!current?.blocks?.length);
@@ -275,19 +275,15 @@ renderBlocks = function() {
   });
   blocksEl.querySelectorAll(".telegram-table-contextual[data-block-id]").forEach(viewport=>{
     const stored=scrollPositions.get(viewport.dataset.blockId);
-    if(stored){
-      viewport.scrollLeft=stored.x;
-      viewport.scrollTop=stored.y;
+    if(stored!==undefined){
+      viewport.scrollLeft=stored;
     }else if(viewport.querySelector("table[dir='rtl']")){
-      // Open RTL tables with column one (rightmost) visible.
+      // Start on the first RTL column, without repositioning the page.
       viewport.scrollLeft=Math.max(0,viewport.scrollWidth-viewport.clientWidth);
     }
-    if(String(activeTablePanId)===String(viewport.dataset.blockId)
-      &&typeof syncTableHeaderPan==="function")syncTableHeaderPan(viewport);
   });
   if(activeTablePanId&&!blocksEl.querySelector(`.telegram-table-contextual[data-block-id="${activeTablePanId}"]`)){
     activeTablePanId=null;
-    if(typeof syncTableHeaderPan==="function")syncTableHeaderPan();
   }
 };
 
@@ -545,15 +541,19 @@ renderBlocks = function() {
       const t=findTouch(event.touches,gesture.id);
       if(!t)return;
       const dx=t.clientX-gesture.x,dy=t.clientY-gesture.y;
-      if(!gesture.moved&&Math.hypot(dx,dy)>7)gesture.moved=true;
+      if(!gesture.moved&&Math.hypot(dx,dy)>7){
+        gesture.moved=true;
+        // Vertical movement belongs to the ordinary document scroller.
+        // Only horizontal movement is handled by this table viewport.
+        gesture.axis=Math.abs(dx)>Math.abs(dy)*1.15?"x":"y";
+      }
       if(!gesture.moved)return;
+      if(gesture.axis!=="x")return;
       if(event.cancelable)event.preventDefault();
       viewport.scrollLeft=gesture.left-dx;
-      viewport.scrollTop=gesture.top-dy;
       const focus=document.activeElement;
       if(focus?.classList?.contains("rich-table-cell-editor")&&viewport.contains(focus))focus.blur();
       activeTablePanId=block.id;
-      if(typeof syncTableHeaderPan==="function")syncTableHeaderPan(viewport);
     },{passive:false});
     const finish=event=>{
       if(!gesture)return;
@@ -573,7 +573,6 @@ renderBlocks = function() {
     },true);
     viewport.addEventListener("scroll",()=>{
       activeTablePanId=block.id;
-      if(typeof syncTableHeaderPan==="function")syncTableHeaderPan(viewport);
     },{passive:true});
   }
 
