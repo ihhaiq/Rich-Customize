@@ -22,6 +22,7 @@ import { shouldIncludeBranding } from 'lib/branding';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { isLegacySavedPage, isSavedPageUnchanged, legacyPagePublishOptions } from 'lib/saved-page-policy';
 import { recordMarketingPublish } from 'lib/marketing-campaign';
+import { resolveForumDeliveryOptions } from 'lib/forum-topics';
 
 const ADMIN = new Set(['administrator', 'creator']);
 const SUBSCRIBER = new Set(['member', 'administrator', 'creator']);
@@ -339,8 +340,9 @@ export async function handlePublishCallback(query){
             if(access.reason==='rights')throw publishFailure('PUBLISH_RIGHTS_MISSING','Missing administrator rights');
             throw access.error || new Error('Could not verify destination access');
           }
+          const topicOptions=await resolveForumDeliveryOptions(chatId,access.chat);
           const markup=publishedButtons.length?buildMessageButtonsKeyboard(publishedButtons,{buttonsPerRow:Number(publishButtonsPerRow||1),sourcePageId:latest.currentPageId||null}):undefined;
-          await sendRichMessageSafe({chat_id:chatId,rich_message:buildInputRichMessage(publishBlocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,entitlement,technicalOnly:Boolean(legacy)}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
+          await sendRichMessageSafe({chat_id:chatId,...topicOptions,rich_message:buildInputRichMessage(publishBlocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,entitlement,technicalOnly:Boolean(legacy)}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
           succeeded.push(title);
         }catch(error){
           failed.push(title);
@@ -556,6 +558,7 @@ async function publishBridgePageContent({
   const id = sourcePageId == null ? null : String(sourcePageId);
 
   let targetChatId = userId;
+  let topicOptions = {};
   if (String(kind) === 'chat') {
     const requested = Number(chatId);
     if (!Number.isSafeInteger(requested)) {
@@ -586,6 +589,7 @@ async function publishBridgePageContent({
       throw failure;
     }
     targetChatId = requested;
+    topicOptions = await resolveForumDeliveryOptions(requested, access.chat);
   } else if (String(kind) !== 'private') {
     const error = new Error('Invalid destination kind');
     error.code = 'INVALID_DESTINATION';
@@ -635,6 +639,7 @@ async function publishBridgePageContent({
   try {
     sent = await sendRichMessageSafe({
       chat_id: targetChatId,
+      ...topicOptions,
       rich_message: richMessage,
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     });
