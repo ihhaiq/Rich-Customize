@@ -64,7 +64,7 @@ function buildTableEditor(){
   const events={selected:0,rebuilt:0,dirty:0,panned:0};
   const build = new Function(
     'document','selectBlock','rebuildTableHtml','markDirty',
-    'selectedTableCell','activeTablePanId','syncTableHeaderPan',
+    'selectedTableCell','activeTablePanId','syncTableHeaderPan','window',
     isolated+';return tableEditor;')(
       mock.document,
       ()=>events.selected++,
@@ -73,6 +73,7 @@ function buildTableEditor(){
       null,
       null,
       ()=>events.panned++,
+      {RichLiveRenderer:null},
     );
   return {build,events};
 }
