@@ -64,13 +64,15 @@ test('/default status and clear report state, and clearing disables forum delive
   assert.deepEqual(JSON.parse(JSON.stringify(await h.forum.resolveForumDeliveryOptions(forumChat.id,ordinary))),{});
 });
 
-test('/default never mutates topic configuration outside actual forum topic messages',async()=>{
+test('/default in General is explicit; never route there as an implicit fallback',async()=>{
   const h=await fixture();
   const noThread=topicMessage(null,'/default',{message_thread_id:undefined,is_topic_message:false});
-  await h.forum.handleDefaultTopicCommand(noThread);
-  assert.equal(h.records.forumTopicDefaults.length,0);
+  assert.equal(await h.forum.handleDefaultTopicCommand(noThread),true);
+  assert.equal(h.records.forumTopicDefaults[0].threadId,0);
+  assert.deepEqual(JSON.parse(JSON.stringify(
+    await h.forum.resolveForumDeliveryOptions(forumChat.id,forumChat))),{});
   await h.forum.handleDefaultTopicCommand(topicMessage(2,'/default@SomeOtherBot'));
-  assert.equal(h.records.forumTopicDefaults.length,0);
+  assert.equal(h.records.forumTopicDefaults[0].threadId,0);
   assert.equal(await h.forum.handleDefaultTopicCommand(topicMessage(3,'/default@RichCustomizebot')),true);
   assert.equal(h.records.forumTopicDefaults[0].threadId,3);
 });
