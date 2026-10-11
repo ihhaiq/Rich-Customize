@@ -347,7 +347,7 @@ export async function handlePublishCallback(query){
         }catch(error){
           failed.push(title);
           const normalized=normalizePublishError(error,{kind:'chat'});
-          if(reasons.length<3)reasons.push(title+': '+publishFailureMessage(normalized,resolveLanguage(c)));
+          if(reasons.length<12)reasons.push(title+': '+publishFailureMessage(normalized,resolveLanguage(c)));
           if(shouldForgetDestination(normalized.code)){
             try{await removeUserChat(userId,chatId);}catch(cleanupError){console.warn('Could not forget inaccessible chat',cleanupError);}
           }
@@ -367,7 +367,10 @@ export async function handlePublishCallback(query){
         if(failed.length)await recordOperation('publish',false,failed.length);
       }catch(statsError){console.warn('Could not record publish stats',statsError);}
       const lines=[cc.result,'✅ '+cc.ok+succeeded.length,'❌ '+cc.fail+failed.length,...succeeded.slice(0,10).map(x=>'✅ '+x),...failed.slice(0,10).map(x=>'❌ '+x)];
-      if(reasons.length)lines.push('',cc.reason+reasons.join('\n'));if(succeeded.length+failed.length>20)lines.push(cc.shortened);lines.push('',cc.again);
+      if(reasons.length)lines.push('',cc.reason+reasons.join('\n'));
+      if(failed.length>reasons.length)lines.push('… '+(failed.length-reasons.length)+' مجموعات أخرى لم يمكن عرض سببها هنا.');
+      if(succeeded.length+failed.length>20)lines.push(cc.shortened);
+      lines.push('',cc.again);
       const ui=await withEditorMessageLock(query.message.chat.id,query.message.message_id,async()=>{
         await editRich(query,settingsRich(selected.length,Boolean(latest.postSilent),Boolean(latest.postProtected),c,lines.join('\n')),backKeyboard('r:postlist',c));
       });
