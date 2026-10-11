@@ -224,7 +224,7 @@ window.RichTableCellEditor = Object.freeze({create:createRichTableCellEditor});
 
 // Render the message as one continuous Telegram-like document. Administrative
 // controls appear only on the selected block.
-renderBlocks = function() {
+function renderRichBlocks() {
   // The live renderer overrides app.js renderBlocks; keep per-table pan
   // positions here, otherwise a cell tool would jump to the first column.
   const scrollPositions=new Map();
@@ -285,11 +285,13 @@ renderBlocks = function() {
   if(activeTablePanId&&!blocksEl.querySelector(`.telegram-table-contextual[data-block-id="${activeTablePanId}"]`)){
     activeTablePanId=null;
   }
-  // The live renderer replaces app.js's renderBlocks. Revalidate AFTER all
-  // cells have been drawn: saved pages and restored drafts must not inherit
-  // the HTML button's initial disabled state or stale previous-page issues.
+  // Recheck validity after rebuilding the actual Rich editor.
   if(typeof updatePublishValidity==="function")updatePublishValidity();
-};
+}
+// The core app.js renderer remains the only renderBlocks() entry point.
+// Handler registration is explicit and independent of script ordering.
+window.RichLiveRenderer=window.RichLiveRenderer||{};
+window.RichLiveRenderer.render=renderRichBlocks;
 
 
 // Contextual cell/row/column tools are kept with the live table editor.
@@ -661,7 +663,8 @@ renderBlocks = function() {
     return wrap;
   }
 
-  if(typeof tableEditor==="function")tableEditor=enhancedTableEditor;
+  window.RichLiveRenderer=window.RichLiveRenderer||{};
+  window.RichLiveRenderer.table=enhancedTableEditor;
   document.addEventListener("pointerdown",event=>{const target=event.target,insideMenu=Boolean(state.menu?.contains?.(target)),onHandle=Boolean(target.closest?.(".table-cell-handle"));if(insideMenu||onHandle)return;if(state.menu)closeMenu();if(!target.closest?.(".telegram-table")){clearSelectionVisuals();state.anchor=null;state.anchorRect=null;}},true);
   const reposition=()=>positionMenu();window.addEventListener("resize",reposition,{passive:true});window.visualViewport?.addEventListener("resize",reposition,{passive:true});window.visualViewport?.addEventListener("scroll",reposition,{passive:true});window.addEventListener("scroll",reposition,{passive:true,capture:true});
 })();
