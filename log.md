@@ -1,3 +1,10 @@
+## 2026-10-12 — Cloudflare from browser
+- **Change:** Added Chrome-only guide for D1 Console, GitHub import, DB binding, secret and Cron setup.
+- **Reason:** Owner explicitly requested Cloudflare website configuration, not CLI steps.
+- **Files:** docs/cloudflare-worker-from-browser.md and log.md.
+- **Tests:** Checked against official Cloudflare instructions; no live deployment.
+- **Deployment:** GitHub only.
+
 ## 2026-10-12 — 429 retry recovery
 - **Change:** Retry definitively rate-limited subscription reminders with a bounded delay (five attempts), but never replay unknown Telegram outcomes.
 - **Reason:** Avoid losing five-day reminders to transient API throttling.
