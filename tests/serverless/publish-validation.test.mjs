@@ -105,7 +105,7 @@ test('an invalid companion block never silently disables send; issues stay acces
 });
 
 test('live renderer revalidates after drawing saved page and restored offline draft',()=>{
-  const from=liveSource.indexOf('renderBlocks = function() {');
+  const from=liveSource.indexOf('function renderRichBlocks() {');
   const until=liveSource.indexOf('\n// Contextual cell/row/column tools',from);
   assert.ok(from>=0&&until>from);
   assert.match(liveSource.slice(from,until),/if\(typeof updatePublishValidity==="function"\)updatePublishValidity\(\)/);
