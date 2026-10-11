@@ -36,6 +36,17 @@ const PAGE_OPEN_COOLDOWN_MS = 700;
 const TABLE_MAX_ROWS = 26;
 const TABLE_MAX_COLUMNS = 20;
 let activeTableColumnLimit = 8; // UI precheck; Serverless verifies the real entitlement.
+let selectedTableCell = null;
+let activeTablePanId = null;
+// The page header and tools should follow the same horizontal movement as
+// the table while remaining in normal document flow vertically.
+function syncTableHeaderPan(viewport = null){
+  const header = document.querySelector(".editor-head");
+  if(!header)return;
+  const offset = viewport ? -(Number(viewport.scrollLeft)||0) : 0;
+  header.style.setProperty("--table-pan-x", offset+"px");
+  header.classList.toggle("table-pan-active", Math.abs(offset)>1);
+}
 const pageCache = new Map();
 let currentUserId=0;
 let mutationVersion=0;
@@ -423,6 +434,7 @@ function canEditCurrent(){
 }
 function newDraft({preserveOffline=false}={}){
   if(!preserveOffline)clearOfflineDraft();
+  selectedTableCell=null;activeTablePanId=null;syncTableHeaderPan();
   current={page_id:null,title:mt("editor.untitled"),blocks:[],buttons:[],buttons_per_row:1,buttons_align:"center"};
   pageTitle.disabled=false;slashInput.disabled=false;
   pageTitle.value=current.title;selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
@@ -623,6 +635,10 @@ function tableEditor(block){
       }
       cell.tabIndex=0;
       cell.className="table-edit-cell";
+      if(selectedTableCell?.blockId===block.id
+        &&selectedTableCell.row===ri&&selectedTableCell.col===ci){
+        cell.classList.add("is-selected");
+      }
       cell.setAttribute("aria-label",ar?`صف ${ri+1}، عمود ${ci+1}`:`Row ${ri+1}, column ${ci+1}`);
       const input=document.createElement("input");
       input.className="table-cell-input";
@@ -645,8 +661,9 @@ function tableEditor(block){
         rebuildTableHtml(block);
         markDirty();
       });
-      // A CSS overlay on the cell intercepts only touches outside edit mode.
-      // Pointer cancellations during a swipe must not be mistaken for taps.
+      // First tap selects the cell, second tap edits it. Swipes must
+      // always stay owned by the native two-axis scroll viewport.
+      // A CSS overlay intercepts gestures outside edit mode.
       let start=null,dragged=false;
       cell.addEventListener("pointerdown",event=>{
         if(event.target===input)return;
@@ -657,15 +674,25 @@ function tableEditor(block){
         if(start&&Math.hypot(event.clientX-start.x,event.clientY-start.y)>8)dragged=true;
       });
       cell.addEventListener("pointercancel",()=>{dragged=true;start=null});
+      function selectCell(){
+        const other=viewport.querySelector(".table-edit-cell.is-selected");
+        if(other&&other!==cell)other.classList.remove("is-selected");
+        selectedTableCell={blockId:block.id,row:ri,col:ci};
+        cell.classList.add("is-selected");
+        selectBlock(block.id);
+      }
       cell.addEventListener("click",event=>{
-        if(event.target!==cell||dragged||input.disabled)return;
-        input.focus({preventScroll:true});
+        if(event.target!==cell||dragged)return;
+        const selected=cell.classList.contains("is-selected");
+        if(!selected)selectCell();
+        else if(!input.disabled)input.focus({preventScroll:true});
       });
       cell.addEventListener("keydown",event=>{
-        if(input.disabled)return;
-        if((event.key==="Enter"||event.key===" ")&&event.target===cell){
+        if(event.target!==cell)return;
+        if(event.key==="Enter"||event.key===" "){
           event.preventDefault();
-          input.focus({preventScroll:true});
+          if(!cell.classList.contains("is-selected"))selectCell();
+          else if(!input.disabled)input.focus({preventScroll:true});
         }
       });
       cell.appendChild(input);
@@ -675,15 +702,20 @@ function tableEditor(block){
   });
   table.append(head,body);
   viewport.appendChild(table);
+  viewport.addEventListener("pointerdown",()=>{
+    activeTablePanId=block.id;
+  },{passive:true});
   viewport.addEventListener("scroll",()=>{
+    activeTablePanId=block.id;
+    syncTableHeaderPan(viewport);
     const focused=document.activeElement;
     if(focused?.classList?.contains("table-cell-input")&&viewport.contains(focused))focused.blur();
   },{passive:true});
   const hint=document.createElement("div");
   hint.className="table-scroll-hint";
   hint.textContent=ar
-    ?"اسحب الجدول للتمرير يميناً ويساراً أو للأعلى والأسفل، واضغط الخلية للتعديل"
-    :"Swipe the table horizontally or vertically; tap a cell to edit";
+    ?"اسحب للتمرير، انقر لتحديد الخلية، وانقر مرة ثانية للتحرير"
+    :"Swipe to scroll, tap to select a cell, and tap again to edit";
   surface.append(viewport,hint);
   return surface;
 }
@@ -724,7 +756,11 @@ function renderBlocks(){
   blocksEl.querySelectorAll(".table-preview[data-block-id]").forEach(viewport=>{
     const previous=oldScroll.get(viewport.dataset.blockId);
     if(previous){viewport.scrollLeft=previous.left;viewport.scrollTop=previous.top}
+    if(viewport.dataset.blockId===activeTablePanId)syncTableHeaderPan(viewport);
   });
+  if(activeTablePanId&&!blocksEl.querySelector(`.table-preview[data-block-id="${activeTablePanId}"]`)){
+    activeTablePanId=null;syncTableHeaderPan();
+  }
   updatePublishValidity();
 }
 
@@ -824,6 +860,7 @@ async function loadPages(){
 }
 function applyOpenedPage(page,pageId){
   clearOfflineDraft();
+  selectedTableCell=null;activeTablePanId=null;syncTableHeaderPan();
   current=copySessionValue(page);
   current.blocks=(current.blocks||[]).sort((a,b)=>(a.position||0)-(b.position||0));
   pageTitle.value=current.title||pageId;
@@ -848,6 +885,7 @@ function confirmDiscardForPageOpen(){
 }
 function discardCurrentSessionForPageOpen(){
   clearOfflineDraft();
+  selectedTableCell=null;activeTablePanId=null;syncTableHeaderPan();
   clearTimeout(historyTimer);
   historyTimer=null;
   dirty=false;
