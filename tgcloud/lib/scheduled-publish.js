@@ -8,7 +8,8 @@ import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { isLegacySavedPage, isSavedPageUnchanged } from 'lib/saved-page-policy';
 import { validateScheduleRequest } from 'lib/schedule-policy';
 import { inspectPublishAccess, sendRichMessageSafe } from 'lib/publish';
-import { isDefinitePublishRejection, normalizePublishError } from 'lib/publish-errors';
+import { resolveForumDeliveryOptions } from 'lib/forum-topics';
+import { isDefinitePublishRejection, normalizePublishError, publishFailureMessage, EXPECTED_PUBLISH_FAILURES } from 'lib/publish-errors';
 import { buildInputRichMessage } from 'lib/editor-renderer';
 import { prepareMessageButtons, buildMessageButtonsKeyboard } from 'lib/page-buttons';
 import { shouldIncludeBranding } from 'lib/branding';
@@ -201,7 +202,24 @@ async function finalizeJob(job,rows){
   await db.update(scheduledPosts).set({status:final,leaseUntil:0,updatedAt:stamp})
     .where(and(eq(scheduledPosts.jobId,job.jobId),eq(scheduledPosts.revision,Number(job.revision)))).run();
   await relay('result',job.jobId,Number(job.revision),{status:final});
-  try{await api.sendMessage({chat_id:job.ownerId,text:'نتيجة الجدولة '+job.jobId+'\nنجح: '+succeeded+' / '+rows.length+'\nالحالة: '+final});}catch{}
+  const failed=rows.filter(row=>row.status==='failed');
+  const details=[];
+  for(const target of failed.slice(0,12)){
+    let title=String(target.chatId);
+    try{
+      const chat=await api.getChat({chat_id:Number(target.chatId)});
+      title=String(chat?.title||title).slice(0,75);
+    }catch{}
+    const reason=publishFailureMessage({code:target.failureCode||'PUBLISH_FAILED'},'ar');
+    details.push('❌ '+title+' — '+reason);
+  }
+  if(failed.length>details.length)details.push('… ومجموعات أخرى فشلت: '+(failed.length-details.length));
+  const message=['نتيجة جدولة المنشور '+job.jobId,
+    '✅ نجح: '+succeeded,
+    '❌ فشل: '+failed.length,
+    '⚠️ غير مؤكد: '+uncertain,
+    ...details];
+  try{await api.sendMessage({chat_id:job.ownerId,text:message.join('\n').slice(0,3900)});}catch{}
 }
 export async function executeScheduledDue(jobId,revision){
   if(!JOB_RE.test(String(jobId))||!Number.isSafeInteger(revision))return;
@@ -246,14 +264,15 @@ export async function executeScheduledDue(jobId,revision){
         }
         throw access.error || new Error('Could not verify destination access');
       }
+      const topicOptions=await resolveForumDeliveryOptions(target.chatId,access.chat);
       const result=await sendRichMessageSafe({
-        chat_id:target.chatId,rich_message:job.snapshot.richMessage,
+        chat_id:target.chatId,...topicOptions,rich_message:job.snapshot.richMessage,
         ...(job.snapshot.replyMarkup?{reply_markup:job.snapshot.replyMarkup}:{}),
         disable_notification:job.snapshot.silent,
         protect_content:job.snapshot.protected,
       });
       await db.update(scheduledPostDestinations).set({
-        status:'sent',sentMessageId:Number(result?.message_id||0)||null,updatedAt:now(),
+        status:'sent',failureCode:null,sentMessageId:Number(result?.message_id||0)||null,updatedAt:now(),
       }).where(eq(scheduledPostDestinations.key,target.key)).run();
     }catch(error){
       // Once a network send may have started, outcome cannot always be proven.
@@ -261,13 +280,18 @@ export async function executeScheduledDue(jobId,revision){
       const definite=isDefinitePublishRejection(error);
       const normalized=normalizePublishError(error,{kind:'chat'});
       await db.update(scheduledPostDestinations).set({
-        status:definite?'failed':'uncertain',updatedAt:now(),
+        status:definite?'failed':'uncertain',
+        failureCode:String(normalized.code||'PUBLISH_FAILED'),updatedAt:now(),
       }).where(eq(scheduledPostDestinations.key,target.key)).run();
-      await logError('schedule.delivery',error,{
-        userId:job.ownerId,chatId:target.chatId,
-        extra:'job='+jobId+'; classification='+String(normalized.code||'PUBLISH_FAILED')
-          +'; outcome='+(definite?'failed':'uncertain'),
-      });
+      if(EXPECTED_PUBLISH_FAILURES.has(String(normalized.code||''))){
+        console.warn('Scheduled destination skipped:',target.chatId,normalized.code);
+      }else{
+        await logError('schedule.delivery',error,{
+          userId:job.ownerId,chatId:target.chatId,
+          extra:'job='+jobId+'; classification='+String(normalized.code||'PUBLISH_FAILED')
+            +'; outcome='+(definite?'failed':'uncertain'),
+        });
+      }
     }
   }
   const results=await db.select().from(scheduledPostDestinations)
