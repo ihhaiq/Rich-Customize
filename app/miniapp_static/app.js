@@ -972,6 +972,9 @@ function publishErrorMessage(error){
 
   if(code==="EMPTY_PAGE")return mt("send.add_content");
   if(code==="PAGE_NOT_FOUND")return mt("send.error_page_not_found");
+  if(code==="PUBLISH_TOPIC_NOT_SET")return "هذه المجموعة مفعّل بيها المواضيع، لكن ماكو موضوع محدد للنشر. خلي أحد المسؤولين يرسل /default داخل الموضوع المطلوب.";
+  if(code==="PUBLISH_TOPIC_CLOSED")return "تعذر النشر: الموضوع الافتراضي مغلق. افتحه أو عيّن موضوع ثاني باستخدام /default.";
+  if(code==="PUBLISH_TOPIC_DELETED"||code==="PUBLISH_THREAD_INVALID")return "تعذر النشر: الموضوع الافتراضي محذوف أو غير متاح. عيّن موضوعاً جديداً باستخدام /default.";
   if(code==="PUBLISH_CHAT_UNAVAILABLE")return mt("send.error_chat_unavailable");
   if(code==="PUBLISH_CHAT_MIGRATED")return mt("send.error_chat_migrated");
   if(code==="PUBLISH_RIGHTS_MISSING"||code==="PUBLISH_FORBIDDEN")return mt("send.error_rights_missing");
