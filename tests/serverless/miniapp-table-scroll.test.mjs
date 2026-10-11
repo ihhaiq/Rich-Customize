@@ -139,36 +139,32 @@ test('gesture CSS overrides previous overflow and block long-press handlers',()=
   assert.match(css,/touch-action:\s*pan-x pan-y/);
   assert.ok(html.indexOf('table_touch_scroll.css')>html.indexOf('liquid_glass_transparent.css'));
   assert.match(interactions,/target\.closest\?\.\("\.table-preview,\.telegram-table-contextual"\)\)return null/);
-  assert.ok(css.includes('table-pan-active')&&css.includes('translate3d(var(--table-pan-x'));
+  assert.ok(!css.includes('translate3d(var(--table-pan-x'),'toolbar must not move offscreen with the table');
   assert.match(css,/color-mix\(in srgb, var\(--panel, #192b3d\) 86%, transparent\)/);
-  assert.match(app,/function syncTableHeaderPan\(viewport = null\)/);
+  assert.match(app,/function syncTableHeaderPan\(\)/);
   assert.match(app,/const oldScroll=new Map\(\)/);
   assert.match(app,/viewport\.scrollLeft=previous\.left;viewport\.scrollTop=previous\.top/);
 });
 
-test('header and upper tools share the active table horizontal displacement',()=>{
+test('header stays anchored while the table pans horizontally',()=>{
   const source=read('app.js');
-  const start=source.indexOf('function syncTableHeaderPan(viewport = null){');
+  const css=read('table_touch_scroll.css');
+  const start=source.indexOf('function syncTableHeaderPan(){');
   const end=source.indexOf('\n}',start);
   assert.ok(start>=0&&end>start);
-  const style={};
-  const classes=new Set();
+  const removed=[];
   const header={
-    style:{setProperty:(key,value)=>{style[key]=value}},
-    classList:{toggle:(key,enabled)=>{if(enabled)classes.add(key);else classes.delete(key)}},
+    style:{removeProperty(key){removed.push(key);}},
+    classList:{remove(key){removed.push(key);}},
   };
   const document={querySelector:selector=>selector==='.editor-head'?header:null};
-  const update=new Function('document',source.slice(start,end+2)+';return syncTableHeaderPan;')(document);
-  update({scrollLeft:-145});
-  assert.equal(style['--table-pan-x'],'145px');
-  assert.equal(classes.has('table-pan-active'),true);
-  update({scrollLeft:0});
-  assert.equal(style['--table-pan-x'],'0px');
-  assert.equal(classes.has('table-pan-active'),false);
-  update();
-  assert.equal(style['--table-pan-x'],'0px');
+  const reset=new Function('document',source.slice(start,end+2)+';return syncTableHeaderPan;')(document);
+  reset();
+  assert.ok(removed.includes('--table-pan-x'));
+  assert.ok(removed.includes('table-pan-active'));
+  assert.match(css,/\.editor-head[\s\S]*?position:\s*sticky\s*!important/);
+  assert.ok(!css.includes('translate3d(var(--table-pan-x'));
 });
-
 
 function isolateLiveTouchPan(){
   const source=read('live_preview.js');
@@ -194,30 +190,34 @@ function isolateLiveTouchPan(){
   return {viewport,block,get panCalls(){return panCalls;}};
 }
 
-test('real live Rich table drags by one finger and does not select text',()=>{
+test('real live Rich table drags horizontally while vertical swipes remain page gestures',()=>{
   const h=isolateLiveTouchPan();
   let prevented=0;
-  const start={identifier:1,clientX:200,clientY:160};
-  h.viewport.fire('touchstart',{touches:[start],target:{closest(){return null}}});
+  const finger={identifier:1,clientX:200,clientY:160};
+  const start=()=>h.viewport.fire('touchstart',{touches:[finger],target:{closest(){return null}}});
+  start();
   h.viewport.fire('touchmove',{
-    touches:[{identifier:1,clientX:145,clientY:125}],
+    touches:[{identifier:1,clientX:120,clientY:140}],
     cancelable:true,preventDefault(){prevented++},
   });
-  assert.equal(h.viewport.scrollLeft,175,'horizontal displacement tracks finger');
-  assert.equal(h.viewport.scrollTop,115,'vertical displacement tracks finger');
-  assert.equal(prevented,1,'WebView native text selection is suppressed on pan');
-  assert.equal(h.panCalls,1,'the header follows the real table pan');
-  h.viewport.fire('touchend',{
-    cancelable:true,preventDefault(){prevented++},
-  });
+  assert.equal(h.viewport.scrollLeft,200,'horizontal drag changes the table offset');
+  assert.equal(h.viewport.scrollTop,80,'horizontal drag does not change page vertical position');
+  assert.equal(prevented,1,'table handles only horizontal panning');
+  assert.equal(h.panCalls,0,'toolbar must not move horizontally');
+  h.viewport.fire('touchend',{cancelable:true,preventDefault(){prevented++;}});
   let clicked=false;
-  h.viewport.fire('click',{
-    preventDefault(){clicked=true},
-    stopImmediatePropagation(){},
+  h.viewport.fire('click',{preventDefault(){clicked=true},stopImmediatePropagation(){}});
+  assert.equal(clicked,true,'ghost click after horizontal swipe suppressed');
+  start();
+  const preventedBefore=prevented;
+  h.viewport.fire('touchmove',{
+    touches:[{identifier:1,clientX:190,clientY:60}],
+    cancelable:true,preventDefault(){prevented++},
   });
-  assert.equal(clicked,true,'synthetic click after a swipe is suppressed');
+  assert.equal(prevented,preventedBefore,'vertical swipe is left for native page scrolling');
+  assert.equal(h.viewport.scrollLeft,200);
+  assert.equal(h.viewport.scrollTop,80);
 });
-
 test('real live Rich table uses two taps and restores swipe position on rerender',()=>{
   const source=read('live_preview.js'),css=read('table_touch_scroll.css');
   const interactions=read('interactions.js'),html=read('editor.html');
@@ -228,11 +228,11 @@ test('real live Rich table uses two taps and restores swipe position on rerender
   assert.ok(!source.includes('onPointerDown:()=>selectCell(block,td,ri,ci)'),
     'touchstart must not select cells');
   assert.match(source,/scrollPositions\.set\(viewport\.dataset\.blockId/);
-  assert.match(source,/viewport\.scrollLeft=stored\.x/);
+  assert.match(source,/viewport\.scrollLeft=stored/);
   assert.match(source,/wrap\.setAttribute\("dir","ltr"\)/);
   assert.match(source,/table\.setAttribute\("dir",rtl\?"rtl":"ltr"\)/);
   assert.match(css,/\.telegram-table\.telegram-table-contextual/);
-  assert.match(css,/touch-action:\s*none\s*!important/);
+  assert.match(css,/touch-action:\s*pan-y pinch-zoom\s*!important/);
   assert.match(css,/rich-table-cell-editor\[contenteditable="false"\]/);
   assert.match(interactions,/\.table-preview,\.telegram-table-contextual/);
   assert.ok(html.includes('live_preview.js'));
@@ -276,4 +276,17 @@ test('visible enhancedTableEditor selects once and edits only on the next tap',(
   assert.equal(td.classList.contains('table-cell-editing'),true);
   editor.blur();
   assert.equal(editor.contentEditable,'false','leaving focus restores pan mode');
+});
+
+test('real table is in document flow and editor chrome remains width constrained',()=>{
+  const css=read('table_touch_scroll.css'),html=read('editor.html');
+  const liveCss=css.slice(css.indexOf('/* Rich live-preview tables are part of the document'));
+  assert.match(liveCss,/max-height:\s*none\s*!important/);
+  assert.match(liveCss,/height:\s*auto\s*!important/);
+  assert.match(liveCss,/overflow-x:\s*auto\s*!important/);
+  assert.match(liveCss,/overflow-y:\s*visible\s*!important/);
+  assert.match(liveCss,/border:\s*0\s*!important/);
+  assert.match(css,/max-width:\s*720px\s*!important/);
+  assert.ok(!css.includes('translate3d(var(--table-pan-x'));
+  assert.ok(html.includes('table_touch_scroll.css'));
 });
