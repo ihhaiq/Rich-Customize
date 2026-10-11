@@ -7,7 +7,7 @@ import { loadEditorSession, updateEditorSession } from 'lib/editor-session';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { isLegacySavedPage, isSavedPageUnchanged } from 'lib/saved-page-policy';
 import { validateScheduleRequest } from 'lib/schedule-policy';
-import { inspectPublishAccess, sendRichMessageSafe } from 'lib/publish';
+import { canPublish, inspectPublishAccess, sendRichMessageSafe } from 'lib/publish';
 import { resolveForumDeliveryOptions } from 'lib/forum-topics';
 import { isDefinitePublishRejection, normalizePublishError, publishFailureMessage, EXPECTED_PUBLISH_FAILURES } from 'lib/publish-errors';
 import { buildInputRichMessage } from 'lib/editor-renderer';
