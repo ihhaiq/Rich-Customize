@@ -1,3 +1,10 @@
+## 2026-10-12 — 429 retry recovery
+- **Change:** Retry definitively rate-limited subscription reminders with a bounded delay (five attempts), but never replay unknown Telegram outcomes.
+- **Reason:** Avoid losing five-day reminders to transient API throttling.
+- **Files:** lib/subscription-reminders.js, schema.js, rollout docs.
+- **Tests:** JavaScript syntax check. CI run was rejected before starting steps; live checks pending.
+- **Deployment:** GitHub only. Migrations and Worker setup still required.
+
 ## 2026-10-12 — /sup and five-day subscription expiry notices
 - **Change:** Added H1/Details/Footer /sup, complete 20-language display
   catalog, trusted paid/gift expiry inspection and independent per-user notices

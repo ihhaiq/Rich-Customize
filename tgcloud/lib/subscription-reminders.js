@@ -7,7 +7,7 @@ import { editorSubscriptions, goldenClaims, usageUsers,
   subscriptionReminderScans, subscriptionReminderDeliveries } from 'schema';
 import { verifiedSubscriptionRow } from 'lib/editor-subscriptions';
 import { buildSubscriptionRich } from 'lib/subscription-rich.js';
-import { isDefinitePublishRejection } from 'lib/publish-errors';
+import { isDefinitePublishRejection, normalizePublishError } from 'lib/publish-errors';
 const WINDOW=5*86400;
 const BATCH=10;
 const stamp=()=>Math.floor(Date.now()/1000);
@@ -27,22 +27,64 @@ async function showReminder(source,row,now) {
   }
   const key=subscriptionReminderKey(source,id,end,now);
   const inserted=await db.insert(subscriptionReminderDeliveries).values({
-    key,userId:id,source,expiresAt:end,day:today(now),status:'sending',updatedAt:now,
+    key,userId:id,source,expiresAt:end,day:today(now),status:'sending',
+    attempts:1,nextAttemptAt:0,updatedAt:now,
   }).onConflictDoNothing({target:subscriptionReminderDeliveries.key}).returning().run();
   if(!inserted?.length)return; // Includes ambiguous outcomes: never resend blindly.
-  const user=await db.select().from(usageUsers).where(eq(usageUsers.userId,id)).get();
-  let state='sent';
+  await deliverReminder({key,userId:id,source,expiresAt:end,attempts:1},row,now);
+}
+async function deliverReminder(delivery,row,now) {
+  const user=await db.select().from(usageUsers)
+    .where(eq(usageUsers.userId,delivery.userId)).get();
+  let state='sent',nextAttemptAt=0;
   try {
-    await api.sendRichMessage({chat_id:id,rich_message:buildSubscriptionRich({
-      plan:source==='gift'?'golden':row.plan,gift:source==='gift',expiresAt:end,
-      now,locale:user?.languageCode||'en',reminder:true,
+    await api.sendRichMessage({chat_id:delivery.userId,rich_message:buildSubscriptionRich({
+      plan:delivery.source==='gift'?'golden':row.plan,gift:delivery.source==='gift',
+      expiresAt:delivery.expiresAt,now,locale:user?.languageCode||'en',reminder:true,
     })});
-  }catch(error) {
-    state=isDefinitePublishRejection(error)?'failed':'uncertain';
-    console.warn('Subscription reminder not confirmed',source,id,state);
+  } catch(error) {
+    const normalized=normalizePublishError(error);
+    if(normalized.code==='PUBLISH_RATE_LIMITED'&&delivery.attempts<5){
+      state='retry';
+      nextAttemptAt=now+Math.max(60,Math.min(3600,Number(normalized.retry_after)||60));
+    }else state=isDefinitePublishRejection(error)?'failed':'uncertain';
+    console.warn('Subscription reminder not confirmed',delivery.source,delivery.userId,state);
   }
-  await db.update(subscriptionReminderDeliveries).set({status:state,updatedAt:stamp()})
-    .where(eq(subscriptionReminderDeliveries.key,key)).run();
+  await db.update(subscriptionReminderDeliveries).set({
+    status:state,nextAttemptAt,updatedAt:stamp(),
+  }).where(and(eq(subscriptionReminderDeliveries.key,delivery.key),
+    eq(subscriptionReminderDeliveries.status,'sending'))).run();
+}
+async function retryDue(now) {
+  const pending=await db.select().from(subscriptionReminderDeliveries)
+    .where(and(eq(subscriptionReminderDeliveries.status,'retry'),
+      lte(subscriptionReminderDeliveries.nextAttemptAt,now))).limit(2).all();
+  for(const item of pending) {
+    let row=null;
+    if(item.day===today(now)&&subscriptionReminderWindow(item.expiresAt,now)){
+      if(item.source==='paid'){
+        row=await db.select().from(editorSubscriptions)
+          .where(eq(editorSubscriptions.userId,item.userId)).get();
+        if(!verifiedSubscriptionRow(row,now)||Number(row.expiresAt)!==item.expiresAt)row=null;
+      }else if(item.source==='gift'){
+        const claims=await db.select().from(goldenClaims)
+          .where(eq(goldenClaims.userId,item.userId)).all();
+        const newest=Math.max(0,...claims.map(c=>Number(c.expiresAt)||0));
+        if(newest===item.expiresAt)row=claims.find(c=>Number(c.expiresAt)===newest);
+      }
+    }
+    if(!row){
+      await db.update(subscriptionReminderDeliveries).set({status:'canceled',updatedAt:now})
+        .where(and(eq(subscriptionReminderDeliveries.key,item.key),
+          eq(subscriptionReminderDeliveries.status,'retry'))).run();
+      continue;
+    }
+    const acquired=await db.update(subscriptionReminderDeliveries)
+      .set({status:'sending',attempts:item.attempts+1,updatedAt:now})
+      .where(and(eq(subscriptionReminderDeliveries.key,item.key),
+        eq(subscriptionReminderDeliveries.status,'retry'))).returning().run();
+    if(acquired?.length)await deliverReminder({...item,attempts:item.attempts+1},row,now);
+  }
 }
 
 async function scan(source,now) {
@@ -88,6 +130,7 @@ async function scan(source,now) {
 }
 export async function runSubscriptionReminderTick(now=stamp()) {
   // The bridge has already authenticated sender, chat and target before this call.
+  await retryDue(now);
   await scan('paid',now);
   await scan('gift',now);
   return true;

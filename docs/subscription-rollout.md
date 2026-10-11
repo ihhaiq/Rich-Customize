@@ -88,3 +88,5 @@ Templates and saved-page version history are intentionally excluded from scope.
 - **Pending production actions:** Serverless schema migration and tgcloud push,
   D1 schedule schema migration, Cloudflare reminder Worker deployment,
   bot-to-bot live check and actual expiration/renewal tests.
+
+- Temporary Telegram 429 rejects are retried with cooldown (up to five attempts); uncertain outcomes are not resent.

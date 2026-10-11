@@ -441,5 +441,7 @@ export const subscriptionReminderDeliveries = table('subscription_reminder_deliv
   expiresAt: integer('expires_at').notNull(),
   day: integer('day').notNull(),
   status: text('status').notNull().default('sending'),
+  attempts: integer('attempts').notNull().default(0),
+  nextAttemptAt: integer('next_attempt_at').notNull().default(0),
   updatedAt: integer('updated_at').notNull(),
 }, (t)=>({dayIdx:index('idx_subscription_reminder_day').on(t.day,t.status)}));
