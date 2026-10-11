@@ -77,16 +77,23 @@ Templates and saved-page version history are intentionally excluded from scope.
 - Paid entitlements must still have source richdonate:verified and active expiry.
   A current 30-day Golden gift takes precedence for display without modifying
   the underlying paid subscription or permanent branding purchases.
-- During the final five 24-hour periods, the separate Cloudflare Cron Worker
-  sends an ID-free (subscriber-free) bridge tick once per minute. Telegram
-  Serverless queries verified paid entitlements and individual gift claims in
-  bounded batches, keeps a daily cursor, and records at-most-once notices.
-- Caveat: the 10-per-source-per-minute limit bounds throughput (~14,400/day
-  per source) and user delivery depends on Telegram access. Ambiguous outcomes
+- During the final five 24-hour periods, the separate Cloudflare Worker starts
+  one daily UTC scan at **09:00 UTC** using `0 9 * * *`. The minute Cron
+  `* * * * *` continues to dispatch scheduled posts. If the daily subscriber
+  scan has remaining records or bounded Telegram 429 retries, Telegram
+  Serverless registers a versioned `sub_` follow-up through the existing RCB1
+  D1 scheduler, rather than sending empty subscription heartbeats all day.
+  Telegram Serverless queries verified entitlements and gift claims in bounded
+  10+10 batches, keeps a per-day CAS-claimed cycle and separate source cursors,
+  and records at-most-once notices. The Worker still stores no subscriber IDs.
+- Caveat: the 10-per-source-per-batch limit bounds throughput; the scan now
+  starts at 09:00 UTC and follow-up batches run at least 75 seconds apart,
+  so finishing very large campaigns before UTC midnight is not guaranteed.
+  User delivery also depends on Telegram access. Ambiguous outcomes
   are marked uncertain rather than resent blindly. Monitor pending throughput
   and expand after load tests; this is not a production delivery guarantee.
 - **Pending production actions:** Serverless schema migration and tgcloud push,
-  D1 schedule schema migration, Cloudflare reminder Worker deployment,
+  D1 schedule schema migration, Cloudflare reminder Worker deployment with both Cron triggers,
   bot-to-bot live check and actual expiration/renewal tests.
 
 - Temporary Telegram 429 rejects are retried with cooldown (up to five attempts); uncertain outcomes are not resent.
