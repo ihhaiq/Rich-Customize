@@ -219,46 +219,8 @@ function createRichTableCellEditor(cell, placeholder, {onFocus,onPointerDown,onI
 
 window.RichTableCellEditor = Object.freeze({create:createRichTableCellEditor});
 
-tableEditor = function(block) {
-  const d = block.data || (block.data = {});
-  const wrap = document.createElement("div");
-  wrap.className = "telegram-table";
-  if (d.is_bordered === false) wrap.classList.add("no-borders");
-  if (d.is_striped) wrap.classList.add("striped");
-  if (d.is_compact) wrap.classList.add("compact");
-  const table = document.createElement("table");
-  const rows = d.rows || [];
-  rows.forEach((row, ri) => {
-    const tr = document.createElement("tr");
-    row.forEach((raw, ci) => {
-      const cell = typeof raw === "object" && raw !== null ? {...raw} : {text:String(raw ?? "")};
-      const td = document.createElement("td");
-      if (cell.colspan) td.colSpan = Number(cell.colspan);
-      if (cell.rowspan) td.rowSpan = Number(cell.rowspan);
-      if (cell.align) td.style.textAlign = cell.align;
-      const editor = createRichTableCellEditor(cell, `${ri + 1}:${ci + 1}`, {
-        onFocus:() => selectBlock(block.id),
-        onInput:({text,html}) => {
-          const currentCell = rows[ri]?.[ci];
-          const next = typeof currentCell === "object" && currentCell !== null
-            ? {...currentCell}
-            : {text:String(currentCell ?? "")};
-          next.text = text;
-          next.html = html;
-          delete next.rich_text;
-          rows[ri][ci] = next;
-          rebuildTableHtml(block);
-          markDirty();
-        },
-      });
-      td.appendChild(editor);
-      tr.appendChild(td);
-    });
-    table.appendChild(tr);
-  });
-  wrap.appendChild(table);
-  return wrap;
-};
+// Rich tables are created by enhancedTableEditor below, the single live
+// implementation of cell selection, formatting, and touch navigation.
 
 // Render the message as one continuous Telegram-like document. Administrative
 // controls appear only on the selected block.
