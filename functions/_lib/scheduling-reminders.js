@@ -1,7 +1,7 @@
 // RCB1 schedule reminder protocol. Cloudflare stores IDs/times ONLY, never post contents.
 // Inputs to handleScheduleBridgeEvent MUST be preauthenticated by the Telegram
 // webhook secret, exact bridge-chat check, and pinned main-bot identity.
-export const JOB_ID_RE = /^(?:sch|gft|gfb)_[a-f0-9]{32}$/;
+export const JOB_ID_RE = /^(?:sch|gft|gfb|sub)_[a-f0-9]{32}$/;
 export const SCHEDULE_REMINDER_MAX_AHEAD = 4 * 86400;
 const PROTOCOL = 'RCB1';
 const TARGET_RE = /^\/(rcb_schedule_register|rcb_schedule_cancel|rcb_schedule_result)@richminiappsbot\s+([\s\S]+)$/i;
