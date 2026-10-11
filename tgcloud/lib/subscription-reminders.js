@@ -182,8 +182,42 @@ export async function runSubscriptionReminderTick(now=stamp(),options={}) {
   const day=today(now),isDue=options.jobId!=null;
   if(isDue && (options.jobId!==subscriptionCycleJobId(day)
     || !Number.isSafeInteger(options.revision) || options.revision<1))return false;
-  const expected=isDue?String(options.revision):'0';
   const row=await readCycle(now);
+  if(!isDue) {
+    // Before any sends, register a replayable seed due job. If this first
+    // Serverless invocation is interrupted, the next minute can resume it.
+    if(row.day!==day||row.cursor!=='0'||row.leaseUntil>now)return false;
+    const seedLease=now+120;
+    const owned=await db.update(subscriptionReminderScans).set({leaseUntil:seedLease})
+      .where(and(eq(subscriptionReminderScans.id,CYCLE_ID),
+        eq(subscriptionReminderScans.day,day),
+        eq(subscriptionReminderScans.cursor,'0'),
+        lte(subscriptionReminderScans.leaseUntil,now))).returning().run();
+    if(!owned?.length)return false;
+    try {
+      await cycleControl('register',day,1,{run_at:now+NEXT_BATCH_DELAY});
+      const updated=await db.update(subscriptionReminderScans)
+        .set({cursor:'1',leaseUntil:0})
+        .where(and(eq(subscriptionReminderScans.id,CYCLE_ID),
+          eq(subscriptionReminderScans.day,day),
+          eq(subscriptionReminderScans.cursor,'0'),
+          eq(subscriptionReminderScans.leaseUntil,seedLease))).returning().run();
+      if(!updated?.length)throw new Error('Subscription daily cycle seed lost');
+    } finally {
+      await db.update(subscriptionReminderScans).set({leaseUntil:0})
+        .where(and(eq(subscriptionReminderScans.id,CYCLE_ID),
+          eq(subscriptionReminderScans.day,day),
+          eq(subscriptionReminderScans.leaseUntil,seedLease))).run();
+    }
+    return runSubscriptionReminderTick(now,{jobId:subscriptionCycleJobId(day),revision:1});
+  }
+  const expected=String(options.revision);
+  // A completed batch may be redelivered when its result packet was lost.
+  // Re-ack it without re-sending any subscriber notices.
+  if(row.day===day&&row.cursor==='DONE'){
+    await cycleControl('result',day,options.revision,{status:'sent'});
+    return true;
+  }
   if(row.day!==day||row.cursor!==expected||row.leaseUntil>now)return false;
   const lease=now+120;
   const claimed=await db.update(subscriptionReminderScans).set({leaseUntil:lease})
