@@ -1,3 +1,11 @@
+## 2026-10-12 — فصل فحص الاشتراكات اليومي عن جدولة المنشورات
+- **القرار:** Cron كل دقيقة يبقى فقط لمهام النشر والجدولة المسجلة؛ Cron `0 9 * * *` يبدأ فحص انتهاء الاشتراكات مرة يومياً (09:00 UTC / 12:00 بغداد).
+- **تفادي فقدان الرسائل:** إذا لم تكتمل دفعة اشتراكات (10 مدفوعة + 10 قسائم) أو بقيت إعادة محاولة مؤكدة 429، يُسجّل Serverless مهمة متابعة `sub_` في نفس جدول D1 للمجدول؛ Worker يوقظها فقط عند استحقاقها، ويحفظ Serverless مؤشرات تقدم مستقلة لليوم ونسخ المهمة.
+- **السبب:** إلغاء نبض الاشتراكات كل دقيقة من دون تخفيض الحد اليومي إلى عشرة مستخدمين فقط.
+- **ملفات:** Worker + wrangler.toml + lib/subscription-reminders.js + miniapp-bridge.js + functions/_lib/scheduling-reminders.js + اختبارات ووثائق.
+- **اختبارات:** فحص بنية JavaScript وسلوك مشغل Worker بالدقيقة واليوم وفحص قبول RCB1 للدفعات؛ اختبار CI والإنتاج لم يُنفذا بعد.
+- **النشر:** GitHub فقط. لا نشر إلى Cloudflare ولا ترحيل/رفع Telegram Serverless في هذه الخطوة.
+
 ## 2026-10-12 — Cloudflare from browser
 - **Change:** Added Chrome-only guide for D1 Console, GitHub import, DB binding, secret and Cron setup.
 - **Reason:** Owner explicitly requested Cloudflare website configuration, not CLI steps.
