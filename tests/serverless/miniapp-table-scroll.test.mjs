@@ -12,7 +12,7 @@ function fakeDocument(){
     const children = [];
     let className = '';
     const el = {
-      tag, children, dataset:{}, attributes:{},
+      tag, children, dataset:{}, attributes:{}, style:{},
       get className(){ return className; },
       set className(v){
         className = String(v);
