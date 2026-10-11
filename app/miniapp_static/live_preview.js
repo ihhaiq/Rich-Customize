@@ -285,6 +285,10 @@ renderBlocks = function() {
   if(activeTablePanId&&!blocksEl.querySelector(`.telegram-table-contextual[data-block-id="${activeTablePanId}"]`)){
     activeTablePanId=null;
   }
+  // The live renderer replaces app.js's renderBlocks. Revalidate AFTER all
+  // cells have been drawn: saved pages and restored drafts must not inherit
+  // the HTML button's initial disabled state or stale previous-page issues.
+  if(typeof updatePublishValidity==="function")updatePublishValidity();
 };
 
 
