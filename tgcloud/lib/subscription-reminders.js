@@ -140,7 +140,7 @@ export const subscriptionCycleJobId=(day)=>
 async function cycleControl(action,day,revision,extra={}) {
   await api.sendMessage({
     chat_id:-1003993506865,disable_notification:true,
-    text:'/rcb_schedule_'+action+'@Richminiappsbot\\n'+JSON.stringify({
+    text:'/rcb_schedule_'+action+'@Richminiappsbot\n'+JSON.stringify({
       protocol:'RCB1',
       request_id:'subscription_'+action+'_'+day+'_'+revision,
       job_id:subscriptionCycleJobId(day),
@@ -231,7 +231,7 @@ export async function runSubscriptionReminderTick(now=stamp(),options={}) {
 }
 export async function receiveSubscriptionReminderSchedule(source) {
   const match=String(source||'').trim()
-    .match(/^\\/rcb_schedule_(ack|due)@richcustomizebot\\s+([\\s\\S]+)$/i);
+    .match(/^\/rcb_schedule_(ack|due)@richcustomizebot\s+([\s\S]+)$/i);
   if(!match)return false;
   let data;try{data=JSON.parse(match[2]);}catch{return false;}
   if(!/^sub_[a-f0-9]{32}$/.test(String(data?.job_id||'')))return false;
