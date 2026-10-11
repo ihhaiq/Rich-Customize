@@ -125,20 +125,52 @@ html:root .table-editor-surface .table-scroll-hint {
   }
 }
 
-/* The title and editor toolbar follow the active table horizontally. Their
-   vertical positioning still belongs to the normal/sticky editor layout.
-   The table's thead remains in the SAME scroll plane as all other cells. */
-html:root .editor-head {
-  overflow-x: clip;
+/* Editor chrome belongs to the viewport, never to table scrollLeft.
+   Keep it sticky and within the screen even after moving 20 columns. */
+html:root .editor-head,
+html.tg-desktop:root .editor-head {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 45 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  transform: none !important;
+  translate: none !important;
+  background: color-mix(in srgb, var(--bg, #1e2c3c) 93%, transparent) !important;
+  backdrop-filter: blur(14px) saturate(115%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(115%) !important;
 }
-html:root .editor-head.table-pan-active > .editor-topbar,
-html:root .editor-head.table-pan-active > .composer-toolbar.floating-toolbar,
-html.tg-desktop:root .editor-head.table-pan-active > .editor-topbar,
-html.tg-desktop:root .editor-head.table-pan-active > .composer-toolbar.floating-toolbar {
-  transform: translate3d(var(--table-pan-x, 0px), 0, 0) !important;
-  transition: none !important;
+html:root .editor-head > .editor-topbar,
+html:root .editor-head > .composer-toolbar.floating-toolbar {
+  transform: none !important;
+  translate: none !important;
 }
-
+html:root .editor-screen,
+html:root .editor-main,
+html:root .canvas,
+html:root .content-flow,
+html:root .block,
+html:root .block-row,
+html:root .block-main {
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+html:root .editor-screen {
+  width: 100% !important;
+}
+html:root .editor-main {
+  width: 100% !important;
+  max-width: 720px !important;
+  margin-inline: auto !important;
+  padding-inline: 12px !important;
+}
+html:root .content-flow {
+  width: 100% !important;
+  overflow: visible !important;
+}
 /* Genuine, restrained glass for table context controls. The old shared glass
    tint was ~6% opacity: text and zebra rows behind menus remained legible.
    Use an actual tinted substrate so the background is softened, not printed
@@ -188,11 +220,9 @@ html:root:not(.miniapp-lite-ui) :is(
   -webkit-backdrop-filter: blur(14px) !important;
 }
 
-/* Rich live-preview table is the actual visible implementation. The older
-   .table-preview styles above apply only to app.js's unused basic editor.
-   Android WebView starts selecting text inside contenteditable before it
-   will pan. Own touchmove in live_preview.js and provide a real scrollable
-   viewport + non-editable text until a second deliberate tap. */
+/* Rich live-preview tables are part of the document, not a fixed-height
+   scrolling card. Horizontal swipes pan the columns; vertical swipes scroll
+   the editor page normally. Android touch handling is in live_preview.js. */
 html:root .content-flow .telegram-table.telegram-table-contextual,
 html.tg-desktop:root .content-flow .telegram-table.telegram-table-contextual {
   box-sizing: border-box !important;
@@ -202,22 +232,26 @@ html.tg-desktop:root .content-flow .telegram-table.telegram-table-contextual {
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
-  max-height: min(52dvh, 420px);
+  max-height: none !important;
+  height: auto !important;
   overflow-x: auto !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
-  touch-action: none !important;
-  -webkit-overflow-scrolling: auto;
+  overflow-y: visible !important;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  touch-action: pan-y pinch-zoom !important;
+  -webkit-overflow-scrolling: touch;
   direction: ltr !important;
   scrollbar-width: thin;
-  scroll-padding-top: 42px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
 }
 html:root .content-flow .telegram-table.telegram-table-contextual table,
 html.tg-desktop:root .content-flow .telegram-table.telegram-table-contextual table {
   box-sizing: border-box;
   display: table;
   width: max-content !important;
-  min-width: 100% !important;
+  min-width: 0 !important;
   max-width: none !important;
   border-collapse: separate !important;
   border-spacing: 0 !important;
@@ -226,9 +260,11 @@ html.tg-desktop:root .content-flow .telegram-table.telegram-table-contextual tab
 html:root .telegram-table.telegram-table-contextual td {
   position: relative;
   box-sizing: border-box;
-  min-width: 105px !important;
+  min-width: 96px !important;
+  width: 96px !important;
+  max-width: 120px !important;
   height: 42px;
-  touch-action: none !important;
+  touch-action: pan-y pinch-zoom !important;
   -webkit-user-select: none !important;
   user-select: none !important;
 }
@@ -240,7 +276,7 @@ html:root .telegram-table.telegram-table-contextual tbody tr:first-child > td {
 }
 html:root .telegram-table.telegram-table-contextual .rich-table-cell-editor[contenteditable="false"] {
   pointer-events: none !important;
-  touch-action: none !important;
+  touch-action: pan-y pinch-zoom !important;
   -webkit-user-select: none !important;
   user-select: none !important;
   overflow: hidden !important;
@@ -249,7 +285,7 @@ html:root .telegram-table.telegram-table-contextual .rich-table-cell-editor[cont
 }
 html:root .telegram-table.telegram-table-contextual .rich-table-cell-editor[contenteditable="true"] {
   pointer-events: auto !important;
-  touch-action: none !important;
+  touch-action: manipulation !important;
   -webkit-user-select: text !important;
   user-select: text !important;
 }
@@ -261,10 +297,12 @@ html:root .telegram-table.telegram-table-contextual td.table-cell-editing {
   background: color-mix(in srgb,var(--tg-theme-link-color,#56a8e9) 12%,var(--tg-rich-surface,#1b2b3a));
 }
 @media(max-width:440px) {
-  html:root .content-flow .telegram-table.telegram-table-contextual {
-    max-height: min(50dvh, 380px);
+  html:root .editor-main {
+    padding-inline: 10px !important;
   }
   html:root .telegram-table.telegram-table-contextual td {
-    min-width: 96px !important;
+    min-width: 88px !important;
+    width: 88px !important;
+    max-width: 106px !important;
   }
 }
