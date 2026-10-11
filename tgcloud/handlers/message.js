@@ -2,6 +2,7 @@
 // The platform passes update.message directly as the first argument.
 
 import { api } from 'sdk';
+import { sendSubscriptionStatus } from 'lib/subscription-status.js';
 import {
   buildWelcomeFallbackText,
   buildWelcomeKeyboard,
@@ -110,6 +111,11 @@ export default async function (message, ctx = {}) {
     if (await handleDeveloperPendingMessage(message)) return;
     if (await handleMiniAppShortcut(message)) return;
     if (await handleShowcaseMessage(message)) return;
+
+    if (matchesCommand(command,'sup')) {
+      if (await sendSubscriptionStatus(message,languageCode)) return;
+      return;
+    }
 
     if (message?.chat?.type==='private' && matchesCommand(command,'scheduled')){
       await showScheduledPosts(message);return;

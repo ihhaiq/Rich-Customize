@@ -425,3 +425,21 @@ export const goldenAnnouncements = table('golden_announcements', {
   status: text('status').notNull(),
   updatedAt: integer('updated_at').notNull(),
 }, (t) => ({ campaignIdx:index('idx_golden_announcement_month').on(t.month) }));
+
+
+// Per-day cursor and at-most-once delivery ledger for subscription expiry notices.
+export const subscriptionReminderScans = table('subscription_reminder_scans', {
+  id: text('id').primaryKey(),
+  day: integer('day').notNull(),
+  cursor: text('cursor').notNull().default('0'),
+  leaseUntil: integer('lease_until').notNull().default(0),
+});
+export const subscriptionReminderDeliveries = table('subscription_reminder_deliveries', {
+  key: text('key').primaryKey(),
+  userId: integer('user_id').notNull(),
+  source: text('source').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  day: integer('day').notNull(),
+  status: text('status').notNull().default('sending'),
+  updatedAt: integer('updated_at').notNull(),
+}, (t)=>({dayIdx:index('idx_subscription_reminder_day').on(t.day,t.status)}));

@@ -1,3 +1,17 @@
+## 2026-10-12 — /sup and five-day subscription expiry notices
+- **Change:** Added H1/Details/Footer /sup, complete 20-language display
+  catalog, trusted paid/gift expiry inspection and independent per-user notices
+  through the existing authenticated Cloudflare Cron→RCB1→Serverless relay.
+  Added bounded daily scans and a no-blind-retry delivery ledger.
+- **Reason:** Each person's 5-day expiry window differs; status must report
+  their actual effective plan, not a client-supplied tier.
+- **Files:** tgcloud/lib/subscription-{copy,rich,status,reminders}.js,
+  handlers/message.js, lib/miniapp-bridge.js, schema.js,
+  workers/schedule-reminders/worker.js, new subscription tests and rollout docs.
+- **Tests:** Source/static validation pending GitHub CI and live bot/Cloudflare
+  execution. GitHub update does not run tgcloud migrate/push or deploy Worker.
+- **Deployment:** GitHub branch only; production migration and Cron setup remain pending.
+
 # 2026-10-12 — إعلان هدية عيد الميلاد بالعربي والإنكليزي
 
 - طلب المالك إرسال إعلان بسيط تلقائياً عند إصدار الهدية، بدلاً من الاكتفاء بإظهار القسيمة في الترحيب. أضيف `golden-announcements.js` وربطه بزر الإصدار والتذكير الموثّق RCB1. لم تُصدر هدية ولم تُرسل رسائل حقيقية خلال التطوير.

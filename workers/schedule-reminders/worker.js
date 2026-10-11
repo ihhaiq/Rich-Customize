@@ -24,6 +24,12 @@ export default {
     };
     const outcome = await dispatchDueReminders(env.DB, dispatch, Math.floor(Date.now()/1000), 10);
     console.log('Schedule reminders', outcome.claimed, outcome.delivered);
+    // No account data is stored in Cloudflare. One authenticated scan heartbeat
+    // per minute lets Telegram Serverless inspect its authoritative entitlements.
+    await dispatch('/rcb_subscription_tick@RichCustomizebot\n' + JSON.stringify({
+      protocol:'RCB1',minute:Math.floor(Date.now()/60000),
+    }));
+
   },
   async fetch() {
     return new Response('Not found', { status: 404 });

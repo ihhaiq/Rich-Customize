@@ -67,3 +67,24 @@ Additional runtime decisions may apply; the server performs authoritative checks
    downgrade and expiry, and RCB1 synchronization end to end.
 
 Templates and saved-page version history are intentionally excluded from scope.
+
+
+## Subscription status and expiry notices (2026-10-12, GitHub only)
+- /sup now renders the *effective* trusted entitlement as H1, an expandable
+  subscription-benefits Details block, and a remaining-time Footer.
+- The 20-locale catalog in tgcloud/lib/subscription-copy.js is shared by
+  status and notices. Quota numbers come from subscription-policy.js.
+- Paid entitlements must still have source richdonate:verified and active expiry.
+  A current 30-day Golden gift takes precedence for display without modifying
+  the underlying paid subscription or permanent branding purchases.
+- During the final five 24-hour periods, the separate Cloudflare Cron Worker
+  sends an ID-free (subscriber-free) bridge tick once per minute. Telegram
+  Serverless queries verified paid entitlements and individual gift claims in
+  bounded batches, keeps a daily cursor, and records at-most-once notices.
+- Caveat: the 10-per-source-per-minute limit bounds throughput (~14,400/day
+  per source) and user delivery depends on Telegram access. Ambiguous outcomes
+  are marked uncertain rather than resent blindly. Monitor pending throughput
+  and expand after load tests; this is not a production delivery guarantee.
+- **Pending production actions:** Serverless schema migration and tgcloud push,
+  D1 schedule schema migration, Cloudflare reminder Worker deployment,
+  bot-to-bot live check and actual expiration/renewal tests.
