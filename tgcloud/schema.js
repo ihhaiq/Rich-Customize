@@ -289,17 +289,6 @@ export const forumTopicDefaults = table('forum_topic_defaults', {
   updatedAt: integer('updated_at').notNull(),
 });
 
-// The group's topic route is global, not associated with an editor user.
-// Existing groups require an explicit /default; zero means the General topic.
-export const forumPublishTopics = table('forum_publish_topics', {
-  chatId: integer('chat_id').primaryKey(),
-  threadId: integer('thread_id').notNull().default(0),
-  title: text('title'),
-  closed: integer('closed').notNull().default(0),
-  setBy: integer('set_by').notNull().default(0),
-  updatedAt: integer('updated_at').notNull(),
-});
-
 export const managedPublishPanels = table('managed_publish_panels', {
   userId: integer('user_id').primaryKey(),
   chatId: integer('chat_id').notNull(),
