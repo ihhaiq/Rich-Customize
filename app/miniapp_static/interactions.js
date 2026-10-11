@@ -19,7 +19,7 @@
   function pressTargetFrom(target){
     // Editable table cells own their touch gestures: the WebView must pan the
     // scroll region, not trigger the block long-press / selection menu.
-    if(target.closest?.(".table-preview"))return null;
+    if(target.closest?.(".table-preview,.telegram-table-contextual"))return null;
     const block=blockFromTarget(target);
     if(block)return block;
     const el=target.closest?.(PRESS_SELECTOR);
@@ -40,7 +40,7 @@
   document.addEventListener("pointerup",event=>endPointer(event,false),{passive:true});document.addEventListener("pointercancel",event=>endPointer(event,true),{passive:true});
   document.addEventListener("click",event=>{if(Date.now()>suppressClickUntil||!suppressTarget)return;if(suppressTarget===event.target||suppressTarget.contains(event.target)){event.preventDefault();event.stopImmediatePropagation();suppressClickUntil=0;suppressTarget=null;}},true);
   document.addEventListener("contextmenu",event=>{
-    if(event.target.closest?.(".table-preview"))return; // Input context menu is valid while editing.
+    if(event.target.closest?.(".table-preview,.telegram-table-contextual"))return; // Let the table own touch/text context interactions.
     const block=event.target.closest?.(".block");
     if(!block)return;
     if(Date.now()<=suppressContextUntil||!event.target.closest?.(BLOCK_EXCLUSIVE_SELECTOR))event.preventDefault();
