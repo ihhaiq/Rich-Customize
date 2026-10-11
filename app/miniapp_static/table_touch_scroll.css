@@ -171,6 +171,15 @@ html:root .content-flow {
   width: 100% !important;
   overflow: visible !important;
 }
+/* The editor is a document, not a floating card around the table. Keep
+   text-only pages unchanged while flattening the table's outer wrapper. */
+html:root .content-flow:has(> .block .telegram-table-contextual) {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding-inline: 0 !important;
+  box-shadow: none !important;
+}
 /* Genuine, restrained glass for table context controls. The old shared glass
    tint was ~6% opacity: text and zebra rows behind menus remained legible.
    Use an actual tinted substrate so the background is softened, not printed
