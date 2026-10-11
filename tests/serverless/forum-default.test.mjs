@@ -55,7 +55,7 @@ test('/default status and clear report state, and clearing disables forum delive
   const h=await fixture();
   await h.forum.handleDefaultTopicCommand(topicMessage(5));
   await h.forum.handleDefaultTopicCommand(topicMessage(5,'/default status'));
-  assert.match(h.calls.at(-1).args.text,/رقم الموضوع: 5/);
+  assert.match(h.calls.at(-1).args.text,/الموضوع #5/);
   await h.forum.handleDefaultTopicCommand(topicMessage(5,'/default clear'));
   assert.equal(h.records.forumTopicDefaults.length,0);
   await assert.rejects(h.forum.resolveForumDeliveryOptions(forumChat.id,forumChat),
