@@ -1,4 +1,4 @@
-import { runSubscriptionReminderTick } from 'lib/subscription-reminders.js';
+import { runSubscriptionReminderTick, receiveSubscriptionReminderSchedule } from 'lib/subscription-reminders.js';
 import { receiveBirthdayReminder } from 'lib/golden-announcements';
 import { goldenGiftStatus, receiveGiftReminder } from 'lib/golden-gifts';
 import { assertUniquePageTitle, acquireOwnerPageLock as acquireCreateLock, releaseOwnerPageLock as releaseCreateLock } from 'lib/page-names';
@@ -1090,7 +1090,7 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
     const payload=scheduleSource.match(/^\/rcb_subscription_tick@richcustomizebot\s+([^\n]+)$/i);
     let data=null;try{data=JSON.parse(payload?.[1]||'');}catch{return true;}
     const minute=Math.floor(Date.now()/60000);
-    if(data?.protocol!=='RCB1'||!Number.isSafeInteger(data.minute)
+    if(data?.protocol!=='RCB1'||data.kind!=='daily'||!Number.isSafeInteger(data.minute)
        ||Math.abs(data.minute-minute)>5)return true;
     await runSubscriptionReminderTick();
     return true;
@@ -1099,6 +1099,7 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
   if (/^\/rcb_schedule_(ack|due)@richcustomizebot\b/i.test(scheduleSource)) {
     if (!isBridgeOrigin(message)) return false;
     await authorizeBridgeMessage(message,'schedule_due');
+    if (await receiveSubscriptionReminderSchedule(scheduleSource)) return true;
     if (await receiveBirthdayReminder(scheduleSource)) return true;
     if (await receiveGiftReminder(scheduleSource)) return true;
     return receiveScheduleRelayControl(scheduleSource);
