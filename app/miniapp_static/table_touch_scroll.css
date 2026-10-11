@@ -173,7 +173,7 @@ html:root .content-flow {
 }
 /* The editor is a document, not a floating card around the table. Keep
    text-only pages unchanged while flattening the table's outer wrapper. */
-html:root .content-flow:has(> .block .telegram-table-contextual) {
+html:root .content-flow:has(.telegram-table-contextual) {
   background: transparent !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -185,20 +185,6 @@ html:root .content-flow:has(> .block .telegram-table-contextual) {
    Use an actual tinted substrate so the background is softened, not printed
    through the controls. Keep buttons/text fully opaque and skip lite mode. */
 html:root:not(.miniapp-lite-ui) :is(
-  .block-menu,
-  .table-cell-menu,
-  .text-toolbar-menu,
-  .text-heading-submenu,
-  .text-button-submenu
-),
-html.mobile-performance:root:not(.miniapp-lite-ui) :is(
-  .block-menu,
-  .table-cell-menu,
-  .text-toolbar-menu,
-  .text-heading-submenu,
-  .text-button-submenu
-),
-html.tg-desktop:root:not(.miniapp-lite-ui) :is(
   .block-menu,
   .table-cell-menu,
   .text-toolbar-menu,
