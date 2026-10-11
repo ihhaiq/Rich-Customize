@@ -1012,8 +1012,15 @@ function updatePublishValidity(){
     :[{code:"validation_unavailable",kind:"page",index:-1,path:[]}];
   const blocked=publishIssues.length>0;
   const send=$("sendBtn");
-  send.disabled=blocked;
-  send.setAttribute("aria-disabled",String(blocked));
+  // The send action is also the entry point to actionable validation errors.
+  // Never disable this control: a disabled button cannot explain why.
+  // openSendPanel() performs validation again and refuses invalid payloads.
+  send.disabled=false;
+  send.classList.toggle("has-publish-issues",blocked);
+  send.setAttribute("aria-disabled","false");
+  send.setAttribute("aria-label",blocked
+    ?mt("send.issues_button",{count:publishIssues.length})
+    :mt("editor.send"));
   sendIssuesBtn.classList.toggle("hidden",!blocked);
   sendIssuesBtn.textContent=blocked?mt("send.issues_button",{count:publishIssues.length}):"";
   send.title=blocked?publishIssues.map(issue=>issueLabel(issue)+": "+mt("send.problem."+issue.code)).join("\n"):mt("editor.send");
