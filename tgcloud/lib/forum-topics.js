@@ -53,7 +53,7 @@ export async function handleDefaultTopicCommand(message) {
   const threadId=safeThread(message?.message_thread_id);
   const reply=async body=>api.sendMessage({
     chat_id:chat.id,
-    ...(threadId?{message_thread_id:threadId}:{}),
+    ...(threadId && threadId!==1?{message_thread_id:threadId}:{}),
     reply_to_message_id:message.message_id,
     text:body,
   });
@@ -107,7 +107,9 @@ export async function handleDefaultTopicCommand(message) {
   // The General topic may omit message_thread_id; accepting /default there
   // is safe because an admin explicitly invoked it in a verified forum.
   // Other topics always require a positive thread id.
-  const selectedThreadId=threadId||0;
+  // General is Telegram's reserved topic #1; send without a thread ID
+  // only when a moderator explicitly configured General via /default.
+  const selectedThreadId=threadId===1?0:(threadId||0);
   const topicTitle=String(message?.reply_to_message?.forum_topic_created?.name
     || message?.reply_to_message?.forum_topic_edited?.name
     || message?.forum_topic_created?.name || (selectedThreadId===0?'العام (General)':''))
