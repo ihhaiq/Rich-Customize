@@ -279,6 +279,16 @@ export const managedChats = table('managed_chats', {
   chatIdx: index('idx_managed_chats_chat').on(t.chatId),
 }));
 
+// One topic choice per forum group. This is owned by the GROUP (not by an
+// editor account); every admin may change the default with /default.
+export const forumTopicDefaults = table('forum_topic_defaults', {
+  chatId: integer('chat_id').primaryKey(),
+  threadId: integer('thread_id').notNull(),
+  topicTitle: text('topic_title').notNull().default(''),
+  updatedBy: integer('updated_by').notNull().default(0),
+  updatedAt: integer('updated_at').notNull(),
+});
+
 export const managedPublishPanels = table('managed_publish_panels', {
   userId: integer('user_id').primaryKey(),
   chatId: integer('chat_id').notNull(),
@@ -372,6 +382,7 @@ export const scheduledPostDestinations = table('scheduled_post_destinations', {
   jobId: text('job_id').notNull(),
   chatId: integer('chat_id').notNull(),
   status: text('status').notNull().default('pending'),
+  failureCode: text('failure_code'),
   sentMessageId: integer('sent_message_id'),
   updatedAt: integer('updated_at').notNull(),
 }, (t) => ({
