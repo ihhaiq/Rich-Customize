@@ -14,6 +14,10 @@
     "migrate": "tgcloud migrate",
     "webhook": "tgcloud webhook",
     "test": "node --experimental-vm-modules --test tests/serverless/*.test.mjs",
-    "test:managed": "node --experimental-vm-modules --test tests/serverless/managed-bots.test.mjs"
+    "test:managed": "node --experimental-vm-modules --test tests/serverless/managed-bots.test.mjs",
+    "generate:plans": "node scripts/generate-plan-catalog.mjs",
+    "check:plans": "node scripts/generate-plan-catalog.mjs --check",
+    "check:miniapp": "node scripts/check-miniapp-static.mjs",
+    "test:ci": "npm run check:plans && npm run check:miniapp && npm test"
   }
 }
