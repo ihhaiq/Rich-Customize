@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import '../../app/miniapp_static/publish_validation.js';
 
@@ -44,4 +45,71 @@ test('valid blocks can enable sending', () => {
 });
 test('native blocks validate their media files', () => {
   assert.equal(check({blocks:[block('photo',{native:true,native_data:{type:'photo',photo:{file_id:''}}})]})[0].code,'missing_file');
+});
+
+const appSource=readFileSync(new URL('../../app/miniapp_static/app.js',import.meta.url),'utf8');
+const liveSource=readFileSync(new URL('../../app/miniapp_static/live_preview.js',import.meta.url),'utf8');
+
+function evaluateSendButtonState(blocks) {
+  const start=appSource.indexOf('function updatePublishValidity(){');
+  const end=appSource.indexOf('\nfunction openPublishIssues(){',start);
+  assert.ok(start>=0&&end>start,'the publish validator exists in app.js');
+  const send={
+    disabled:true,
+    title:'',
+    attributes:{},
+    classes:new Set(),
+    setAttribute(name,value){this.attributes[name]=value},
+    classList:{toggle(name,on){if(on)send.classes.add(name);else send.classes.delete(name)}},
+  };
+  const issueBtn={textContent:'',classes:new Set(),classList:{
+    toggle(name,on){if(on)issueBtn.classes.add(name);else issueBtn.classes.delete(name)},
+  }};
+  const scope=new Function(
+    'window','current','sendIssuesBtn','blocksEl','$','mt','BLOCKS',
+    'let publishIssues=[];'+appSource.slice(start,end)
+    +';return {updatePublishValidity,issues:()=>publishIssues};',
+  )(
+    {RichPublishValidation:{checkPage:check}},
+    {blocks},
+    issueBtn,
+    {querySelectorAll:()=>[]},
+    id=>id==='sendBtn'?send:null,
+    (key,args)=>key==='send.issues_button'?args.count+' مشكلة في الرسالة':key,
+    [{type:'animation',label:'GIF'},{type:'paragraph',label:'نص'}],
+  );
+  scope.updatePublishValidity();
+  return {send,issueBtn,issues:scope.issues()};
+}
+
+test('a saved page with a valid GIF enables the previously disabled send button',()=>{
+  const {send,issues,issueBtn}=evaluateSendButtonState([
+    {id:'gif',type:'animation',data:{file:{file_id:'telegram-file-123'}}},
+  ]);
+  assert.equal(issues.length,0);
+  assert.equal(send.disabled,false);
+  assert.equal(send.attributes['aria-disabled'],'false');
+  assert.equal(issueBtn.classes.has('hidden'),true);
+});
+
+test('an invalid companion block never silently disables send; issues stay accessible',()=>{
+  const {send,issues,issueBtn}=evaluateSendButtonState([
+    {id:'empty',type:'paragraph',data:{text:''}},
+    {id:'gif',type:'animation',data:{file:{file_id:'telegram-file-123'}}},
+  ]);
+  assert.equal(issues.length,1);
+  assert.equal(issues[0].code,'missing_text');
+  assert.equal(send.disabled,false,'the user can tap send to read what is wrong');
+  assert.equal(send.classes.has('has-publish-issues'),true);
+  assert.equal(issueBtn.classes.has('hidden'),false,'issues control is visible');
+  assert.match(send.title,/missing_text/);
+});
+
+test('live renderer revalidates after drawing saved page and restored offline draft',()=>{
+  const from=liveSource.indexOf('renderBlocks = function() {');
+  const until=liveSource.indexOf('\n// Contextual cell/row/column tools',from);
+  assert.ok(from>=0&&until>from);
+  assert.match(liveSource.slice(from,until),/if\(typeof updatePublishValidity==="function"\)updatePublishValidity\(\)/);
+  assert.match(appSource,/if\(publishIssues\.length\)\{openPublishIssues\(\);return\}/);
+  assert.match(appSource,/\$\("sendBtn"\)\.onclick=openSendPanel/);
 });
