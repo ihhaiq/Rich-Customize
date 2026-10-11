@@ -221,7 +221,7 @@ test('real live Rich table drags horizontally while vertical swipes remain page 
 test('real live Rich table uses two taps and restores swipe position on rerender',()=>{
   const source=read('live_preview.js'),css=read('table_touch_scroll.css');
   const interactions=read('interactions.js'),html=read('editor.html');
-  assert.match(source,/tableEditor=enhancedTableEditor/);
+  assert.match(source,/window\.RichLiveRenderer\.table=enhancedTableEditor/);
   assert.match(source,/editor\.contentEditable="false"/);
   assert.match(source,/if\(td\.classList\.contains\("table-cell-editing"\)\)return/);
   assert.match(source,/if\(state\.blockId===String\(block\.id\).*startEdit|const edit=\(\)=>/s);
@@ -242,7 +242,7 @@ test('real live Rich table uses two taps and restores swipe position on rerender
 test('visible enhancedTableEditor selects once and edits only on the next tap',()=>{
   const source=read('live_preview.js');
   const start=source.indexOf('  function enhancedTableEditor(block){');
-  const end=source.indexOf('\n  if(typeof tableEditor==="function")tableEditor=enhancedTableEditor;',start);
+  const end=source.indexOf('\n  window.RichLiveRenderer=window.RichLiveRenderer||{};',start);
   assert.ok(start>=0&&end>start);
   const mock=fakeDocument(),state={blockId:null,row:-1,col:-1};
   let chosen=0,selected=0;
@@ -289,4 +289,14 @@ test('real table is in document flow and editor chrome remains width constrained
   assert.match(css,/max-width:\s*720px\s*!important/);
   assert.ok(!css.includes('translate3d(var(--table-pan-x'));
   assert.ok(html.includes('table_touch_scroll.css'));
+});
+
+test('main app retains the only renderer entry points',()=>{
+  const app=read('app.js'),live=read('live_preview.js');
+  assert.match(app,/function renderBlocks\(\)\{[\s\S]*?RichLiveRenderer\?\.render/);
+  assert.match(app,/function tableEditor\(block\)\{[\s\S]*?RichLiveRenderer\?\.table/);
+  assert.match(live,/window\.RichLiveRenderer\.render=renderRichBlocks/);
+  assert.match(live,/window\.RichLiveRenderer\.table=enhancedTableEditor/);
+  assert.ok(!/\brenderBlocks\s*=\s*function/.test(live),'Rich layer must not replace the renderer');
+  assert.ok(!/\btableEditor\s*=\s*enhancedTableEditor/.test(live),'Rich layer must not replace tableEditor');
 });
