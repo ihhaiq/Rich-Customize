@@ -937,7 +937,7 @@ export async function handleDeveloperCallback(query) {
 
   if (data === 'dev:golden:gift') {
     const result = await issueGoldenGift(query.from.id);
-    await api.answerCallbackQuery({callback_query_id:query.id,show_alert:true,text:result.created?'تم منح القسيمة للمستخدمين الحاليين. التفعيل خلال ١٢ ساعة، والمدة ٣٠ يوماً من التفعيل.':'تم استخدام هدية هذا الشهر بالفعل.'});
+    await api.answerCallbackQuery({callback_query_id:query.id,show_alert:true,text:(result.created?'تم منح القسيمة. التفعيل خلال ١٢ ساعة، والمدة ٣٠ يوماً من التفعيل.':'تم استخدام هدية هذا الشهر بالفعل.')+(result.announcementQueued?' الإعلان في طابور الإرسال.':' تعذر تأكيد طابور الإعلان؛ اضغط مجدداً للمحاولة دون تكرار الهدية.')});
     return true;
   }
   if (data === 'dev:errorlog') {

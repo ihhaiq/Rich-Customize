@@ -15,13 +15,14 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
     records[name] = [];
     tables[name] = new Proxy({ _name: name }, { get: (target, prop) => prop === '_name' ? target._name : { table: name, key: prop } });
   }
-  const keys = { goldenCampaigns:'month', goldenClaims:'key', editorSessions: 'userId', maintenanceLocks: 'name', richPages: 'pageId', usageUsers: 'userId', editorSubscriptions: 'userId', managedBotOrders: 'orderId', managedBotPayments: 'chargeId', managedBotLicenses: 'licenseId', brandingEntitlements: 'userId', forumTopicDefaults: 'chatId' };
+  const keys = { goldenBroadcasts:'month', goldenAnnouncements:'key', goldenCampaigns:'month', goldenClaims:'key', editorSessions: 'userId', maintenanceLocks: 'name', richPages: 'pageId', usageUsers: 'userId', editorSubscriptions: 'userId', managedBotOrders: 'orderId', managedBotPayments: 'chargeId', managedBotLicenses: 'licenseId', brandingEntitlements: 'userId', forumTopicDefaults: 'chatId' };
   const clone = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
   const db = {
     select() {
-      let name; let predicate = () => true;
+      let name; let predicate = () => true; let sortColumn; let take = Infinity;
       const q = { from(table) { name = table._name; return q; }, where(p) { predicate = p; return q; },
-        async get() { return clone(records[name].find(predicate)); }, async all() { return clone(records[name].filter(predicate)); } };
+        orderBy(column) { sortColumn=column;return q; }, limit(n) {take=n;return q;},
+        async get() { return clone(records[name].find(predicate)); }, async all() { let rows=records[name].filter(predicate);if(sortColumn) rows.sort((a,b)=>a[sortColumn.key]-b[sortColumn.key]);return clone(rows.slice(0,take)); } };
       return q;
     },
     update(table) {
@@ -62,6 +63,7 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
       return clone(apiState.members[String(args.user_id)]);
     }
     if (method === 'getMe' && apiState.me) return clone(apiState.me);
+    if (method === 'sendRichMessage' && apiState.richSendErrors?.[String(args.chat_id)]) throw apiState.richSendErrors[String(args.chat_id)];
     if (method === 'sendRichMessage' && apiState.richSendError) throw new Error(apiState.richSendError);
     if (method === 'getStickerSet') {
       if (apiState.error) throw new Error('Sticker set unavailable');
@@ -73,7 +75,7 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
   const apiState = { pack: null };
   const eq = (column, value) => row => row[column.key] === value;
   const lt = (column, value) => row => row[column.key] < value;
-  const mocks = { sdk: { api, db, InputFile: class InputFile {} }, 'sdk/db': { eq, lt, asc: column => column, desc: column => column, gt: (column, value) => row => row[column.key] > value, gte: (column, value) => row => row[column.key] >= value, sql: () => null, and: (...parts) => row => parts.every(p => p(row)) }, schema: tables };
+  const mocks = { sdk: { api, db, InputFile: class InputFile {} }, 'sdk/db': { eq, lt, lte: (column,value) => row => row[column.key]<=value, asc: column => column, desc: column => column, gt: (column, value) => row => row[column.key] > value, gte: (column, value) => row => row[column.key] >= value, sql: () => null, and: (...parts) => row => parts.every(p => p(row)) }, schema: tables };
   const modules = new Map();
   const load = (name) => {
     if (modules.has(name)) return modules.get(name);

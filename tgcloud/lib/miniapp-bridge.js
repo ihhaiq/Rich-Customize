@@ -1,3 +1,4 @@
+import { receiveBirthdayReminder } from 'lib/golden-announcements';
 import { goldenGiftStatus, receiveGiftReminder } from 'lib/golden-gifts';
 import { assertUniquePageTitle, acquireOwnerPageLock as acquireCreateLock, releaseOwnerPageLock as releaseCreateLock } from 'lib/page-names';
 import { managedPage } from 'lib/managed-pages';
@@ -1085,6 +1086,7 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
   if (/^\/rcb_schedule_(ack|due)@richcustomizebot\b/i.test(scheduleSource)) {
     if (!isBridgeOrigin(message)) return false;
     await authorizeBridgeMessage(message,'schedule_due');
+    if (await receiveBirthdayReminder(scheduleSource)) return true;
     if (await receiveGiftReminder(scheduleSource)) return true;
     return receiveScheduleRelayControl(scheduleSource);
   }

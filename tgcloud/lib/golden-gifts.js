@@ -1,3 +1,4 @@
+import { ensureBirthdayBroadcast } from 'lib/golden-announcements';
 import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { goldenCampaigns, goldenClaims, usageUsers } from 'schema';
@@ -33,7 +34,10 @@ export async function issueGoldenGift(actor, now=stamp()) {
     .onConflictDoNothing({target:goldenCampaigns.month}).returning().run();
   const campaign=await db.select().from(goldenCampaigns).where(eq(goldenCampaigns.month,month)).get();
   await register(campaign,campaign.claimUntil);
-  return {created:Boolean(rows?.length),campaign};
+  let announcementQueued=true;
+  try { await ensureBirthdayBroadcast(campaign,actor); }
+  catch { announcementQueued=false; console.warn('Birthday announcement queue registration pending',campaign.month); }
+  return {created:Boolean(rows?.length),campaign,announcementQueued};
 }
 export async function activeGoldenGift(userId, now=stamp()) {
   const rows=await db.select().from(goldenClaims).where(eq(goldenClaims.userId,Number(userId))).all();
@@ -89,9 +93,13 @@ export async function handleGoldenGiftCallback(query) {
   if(!['gift:show','gift:activate'].includes(query?.data)) return false;
   const state=query.data==='gift:activate'?await activateGoldenGift(query.from.id):await goldenGiftStatus(query.from.id);
   await api.answerCallbackQuery({callback_query_id:query.id});
+  const arabic=/^ar(?:[-_]|$)/i.test(String(query.from?.language_code||''));
+  const date=value=>new Date(value*1000).toISOString().replace('T',' ')+' (UTC)';
   const text=state.Golden_ticket
-    ? '🎟 قسيمتك الذهبية مفعّلة حتى '+new Date(state.expires_at*1000).toISOString().replace('T',' ')+' (UTC)'
-    : state.available?'🎁 هدية قسيمة ذهبية لمدة ٣٠ يوماً من لحظة التفعيل. فعّلها قبل '+new Date(state.claim_until*1000).toISOString():'لا توجد قسيمة متاحة للتفعيل حالياً.';
-  await api.sendMessage({chat_id:query.from.id,text,...(state.available?{reply_markup:{inline_keyboard:[[{text:'🎟 تفعيل القسيمة الذهبية',callback_data:'gift:activate'}]]}}:{})});
+    ? (arabic?'🎟 قسيمتك الذهبية مفعّلة حتى ':'🎟 Your Golden Ticket is active until ')+date(state.expires_at)
+    : state.available
+      ? (arabic?'🎁 هدية قسيمة ذهبية لمدة ٣٠ يوماً من لحظة التفعيل. فعّلها قبل ':'🎁 A Golden Ticket for 30 days from activation. Activate before ')+date(state.claim_until)
+      : (arabic?'لا توجد قسيمة متاحة للتفعيل حالياً.':'No gift is available to activate right now.');
+  await api.sendMessage({chat_id:query.from.id,text,...(state.available?{reply_markup:{inline_keyboard:[[{text:arabic?'🎟 تفعيل القسيمة الذهبية':'🎟 Activate Golden Ticket',callback_data:'gift:activate'}]]}}:{})});
   return true;
 }

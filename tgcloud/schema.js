@@ -406,3 +406,22 @@ export const goldenClaims = table('golden_claims', {
   expiresAt: integer('expires_at').notNull(),
   reminderReady: integer('reminder_ready').notNull().default(0),
 }, (t) => ({ ownerIdx: index('idx_golden_claim_owner').on(t.userId) }));
+
+// Resumable birthday announcement queue; message content remains in Serverless.
+export const goldenBroadcasts = table('golden_broadcasts', {
+  month: text('month').primaryKey(),
+  jobId: text('job_id').notNull(),
+  actorId: integer('actor_id').notNull(),
+  revision: integer('revision').notNull().default(1),
+  cursor: integer('cursor').notNull().default(0),
+  runAt: integer('run_at').notNull(),
+  leaseUntil: integer('lease_until').notNull().default(0),
+  status: text('status').notNull().default('pending'),
+});
+export const goldenAnnouncements = table('golden_announcements', {
+  key: text('key').primaryKey(),
+  month: text('month').notNull(),
+  userId: integer('user_id').notNull(),
+  status: text('status').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, (t) => ({ campaignIdx:index('idx_golden_announcement_month').on(t.month) }));
