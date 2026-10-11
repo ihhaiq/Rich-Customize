@@ -62,9 +62,14 @@ export async function handleDefaultTopicCommand(message) {
   const sentAsGroup=Number(message?.sender_chat?.id)===Number(chat.id)
     && !Boolean(message?.is_automatic_forward);
   let permitted=sentAsGroup;
-  if(!permitted && Number.isSafeInteger(actorId) && actorId>0){
-    const member=await api.getChatMember({chat_id:chat.id,user_id:actorId});
-    permitted=admin(member);
+  if(!permitted && Number.isSafeInteger(actorId) && actorId>0 && !message?.from?.is_bot){
+    try{
+      const member=await api.getChatMember({chat_id:chat.id,user_id:actorId});
+      permitted=admin(member);
+    }catch(error){
+      await reply('❌ ما گدرت أتحقق من صلاحياتك بالمجموعة. تحقق من صلاحيات البوت وجرّب مرة ثانية.');
+      return true;
+    }
   }
   if(!permitted){
     await reply('❌ أمر /default مخصص لمالك المجموعة ومسؤوليها فقط.');
@@ -79,8 +84,9 @@ export async function handleDefaultTopicCommand(message) {
   if(args==='status'){
     const current=await getDefaultForumTopic(chat.id);
     await reply(current
-      ?'ℹ️ موضوع النشر الافتراضي:\n'+(current.topicTitle||'معرّف الموضوع: '+current.threadId)
-        +'\nرقم الموضوع: '+current.threadId+'\nكل منشورات المحرر الغني لهذه المجموعة تروح لهذا الموضوع.'
+      ?'ℹ️ موضوع النشر الافتراضي:\n'+(current.topicTitle||(Number(current.threadId)===0?'العام (General)':'معرّف الموضوع: '+current.threadId))
+        +'\nالوجهة: '+(Number(current.threadId)===0?'العام (General)':'الموضوع #'+current.threadId)
+        +'\nكل منشورات المحرر الغني لهذه المجموعة تروح لهذا الموضوع.'
       :'ℹ️ ماكو موضوع افتراضي مضبوط. النشر للمجموعة متوقف لحين إرسال /default داخل موضوع.');
     return true;
   }
