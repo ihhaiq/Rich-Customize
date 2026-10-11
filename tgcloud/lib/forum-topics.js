@@ -75,7 +75,12 @@ export async function handleDefaultTopicCommand(message) {
     await reply('❌ أمر /default مخصص لمالك المجموعة ومسؤوليها فقط.');
     return true;
   }
-  const info=await api.getChat({chat_id:chat.id});
+  let info;
+  try{info=await api.getChat({chat_id:chat.id});}
+  catch{
+    await reply('❌ تعذّر التأكد من إعدادات المجموعة حالياً. جرّب مرة ثانية.');
+    return true;
+  }
   if(!forum(info)){
     await reply('❌ هذا الأمر يعمل فقط داخل المجموعات المفعّل بيها نظام المواضيع.');
     return true;
