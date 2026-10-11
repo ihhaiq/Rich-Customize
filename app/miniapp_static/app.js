@@ -360,22 +360,68 @@ function applyOfflineDraft(draft){
   renderBlocks();pushHistory();syncHistory();
   updateSaveState(mt("save.offline_restored"));
 }
+function confirmMissingPageRecovery(){
+  const ar=String(document.documentElement.lang||"ar").startsWith("ar");
+  const message=ar
+    ?"الصفحة الأصلية لهذه المسودة ما عادت موجودة بحسابك. تريد تستعيد محتواها كصفحة جديدة؟ لن نحذف المسودة المحلية إذا ألغيت."
+    :"The original page for this offline draft is no longer available. Restore its contents as a new page? Canceling keeps your offline copy.";
+  return new Promise(resolve=>{
+    if(tg?.showConfirm){
+      try{tg.showConfirm(message,value=>resolve(Boolean(value)));return}catch(_){}
+    }
+    resolve(window.confirm(message));
+  });
+}
 async function restoreOfflineDraft(pages){
-  const draft=readOfflineDraft();if(!draft)return false;
+  let draft=readOfflineDraft();if(!draft)return false;
   if(draft.page_id){
-    const summary=(Array.isArray(pages)?pages:[]).find(page=>String(page?.page_id||"")===String(draft.page_id));
-    const serverRevision=Number(summary?.revision||0);
-    const serverUpdatedAt=Number(summary?.updated_at||0);
-    const conflict=(serverRevision>Number(draft.base_revision||0))
-      ||(serverUpdatedAt>Number(draft.base_updated_at||0));
-    if(conflict){
-      const approved=await confirmOfflineConflict();
-      if(!approved){clearOfflineDraft();return false}
+    let summary=(Array.isArray(pages)?pages:[]).find(page=>String(page?.page_id||"")===String(draft.page_id));
+    if(!summary){
+      // The list can be stale, filtered or incomplete. Verify server ownership
+      // before ever suggesting a new page to avoid creating duplicates.
+      try{
+        const response=await api(`/miniapp/api/pages/${encodeURIComponent(draft.page_id)}`);
+        summary=response?.page||null;
+      }catch(error){
+        if(Number(error?.status)!==404&&String(error?.code||"")!=="PAGE_NOT_FOUND"){
+          // A temporary bridge outage must never be interpreted as deletion.
+          applyOfflineDraft(draft);
+          toast(mt("save.offline_restored"),2800);
+          return true;
+        }
+        const approved=await confirmMissingPageRecovery();
+        if(!approved){
+          toast(String(document.documentElement.lang||"ar").startsWith("ar")
+            ?"بقيت المسودة محفوظة على جهازك. أعد فتح المحرر لاستعادتها."
+            :"Your offline draft was kept on this device. Reopen the editor to recover it.",4300);
+          return false;
+        }
+        // Explicit consent only: keep all content, but discard the missing
+        // server page ID and revision so the next save performs CREATE.
+        draft={...draft,page_id:null,base_revision:0,base_updated_at:0};
+      }
+    }
+    if(draft.page_id&&summary){
+      const serverRevision=Number(summary?.revision||0);
+      const serverUpdatedAt=Number(summary?.updated_at||0);
+      const conflict=(serverRevision>Number(draft.base_revision||0))
+        ||(serverUpdatedAt>Number(draft.base_updated_at||0));
+      if(conflict){
+        const approved=await confirmOfflineConflict();
+        if(!approved){
+          // Never discard the local copy because the user declines an overwrite.
+          toast(String(document.documentElement.lang||"ar").startsWith("ar")
+            ?"احتفظنا بالمسودة المحلية بدون تعديل. أعد فتح المحرر لاستعادتها."
+            :"The local draft remains unchanged. Reopen the editor to recover it.",4300);
+          return false;
+        }
+      }
     }
   }
   applyOfflineDraft(draft);
+  if(!draft.page_id)persistOfflineDraftNow();
   toast(mt("save.offline_restored"),2800);
-  return true
+  return true;
 }
 
 function loadPerfQueue(){
