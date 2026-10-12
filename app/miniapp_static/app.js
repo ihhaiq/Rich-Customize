@@ -470,8 +470,8 @@ window.RichMiniAppPerf=Object.freeze({
 
 function legacyPageNotice(){
   return String(document.documentElement.lang||"ar").startsWith("ar")
-    ?"هذه صفحة قديمة للنشر فقط. ما تگدر تعدلها؛ افتح مسودة جديدة."
-    :"This saved legacy page is publish-only. Start a new draft to edit.";
+    ?"هذه الصفحة تتجاوز حدود باقتك الحالية. تگدر تنشرها كما هي؛ للتعديل تحتاج باقة أعلى."
+    :"This saved page exceeds your current plan. You can republish it unchanged; upgrade to edit.";
 }
 function canEditCurrent(){
   if(current?.legacy_read_only){toast(legacyPageNotice(),3500);return false}
