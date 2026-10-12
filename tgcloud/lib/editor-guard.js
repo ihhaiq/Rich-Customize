@@ -158,8 +158,8 @@ export async function guardEditorCallback(query) {
     await api.answerCallbackQuery({
       callback_query_id: query.id, show_alert: true,
       text: resolveLanguage(languageCode(query)) === 'ar'
-        ? 'الصفحة القديمة للنشر فقط. لا يمكن تعديلها. افتح مسودة جديدة حتى تنشئ محتوى جديد.'
-        : 'This legacy page is publish-only. Open a new draft to make changes.',
+        ? 'هذه الصفحة تتجاوز حدود باقتك الحالية. تگدر تنشرها كما هي، وللتعديل تحتاج اشتراكاً يتيح حجمها.'
+        : 'This page exceeds your current plan limits. You can publish it unchanged, or activate a plan covering its contents to edit.',
     });
     return true;
   }
@@ -193,8 +193,8 @@ export async function guardLegacyEditorMessage(message) {
   await api.sendMessage({
     chat_id:message.chat.id,
     text:resolveLanguage(message?.from?.language_code) === 'ar'
-      ? 'هذه الصفحة القديمة متاحة للنشر كما هي فقط. افتح مسودة جديدة للتعديل.'
-      : 'This saved legacy page is publish-only. Open a new draft to edit.',
+      ? 'الصفحة تتجاوز حدود باقتك الحالية؛ مسموح نشرها كما هي. تحتاج باقة أعلى حتى تعدّلها.'
+      : 'This page is over your current plan limit. Publishing unchanged is allowed; upgrade to edit.',
   });
   return true;
 }
