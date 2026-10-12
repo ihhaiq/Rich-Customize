@@ -792,7 +792,7 @@ async function handleSave(message, id, envelope) {
   if (isLegacySavedPage(existing, input.ownerId, await getEditorEntitlement(input.ownerId))) {
     if (!samePageContent(existing, input)) {
       throw new BridgeError('LEGACY_PAGE_READ_ONLY',
-        'This saved legacy page may be published unchanged, but it cannot be edited.', { alert: true });
+        'This saved page exceeds your current plan. Republish unchanged or activate a plan covering it before editing.', { alert: true });
     }
     return {
       status:'saved', user_id:input.ownerId, page_id:input.pageId,
