@@ -81,3 +81,42 @@ test('gift branding ends for Free; current Plus and permanent purchased removal 
  assert.equal(await h.branding.shouldIncludeBranding(2),false);
  assert.equal(await h.branding.shouldIncludeBranding(3),false);
 });
+
+test('developer preview sends one private rich gift announcement with inert activation and no broadcast',async()=>{
+ const h=await harness({extraModules:{birthday:'lib/golden-announcements'}});
+ await assert.rejects(h.birthday.sendBirthdayAnnouncementTest(101,'ar'),/Developer access required/);
+ assert.equal(h.calls.length,0,'unauthorized preview must never send');
+ const result=await h.birthday.sendBirthdayAnnouncementTest(developer,'ar');
+ assert.ok(result);
+ const sends=h.calls.filter(c=>c.method==='sendRichMessage');
+ assert.equal(sends.length,1,'preview sends only one message');
+ assert.equal(sends[0].args.chat_id,developer,'recipient is the authorized developer');
+ assert.deepEqual(sends[0].args.rich_message,h.birthday.birthdayAnnouncement('ar',{preview:true}));
+ const previewButton=sends[0].args.rich_message.blocks.flatMap(b=>b.text)
+   .find(item=>item?.type==='button')?.button;
+ assert.equal(previewButton?.callback_data,'dev:golden:preview:activate');
+ const liveButton=h.birthday.birthdayAnnouncement('ar').blocks.flatMap(b=>b.text)
+   .find(item=>item?.type==='button')?.button;
+ assert.equal(liveButton?.callback_data,'gift:activate','normal gift announcement remains functional');
+ assert.equal(h.records.goldenCampaigns.length,0,'preview must not issue a campaign');
+ assert.equal(h.records.goldenClaims.length,0,'preview must not activate a gift');
+ assert.equal(h.records.goldenBroadcasts.length,0,'preview must not schedule a broadcast');
+ assert.equal(h.records.goldenAnnouncements.length,0,'preview must not persist deliveries');
+ assert.equal(h.calls.filter(c=>c.method==='sendMessage').length,0,'preview does not use a relay');
+});
+
+test('welcome never includes the gift button; developer panel offers distinct live and preview actions',async()=>{
+ const fs=await import('node:fs');
+ const welcome=fs.readFileSync(new URL('../../tgcloud/lib/welcome.js',import.meta.url),'utf8');
+ const dev=fs.readFileSync(new URL('../../tgcloud/lib/developer.js',import.meta.url),'utf8');
+ assert.doesNotMatch(welcome,/callback_data:\s*['"]gift:show['"]/);
+ assert.match(welcome,/callback_data:\s*['"]r:starteditor['"]/);
+ assert.match(dev,/🎁 إهداء \(مرة بالشهر\)/);
+ assert.match(dev,/🧪 اختبار الإهداء/);
+ assert.match(dev,/callback_data:\s*'dev:golden:preview'/);
+ assert.match(dev,/await sendBirthdayAnnouncementTest\(query\.from\.id, query\.from\.language_code\)/);
+ const guard=dev.indexOf("!isDeveloper(query.from?.id)");
+ const preview=dev.indexOf("if (data === 'dev:golden:preview')");
+ assert.ok(guard>=0 && preview>guard,'developer-only authentication precedes preview');
+ assert.match(dev,/dev:golden:preview:activate/);
+});
