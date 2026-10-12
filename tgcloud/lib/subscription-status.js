@@ -3,7 +3,7 @@ import { eq } from 'sdk/db';
 import { editorSubscriptions, goldenClaims } from 'schema';
 import { isDeveloper } from 'lib/developer-access';
 import { verifiedSubscriptionRow } from 'lib/editor-subscriptions';
-import { buildSubscriptionRich, buildSubscriptionPlain } from 'lib/subscription-rich.js';
+import { buildSubscriptionRich, buildSubscriptionPlain } from 'lib/subscription-rich';
 
 export async function subscriptionSnapshot(userId, now=Math.floor(Date.now()/1000)) {
   const id=Number(userId);
