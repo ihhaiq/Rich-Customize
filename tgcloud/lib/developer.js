@@ -1,5 +1,6 @@
 import { issueGoldenGift } from 'lib/golden-gifts';
-import { sendBirthdayAnnouncementTest } from 'lib/golden-announcements';
+import { sendBirthdayAnnouncementTest, birthdayCampaignStatus, birthdayReportText } from 'lib/golden-announcements';
+import { audienceAndSubscriptionStats } from 'lib/admin-stats';
 import { api, BotApiError, db, InputFile } from 'sdk';
 import { and, eq, gte, lt, sql } from 'sdk/db';
 import { developerStates, editorSessions, legacyStates, maintenanceLocks, richPages, usageUsers } from 'schema';
@@ -157,6 +158,7 @@ function panelRichMessage(content, extraButtons = []) {
   const mainActions = buttonTableBlock([
     { text: '🎁 إهداء (مرة بالشهر)', callback_data: 'dev:golden:gift', style: 'success' },
     { text: '🧪 اختبار الإهداء', callback_data: 'dev:golden:preview', style: 'primary' },
+    { text: '📨 حالة الإهداء', callback_data: 'dev:golden:status', style: 'primary' },
     { text: 'فحص قاعدة البيانات', callback_data: 'dev:database:check', style: 'primary' },
     { text: 'تحديث قناة المعاينة', callback_data: 'dev:showcase:refresh', style: 'primary' },
     { text: 'بيانات / إحصائيات', callback_data: 'dev:stats', style: 'primary' },
@@ -641,6 +643,9 @@ async function showStats(query, chatId) {
   await api.answerCallbackQuery({ callback_query_id: query.id });
   const stamp = now();
   const summary = await usageSummary(stamp);
+  let audience=null;
+  try { audience=await audienceAndSubscriptionStats(stamp); }
+  catch(error) { console.warn('Subscription and reachability statistics unavailable',error); }
   const pageStats = await pageStatistics();
   const dbBytes = await databaseSizeBytes();
   const editorSessionCount = await db.$count(editorSessions);
@@ -658,6 +663,10 @@ async function showStats(query, chatId) {
     { type: 'heading', text: '📊 بيانات / إحصائيات', size: 3 },
     statTable('👥 المستخدمون', [
       ['الإجمالي المعروف', summary.trackedUsers.toLocaleString()],
+      ['المتاحون تقديرياً', audience ? audience.estimatedAvailable.toLocaleString() : 'غير متاح'],
+      ['تعذر الوصول مؤكداً', audience ? audience.unavailable.toLocaleString() : 'غير متاح'],
+      ['قبل تليكرام رسائلهم', audience ? audience.confirmedReachable.toLocaleString() : 'غير متاح'],
+      ['لم يُختبر وصولهم', audience ? audience.unverified.toLocaleString() : 'غير متاح'],
       ['لديهم بيانات حساب', summary.profiledUsers.toLocaleString()],
       ['لديهم username', summary.usersWithUsername.toLocaleString()],
       ['نشطون آخر ساعة', summary.active1h.toLocaleString()],
@@ -669,6 +678,14 @@ async function showStats(query, chatId) {
       ['أكثر اللغات', languageText],
       ['إجمالي التفاعلات', summary.events.toLocaleString()],
     ]),
+    statTable('🎟 الاشتراكات الفعالة حسب الباقة', [
+      ['مجاني', audience ? audience.tiers.free.toLocaleString() : 'غير متاح'],
+      ['بلص', audience ? audience.tiers.plus.toLocaleString() : 'غير متاح'],
+      ['غولدن (مدفوع)', audience ? audience.tiers.golden.toLocaleString() : 'غير متاح'],
+      ['غولدن (هدية)', audience ? audience.tiers.gift.toLocaleString() : 'غير متاح'],
+      ['المطور', audience ? audience.tiers.developer.toLocaleString() : 'غير متاح'],
+    ]),
+    {type:'paragraph',text:'المتاحون تقديرياً = المستخدمون المعروفون ما عدا من تأكد تعذر الوصول لهم بآخر محاولة. غير المختبرين ضمن التقدير، والقبول لا يثبت قراءة الرسالة. اشتراكات الباقات محسوبة من الحالة الفعالة الموثقة.'},
     statTable('⚙️ التشغيل والأداء', [
       ['مدة التتبع', formatDuration(stamp - op.startedAt)],
       ['Requests هذه الدقيقة', op.requestsCurrentMinute.toLocaleString()],
@@ -694,6 +711,7 @@ async function showStats(query, chatId) {
 
   await sendPanel(chatId, blocks, [
     { text: '👥 إحصائيات المستخدمين', callback_data: 'dev:stats:users:0', style: 'primary' },
+    { text: '📨 حالة الإهداء', callback_data: 'dev:golden:status', style: 'primary' },
     { text: '🔄 تحديث', callback_data: 'dev:stats', style: 'primary' },
   ], query.message?.message_id || null);
 }
@@ -937,6 +955,13 @@ export async function handleDeveloperCallback(query) {
     return true;
   }
 
+  if (data === 'dev:golden:status') {
+    const status=await birthdayCampaignStatus();
+    await api.answerCallbackQuery({callback_query_id:query.id});
+    await api.sendMessage({chat_id:query.from.id,
+      text:birthdayReportText(status)+'\n\nإذا ماكو تقدّم، تأكد من تشغيل Cloudflare Worker والجدولة وربط بوت الجسر.'});
+    return true;
+  }
   if (data === 'dev:golden:preview') {
     // Never call issueGoldenGift here: send only a private, non-activating preview.
     await sendBirthdayAnnouncementTest(query.from.id, query.from.language_code);
