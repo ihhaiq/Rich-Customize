@@ -41,7 +41,14 @@ export async function birthdayFailureBreakdown() {
     WHERE a.month=${current.month} AND a.round=${current.round}
       AND a.status IN ('failed','unavailable','uncertain','sending')
     GROUP BY a.status,reason ORDER BY total DESC LIMIT 30`);
-  return {current,rows};
+  const samples=await db.all(sql`SELECT a.user_id AS user_id,a.status AS status,
+    COALESCE(json_extract(l.payload,'$.code'),'NOT_RECORDED') AS reason
+    FROM golden_announcements a LEFT JOIN legacy_states l
+      ON l.namespace=('golden_delivery:' || a.key)
+    WHERE a.month=${current.month} AND a.round=${current.round}
+      AND a.status IN ('failed','unavailable','uncertain','sending')
+    ORDER BY a.updated_at DESC, a.user_id DESC LIMIT 12`);
+  return {current,rows,samples};
 }
 export function birthdayFailureText(data) {
   if(!data?.current)return 'ماكو حملة إهداء مسجلة.';
@@ -53,6 +60,8 @@ export function birthdayFailureText(data) {
     INTERRUPTED:'انقطاع أثناء الإرسال',ENTITLEMENT_LOOKUP:'خطأ فحص الاستحقاق'};
   return '📋 أسباب تعذر الإهداء — '+data.current.month+' / الجولة '+data.current.round+'\n'
     +(data.rows.length?data.rows.map(r=>'• '+(labels[r.reason]||r.reason)+' ('+r.status+'): '+r.total).join('\n'):'لا توجد إخفاقات بهذه الجولة.')
+    +(data.samples?.length?'\n\nآخر 12 حالة (معرّف / نتيجة / سبب):\n'+
+      data.samples.map(r=>r.user_id+' / '+r.status+' / '+(labels[r.reason]||r.reason)).join('\n'):'')
     +'\nالأسباب التاريخية غير المسجلة لا يمكن استنتاجها من حالة الإرسال.';
 }
 
