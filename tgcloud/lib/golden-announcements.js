@@ -211,7 +211,7 @@ async function notifyOnce(row,type,body) {
     // Prefer the donation bot for operator notices. The editor remains a
     // temporary fallback until private Bot-to-Bot messaging is deployed.
     const noticeKey=[row.month,row.round||1,type].join(':');
-    const noticeId='rdn_'+Array.from(new TextEncoder().encode(noticeKey))
+    const noticeId='rdn_'+Array.from(noticeKey).map(char => char.charCodeAt(0))
       .map(n=>n.toString(16).padStart(2,'0')).join('').slice(0,32).padEnd(32,'0');
     try {
       await api.sendMessage({chat_id:'@richDonateBot',disable_notification:true,
