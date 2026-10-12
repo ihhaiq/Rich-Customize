@@ -9,24 +9,39 @@ const regular = 123;
 const paragraph = text => ({ id: crypto.randomUUID(), type: 'paragraph', position: 0, data: { text } });
 const table = (rows, cols) => ({ id: 'table', type: 'table', data: { rows: Array.from({length: rows}, () => Array.from({length: cols}, () => ({text:'x'}))) } });
 const cases = [
-  ['blocks', Array.from({length:31}, () => paragraph('x'))],
-  ['characters', [paragraph('x'.repeat(20001))]],
-  ['table_rows', [table(51, 1)]],
-  ['table_columns', [table(1, 26)]],
-  ['table_rows', [{id:'nested', type:'details', data:{summary_text:'Details', children:[table(51, 1)]}}]],
+  ['blocks', Array.from({length:51}, () => paragraph('x')), true],
+  ['characters', [paragraph('x'.repeat(20001))], true],
+  ['table_rows', [table(27, 1)], false],
+  ['table_columns', [table(1, 21)], false],
+  ['table_rows', [{id:'nested', type:'details', data:{summary_text:'Details', children:[table(27, 1)]}}], false],
 ];
 
-test('bot and Mini App apply owner quotas consistently; missing or forged identity stays limited', async () => {
+test('Serverless Free quotas and technical ceilings apply consistently; client developer claims are ignored', async () => {
   const h = await harness();
-  for (const [code, blocks] of cases) {
+  for (const [code, blocks, developerAllowed] of cases) {
     for (const id of [null, regular]) {
       assert.equal(h.blocks.validateEditorLimits(blocks, id).code, code);
-      assert.throws(() => validatePagePayload({blocks, is_developer:true, user_id:developer}, null, id), /editor limit exceeded/);
       assert.throws(() => h.renderer.buildInputRichMessage(blocks, {userId:id}), /EDITOR_LIMIT/);
+      if(developerAllowed) {
+        // Cloudflare validates Telegram's technical maxima only, then
+        // Telegram Serverless authoritatively validates the user's product quota.
+        assert.doesNotThrow(() => validatePagePayload({
+          blocks, is_developer:true, user_id:developer,
+        }, null, id));
+      } else {
+        assert.throws(() => validatePagePayload({
+          blocks, is_developer:true, user_id:developer,
+        }, null, id), /editor limit exceeded/);
+      }
     }
-    assert.equal(h.blocks.validateEditorLimits(blocks, developer).ok, true);
-    assert.deepEqual(validatePagePayload({blocks}, null, developer).blocks, blocks);
-    assert.ok(h.renderer.buildInputRichMessage(blocks, {userId:developer}).blocks.length);
+    assert.equal(h.blocks.validateEditorLimits(blocks, developer).ok, developerAllowed);
+    if(developerAllowed) {
+      assert.deepEqual(validatePagePayload({blocks}, null, developer).blocks, blocks);
+      assert.ok(h.renderer.buildInputRichMessage(blocks, {userId:developer}).blocks.length);
+    } else {
+      assert.throws(() => validatePagePayload({blocks}, null, developer),/editor limit exceeded/);
+      assert.throws(() => h.renderer.buildInputRichMessage(blocks, {userId:developer}),/EDITOR_LIMIT/);
+    }
   }
   assert.throws(() => validatePagePayload({blocks:[null]}, null, developer), /list of objects/);
   assert.throws(() => h.renderer.buildInputRichMessage([], {userId:developer}), /no blocks/);
@@ -34,7 +49,7 @@ test('bot and Mini App apply owner quotas consistently; missing or forged identi
 
 test('regular users may reach the exact existing thresholds', async () => {
   const h = await harness();
-  for (const blocks of [Array.from({length:30},()=>paragraph('x')), [paragraph('x'.repeat(20000))], [table(50,25)]]) {
+  for (const blocks of [Array.from({length:50},()=>paragraph('x')), [paragraph('x'.repeat(20000))], [table(26,8)]]) {
     assert.equal(h.blocks.validateEditorLimits(blocks, regular).ok, true);
     assert.doesNotThrow(() => validatePagePayload({blocks}, null, regular));
   }
@@ -42,15 +57,15 @@ test('regular users may reach the exact existing thresholds', async () => {
 
 test('large developer pages survive sync, inline delivery and block management previews', async () => {
   const h = await harness({extraModules:{sync:'lib/miniapp-sync', delivery:'lib/page-delivery'}});
-  const blocks = Array.from({length:31},()=>paragraph('x'.repeat(900)));
+  const blocks = Array.from({length:51},()=>paragraph('x'.repeat(200)));
   h.records.richPages.push({pageId:'large', ownerId:developer, blocks, title:'Large'});
   const event = h.sync.buildPageUpsertSync(h.records.richPages[0]);
   assert.equal(event.page.blocks.length,31);
   assert.equal(JSON.stringify(event.page.blocks),JSON.stringify(blocks));
   const result = await h.delivery.savedPageQueryResult('large');
   assert.ok(result.input_message_content.rich_message.blocks.length >= 31);
-  const preview = h.ui.blockEditorRichMessage(table(51,1), [table(51,1)], 'en', developer);
-  assert.ok(preview.blocks.some(block=>block.type==='table' && block.cells?.length===51));
+  const preview = h.ui.blockEditorRichMessage(table(26,1), [table(26,1)], 'en', developer);
+  assert.ok(preview.blocks.some(block=>block.type==='table' && block.cells?.length===26));
 });
 
 test('developer repeated editor actions bypass per-user windows; ordinary users remain limited', async () => {
@@ -77,9 +92,9 @@ test('developer slideshow Add more remains available after fifty media', async (
 
 test('bridge publishing accepts developer content and blocks ordinary over-quota content before sending', async () => {
   const h = await harness({extraModules:{publish:'lib/publish'}});
-  const blocks=Array.from({length:31},()=>paragraph('x'));
+  const blocks=Array.from({length:51},()=>paragraph('x'));
   await h.publish.publishPageContentFromBridge({ownerId:developer,blocks});
-  assert.ok(h.calls.some(call=>call.method==='sendRichMessage' && call.args.rich_message.blocks.length>=31));
+  assert.ok(h.calls.some(call=>call.method==='sendRichMessage' && call.args.rich_message.blocks.length>=51));
   const sends=h.calls.filter(call=>call.method==='sendRichMessage').length;
   await assert.rejects(()=>h.publish.publishPageContentFromBridge({ownerId:regular,blocks}),/EDITOR_LIMIT/);
   assert.equal(h.calls.filter(call=>call.method==='sendRichMessage').length,sends);
@@ -87,8 +102,8 @@ test('bridge publishing accepts developer content and blocks ordinary over-quota
 
 test('saving an existing developer page preserves over-quota content', async () => {
   const h = await harness({extraModules:{pages:'lib/editor-pages'}});
-  const blocks=Array.from({length:31},()=>paragraph('x'));
-  h.records.richPages.push({pageId:'large',ownerId:developer,blocks:[],title:'Old',revision:1,updatedAt:1});
+  const blocks=Array.from({length:51},()=>paragraph('x'));
+  h.records.richPages.push({pageId:'large',ownerId:developer,blocks:[],title:'Old',quotaVersion:2,revision:1,updatedAt:1});
   await h.session.createEditorSession(developer,developer,100);
   await h.session.updateEditorSession(developer,{state:'saving_page_name',currentPageId:'large',blocks});
   await h.pages.handleEditorPageMessage({from:{id:developer,language_code:'en'},chat:{id:developer,type:'private'},message_id:101,text:'Large page'});
