@@ -10,28 +10,34 @@ const blocks=n=>[{id:'txt',position:0,type:'paragraph',data:{text:'x'.repeat(n)}
 const page=(n=24000)=>({pageId:'legacy',ownerId:userId,blocks:blocks(n),
   buttons:[],title:'Legacy page',revision:7,updatedAt:300});
 
-test('A1 Cloudflare PUT never trusts a missing or stale mirror baseline',async()=>{
+test('A1 D1 mirror baseline is owner/revision scoped but never grants Serverless edit authority',async()=>{
   const stored=page();
   const gateway={ready:async()=>true,getPage:async(_,owner,id)=>
     owner===userId&&id==='legacy'
       ? {blocks:stored.blocks,revision:7,updated_at:300} : null};
-  const unchanged=await quotaSafeMirrorBaseline({},userId,'legacy',{base_revision:7},gateway);
-  assert.ok(unchanged);
-  assert.doesNotThrow(()=>validatePagePayload({blocks:blocks(23000)},unchanged,userId));
-  assert.throws(()=>validatePagePayload({blocks:blocks(24001)},unchanged,userId),/characters/);
-  for(const bad of [
-    {base_revision:8},{base_updated_at:301},{},
-  ]){
+  const valid=await quotaSafeMirrorBaseline({},userId,'legacy',{base_revision:7},gateway);
+  assert.ok(valid);
+  const h=await harness({extraModules:{legacy:'lib/saved-page-policy'}});
+  // The Cloudflare bridge validates transport maxima (32,768 characters).
+  // Only Telegram Serverless authoritatively enforces the user's 20k quota.
+  assert.doesNotThrow(()=>validatePagePayload({blocks:blocks(24001)},valid,userId));
+  assert.equal(h.blocks.validateEditorLimits(blocks(24001),userId,{previousBlocks:stored.blocks}).code,'characters');
+  assert.equal(h.legacy.isLegacySavedPage({...stored,quotaVersion:1},userId),true);
+  for(const bad of [{base_revision:8},{base_updated_at:301},{}]){
     const previous=await quotaSafeMirrorBaseline({},userId,'legacy',bad,gateway);
     assert.equal(previous,null);
-    assert.throws(()=>validatePagePayload({blocks:blocks(22000)},previous,userId),/characters/);
+    assert.doesNotThrow(()=>validatePagePayload({blocks:blocks(22000)},previous,userId));
+    assert.equal(h.blocks.validateEditorLimits(blocks(22000),userId).code,'characters');
   }
+  assert.throws(()=>validatePagePayload({blocks:blocks(32769)},valid,userId),/characters/);
   assert.equal(await quotaSafeMirrorBaseline({},999,'legacy',{base_revision:7},gateway),null);
 });
 
-test('A1 new pages and unsaved direct publishing cannot claim legacy text allowance',async()=>{
+test('A1 direct publishing is rejected by Serverless; Cloudflare never trusts a claimed Free plan',async()=>{
   const h=await harness({extraModules:{publish:'lib/publish'}});
-  assert.throws(()=>validatePagePayload({blocks:blocks(24000)},null,userId),/characters/);
+  // 24k is transport-valid but over Free's 20k product quota.
+  assert.doesNotThrow(()=>validatePagePayload({blocks:blocks(24000),is_developer:true},null,userId));
+  assert.equal(h.blocks.validateEditorLimits(blocks(24000),userId).code,'characters');
   await assert.rejects(
     ()=>h.publish.publishPageContentFromBridge({ownerId:userId,blocks:blocks(24000)}),
     /EDITOR_LIMIT/,
