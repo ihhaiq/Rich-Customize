@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 
 const root = new URL('../../app/miniapp_static/', import.meta.url);
 const offersSource = readFileSync(new URL('subscription_offers.js', root), 'utf8');
+const catalogSource = readFileSync(new URL('plan_catalog.generated.js', root), 'utf8');
 
 class Node {
   constructor(tag) {
@@ -35,7 +36,12 @@ function loadOffers(language = 'ar') {
     Telegram: { WebApp: { openTelegramLink(url) { links.push(url); } } },
     location: { href: '' },
   };
-  runInNewContext(offersSource, { window, document, Intl });
+  // Production loads the generated plan catalog before subscription_offers.js.
+  // Loading offers in isolation suppresses the public API by design.
+  const context = { window, document, Intl, console };
+  runInNewContext(catalogSource, context);
+  runInNewContext(offersSource, context);
+  assert.ok(window.RichSubscriptionOffers, 'offers must initialize with trusted generated catalog');
   return { api:window.RichSubscriptionOffers, body, links };
 }
 function walk(node, fn) {
