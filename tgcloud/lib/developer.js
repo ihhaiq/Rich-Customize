@@ -1,4 +1,5 @@
 import { issueGoldenGift } from 'lib/golden-gifts';
+import { sendBirthdayAnnouncementTest } from 'lib/golden-announcements';
 import { api, BotApiError, db, InputFile } from 'sdk';
 import { and, eq, gte, lt, sql } from 'sdk/db';
 import { developerStates, editorSessions, legacyStates, maintenanceLocks, richPages, usageUsers } from 'schema';
@@ -154,7 +155,8 @@ function panelRichMessage(content, extraButtons = []) {
   }
 
   const mainActions = buttonTableBlock([
-    { text: '🎁 إهداء قسيمة ذهبية للجميع (مرة بالشهر)', callback_data: 'dev:golden:gift', style: 'success' },
+    { text: '🎁 إهداء (مرة بالشهر)', callback_data: 'dev:golden:gift', style: 'success' },
+    { text: '🧪 اختبار الإهداء', callback_data: 'dev:golden:preview', style: 'primary' },
     { text: 'فحص قاعدة البيانات', callback_data: 'dev:database:check', style: 'primary' },
     { text: 'تحديث قناة المعاينة', callback_data: 'dev:showcase:refresh', style: 'primary' },
     { text: 'بيانات / إحصائيات', callback_data: 'dev:stats', style: 'primary' },
@@ -935,6 +937,24 @@ export async function handleDeveloperCallback(query) {
     return true;
   }
 
+  if (data === 'dev:golden:preview') {
+    // Never call issueGoldenGift here: send only a private, non-activating preview.
+    await sendBirthdayAnnouncementTest(query.from.id, query.from.language_code);
+    await api.answerCallbackQuery({
+      callback_query_id:query.id,
+      text:'تم إرسال معاينة الإهداء إلى محادثتك الخاصة فقط، بدون منح قسائم.',
+      show_alert:true,
+    });
+    return true;
+  }
+  if (data === 'dev:golden:preview:activate') {
+    await api.answerCallbackQuery({
+      callback_query_id:query.id,
+      text:'هذه معاينة فقط؛ لا توجد قسيمة فعلية للتفعيل.',
+      show_alert:true,
+    });
+    return true;
+  }
   if (data === 'dev:golden:gift') {
     const result = await issueGoldenGift(query.from.id);
     await api.answerCallbackQuery({callback_query_id:query.id,show_alert:true,text:(result.created?'تم منح القسيمة. التفعيل خلال ١٢ ساعة، والمدة ٣٠ يوماً من التفعيل.':'تم استخدام هدية هذا الشهر بالفعل.')+(result.announcementQueued?' الإعلان في طابور الإرسال.':' تعذر تأكيد طابور الإعلان؛ اضغط مجدداً للمحاولة دون تكرار الهدية.')});
