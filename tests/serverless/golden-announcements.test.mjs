@@ -9,7 +9,7 @@ async function fixture(count=3){
  await h.gifts.issueGoldenGift(developer,now);
  return {...h,now};
 }
-test('Arabic vs other languages: native cake, inline rich activation, English H1/footer',async()=>{
+test('all languages use H1 birthday heading and footer with native cake and inline activation',async()=>{
  const h=await fixture();
  for(const lang of ['ar','ar-IQ','en','ru',null]){
   const rich=h.birthday.birthdayAnnouncement(lang),arabic=String(lang).startsWith('ar');
@@ -18,7 +18,14 @@ test('Arabic vs other languages: native cake, inline rich activation, English H1
   const button=texts.find(t=>t?.type==='button').button;
   assert.equal(button.callback_data,'gift:activate');
   assert.equal(button.text,arabic?'فعلها':'Active');
-  if(!arabic){assert.equal(rich.blocks[0].type,'heading');assert.equal(rich.blocks[0].size,1);assert.equal(rich.blocks[1].type,'footer');}
+  assert.equal(rich.blocks.length,2);
+  assert.equal(rich.blocks[0].type,'heading');
+  assert.equal(rich.blocks[0].size,1);
+  assert.equal(rich.blocks[1].type,'footer');
+  assert.equal(rich.blocks[0].text.some(t=>t?.type==='custom_emoji'),true,'cake belongs to H1');
+  assert.equal(rich.blocks[1].text.some(t=>t?.type==='button'),true,'activation belongs to footer');
+  assert.equal(rich.blocks[0].text[0],arabic?'عيد ميلادي اليوم ':"It's my BIRTHDAY ");
+  if(arabic) assert.equal(rich.is_rtl,true);
  }
 });
 test('one announcement per eligible user, concurrent reminders do not duplicate, no auto activation',async()=>{
