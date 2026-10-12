@@ -7,7 +7,7 @@ import { and, asc, eq, gt, lte } from 'sdk/db';
 import { editorSubscriptions, goldenClaims, usageUsers,
   subscriptionReminderScans, subscriptionReminderDeliveries } from 'schema';
 import { verifiedSubscriptionRow } from 'lib/editor-subscriptions';
-import { buildSubscriptionRich } from 'lib/subscription-rich.js';
+import { buildSubscriptionRich } from 'lib/subscription-rich';
 import { isDefinitePublishRejection, normalizePublishError } from 'lib/publish-errors';
 const WINDOW=5*86400;
 const BATCH=10;
