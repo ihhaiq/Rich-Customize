@@ -343,7 +343,8 @@ export async function updateEditorSession(userId, changes, { touch = true } = {}
   // Every session write that carries block or button content passes through
   // the same server-side quota gate. This covers edits that skip the explicit
   // per-handler checks (undo/redo, reorder, media, details, imported messages).
-  // Hydrating an identical persisted legacy page is allowed; editing it is not.
+  // An unchanged stored page can always be loaded; an over-quota page
+  // remains read-only until the trusted plan covers its current contents.
   if (SAVED_DRAFT_FIELDS.some(field => Object.hasOwn(payload, field))) {
     const entitlement = await getEditorEntitlement(id);
     const targetId = Object.hasOwn(payload, 'currentPageId')
