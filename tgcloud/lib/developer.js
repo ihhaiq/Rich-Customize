@@ -1,6 +1,4 @@
-import { issueGoldenGift } from 'lib/golden-gifts';
-import { sendBirthdayAnnouncementTest, birthdayCampaignStatus, birthdayReportText } from 'lib/golden-announcements';
-import { audienceAndSubscriptionStats, activeSubscribersPage } from 'lib/admin-stats';
+import { audienceAndSubscriptionStats } from 'lib/admin-stats';
 import { api, BotApiError, db, InputFile } from 'sdk';
 import { and, eq, gte, lt, sql } from 'sdk/db';
 import { developerStates, editorSessions, legacyStates, maintenanceLocks, richPages, usageUsers } from 'schema';
@@ -156,9 +154,6 @@ function panelRichMessage(content, extraButtons = []) {
   }
 
   const mainActions = buttonTableBlock([
-    { text: '🎁 إهداء (إعادة التذكير)', callback_data: 'dev:golden:gift', style: 'success' },
-    { text: '🧪 اختبار الإهداء', callback_data: 'dev:golden:preview', style: 'primary' },
-    { text: '📨 حالة الإهداء', callback_data: 'dev:golden:status', style: 'primary' },
     { text: 'فحص قاعدة البيانات', callback_data: 'dev:database:check', style: 'primary' },
     { text: 'تحديث قناة المعاينة', callback_data: 'dev:showcase:refresh', style: 'primary' },
     { text: 'بيانات / إحصائيات', callback_data: 'dev:stats', style: 'primary' },
@@ -678,10 +673,6 @@ async function showStats(query, chatId) {
       ['أكثر اللغات', languageText],
       ['إجمالي التفاعلات', summary.events.toLocaleString()],
     ]),
-    statTable('🎟 المشتركون حسب الباقة', [
-      ['Plus', audience ? audience.tiers.plus.toLocaleString() : 'غير متاح'],
-      ['Golden Ticket', audience ? audience.goldenTotal.toLocaleString() : 'غير متاح'],
-    ]),
     {type:'paragraph',text:'المتاحون تقديرياً = المستخدمون المعروفون ما عدا من تأكد تعذر الوصول لهم بآخر محاولة. غير المختبرين ضمن التقدير، والقبول لا يثبت قراءة الرسالة. اشتراكات الباقات محسوبة من الحالة الفعالة الموثقة.'},
     statTable('⚙️ التشغيل والأداء', [
       ['مدة التتبع', formatDuration(stamp - op.startedAt)],
@@ -707,40 +698,9 @@ async function showStats(query, chatId) {
   ];
 
   await sendPanel(chatId, blocks, [
-    { text: '🎟 المشتركون وباقاتهم', callback_data: 'dev:stats:subscribers:0', style: 'primary' },
     { text: '👥 إحصائيات المستخدمين', callback_data: 'dev:stats:users:0', style: 'primary' },
-    { text: '📨 حالة الإهداء', callback_data: 'dev:golden:status', style: 'primary' },
     { text: '🔄 تحديث', callback_data: 'dev:stats', style: 'primary' },
   ], query.message?.message_id || null);
-}
-
-async function showSubscribers(query, chatId, requestedPage) {
-  await api.answerCallbackQuery({callback_query_id:query.id});
-  let result;
-  try { result=await activeSubscribersPage(requestedPage); }
-  catch(error) {
-    console.warn('Subscriber list unavailable',error);
-    await sendPanel(chatId,'تعذر تحميل المشتركين. حاول مجدداً.',[
-      {text:'🔄 إعادة المحاولة',callback_data:'dev:stats:subscribers:0',style:'primary'},
-    ],query.message?.message_id||null);
-    return;
-  }
-  const blocks=[
-    {type:'heading',text:'🎟 المشتركون وباقاتهم',size:3},
-    statTable('الباقات الفعالة', [['Plus',result.plus],['Golden Ticket',result.golden]]),
-    {type:'paragraph',text:'عدد المشتركين: '+result.total+' · الصفحة: '+(result.page+1)+'/'+(result.maxPage+1)},
-  ];
-  if(result.users.length)blocks.push({type:'table',is_bordered:true,is_compact:false,cells:[
-    [tableTextCell('معرّف المستخدم',{header:true}),tableTextCell('الباقة',{header:true}),tableTextCell('نهاية الاستحقاق الحالي',{header:true})],
-    ...result.users.map(user=>[tableTextCell(user.user_id),tableTextCell(user.plan==='plus'?'Plus':'Golden Ticket'),tableTextCell(formatTime(user.expires_at))]),
-  ]});
-  else blocks.push({type:'paragraph',text:'لا يوجد مشتركون بباقات فعالة حالياً.'});
-  const buttons=[];
-  if(result.page>0)buttons.push({text:'⬅️ السابق',callback_data:'dev:stats:subscribers:'+(result.page-1),style:'primary'});
-  buttons.push({text:'📊 الملخص',callback_data:'dev:stats',style:'primary'});
-  buttons.push({text:'🔄 تحديث',callback_data:'dev:stats:subscribers:'+result.page,style:'primary'});
-  if(result.page<result.maxPage)buttons.push({text:'التالي ➡️',callback_data:'dev:stats:subscribers:'+(result.page+1),style:'primary'});
-  await sendPanel(chatId,blocks,buttons,query.message?.message_id||null);
 }
 
 async function showUsers(query, chatId, requestedPage) {
@@ -982,34 +942,9 @@ export async function handleDeveloperCallback(query) {
     return true;
   }
 
-  if (data === 'dev:golden:status') {
-    const status=await birthdayCampaignStatus();
-    await api.answerCallbackQuery({callback_query_id:query.id});
-    await api.sendMessage({chat_id:query.from.id,
-      text:birthdayReportText(status)+'\n\nإذا ماكو تقدّم، تأكد من تشغيل Cloudflare Worker والجدولة وربط بوت الجسر.'});
-    return true;
-  }
-  if (data === 'dev:golden:preview') {
-    // Never call issueGoldenGift here: send only a private, non-activating preview.
-    await sendBirthdayAnnouncementTest(query.from.id, query.from.language_code);
-    await api.answerCallbackQuery({
-      callback_query_id:query.id,
-      text:'تم إرسال معاينة الإهداء إلى محادثتك الخاصة فقط، بدون منح قسائم.',
-      show_alert:true,
-    });
-    return true;
-  }
-  if (data === 'dev:golden:preview:activate') {
-    await api.answerCallbackQuery({
-      callback_query_id:query.id,
-      text:'هذه معاينة فقط؛ لا توجد قسيمة فعلية للتفعيل.',
-      show_alert:true,
-    });
-    return true;
-  }
-  if (data === 'dev:golden:gift') {
-    const result = await issueGoldenGift(query.from.id);
-    await api.answerCallbackQuery({callback_query_id:query.id,show_alert:true,text:(result.created?'تم إنشاء الهدية. التفعيل بأي وقت، والمدة ٣٠ يوماً من أول تفعيل.':'تم طلب إعادة التذكير بنفس الهدية دون إضافة مدة للمفعّلين.')+(result.announcementQueued?' الإعلان في طابور الإرسال.':' تعذر تأكيد طابور الإعلان؛ اضغط مجدداً للمحاولة دون تكرار الهدية.')});
+  if (data.startsWith('dev:golden:') || data.startsWith('dev:stats:subscribers:')) {
+    await api.answerCallbackQuery({callback_query_id:query.id,show_alert:true,
+      text:'تم نقل إدارة الاشتراكات والإهداء إلى @richDonateBot. افتح /dev هناك.'});
     return true;
   }
   if (data === 'dev:errorlog') {
