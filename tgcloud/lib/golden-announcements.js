@@ -81,7 +81,7 @@ export async function birthdayCampaignStatus() {
 export function birthdayReportText(snapshot, {error=false}={}) {
   if(!snapshot)return '🎁 ماكو حملة إهداء مسجلة بعد.';
   const c=snapshot.counts;
-  const handled=c.sent+c.failed+c.unavailable+c.uncertain;
+  const handled=c.sent+c.failed+c.unavailable+c.uncertain+c.sending;
   const pending=Math.max(0,snapshot.eligible-handled);
   const phase=snapshot.status==='done'
     ? (snapshot.claimUntil<=now()?'انتهت المهلة':'انتهى المرور على المستلمين')
@@ -93,7 +93,8 @@ export function birthdayReportText(snapshot, {error=false}={}) {
     +'قبله تليكرام: '+c.sent+'\n'
     +'تعذر إيصالها: '+(c.failed+c.unavailable)+'\n'
     +'غير مؤكد: '+(c.uncertain+c.sending)+'\n'
-    +'بانتظار الإرسال أو إعادة المحاولة: '+(pending+c.retry)+'\n'
+    +'بانتظار الإرسال أو إعادة المحاولة: '+pending+'\n'
+    +'منها بانتظار رفع تقييد تليكرام: '+c.retry+'\n'
     +'القبول من تليكرام مو دليل قراءة الرسالة.';
 }
 async function notifyOnce(row,type,body) {
