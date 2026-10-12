@@ -3,6 +3,7 @@
 
 import { api } from 'sdk';
 import { sendSubscriptionStatus } from 'lib/subscription-status';
+import { handleDonateConsoleMessage } from 'lib/donate-console';
 import {
   buildWelcomeFallbackText,
   buildWelcomeKeyboard,
@@ -64,6 +65,7 @@ export default async function (message, ctx = {}) {
   let failed = false;
   let bridgeHandled = false;
   try {
+    if (await handleDonateConsoleMessage(message)) return;
     bridgeHandled = await handleMiniAppBridgeMessage(message, { updateId });
     if (bridgeHandled) return;
     if (await handleBrandingSuccessfulPayment(message)) return;
