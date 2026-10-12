@@ -86,19 +86,44 @@
 - عند إعداد نسخة D1 جديدة نفذ `cloudflare/d1/schema.sql`؛ في قاعدة الإنتاج القائمة نفذ ملف الترحيل `0002-schedule-reminders.sql` فقط حتى لا تغير البيانات القائمة.
 
 
-## Golden broadcast recovery — 2026-10-12
+## Golden broadcast recovery and repeat reminders — 2026-10-12
 
-`gfb_` reminders now recover `exhausted` rows and keep retrying until the
-Serverless campaign returns a terminal result. Retries back off to at most
-15 minutes; each revision still processes a bounded recipient batch. The bot
-continues to enforce the existing 12-hour claim window, so recovery does not
-extend an expired offer. A functioning deployed Cron, D1 and authenticated
+`gfb_` reminders recover exhausted rows and keep retrying until Serverless
+returns a terminal result, with backoff up to 15 minutes. Each revision
+processes a bounded recipient batch. A deployed Cron, D1 and authenticated
 RCB1 relay are required; this does not keep a Serverless process alive.
 
-Completion notices are persisted separately from recipient delivery. Definite
-retryable rejections postpone the scheduler acknowledgement. Ambiguous sends
-and stale sending records remain uncertain to avoid duplicate messages; old
-notification markers cannot prove successful historical delivery.
+Gift activation has **no deadline**, including previously issued unclaimed
+gifts. The old 12-hour policy is superseded. The subscription lasts 30 days
+from first activation. Expiry timestamps still enforce the active period.
 
-Deploy both Telegram code and the separate reminder Worker for this change.
-The existing tables suffice: this diff introduces no schema migration.
+Pressing the gift button while a broadcast is pending repairs/resumes it.
+After completion, it starts a new numbered reminder round, skips activated
+recipients, and does not reset claims. Each round has its own delivery ledger
+and completion report. Campaign audience remains the users known at issuance.
+
+New callback buttons carry a campaign identity. Multiple monthly campaigns
+issued while the user's gift was unclaimed resolve to the earliest pending
+gift; activation consumes those pending offers as one month. Old callbacks
+cannot claim a later independent campaign, including after the gift expires.
+A genuinely new campaign issued after activation remains a separate offer
+under the existing monthly campaign policy, usable after current gift expiry.
+
+Completion notices retry definite retryable rejections. Ambiguous sends
+remain uncertain to avoid duplicates. This is not an exactly-once delivery
+guarantee or proof that users read the notification.
+
+### Required rollout
+
+1. Apply the Telegram schema migration **before** deploying new code:
+   `golden_broadcasts.round` and `golden_announcements.round`, integer NOT NULL
+   DEFAULT 1. Existing delivery rows belong to round 1 and must be preserved.
+2. Deploy Serverless code with the new callback handler, claim resolution,
+   recipient ledger and developer panel. Do not press the repeat button before
+   migration and deployment succeed.
+3. Deploy the separate reminder Worker to pick up the earlier persistent retry
+   fix. Pages deployment alone does not deploy that Worker. No new D1 columns
+   are introduced by the round feature.
+4. Check a real campaign, click an old and new notification for the same test
+   recipient, and confirm one unchanged expiry in `/sup`. This live check was
+   not run by the local test suite.

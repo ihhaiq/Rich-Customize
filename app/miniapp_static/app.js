@@ -1255,7 +1255,7 @@ async function boot(){
       expireGift();
     }
     window.dispatchEvent(new CustomEvent("rich-miniapp-access",{detail:window.RichMiniAppAccess}));
-    if(pageData?.golden_gift?.available) toast("🎁 عندك قسيمة ذهبية! افتح البوت واضغط قسيمتي الذهبية لتفعيلها خلال ١٢ ساعة.");
+    if(pageData?.golden_gift?.available) toast("🎁 عندك قسيمة ذهبية! افتح إشعار الهدية في البوت لتفعيلها بأي وقت؛ مدتها ٣٠ يوماً من أول تفعيل.");
     const pages=Array.isArray(pageData?.pages)?pageData.pages:[];
     setPagesSnapshot(pages);
 

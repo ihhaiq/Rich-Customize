@@ -34,11 +34,11 @@ test('manual claims are idempotent, expire individually, and do not overwrite pa
   assert.equal((await h.subscriptions.getEditorEntitlement(102,{now:h.now+30*86400+60})).plan,'free');
   assert.equal(h.records.editorSubscriptions[0].plan,'plus');
 });
-test('unclaimed coupon expires at exact 12-hour boundary and survives month rollover',async()=>{
+test('unclaimed coupon never expires and survives month rollover',async()=>{
   const h=await fixture();
   await h.gifts.issueGoldenGift(developer,h.now);
   assert.equal((await h.gifts.goldenGiftStatus(101,h.now+43200-1)).available,true);
-  assert.equal((await h.gifts.goldenGiftStatus(101,h.now+43200)).available,false);
+  assert.equal((await h.gifts.goldenGiftStatus(101,h.now+43200)).available,true);
   const boundary=Date.parse('2026-11-01T00:00:00+03:00')/1000;
   h.records.goldenCampaigns.length=0;
   h.records.usageUsers[0].firstSeen=boundary-10000;
@@ -74,4 +74,32 @@ test('Cloudflare access is server-owned, expires without a reminder and fails cl
   assert.equal((await goldenGiftAccess(env,101,99)).Golden_ticket,true);
   assert.equal((await goldenGiftAccess(env,101,100)).Golden_ticket,false);
   assert.equal((await goldenGiftAccess({},101,99)).Golden_ticket,false);
+});
+
+test('old and new campaigns while unclaimed provide one month only, including after expiry',async()=>{
+ const h=await fixture();
+ const issued=await h.gifts.issueGoldenGift(developer,h.now);
+ const later=h.now+40*86400;
+ const second=await h.gifts.issueGoldenGift(developer,later);
+ assert.notEqual(issued.campaign.month,second.campaign.month);
+ const activation=later+200*86400;
+ await Promise.all([
+  h.gifts.activateGoldenGift(101,activation,issued.campaign.month),
+  h.gifts.activateGoldenGift(101,activation,second.campaign.month),
+ ]);
+ assert.equal(h.records.goldenClaims.length,1);
+ assert.equal(h.records.goldenClaims[0].expiresAt,activation+30*86400);
+ await h.gifts.activateGoldenGift(101,activation+31*86400,second.campaign.month);
+ await h.gifts.activateGoldenGift(101,activation+31*86400,'legacy');
+ assert.equal(h.records.goldenClaims.length,1,'old reminders cannot grant another month after expiry');
+});
+test('campaign-bound callbacks cannot claim a later independent gift using an old message',async()=>{
+ const h=await fixture();const first=await h.gifts.issueGoldenGift(developer,h.now);
+ await h.gifts.activateGoldenGift(101,h.now+1,first.campaign.month);
+ const second=await h.gifts.issueGoldenGift(developer,h.now+40*86400);
+ const at=h.now+41*86400;
+ assert.equal((await h.gifts.goldenGiftStatus(101,at,first.campaign.month)).available,false);
+ assert.equal((await h.gifts.goldenGiftStatus(101,at,'legacy')).available,false);
+ assert.equal((await h.gifts.goldenGiftStatus(101,at,second.campaign.month)).available,true);
+ assert.equal((await h.gifts.goldenGiftStatus(101,at,'2099-01')).available,false);
 });

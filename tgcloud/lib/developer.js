@@ -156,7 +156,7 @@ function panelRichMessage(content, extraButtons = []) {
   }
 
   const mainActions = buttonTableBlock([
-    { text: '🎁 إهداء (مرة بالشهر)', callback_data: 'dev:golden:gift', style: 'success' },
+    { text: '🎁 إهداء (إعادة التذكير)', callback_data: 'dev:golden:gift', style: 'success' },
     { text: '🧪 اختبار الإهداء', callback_data: 'dev:golden:preview', style: 'primary' },
     { text: '📨 حالة الإهداء', callback_data: 'dev:golden:status', style: 'primary' },
     { text: 'فحص قاعدة البيانات', callback_data: 'dev:database:check', style: 'primary' },
@@ -1009,7 +1009,7 @@ export async function handleDeveloperCallback(query) {
   }
   if (data === 'dev:golden:gift') {
     const result = await issueGoldenGift(query.from.id);
-    await api.answerCallbackQuery({callback_query_id:query.id,show_alert:true,text:(result.created?'تم منح القسيمة. التفعيل خلال ١٢ ساعة، والمدة ٣٠ يوماً من التفعيل.':'تم استخدام هدية هذا الشهر بالفعل.')+(result.announcementQueued?' الإعلان في طابور الإرسال.':' تعذر تأكيد طابور الإعلان؛ اضغط مجدداً للمحاولة دون تكرار الهدية.')});
+    await api.answerCallbackQuery({callback_query_id:query.id,show_alert:true,text:(result.created?'تم إنشاء الهدية. التفعيل بأي وقت، والمدة ٣٠ يوماً من أول تفعيل.':'تم طلب إعادة التذكير بنفس الهدية دون إضافة مدة للمفعّلين.')+(result.announcementQueued?' الإعلان في طابور الإرسال.':' تعذر تأكيد طابور الإعلان؛ اضغط مجدداً للمحاولة دون تكرار الهدية.')});
     return true;
   }
   if (data === 'dev:errorlog') {

@@ -75,11 +75,11 @@ test('Telegram flood wait leaves recipient retryable, preserving cursor and dela
  await h.birthday.runBirthdayBatch(job.jobId,2);
  assert.equal(h.records.goldenAnnouncements[0].status,'sent');assert.equal(job.status,'done');
 });
-test('expired campaign never sends an advertisement with an unusable activation',async()=>{
+test('old campaign deadline no longer stops a usable gift announcement',async()=>{
  const h=await fixture(),job=h.records.goldenBroadcasts[0];
  h.records.goldenCampaigns[0].claimUntil=h.now-1;
  await h.birthday.runBirthdayBatch(job.jobId,1);
- assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,0);
+ assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,3);
  assert.equal(job.status,'done');
 });
 test('gift branding ends for Free; current Plus and permanent purchased removal survive',async()=>{
@@ -124,7 +124,7 @@ test('welcome never includes the gift button; developer panel offers distinct li
  const dev=fs.readFileSync(new URL('../../tgcloud/lib/developer.js',import.meta.url),'utf8');
  assert.doesNotMatch(welcome,/callback_data:\s*['"]gift:show['"]/);
  assert.match(welcome,/callback_data:\s*['"]r:starteditor['"]/);
- assert.match(dev,/🎁 إهداء \(مرة بالشهر\)/);
+ assert.match(dev,/🎁 إهداء \(إعادة التذكير\)/);
  assert.match(dev,/🧪 اختبار الإهداء/);
  assert.match(dev,/callback_data:\s*'dev:golden:preview'/);
  assert.match(dev,/await sendBirthdayAnnouncementTest\(query\.from\.id, query\.from\.language_code\)/);
@@ -147,7 +147,7 @@ test('broadcast status is visible and reports definitive and uncertain failures 
  assert.match(text,/المؤهلون: 3/);
  assert.match(text,/تعذر إيصالها: 1/);
  assert.match(text,/غير مؤكد: 1/);
- assert.match(text,/لم تُرسل قبل إغلاق الحملة: 0/);
+ assert.match(text,/لم تُرسل بهذه الجولة: 0/);
  const completion=h.calls.filter(c=>c.method==='sendMessage' && c.args.chat_id===developer
    &&c.args.text?.includes('🎁 تقرير'));
  assert.equal(completion.length,1);
@@ -188,7 +188,7 @@ test('definite rich formatting rejection falls back to text with activation; blo
  await h.birthday.runBirthdayBatch(job.jobId,1);
  const fallback=h.calls.filter(c=>c.method==='sendMessage'&&c.args.chat_id===1);
  assert.equal(fallback.length,1);
- assert.equal(fallback[0].args.reply_markup.inline_keyboard[0][0].callback_data,'gift:activate');
+ assert.equal(fallback[0].args.reply_markup.inline_keyboard[0][0].callback_data,'gift:activate:'+job.month);
  assert.deepEqual(h.records.goldenAnnouncements.map(r=>r.status),['sent','unavailable','sent']);
 });
 test('ambiguous network failure never sends a duplicate text fallback',async()=>{
@@ -198,10 +198,38 @@ test('ambiguous network failure never sends a duplicate text fallback',async()=>
  assert.equal(h.calls.filter(c=>c.method==='sendMessage'&&c.args.chat_id===1).length,0);
  assert.equal(h.records.goldenAnnouncements[0].status,'uncertain');
 });
-test('expired campaign report explicitly identifies recipients left unsent',async()=>{
+test('old deadline report confirms the full recipient pass continues',async()=>{
  const h=await fixture(),job=h.records.goldenBroadcasts[0];
  h.records.goldenCampaigns[0].claimUntil=h.now-1;
  await h.birthday.runBirthdayBatch(job.jobId,1);
  const report=h.birthday.birthdayReportText(await h.birthday.birthdayCampaignStatus());
- assert.match(report,/لم تُرسل قبل إغلاق الحملة: 3/);
+ assert.match(report,/لم تُرسل بهذه الجولة: 0/);
+});
+
+test('repeat developer issue starts one new reminder round, skips activated users and never extends expiry',async()=>{
+ const h=await fixture(),job=h.records.goldenBroadcasts[0];
+ await h.birthday.runBirthdayBatch(job.jobId,1);
+ const firstButton=h.calls.find(c=>c.method==='sendRichMessage').args.rich_message.blocks[1].text.find(t=>t?.type==='button').button.callback_data;
+ await h.gifts.activateGoldenGift(1,h.now,job.month);
+ const expiry=h.records.goldenClaims[0].expiresAt;
+ await Promise.all([h.gifts.issueGoldenGift(developer,h.now),h.gifts.issueGoldenGift(developer,h.now)]);
+ assert.equal(job.round,2);assert.equal(h.records.goldenCampaigns.length,1);
+ assert.equal(job.status,'pending');
+ await h.birthday.runBirthdayBatch(job.jobId,job.revision);
+ const round2=await h.birthday.birthdayCampaignStatus();
+ assert.equal(round2.counts.sent,2);assert.equal(round2.counts.skipped,1);
+ assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,5);
+ assert.equal(h.records.goldenClaims[0].expiresAt,expiry);
+ assert.equal(firstButton,'gift:activate:'+job.month);
+ const notices=h.calls.filter(c=>c.args.chat_id===developer&&c.args.text?.includes('انتهت عملية الإرسال'));
+ assert.equal(notices.length,2);
+});
+test('pressing issue during an active batch resumes it without a duplicate round',async()=>{
+ const h=await fixture(25),job=h.records.goldenBroadcasts[0];
+ await h.birthday.runBirthdayBatch(job.jobId,1);
+ await h.gifts.issueGoldenGift(developer,h.now);
+ assert.equal(job.round,1);assert.equal(job.cursor,20);
+ job.runAt=h.now;
+ await h.birthday.runBirthdayBatch(job.jobId,job.revision);
+ assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,25);
 });

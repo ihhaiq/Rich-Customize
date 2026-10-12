@@ -409,6 +409,7 @@ export const goldenClaims = table('golden_claims', {
 
 // Resumable birthday announcement queue; message content remains in Serverless.
 export const goldenBroadcasts = table('golden_broadcasts', {
+  round: integer('round').notNull().default(1),
   month: text('month').primaryKey(),
   jobId: text('job_id').notNull(),
   actorId: integer('actor_id').notNull(),
@@ -419,6 +420,7 @@ export const goldenBroadcasts = table('golden_broadcasts', {
   status: text('status').notNull().default('pending'),
 });
 export const goldenAnnouncements = table('golden_announcements', {
+  round: integer('round').notNull().default(1),
   key: text('key').primaryKey(),
   month: text('month').notNull(),
   userId: integer('user_id').notNull(),
