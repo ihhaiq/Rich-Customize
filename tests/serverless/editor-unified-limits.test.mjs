@@ -146,3 +146,48 @@ test('new policy version has a persistent schema default for older pages', async
   assert.match(pages,/quotaVersion:\s*2,/);
   assert.match(bridge,/quotaVersion:\s*2,/);
 });
+
+test('final Free message charges generated branding and navigation to the actual plan', async () => {
+  const h=await harness({extraModules:{policy:'lib/subscription-policy',access:'lib/developer-access'}});
+  const fifty=Array.from({length:50},()=>text(h));
+  assert.equal(h.blocks.validateEditorLimits(fifty,999999).ok,true);
+  assert.equal(h.renderer.buildInputRichMessage(fifty,{userId:999999}).blocks.length,50);
+  // The inserted footer is a real Rich block, not a free quota exemption.
+  assert.throws(()=>h.renderer.buildInputRichMessage(fifty,{
+    userId:999999,includeBranding:true,
+  }),/EDITOR_LIMIT:blocks:51:50/);
+  assert.throws(()=>h.renderer.buildInputRichMessage(fifty,{
+    userId:999999,navigationButtons:[{text:'Open',url:'https://example.com'}],
+  }),/EDITOR_LIMIT:blocks:51:50/);
+  const plus=h.policy.resolveEditorEntitlement({plan:'plus',active:true});
+  assert.equal(h.renderer.buildInputRichMessage(fifty,{
+    userId:999999,includeBranding:true,entitlement:plus,
+  }).blocks.length,51);
+  assert.equal(h.renderer.buildInputRichMessage(fifty,{
+    userId:h.access.DEVELOPER_IDS[0],includeBranding:true,
+  }).blocks.length,51);
+  assert.equal(h.renderer.buildInputRichMessage(fifty,{
+    userId:999999,includeBranding:true,technicalOnly:true,
+  }).blocks.length,51);
+});
+
+test('final text after branding also respects the 20k Free quota',async()=>{
+  const h=await harness();
+  const full=[text(h,20000)];
+  assert.equal(h.blocks.validateEditorLimits(full,999999).ok,true);
+  assert.doesNotThrow(()=>h.renderer.buildInputRichMessage(full,{userId:999999}));
+  assert.throws(()=>h.renderer.buildInputRichMessage(full,{
+    userId:999999,includeBranding:true,
+  }),/EDITOR_LIMIT:characters/);
+});
+
+test('developers still obey hard 500-block output limit with generated footer',async()=>{
+  const h=await harness({extraModules:{access:'lib/developer-access'}});
+  const fiveHundred=Array.from({length:500},()=>text(h));
+  const dev=h.access.DEVELOPER_IDS[0];
+  assert.equal(h.blocks.validateEditorLimits(fiveHundred,dev).ok,true);
+  assert.equal(h.renderer.buildInputRichMessage(fiveHundred,{userId:dev}).blocks.length,500);
+  assert.throws(()=>h.renderer.buildInputRichMessage(fiveHundred,{
+    userId:dev,includeBranding:true,
+  }),/EDITOR_LIMIT:blocks:501:500/);
+});
