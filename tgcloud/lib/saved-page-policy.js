@@ -1,5 +1,6 @@
-// A page persisted before new quotas may be sent again without mutation.
-// The exception is never inferred from client-supplied previousBlocks.
+// Saved pages are writable whenever their persisted content fits the owner's
+// current verified entitlement, regardless of creation date or quota_version.
+// Over-quota pages can be re-sent unchanged without inventing edit allowance.
 import { normalizeBlocks, validateEditorLimits } from 'lib/editor-blocks';
 
 function stable(value) {
@@ -33,16 +34,16 @@ function canonicalBlocks(blocks) {
   return copied;
 }
 
-// The DB migration defaults existing rows to policy version 1. Only new
-// server-authorized CREATE flows write version 2. No date guesses or bulk
-// modifications to existing user content are needed.
+// Kept for schema compatibility. This field records historical policy
+// generation, not permission to edit; a version 1 page may be fully writable.
 export const CURRENT_PAGE_QUOTA_VERSION = 2;
-export function isLegacySavedPage(page, userId, entitlement) {
+export function isSavedPageOverQuota(page, userId, entitlement) {
   if (!page || Number(page.ownerId) !== Number(userId)) return false;
-  if (Number(page.quotaVersion || 1) < CURRENT_PAGE_QUOTA_VERSION) return true;
-  // Downgraded subscriptions also make over-quota saved pages read-only.
+  // Entitlement must come from the trusted Serverless resolver at call sites.
   return !validateEditorLimits(page.blocks || [], userId, { entitlement }).ok;
 }
+// Compatibility alias for existing Serverless imports and wire error codes.
+export const isLegacySavedPage = isSavedPageOverQuota;
 
 export function isSavedPageUnchanged(page, draft, { includeTitle = false } = {}) {
   if (!page || !draft) return false;
@@ -55,7 +56,7 @@ export function isSavedPageUnchanged(page, draft, { includeTitle = false } = {})
 }
 
 export function assertWritableSavedPage(page, userId, entitlement) {
-  if (isLegacySavedPage(page, userId, entitlement)) {
+  if (isSavedPageOverQuota(page, userId, entitlement)) {
     const error = new Error('LEGACY_PAGE_READ_ONLY');
     error.code = 'LEGACY_PAGE_READ_ONLY';
     throw error;
@@ -67,5 +68,5 @@ export function legacyPagePublishOptions(page, userId, entitlement) {
   if (!page || Number(page.ownerId) !== Number(userId)) {
     throw new Error('Saved page is not owned by publisher');
   }
-  return { technicalOnly: isLegacySavedPage(page, userId, entitlement) };
+  return { technicalOnly: isSavedPageOverQuota(page, userId, entitlement) };
 }
