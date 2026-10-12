@@ -322,8 +322,8 @@ export async function handlePublishCallback(query){
       if (legacy && !isSavedPageUnchanged(savedPage,latest)) {
         await api.answerCallbackQuery({callback_query_id:query.id,show_alert:true,text:
           resolveLanguage(c)==='ar'
-            ? 'هذه الصفحة القديمة للنشر كما هي فقط. افتحها من صفحاتك من جديد حتى تنشر النسخة المحفوظة.'
-            : 'This legacy page can only be published unchanged. Reopen its saved version.'});
+            ? 'هذه الصفحة تتجاوز حدود باقتك؛ افتح النسخة المحفوظة من صفحاتك حتى تنشرها بدون تعديل.'
+            : 'This page exceeds your current plan. Reopen the saved version to publish it unchanged.'});
         return true;
       }
       await api.answerCallbackQuery({callback_query_id:query.id,text:cc.sending});
