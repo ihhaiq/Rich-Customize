@@ -1,4 +1,4 @@
-import { runSubscriptionReminderTick, receiveSubscriptionReminderSchedule } from 'lib/subscription-reminders.js';
+import { runSubscriptionReminderTick, receiveSubscriptionReminderSchedule } from 'lib/subscription-reminders';
 import { receiveBirthdayReminder } from 'lib/golden-announcements';
 import { goldenGiftStatus, receiveGiftReminder } from 'lib/golden-gifts';
 import { assertUniquePageTitle, acquireOwnerPageLock as acquireCreateLock, releaseOwnerPageLock as releaseCreateLock } from 'lib/page-names';
