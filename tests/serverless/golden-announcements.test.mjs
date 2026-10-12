@@ -40,7 +40,7 @@ test('one announcement per eligible user, concurrent reminders do not duplicate,
  assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,3);
  assert.equal(h.records.goldenAnnouncements.filter(r=>r.status==='sent').length,3);
  const reports=h.calls.filter(c=>c.method==='sendMessage'&&c.args.chat_id===developer
-  &&c.args.text?.startsWith('🎁 تقرير إهداء القسيمة'));
+  &&c.args.text?.includes('🎁 تقرير إهداء القسيمة'));
  assert.equal(reports.length,1,'developer must receive exactly one completion report');
  assert.match(reports[0].args.text,/قبله تليكرام: 3/);
  assert.match(reports[0].args.text,/المؤهلون: 3/);
@@ -147,11 +147,61 @@ test('broadcast status is visible and reports definitive and uncertain failures 
  assert.match(text,/المؤهلون: 3/);
  assert.match(text,/تعذر إيصالها: 1/);
  assert.match(text,/غير مؤكد: 1/);
- assert.match(text,/بانتظار الإرسال أو إعادة المحاولة: 0/);
+ assert.match(text,/لم تُرسل قبل إغلاق الحملة: 0/);
  const completion=h.calls.filter(c=>c.method==='sendMessage' && c.args.chat_id===developer
-   &&c.args.text?.startsWith('🎁 تقرير'));
+   &&c.args.text?.includes('🎁 تقرير'));
  assert.equal(completion.length,1);
  await h.birthday.runBirthdayBatch(job.jobId,1);
  assert.equal(h.calls.filter(c=>c.method==='sendMessage'
-   &&c.args.chat_id===developer && c.args.text?.startsWith('🎁 تقرير')).length,1);
+   &&c.args.chat_id===developer && c.args.text?.includes('🎁 تقرير')).length,1);
+});
+
+ test('completion notification retries a definite rejection before acknowledging the Cloudflare job',async()=>{
+ const h=await fixture(),job=h.records.goldenBroadcasts[0];
+ h.apiState.messageSendErrors={[developer]:new Error('BotApiError [429]: retry after 90')};
+ await h.birthday.runBirthdayBatch(job.jobId,1);
+ assert.equal(job.status,'done');
+ const notice=h.records.legacyStates.find(r=>r.namespace.endsWith(':complete'));
+ assert.equal(notice.payload.status,'retry');
+ const completions=()=>h.calls.filter(c=>c.args.text?.startsWith('/rcb_schedule_result')&&c.args.text.includes(job.jobId));
+ assert.equal(completions().length,0);
+ h.apiState.messageSendErrors={};notice.payload.retryAt=0;
+ await Promise.all([h.birthday.runBirthdayBatch(job.jobId,1),h.birthday.runBirthdayBatch(job.jobId,1)]);
+ assert.equal(notice.payload.status,'sent');
+ assert.ok(completions().length>0);
+ assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,3);
+ assert.equal(h.calls.filter(c=>c.args.chat_id===developer&&c.args.text?.includes('انتهت عملية الإرسال')).length,2);
+ });
+ test('crashed recipient and crashed completion are classified without duplicate delivery',async()=>{
+ const h=await fixture(),job=h.records.goldenBroadcasts[0];
+ h.records.goldenAnnouncements.push({key:job.month+':1',month:job.month,userId:1,status:'sending',updatedAt:h.now-200});
+ h.records.legacyStates.push({namespace:'golden_notice:'+job.month+':complete',payload:{status:'sending'},updatedAt:h.now-200});
+ await h.birthday.runBirthdayBatch(job.jobId,1);
+ assert.equal(h.records.goldenAnnouncements[0].status,'uncertain');
+ assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,2);
+ assert.equal(h.records.legacyStates[0].payload.status,'uncertain');
+ });
+
+test('definite rich formatting rejection falls back to text with activation; blocked user does not stop the batch',async()=>{
+ const h=await fixture(),job=h.records.goldenBroadcasts[0];
+ h.apiState.richSendErrors={'1':new Error('BotApiError [400]: RICH_MESSAGE_EMOJI_INVALID'),'2':new Error('BotApiError [403]: bot was blocked by the user')};
+ await h.birthday.runBirthdayBatch(job.jobId,1);
+ const fallback=h.calls.filter(c=>c.method==='sendMessage'&&c.args.chat_id===1);
+ assert.equal(fallback.length,1);
+ assert.equal(fallback[0].args.reply_markup.inline_keyboard[0][0].callback_data,'gift:activate');
+ assert.deepEqual(h.records.goldenAnnouncements.map(r=>r.status),['sent','unavailable','sent']);
+});
+test('ambiguous network failure never sends a duplicate text fallback',async()=>{
+ const h=await fixture(),job=h.records.goldenBroadcasts[0];
+ h.apiState.richSendErrors={'1':new Error('Network timeout')};
+ await h.birthday.runBirthdayBatch(job.jobId,1);
+ assert.equal(h.calls.filter(c=>c.method==='sendMessage'&&c.args.chat_id===1).length,0);
+ assert.equal(h.records.goldenAnnouncements[0].status,'uncertain');
+});
+test('expired campaign report explicitly identifies recipients left unsent',async()=>{
+ const h=await fixture(),job=h.records.goldenBroadcasts[0];
+ h.records.goldenCampaigns[0].claimUntil=h.now-1;
+ await h.birthday.runBirthdayBatch(job.jobId,1);
+ const report=h.birthday.birthdayReportText(await h.birthday.birthdayCampaignStatus());
+ assert.match(report,/لم تُرسل قبل إغلاق الحملة: 3/);
 });

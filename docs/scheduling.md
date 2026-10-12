@@ -84,3 +84,21 @@
 - هذا المسار يحتاج تأكيد صلاحيات Bot-to-Bot في المجموعة الحالية، وأن bot relay يستلم الرسائل الصادرة من المحرر ثم يستطيع تنبيه المحرر. التحقق الحي واجب.
 - الاستدعاء كل دقيقة ليس SLA زمنياً دقيقاً. معدل B2B المشترك قد يؤخر المهام المتزامنة؛ حد 10 تذكيرات بالدورة حماية أولية فقط.
 - عند إعداد نسخة D1 جديدة نفذ `cloudflare/d1/schema.sql`؛ في قاعدة الإنتاج القائمة نفذ ملف الترحيل `0002-schedule-reminders.sql` فقط حتى لا تغير البيانات القائمة.
+
+
+## Golden broadcast recovery — 2026-10-12
+
+`gfb_` reminders now recover `exhausted` rows and keep retrying until the
+Serverless campaign returns a terminal result. Retries back off to at most
+15 minutes; each revision still processes a bounded recipient batch. The bot
+continues to enforce the existing 12-hour claim window, so recovery does not
+extend an expired offer. A functioning deployed Cron, D1 and authenticated
+RCB1 relay are required; this does not keep a Serverless process alive.
+
+Completion notices are persisted separately from recipient delivery. Definite
+retryable rejections postpone the scheduler acknowledgement. Ambiguous sends
+and stale sending records remain uncertain to avoid duplicate messages; old
+notification markers cannot prove successful historical delivery.
+
+Deploy both Telegram code and the separate reminder Worker for this change.
+The existing tables suffice: this diff introduces no schema migration.

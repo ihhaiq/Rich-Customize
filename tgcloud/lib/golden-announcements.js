@@ -32,6 +32,23 @@ export async function sendBirthdayAnnouncementTest(userId, languageCode) {
   });
 }
 
+// Only a definite formatting rejection permits a fallback; timeouts may have
+// already delivered the rich message and must never cause a duplicate send.
+async function deliverAnnouncement(user) {
+  try {
+    return await api.sendRichMessage({chat_id:user.userId,rich_message:birthdayAnnouncement(user.languageCode)});
+  } catch(error) {
+    const failure=normalizePublishError(error);
+    if(!['PUBLISH_CONTENT_INVALID','PUBLISH_BUTTON_INVALID','PUBLISH_CONTENT_TOO_LARGE'].includes(failure.code)
+      || !isDefinitePublishRejection(error))throw error;
+    const ar=/^ar(?:[-_]|$)/i.test(String(user.languageCode||''));
+    return api.sendMessage({chat_id:user.userId,
+      text:ar?'عيد ميلادي اليوم 🎂!\nوصلت الك باقة Golden Ticket هدية، اضغط لتفعيلها.':"It's my BIRTHDAY 🎂!\nHere's a Golden Ticket as a gift. Activate it below.",
+      reply_markup:{inline_keyboard:[[{text:ar?'فعلها':'Activate',callback_data:'gift:activate'}]]},
+    });
+  }
+}
+
 async function register(row) {
   await api.sendMessage({chat_id:-1003993506865,disable_notification:true,
     text:'/rcb_schedule_register@Richminiappsbot\n'+JSON.stringify({protocol:'RCB1',
@@ -93,7 +110,7 @@ export function birthdayReportText(snapshot, {error=false}={}) {
     +'قبله تليكرام: '+c.sent+'\n'
     +'تعذر إيصالها: '+(c.failed+c.unavailable)+'\n'
     +'غير مؤكد: '+(c.uncertain+c.sending)+'\n'
-    +'بانتظار الإرسال أو إعادة المحاولة: '+pending+'\n'
+    +(snapshot.status==='done'?'لم تُرسل قبل إغلاق الحملة: ':'بانتظار الإرسال أو إعادة المحاولة: ')+pending+'\n'
     +'منها بانتظار رفع تقييد تليكرام: '+c.retry+'\n'
     +(snapshot.status==='pending' && pending>0
       ? 'الحد الأدنى التقريبي للمتبقي: '+Math.ceil(pending/BATCH_SIZE)+' دقيقة عند تشغيل العامل كل دقيقة.\n'
@@ -106,17 +123,42 @@ export function birthdayReportText(snapshot, {error=false}={}) {
 async function notifyOnce(row,type,body) {
   const namespace='golden_notice:'+row.month+':'+type;
   const claimed=await db.insert(legacyStates).values({
-    namespace,payload:{actor_id:row.actorId},updatedAt:now(),
+    namespace,payload:{actor_id:row.actorId,status:'sending'},updatedAt:now(),
   }).onConflictDoNothing({target:legacyStates.namespace}).returning().run();
-  if(!claimed?.length)return false;
-  try {await api.sendMessage({chat_id:row.actorId,text:body});return true;}
-  catch(error){console.warn('Golden campaign notice not delivered',type,row.month);return false;}
+  if(!claimed?.length) {
+    const existing=await db.select().from(legacyStates).where(eq(legacyStates.namespace,namespace)).get();
+    // Legacy records and ambiguous outcomes are not blindly resent.
+    if(existing?.payload?.status==='sending') {
+      if(Number(existing.updatedAt)>now()-120)return false;
+      await db.update(legacyStates).set({payload:{actor_id:row.actorId,status:'uncertain'},updatedAt:now()})
+        .where(and(eq(legacyStates.namespace,namespace),eq(legacyStates.updatedAt,existing.updatedAt))).run();
+      return true;
+    }
+    if(existing?.payload?.status!=='retry') return true;
+    if(Number(existing.payload.retryAt)>now()) return false;
+    const locked=await db.update(legacyStates).set({payload:{actor_id:row.actorId,status:'sending'},updatedAt:Math.max(now(),Number(existing.updatedAt)+1)})
+      .where(and(eq(legacyStates.namespace,namespace),eq(legacyStates.updatedAt,existing.updatedAt)))
+      .returning().run();
+    if(!locked?.length)return false;
+  }
+  let status='sent',retryAt=0;
+  try {await api.sendMessage({chat_id:row.actorId,text:body});}
+  catch(error){
+    const failure=normalizePublishError(error);
+    const permanent=['PUBLISH_BOT_BLOCKED','PUBLISH_PRIVATE_UNAVAILABLE'].includes(failure.code);
+    status=!permanent && isDefinitePublishRejection(error)?'retry':'uncertain';
+    retryAt=now()+Math.max(60,Number(failure.retry_after)||60);
+    console.warn('Golden campaign notice not delivered',type,row.month,status);
+  }
+  await db.update(legacyStates).set({payload:{actor_id:row.actorId,status,retryAt},updatedAt:now()})
+    .where(eq(legacyStates.namespace,namespace)).run();
+  return status!=='retry';
 }
 async function notifyCompleted(row) {
   try{
     const snapshot=await campaignSnapshot(row);
-    await notifyOnce(row,'complete',birthdayReportText({...snapshot,status:'done'}));
-  }catch(error){console.warn('Could not send golden campaign summary',row.month);await logError('golden.broadcast.report',error,{userId:row.actorId});}
+    return await notifyOnce(row,'complete','✅ انتهت عملية الإرسال.\n'+birthdayReportText({...snapshot,status:'done'}));
+  }catch(error){console.warn('Could not send golden campaign summary',row.month);await logError('golden.broadcast.report',error,{userId:row.actorId});return false;}
 }
 async function notifyCriticalFailure(row,error) {
   try {
@@ -131,7 +173,7 @@ async function notifyCriticalFailure(row,error) {
 export async function runBirthdayBatch(jobId, revision) {
   const row=await db.select().from(goldenBroadcasts).where(eq(goldenBroadcasts.jobId,jobId)).get();
   if(!row) return;
-  if(row.status==='done') { await notifyCompleted(row); await complete(row); return; }
+  if(row.status==='done') { if(await notifyCompleted(row)) await complete(row); return; }
   if(revision!==row.revision) { if(revision<row.revision) await register({...row,runAt:Math.max(now(),row.runAt)}); return; }
   if(row.runAt>now()) return;
   const campaign=await db.select().from(goldenCampaigns).where(eq(goldenCampaigns.month,row.month)).get();
@@ -164,7 +206,7 @@ export async function runBirthdayBatch(jobId, revision) {
       }
       if(existing) await db.update(goldenAnnouncements).set({status:'sending',updatedAt:now()}).where(eq(goldenAnnouncements.key,key)).run();
       let status='sent';
-      try { await api.sendRichMessage({chat_id:user.userId,rich_message:birthdayAnnouncement(user.languageCode)}); }
+      try { await deliverAnnouncement(user); }
       catch(error) {
         const failure=normalizePublishError(error);
         if(failure.code==='PUBLISH_RATE_LIMITED') { status='retry';delay=Math.max(5,Number(failure.retry_after)||60); }
@@ -183,11 +225,11 @@ export async function runBirthdayBatch(jobId, revision) {
     }
     finished=finished || (users.length<BATCH_SIZE && (users.length===0 || cursor===users.at(-1).userId));
     const next={...row,cursor,revision:finished?revision:revision+1,runAt:now()+delay,leaseUntil:0,status:finished?'done':'pending'};
-    await db.update(goldenBroadcasts).set({cursor:next.cursor,revision:next.revision,runAt:next.runAt,leaseUntil:0,status:next.status})
-      .where(and(eq(goldenBroadcasts.month,row.month),eq(goldenBroadcasts.revision,revision),eq(goldenBroadcasts.leaseUntil,lease))).run();
+    const saved=await db.update(goldenBroadcasts).set({cursor:next.cursor,revision:next.revision,runAt:next.runAt,leaseUntil:0,status:next.status})
+      .where(and(eq(goldenBroadcasts.month,row.month),eq(goldenBroadcasts.revision,revision),eq(goldenBroadcasts.leaseUntil,lease))).returning().run();
+    if(!saved?.length)return;
     if(finished) {
-      try {await complete(row);}
-      finally {await notifyCompleted(row);}
+      if(await notifyCompleted(next)) await complete(next);
     } else await register(next);
   } catch (error) {
     await notifyCriticalFailure(row,error);

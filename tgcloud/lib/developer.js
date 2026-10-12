@@ -1,6 +1,6 @@
 import { issueGoldenGift } from 'lib/golden-gifts';
 import { sendBirthdayAnnouncementTest, birthdayCampaignStatus, birthdayReportText } from 'lib/golden-announcements';
-import { audienceAndSubscriptionStats } from 'lib/admin-stats';
+import { audienceAndSubscriptionStats, activeSubscribersPage } from 'lib/admin-stats';
 import { api, BotApiError, db, InputFile } from 'sdk';
 import { and, eq, gte, lt, sql } from 'sdk/db';
 import { developerStates, editorSessions, legacyStates, maintenanceLocks, richPages, usageUsers } from 'schema';
@@ -678,12 +678,9 @@ async function showStats(query, chatId) {
       ['أكثر اللغات', languageText],
       ['إجمالي التفاعلات', summary.events.toLocaleString()],
     ]),
-    statTable('🎟 الاشتراكات الفعالة حسب الباقة', [
-      ['مجاني', audience ? audience.tiers.free.toLocaleString() : 'غير متاح'],
-      ['بلص', audience ? audience.tiers.plus.toLocaleString() : 'غير متاح'],
-      ['غولدن (مدفوع)', audience ? audience.tiers.golden.toLocaleString() : 'غير متاح'],
-      ['غولدن (هدية)', audience ? audience.tiers.gift.toLocaleString() : 'غير متاح'],
-      ['المطور', audience ? audience.tiers.developer.toLocaleString() : 'غير متاح'],
+    statTable('🎟 المشتركون حسب الباقة', [
+      ['Plus', audience ? audience.tiers.plus.toLocaleString() : 'غير متاح'],
+      ['Golden Ticket', audience ? audience.goldenTotal.toLocaleString() : 'غير متاح'],
     ]),
     {type:'paragraph',text:'المتاحون تقديرياً = المستخدمون المعروفون ما عدا من تأكد تعذر الوصول لهم بآخر محاولة. غير المختبرين ضمن التقدير، والقبول لا يثبت قراءة الرسالة. اشتراكات الباقات محسوبة من الحالة الفعالة الموثقة.'},
     statTable('⚙️ التشغيل والأداء', [
@@ -710,10 +707,40 @@ async function showStats(query, chatId) {
   ];
 
   await sendPanel(chatId, blocks, [
+    { text: '🎟 المشتركون وباقاتهم', callback_data: 'dev:stats:subscribers:0', style: 'primary' },
     { text: '👥 إحصائيات المستخدمين', callback_data: 'dev:stats:users:0', style: 'primary' },
     { text: '📨 حالة الإهداء', callback_data: 'dev:golden:status', style: 'primary' },
     { text: '🔄 تحديث', callback_data: 'dev:stats', style: 'primary' },
   ], query.message?.message_id || null);
+}
+
+async function showSubscribers(query, chatId, requestedPage) {
+  await api.answerCallbackQuery({callback_query_id:query.id});
+  let result;
+  try { result=await activeSubscribersPage(requestedPage); }
+  catch(error) {
+    console.warn('Subscriber list unavailable',error);
+    await sendPanel(chatId,'تعذر تحميل المشتركين. حاول مجدداً.',[
+      {text:'🔄 إعادة المحاولة',callback_data:'dev:stats:subscribers:0',style:'primary'},
+    ],query.message?.message_id||null);
+    return;
+  }
+  const blocks=[
+    {type:'heading',text:'🎟 المشتركون وباقاتهم',size:3},
+    statTable('الباقات الفعالة', [['Plus',result.plus],['Golden Ticket',result.golden]]),
+    {type:'paragraph',text:'عدد المشتركين: '+result.total+' · الصفحة: '+(result.page+1)+'/'+(result.maxPage+1)},
+  ];
+  if(result.users.length)blocks.push({type:'table',is_bordered:true,is_compact:false,cells:[
+    [tableTextCell('معرّف المستخدم',{header:true}),tableTextCell('الباقة',{header:true}),tableTextCell('نهاية الاستحقاق الحالي',{header:true})],
+    ...result.users.map(user=>[tableTextCell(user.user_id),tableTextCell(user.plan==='plus'?'Plus':'Golden Ticket'),tableTextCell(formatTime(user.expires_at))]),
+  ]});
+  else blocks.push({type:'paragraph',text:'لا يوجد مشتركون بباقات فعالة حالياً.'});
+  const buttons=[];
+  if(result.page>0)buttons.push({text:'⬅️ السابق',callback_data:'dev:stats:subscribers:'+(result.page-1),style:'primary'});
+  buttons.push({text:'📊 الملخص',callback_data:'dev:stats',style:'primary'});
+  buttons.push({text:'🔄 تحديث',callback_data:'dev:stats:subscribers:'+result.page,style:'primary'});
+  if(result.page<result.maxPage)buttons.push({text:'التالي ➡️',callback_data:'dev:stats:subscribers:'+(result.page+1),style:'primary'});
+  await sendPanel(chatId,blocks,buttons,query.message?.message_id||null);
 }
 
 async function showUsers(query, chatId, requestedPage) {
@@ -1105,6 +1132,10 @@ export async function handleDeveloperCallback(query) {
   }
   if (data === 'dev:stats') {
     await showStats(query, chatId);
+    return true;
+  }
+  if (data.startsWith('dev:stats:subscribers:')) {
+    await showSubscribers(query,chatId,Number.parseInt(data.split(':').at(-1),10)||0);
     return true;
   }
   if (data.startsWith('dev:stats:users:')) {

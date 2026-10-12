@@ -16,8 +16,8 @@ export function normalizeAudienceStats(tierRows, reachabilityRow, knownUsers) {
   const confirmedReachable = Math.min(known-unreachable, Math.max(0, Number(reachabilityRow?.confirmed)||0));
   return {
     known, estimatedAvailable:known-unreachable,
-    unavailable, confirmedReachable, unverified:Math.max(0,known-unreachable-confirmedReachable),
-    tiers,
+    unavailable:unreachable, confirmedReachable, unverified:Math.max(0,known-unreachable-confirmedReachable),
+    tiers, activePlans:tiers.plus+tiers.golden+tiers.gift, goldenTotal:tiers.golden+tiers.gift,
   };
 }
 
@@ -35,7 +35,8 @@ export async function audienceAndSubscriptionStats(stamp=Math.floor(Date.now()/1
       WHEN s.user_id IS NOT NULL THEN s.plan
       ELSE 'free'
     END AS tier, COUNT(*) AS total
-    FROM usage_users u
+    FROM (SELECT user_id FROM usage_users UNION SELECT user_id FROM editor_subscriptions
+      UNION SELECT user_id FROM golden_claims) u
     LEFT JOIN editor_subscriptions s ON
       s.user_id=u.user_id AND s.status='active'
       AND s.source='richdonate:verified' AND s.plan IN ('plus','golden')
@@ -59,4 +60,35 @@ export async function audienceAndSubscriptionStats(stamp=Math.floor(Date.now()/1
     LEFT JOIN latest a ON a.user_id=u.user_id AND a.rank=1
   `));
   return normalizeAudienceStats(tierRows,reach,reach?.known);
+}
+
+// Union preserves subscribers even if their usage profile has not been populated.
+export function activeSubscribersSql(stamp=Math.floor(Date.now()/1000)) {
+  const time=Math.max(0,Math.floor(Number(stamp)||0));
+  const developers=DEVELOPER_IDS.filter(id=>Number.isSafeInteger(id)&&id>0).join(',')||'-1';
+  return `WITH gifts AS (
+    SELECT user_id,MAX(expires_at) AS expires_at FROM golden_claims
+    WHERE expires_at>${time} GROUP BY user_id
+  ), paid AS (
+    SELECT user_id,plan,expires_at FROM editor_subscriptions
+    WHERE status='active' AND source='richdonate:verified'
+      AND plan IN ('plus','golden') AND expires_at>${time}
+  ), owners AS (
+    SELECT user_id FROM gifts UNION SELECT user_id FROM paid
+  ) SELECT o.user_id,
+    CASE WHEN g.user_id IS NOT NULL THEN 'golden' ELSE p.plan END AS plan,
+    CASE WHEN g.user_id IS NOT NULL THEN g.expires_at ELSE p.expires_at END AS expires_at
+  FROM owners o LEFT JOIN gifts g ON g.user_id=o.user_id
+  LEFT JOIN paid p ON p.user_id=o.user_id
+  WHERE o.user_id>0 AND o.user_id NOT IN (${developers})`;
+}
+export async function activeSubscribersPage(requestedPage=0,stamp=Math.floor(Date.now()/1000)) {
+  const source=activeSubscribersSql(stamp);
+  const counts=await db.all(sql.raw(`SELECT plan,COUNT(*) AS total FROM (${source}) GROUP BY plan`));
+  const plus=Number(counts.find(r=>r.plan==='plus')?.total)||0;
+  const golden=Number(counts.find(r=>r.plan==='golden')?.total)||0;
+  const total=plus+golden,maxPage=Math.max(0,Math.ceil(total/10)-1);
+  const page=Math.min(maxPage,Math.max(0,Math.floor(Number(requestedPage)||0)));
+  const users=await db.all(sql.raw(`${source} ORDER BY o.user_id LIMIT 10 OFFSET ${page*10}`));
+  return {users,total,plus,golden,page,maxPage};
 }

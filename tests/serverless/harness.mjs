@@ -65,6 +65,7 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
     if (method === 'getChatMember' && apiState.members?.[String(args?.user_id)]) {
       return clone(apiState.members[String(args.user_id)]);
     }
+    if (method === 'sendMessage' && apiState.messageSendErrors?.[String(args.chat_id)]) throw apiState.messageSendErrors[String(args.chat_id)];
     if (method === 'getMe' && apiState.me) return clone(apiState.me);
     if (method === 'sendRichMessage' && apiState.richSendErrors?.[String(args.chat_id)]) throw apiState.richSendErrors[String(args.chat_id)];
     if (method === 'sendRichMessage' && apiState.richSendError) throw new Error(apiState.richSendError);

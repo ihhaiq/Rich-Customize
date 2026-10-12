@@ -64,24 +64,32 @@ export function scheduleDueCommand(jobId, revision, attempt) {
 }
 
 export async function dispatchDueReminders(db, deliver, now = Math.floor(Date.now() / 1000), limit = 10) {
-  // Expired final attempts need a visible terminal status for diagnosis.
+  // Golden broadcasts must survive a stopped Serverless execution. Recover old
+  // exhausted jobs too; the authoritative bot closes expired campaigns itself.
+  await db.prepare(
+    "UPDATE schedule_reminders SET status='pending',next_attempt_at=?,updated_at=? "+
+    "WHERE substr(job_id,1,4)='gfb_' AND status='exhausted'"
+  ).bind(now, now).run();
+  // Other job kinds retain their existing retry policy.
   await db.prepare(
     "UPDATE schedule_reminders SET status='exhausted',updated_at=? "+
-    "WHERE status='awaiting_ack' AND attempts>=8 AND next_attempt_at<=?"
+    "WHERE status IN ('awaiting_ack','dispatching') AND attempts>=8 AND next_attempt_at<=? AND substr(job_id,1,4)!='gfb_'"
   ).bind(now, now).run();
   const rows = await db.prepare(
     "SELECT job_id,revision,run_at,attempts FROM schedule_reminders "+
     "WHERE status IN ('pending','dispatching','awaiting_ack') AND run_at<=? AND next_attempt_at<=? "+
-    "AND attempts<8 ORDER BY run_at LIMIT ?"
+    "AND (attempts<8 OR substr(job_id,1,4)='gfb_') ORDER BY next_attempt_at,run_at LIMIT ?"
   ).bind(now, now, Math.max(1, Math.min(100, Number(limit) || 50))).all();
   let claimed = 0, delivered = 0;
   for (const row of rows.results || []) {
     const attempt = Number(row.attempts) + 1;
+    const persistent = row.job_id.startsWith('gfb_');
+    const retryDelay = persistent ? Math.min(900,120 * 2 ** Math.min(attempt-1,3)) : 120;
     const claim = await db.prepare(
       "UPDATE schedule_reminders SET status='dispatching',attempts=?,next_attempt_at=?,updated_at=? "+
       "WHERE job_id=? AND revision=? AND attempts=? AND status IN ('pending','dispatching','awaiting_ack') "+
       "AND run_at<=? AND next_attempt_at<=?"
-    ).bind(attempt, now + 120, now, row.job_id, row.revision, row.attempts, now, now).run();
+    ).bind(attempt, now + retryDelay, now, row.job_id, row.revision, row.attempts, now, now).run();
     if (!claim.meta?.changes) continue;
     claimed++;
     try {
@@ -96,7 +104,7 @@ export async function dispatchDueReminders(db, deliver, now = Math.floor(Date.no
       await db.prepare(
         "UPDATE schedule_reminders SET status=?,next_attempt_at=?,updated_at=? "+
         "WHERE job_id=? AND revision=? AND status='dispatching' AND attempts=?"
-      ).bind(attempt >= 8 ? 'exhausted' : 'pending', attempt >= 8 ? 0 : now + cooldown,
+      ).bind(!persistent && attempt >= 8 ? 'exhausted' : 'pending', !persistent && attempt >= 8 ? 0 : now + cooldown,
         now, row.job_id, row.revision, attempt).run();
       console.warn('Schedule reminder relay failure', row.job_id, String(error?.message || error).slice(0, 120));
     }

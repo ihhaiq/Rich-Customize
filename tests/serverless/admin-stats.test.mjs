@@ -10,6 +10,8 @@ test('developer audience stats distinguish estimated reachability from verified 
     {tier:'gift',total:4},{tier:'developer',total:1},
   ],{known:19,unreachable:2,confirmed:7},19);
   assert.equal(result.known,19);
+  assert.equal(result.activePlans,9);
+  assert.equal(result.goldenTotal,6);
   assert.equal(result.estimatedAvailable,17);
   assert.equal(result.unavailable,2);
   assert.equal(result.confirmedReachable,7);
@@ -36,7 +38,7 @@ test('verified paid cohorts are checked against Serverless billing source and ac
  assert.match(source,/a\.updated_at>=u\.last_seen/);
  assert.match(source,/a\.status='unavailable'/);
  assert.match(panel,/المتاحون تقديرياً/);
- assert.match(panel,/غولدن \(هدية\)/);
- assert.match(panel,/غولدن \(مدفوع\)/);
+ assert.match(panel,/Golden Ticket/);
+ assert.match(panel,/dev:stats:subscribers:0/);
  assert.match(panel,/dev:golden:status/);
 });
