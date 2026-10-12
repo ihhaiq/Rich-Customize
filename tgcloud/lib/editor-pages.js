@@ -173,7 +173,7 @@ async function allocatePageId() {
 }
 
 async function persistPage(userId, title, session, existingId = null) {
-  // Legacy allowance must use actual persisted blocks for this page owner.
+  // Saved pages can be edited only when their stored content fits the current verified plan.
   async function assertQuota(previousBlocks = null) {
     const entitlement = await getEditorEntitlement(userId);
     const limit = validateEditorLimits(session.blocks || [], userId, { previousBlocks, entitlement });
@@ -525,8 +525,8 @@ export async function handleEditorPageCallback(query) {
       await api.answerCallbackQuery({
         callback_query_id:query.id,
         text:resolveLanguage(code)==='ar'
-          ? 'هذه الصفحة القديمة للنشر فقط؛ ما تگدر تحفظ تعديلات عليها.'
-          : 'This legacy saved page is publish-only. Edits are not allowed.',
+          ? 'هذه الصفحة تتجاوز حدود باقتك الحالية؛ تگدر تنشرها كما هي، وللتعديل تحتاج باقة تناسب محتواها.'
+          : 'This saved page exceeds your active plan. Upgrade to edit; publishing unchanged remains allowed.',
         show_alert:true,
       });
       return true;
@@ -560,8 +560,8 @@ export async function handleEditorPageCallback(query) {
     if (isLegacySavedPage(page, query.from.id, await getEditorEntitlement(query.from.id))) {
       await api.answerCallbackQuery({ callback_query_id:query.id,
         text:resolveLanguage(code)==='ar'
-          ? 'هذه صفحة قديمة تتجاوز حدود باقتك؛ يمكن نشرها كما هي لكن لا يمكن تعديلها.'
-          : 'This legacy page is publish-only. Editing is unavailable.',
+          ? 'هذه الصفحة تتجاوز حدود باقتك الحالية؛ تگدر تنشرها كما هي، وللتعديل تحتاج باقة أعلى.'
+          : 'This page is over your plan quota. Publishing unchanged is allowed; upgrade to edit.',
         show_alert:true });
       return true;
     }
@@ -776,8 +776,8 @@ async function receiveSaveName(message, session, code) {
       }
       if (error?.code === 'LEGACY_PAGE_READ_ONLY') {
         await api.sendMessage({chat_id:message.chat.id,text:resolveLanguage(code)==='ar'
-          ? 'الصفحة القديمة متاحة للنشر كما هي، لكن تعديلها أو حفظ نسخة معدّلة منها غير مسموح.'
-          : 'This legacy page can be republished unchanged, but cannot be edited.'});
+          ? 'الصفحة تتجاوز حدود باقتك الحالية؛ متاحة للنشر كما هي، لكن تعديلها يتطلب باقة تسمح بحجمها.'
+          : 'This page exceeds your active plan. You may republish unchanged; editing requires an eligible plan.'});
         return true;
       }
 
@@ -846,8 +846,8 @@ async function receiveRename(message, session, code) {
   if (isLegacySavedPage(page, userId, await getEditorEntitlement(userId))) {
     await updateEditorSession(userId, { state:'managing', renamePageId:null });
     await api.sendMessage({chat_id:message.chat.id,text:resolveLanguage(code)==='ar'
-      ? 'هذه الصفحة القديمة للنشر فقط؛ لا يمكن تغيير اسمها أو محتواها.'
-      : 'This legacy page is publish-only and cannot be renamed.'});
+      ? 'هذه الصفحة تتجاوز حدود باقتك الحالية؛ تگدر تنشرها كما هي، لكن تغيير اسمها أو محتواها يتطلب باقة أعلى.'
+      : 'This page exceeds your plan quota. A qualifying plan is required to rename or edit it.'});
     return true;
   }
   const ownerLock = await acquireOwnerPageLock(userId);
