@@ -16,7 +16,7 @@ import {
 import { recordOperation } from 'lib/usage-stats';
 import { resolveLanguage, resolveUserLanguage, t as i18nT, tr } from 'lib/i18n';
 import { logError } from 'lib/error-log';
-import { EXPECTED_PUBLISH_FAILURES, publishFailure, normalizePublishError,
+import { EXPECTED_PUBLISH_FAILURES, publishFailure, publishErrorDetail, normalizePublishError,
   shouldForgetDestination, publishFailureMessage } from 'lib/publish-errors';
 import { shouldIncludeBranding } from 'lib/branding';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
