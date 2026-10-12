@@ -238,13 +238,13 @@ test('table field selection inserts into the chosen cell without losing merge or
   assert.equal(saved.data.is_compact, true);
 });
 
-test('page limit rejects insertion before changing draft or history; stale target cannot overwrite edits', async () => {
+test('text quota rejects insertion before changing draft or history; stale target cannot overwrite edits', async () => {
   const h = await setup();
-  await h.session.updateEditorSession(1, { blocks: [h.blocks.makeBlock('paragraph', { text: 'x'.repeat(25000) })] });
+  await h.session.updateEditorSession(1, { blocks: [h.blocks.makeBlock('paragraph', { text: 'x'.repeat(20000) })] });
   await h.open(); await h.press('select', 0); await h.press('finish'); await h.press('block', 0);
   assert.equal(h.get().addPayload.premiumEmoji.stage, 'blocks');
   assert.equal(h.get().undoStack.length, 0);
-  assert.equal(h.get().blocks[0].data.text.length, 25000);
+  assert.equal(h.get().blocks[0].data.text.length, 20000);
   assert.ok(h.calls.at(-1).args.show_alert);
   await h.session.updateEditorSession(1, { blocks: [h.blocks.makeBlock('paragraph', { text: 'short' })] });
   await h.press('block', 0);
