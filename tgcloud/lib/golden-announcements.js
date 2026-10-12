@@ -2,13 +2,16 @@ import { api, db } from 'sdk';
 import { normalizePublishError, isDefinitePublishRejection } from 'lib/publish-errors';
 import { and, asc, eq, gt, lt, lte } from 'sdk/db';
 import { goldenCampaigns, goldenBroadcasts, goldenAnnouncements, usageUsers } from 'schema';
+import { isDeveloper } from 'lib/developer-access';
 
 const now = () => Math.floor(Date.now()/1000);
 const BATCH_SIZE = 20;
 const CAKE = {type:'custom_emoji',custom_emoji_id:'5427201480740321598',alternative_text:'🎂'};
-export function birthdayAnnouncement(languageCode) {
+export function birthdayAnnouncement(languageCode, { preview=false }={}) {
   const arabic=/^ar(?:[-_]|$)/i.test(String(languageCode||''));
-  const activate={type:'button',button:{text:arabic?'فعلها':'Active',callback_data:'gift:activate'}};
+  // The test looks identical, but its button can never activate a real coupon.
+  const activate={type:'button',button:{text:arabic?'فعلها':'Active',
+    callback_data:preview?'dev:golden:preview:activate':'gift:activate'}};
   return arabic ? {is_rtl:true,blocks:[{type:'paragraph',text:[
     'عيد ميلادي اليوم ',CAKE,'! وصلت الك باقة golden ticket ',activate,'.',
   ]}]} : {blocks:[
@@ -16,6 +19,17 @@ export function birthdayAnnouncement(languageCode) {
     {type:'footer',text:["Here's a gold ticket as a gift from me. ",activate,' it and wish me a happy new year.']},
   ]};
 }
+// Developer-only, single-recipient preview. Never creates a campaign, claim,
+// broadcast, scheduler job or recipient list; callback is deliberately inert.
+export async function sendBirthdayAnnouncementTest(userId, languageCode) {
+  const recipient=Number(userId);
+  if (!isDeveloper(recipient)) throw new Error('Developer access required');
+  return api.sendRichMessage({
+    chat_id:recipient,
+    rich_message:birthdayAnnouncement(languageCode,{preview:true}),
+  });
+}
+
 async function register(row) {
   await api.sendMessage({chat_id:-1003993506865,disable_notification:true,
     text:'/rcb_schedule_register@Richminiappsbot\n'+JSON.stringify({protocol:'RCB1',
