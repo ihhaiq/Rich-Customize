@@ -124,17 +124,63 @@ test('unverified plan claims remain Free', async () => {
   assert.equal(h.blocks.validateEditorLimits([table(h,13)],999999,{entitlement:verified}).limit,12);
 });
 
-test('legacy policy version freezes all pre-rollout pages, not just oversized content', async () => {
+test('a page saved before rollout remains editable if it fits current Free limits', async () => {
   const h=await harness({extraModules:{legacy:'lib/saved-page-policy'}});
   const page={
     pageId:'old-small', ownerId:999999,title:'Old', quotaVersion:1,
-    blocks:[text(h)],buttons:[],buttonsPerRow:1,buttonsAlign:'center',
+    blocks:[text(h,50)],buttons:[],buttonsPerRow:1,buttonsAlign:'center',
+    revision:1,updatedAt:1234,
   };
+  h.records.richPages.push(page);
   assert.equal(h.legacy.CURRENT_PAGE_QUOTA_VERSION,2);
-  assert.equal(h.legacy.isLegacySavedPage(page,999999),true);
-  assert.equal(h.legacy.legacyPagePublishOptions(page,999999).technicalOnly,true);
-  assert.equal(h.legacy.isLegacySavedPage({...page,quotaVersion:2},999999),false);
-  assert.equal(h.legacy.isLegacySavedPage({...page,quotaVersion:2,blocks:[table(h,9)]},999999),true);
+  assert.equal(h.legacy.isLegacySavedPage(page,999999),false);
+  assert.equal(h.legacy.legacyPagePublishOptions(page,999999).technicalOnly,false);
+  assert.doesNotThrow(()=>h.legacy.assertWritableSavedPage(page,999999));
+  await h.session.createEditorSession(999999,999999,100);
+  await h.session.updateEditorSession(999999,{
+    currentPageId:page.pageId,currentPageTitle:'Old',blocks:page.blocks,
+    messageButtons:[],buttonsPerRow:1,buttonsAlign:'center',
+  });
+  await h.session.updateEditorSession(999999,{blocks:[text(h,60)]});
+  assert.equal(h.records.richPages[0].blocks[0].data.text.length,60);
+});
+
+test('over-quota legacy page unlocks only with current verified plan and relocks after expiry',async()=>{
+  const h=await harness({
+    extraModules:{legacy:'lib/saved-page-policy',subs:'lib/editor-subscriptions',policy:'lib/subscription-policy'},
+  });
+  const owner=999999, saved=table(h,12,2);
+  const page={pageId:'older-plus',ownerId:owner,title:'Older',quotaVersion:1,
+    blocks:[saved],buttons:[],buttonsPerRow:1,buttonsAlign:'center',
+    revision:1,updatedAt:1234};
+  h.records.richPages.push(page);
+  assert.equal(h.legacy.isLegacySavedPage(page,owner),true);
+  assert.throws(()=>h.legacy.assertWritableSavedPage(page,owner),/LEGACY_PAGE_READ_ONLY/);
+  assert.equal(h.legacy.legacyPagePublishOptions(page,owner).technicalOnly,true);
+  // Browser-reported or inactive subscription is not a Serverless entitlement.
+  assert.equal(h.policy.resolveEditorEntitlement({plan:'plus'}).plan,'free');
+  assert.equal(h.legacy.isLegacySavedPage(page,owner,h.policy.resolveEditorEntitlement({plan:'plus'})),true);
+  const now=Math.floor(Date.now()/1000);
+  h.records.editorSubscriptions.push({userId:owner,plan:'plus',status:'active',
+    source:'richdonate:verified',startedAt:now-60,expiresAt:now+3600,updatedAt:now});
+  const paid=await h.subs.getEditorEntitlement(owner);
+  assert.equal(paid.plan,'plus');
+  assert.equal(h.legacy.isLegacySavedPage(page,owner,paid),false);
+  assert.equal(h.legacy.legacyPagePublishOptions(page,owner,paid).technicalOnly,false);
+  await h.session.createEditorSession(owner,owner,100);
+  await h.session.updateEditorSession(owner,{
+    currentPageId:page.pageId,currentPageTitle:'Older',blocks:page.blocks,
+    messageButtons:[],buttonsPerRow:1,buttonsAlign:'center',
+  });
+  await h.session.updateEditorSession(owner,{blocks:[table(h,12,3)]});
+  assert.equal(h.records.richPages[0].blocks[0].data.rows.length,3);
+  h.records.editorSubscriptions[0].expiresAt=now-1;
+  assert.equal((await h.subs.getEditorEntitlement(owner)).plan,'free');
+  await assert.rejects(
+    h.session.updateEditorSession(owner,{blocks:[table(h,8,3)]}),
+    /LEGACY_PAGE_READ_ONLY/,
+  );
+  assert.equal(h.records.richPages[0].blocks[0].data.rows.length,3);
 });
 
 test('new policy version has a persistent schema default for older pages', async () => {
