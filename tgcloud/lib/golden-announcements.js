@@ -198,7 +198,20 @@ async function notifyOnce(row,type,body) {
     if(!locked?.length)return false;
   }
   let status='sent',retryAt=0;
-  try {await api.sendMessage({chat_id:row.actorId,text:body});}
+  try {
+    // Prefer the donation bot for operator notices. The editor remains a
+    // temporary fallback until private Bot-to-Bot messaging is deployed.
+    const noticeKey=[row.month,row.round||1,type].join(':');
+    const noticeId='rdn_'+Array.from(new TextEncoder().encode(noticeKey))
+      .map(n=>n.toString(16).padStart(2,'0')).join('').slice(0,32).padEnd(32,'0');
+    try {
+      await api.sendMessage({chat_id:'@richDonateBot',disable_notification:true,
+        text:'/rdm_notice_v1 '+JSON.stringify({notice_id:noticeId,user_id:row.actorId,text:body})});
+    }catch(bridgeError) {
+      console.warn('Donation console notice unavailable; using editor fallback',bridgeError);
+      await api.sendMessage({chat_id:row.actorId,text:body});
+    }
+  }
   catch(error){
     const failure=normalizePublishError(error);
     const permanent=['PUBLISH_BOT_BLOCKED','PUBLISH_PRIVATE_UNAVAILABLE'].includes(failure.code);
