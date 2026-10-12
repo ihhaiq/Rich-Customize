@@ -1,7 +1,8 @@
 import { api, db } from 'sdk';
 import { normalizePublishError, isDefinitePublishRejection } from 'lib/publish-errors';
-import { and, asc, eq, gt, lt, lte } from 'sdk/db';
-import { goldenCampaigns, goldenBroadcasts, goldenAnnouncements, usageUsers } from 'schema';
+import { and, asc, desc, eq, gt, lt, lte } from 'sdk/db';
+import { goldenCampaigns, goldenBroadcasts, goldenAnnouncements, legacyStates, usageUsers } from 'schema';
+import { logError } from 'lib/error-log';
 import { isDeveloper } from 'lib/developer-access';
 
 const now = () => Math.floor(Date.now()/1000);
@@ -56,10 +57,74 @@ export async function ensureBirthdayBroadcast(campaign, actorId) {
     await register(refreshed);
   }
 }
+const DELIVERY_STATES=['sent','failed','unavailable','uncertain','retry','sending'];
+async function deliveryCounts(month) {
+  const counts={sent:0,failed:0,unavailable:0,uncertain:0,retry:0,sending:0};
+  for(const status of DELIVERY_STATES) {
+    counts[status]=await db.$count(goldenAnnouncements,and(
+      eq(goldenAnnouncements.month,month),eq(goldenAnnouncements.status,status)));
+  }
+  return counts;
+}
+async function campaignSnapshot(row) {
+  if(!row)return null;
+  const campaign=await db.select().from(goldenCampaigns).where(eq(goldenCampaigns.month,row.month)).get();
+  const eligible=campaign?await db.$count(usageUsers,lte(usageUsers.firstSeen,campaign.issuedAt)):0;
+  return {month:row.month,status:row.status,revision:row.revision,
+    updatedAt:row.runAt,claimUntil:Number(campaign?.claimUntil)||0,
+    eligible,counts:await deliveryCounts(row.month)};
+}
+export async function birthdayCampaignStatus() {
+  const rows=await db.select().from(goldenBroadcasts).orderBy(desc(goldenBroadcasts.month)).limit(1).all();
+  return campaignSnapshot(rows[0]||null);
+}
+export function birthdayReportText(snapshot, {error=false}={}) {
+  if(!snapshot)return '🎁 ماكو حملة إهداء مسجلة بعد.';
+  const c=snapshot.counts;
+  const handled=c.sent+c.failed+c.unavailable+c.uncertain;
+  const pending=Math.max(0,snapshot.eligible-handled);
+  const phase=snapshot.status==='done'
+    ? (snapshot.claimUntil<=now()?'انتهت المهلة':'انتهى المرور على المستلمين')
+    : (snapshot.status==='pending'?'قيد الانتظار / الإرسال':'حالة '+snapshot.status);
+  return (error?'⚠️ تنبيه تعثر الإهداء':'🎁 تقرير إهداء القسيمة')+'\n'
+    +'الحملة: '+snapshot.month+'\n'
+    +'الحالة: '+phase+'\n'
+    +'المؤهلون: '+snapshot.eligible+'\n'
+    +'قبله تليكرام: '+c.sent+'\n'
+    +'تعذر إيصالها: '+(c.failed+c.unavailable)+'\n'
+    +'غير مؤكد: '+(c.uncertain+c.sending)+'\n'
+    +'بانتظار الإرسال أو إعادة المحاولة: '+(pending+c.retry)+'\n'
+    +'القبول من تليكرام مو دليل قراءة الرسالة.';
+}
+async function notifyOnce(row,type,body) {
+  const namespace='golden_notice:'+row.month+':'+type;
+  const claimed=await db.insert(legacyStates).values({
+    namespace,payload:{actor_id:row.actorId},updatedAt:now(),
+  }).onConflictDoNothing({target:legacyStates.namespace}).returning().run();
+  if(!claimed?.length)return false;
+  try {await api.sendMessage({chat_id:row.actorId,text:body});return true;}
+  catch(error){console.warn('Golden campaign notice not delivered',type,row.month);return false;}
+}
+async function notifyCompleted(row) {
+  try{
+    const snapshot=await campaignSnapshot(row);
+    await notifyOnce(row,'complete',birthdayReportText({...snapshot,status:'done'}));
+  }catch(error){console.warn('Could not send golden campaign summary',row.month);await logError('golden.broadcast.report',error,{userId:row.actorId});}
+}
+async function notifyCriticalFailure(row,error) {
+  try {
+    await notifyOnce(row,'failure',
+      '⚠️ تعثر إرسال حملة الإهداء '+row.month+' بسبب مشكلة تشغيلية.\n'
+      +'افتح /dev ← حالة الإهداء للتحقق.\n'
+      +'ماكو إعادة إرسال جماعية تلقائية من هذا التنبيه.');
+  }catch(noticeError){console.warn('Could not notify developer about broadcast issue',row.month);}
+  await logError('golden.broadcast.batch',error,{userId:row.actorId});
+}
+
 export async function runBirthdayBatch(jobId, revision) {
   const row=await db.select().from(goldenBroadcasts).where(eq(goldenBroadcasts.jobId,jobId)).get();
   if(!row) return;
-  if(row.status==='done') { await complete(row); return; }
+  if(row.status==='done') { await notifyCompleted(row); await complete(row); return; }
   if(revision!==row.revision) { if(revision<row.revision) await register({...row,runAt:Math.max(now(),row.runAt)}); return; }
   if(row.runAt>now()) return;
   const campaign=await db.select().from(goldenCampaigns).where(eq(goldenCampaigns.month,row.month)).get();
@@ -96,6 +161,7 @@ export async function runBirthdayBatch(jobId, revision) {
       catch(error) {
         const failure=normalizePublishError(error);
         if(failure.code==='PUBLISH_RATE_LIMITED') { status='retry';delay=Math.max(5,Number(failure.retry_after)||60); }
+        else if(['PUBLISH_BOT_BLOCKED','PUBLISH_PRIVATE_UNAVAILABLE'].includes(failure.code)) status='unavailable';
         else status=isDefinitePublishRejection(error)?'failed':'uncertain';
       }
       await db.update(goldenAnnouncements).set({status,updatedAt:now()}).where(eq(goldenAnnouncements.key,key)).run();
@@ -106,7 +172,13 @@ export async function runBirthdayBatch(jobId, revision) {
     const next={...row,cursor,revision:finished?revision:revision+1,runAt:now()+delay,leaseUntil:0,status:finished?'done':'pending'};
     await db.update(goldenBroadcasts).set({cursor:next.cursor,revision:next.revision,runAt:next.runAt,leaseUntil:0,status:next.status})
       .where(and(eq(goldenBroadcasts.month,row.month),eq(goldenBroadcasts.revision,revision),eq(goldenBroadcasts.leaseUntil,lease))).run();
-    if(finished) await complete(row); else await register(next);
+    if(finished) {
+      try {await complete(row);}
+      finally {await notifyCompleted(row);}
+    } else await register(next);
+  } catch (error) {
+    await notifyCriticalFailure(row,error);
+    throw error;
   } finally {
     await db.update(goldenBroadcasts).set({leaseUntil:0}).where(and(
       eq(goldenBroadcasts.month,row.month),eq(goldenBroadcasts.revision,revision),eq(goldenBroadcasts.leaseUntil,lease))).run();
