@@ -1,12 +1,12 @@
 // Telegram publishing error normalization shared by manual, Mini App and scheduled delivery.
 // Keep SDK-free so classification can be tested without Telegram.
-function detail(error) {
+export function publishErrorDetail(error) {
   return String(error?.description || error?.response?.description || error?.message || error || '').trim();
 }
 function status(error) {
   const code = Number(error?.error_code ?? error?.response?.error_code ?? error?.status ?? error?.statusCode);
   if (Number.isSafeInteger(code) && code >= 400 && code <= 599) return code;
-  const match = detail(error).match(/BotApiError\s*\[(\d{3})\]/i);
+  const match = publishErrorDetail(error).match(/BotApiError\s*\[(\d{3})\]/i);
   return match ? Number(match[1]) : null;
 }
 export function publishFailure(code, message, cause, extra = {}) {
@@ -25,7 +25,7 @@ export const EXPECTED_PUBLISH_FAILURES = new Set([
 ]);
 export function normalizePublishError(error, { kind = 'private' } = {}) {
   if (String(error?.code || '').startsWith('PUBLISH_')) return error;
-  const d = detail(error), http = status(error);
+  const d = publishErrorDetail(error), http = status(error);
   const match = d.match(/retry after\s+(\d+)/i);
   const n = Number(error?.parameters?.retry_after ?? error?.response?.parameters?.retry_after
     ?? error?.retry_after ?? error?.retryAfter ?? match?.[1]);
