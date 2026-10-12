@@ -30,7 +30,9 @@ test('all local module aliases imported from lib exist',()=>{
   for(const p of scripts){
     const content=fs.readFileSync(p,'utf8');
     for(const match of content.matchAll(/from\s*['"]lib\/([^'"]+)['"]/g)){
-      const target=path.join(root,'lib',match[1]+'.js');
+      const alias=match[1];
+      // Source imports support both lib/name and lib/name.js.
+      const target=path.join(root,'lib',alias.endsWith('.js')?alias:alias+'.js');
       assert.ok(fs.existsSync(target),path.relative(root,p)+': missing '+match[1]);
     }
   }
