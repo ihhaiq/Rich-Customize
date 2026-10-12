@@ -12,9 +12,10 @@ export function birthdayAnnouncement(languageCode, { preview=false }={}) {
   // The test looks identical, but its button can never activate a real coupon.
   const activate={type:'button',button:{text:arabic?'فعلها':'Active',
     callback_data:preview?'dev:golden:preview:activate':'gift:activate'}};
-  return arabic ? {is_rtl:true,blocks:[{type:'paragraph',text:[
-    'عيد ميلادي اليوم ',CAKE,'! وصلت الك باقة golden ticket ',activate,'.',
-  ]}]} : {blocks:[
+  return arabic ? {is_rtl:true,blocks:[
+    {type:'heading',size:1,text:['عيد ميلادي اليوم ',CAKE,'!']},
+    {type:'footer',text:['وصلت الك باقة golden ticket ',activate,'.']},
+  ]} : {blocks:[
     {type:'heading',size:1,text:["It's my BIRTHDAY ",CAKE,',']},
     {type:'footer',text:["Here's a gold ticket as a gift from me. ",activate,' it and wish me a happy new year.']},
   ]};
