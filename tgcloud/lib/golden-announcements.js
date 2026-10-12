@@ -1,13 +1,61 @@
 import { api, db } from 'sdk';
 import { goldenGiftStatus } from 'lib/golden-gifts';
 import { normalizePublishError, isDefinitePublishRejection } from 'lib/publish-errors';
-import { and, asc, desc, eq, gt, lt, lte } from 'sdk/db';
+import { and, asc, desc, eq, gt, lt, lte, sql } from 'sdk/db';
 import { goldenCampaigns, goldenBroadcasts, goldenAnnouncements, legacyStates, usageUsers } from 'schema';
 import { logError } from 'lib/error-log';
 import { isDeveloper } from 'lib/developer-access';
 
 const now = () => Math.floor(Date.now()/1000);
 const BATCH_SIZE = 20;
+// Only enumerated failure categories are retained; never raw Telegram errors.
+export function giftDeliveryReason(error) {
+  const f=normalizePublishError(error);
+  const d=String(error?.description||error?.response?.description||error?.message||'').toLowerCase();
+  if(f.code==='PUBLISH_BOT_BLOCKED')return 'BOT_BLOCKED';
+  if(/user is deactivated|user deactivated/.test(d))return 'USER_DEACTIVATED';
+  if(/user not found/.test(d))return 'USER_NOT_FOUND';
+  if(f.code==='PUBLISH_PRIVATE_UNAVAILABLE')return 'PRIVATE_UNAVAILABLE';
+  if(f.code==='PUBLISH_RATE_LIMITED')return 'RATE_LIMITED';
+  if(f.code==='PUBLISH_BUTTON_INVALID')return 'BUTTON_INVALID';
+  if(f.code==='PUBLISH_CONTENT_INVALID')return 'CONTENT_INVALID';
+  if(f.code==='PUBLISH_CONTENT_TOO_LARGE')return 'CONTENT_TOO_LARGE';
+  if(f.code==='PUBLISH_FAILED')return 'UNCONFIRMED_OTHER';
+  return String(f.code||'UNKNOWN').slice(0,50);
+}
+async function recordDeliveryReason(key,code,status) {
+  const namespace='golden_delivery:'+key,payload={code,status};
+  try {
+    await db.insert(legacyStates).values({namespace,payload,updatedAt:now()})
+      .onConflictDoUpdate({target:legacyStates.namespace,set:{payload,updatedAt:now()}}).run();
+  }catch(error){console.warn('Could not store delivery reason',key,error);}
+}
+export async function birthdayFailureBreakdown() {
+  const current=await birthdayCampaignStatus();
+  if(!current)return {current:null,rows:[]};
+  const rows=await db.all(sql`SELECT a.status AS status,
+    COALESCE(json_extract(l.payload,'$.code'),'NOT_RECORDED') AS reason,
+    COUNT(*) AS total
+    FROM golden_announcements a LEFT JOIN legacy_states l
+      ON l.namespace=('golden_delivery:' || a.key)
+    WHERE a.month=${current.month} AND a.round=${current.round}
+      AND a.status IN ('failed','unavailable','uncertain','sending')
+    GROUP BY a.status,reason ORDER BY total DESC LIMIT 30`);
+  return {current,rows};
+}
+export function birthdayFailureText(data) {
+  if(!data?.current)return 'ماكو حملة إهداء مسجلة.';
+  const labels={BOT_BLOCKED:'حظر البوت',USER_DEACTIVATED:'حساب معطّل',
+    USER_NOT_FOUND:'مستخدم غير موجود',PRIVATE_UNAVAILABLE:'محادثة خاصة غير متاحة',
+    RATE_LIMITED:'تقييد إرسال',BUTTON_INVALID:'زر مرفوض',
+    CONTENT_INVALID:'تنسيق مرفوض',CONTENT_TOO_LARGE:'محتوى طويل',
+    UNCONFIRMED_OTHER:'نتيجة غير مؤكدة',NOT_RECORDED:'السبب لم يُسجّل سابقاً',
+    INTERRUPTED:'انقطاع أثناء الإرسال',ENTITLEMENT_LOOKUP:'خطأ فحص الاستحقاق'};
+  return '📋 أسباب تعذر الإهداء — '+data.current.month+' / الجولة '+data.current.round+'\n'
+    +(data.rows.length?data.rows.map(r=>'• '+(labels[r.reason]||r.reason)+' ('+r.status+'): '+r.total).join('\n'):'لا توجد إخفاقات بهذه الجولة.')
+    +'\nالأسباب التاريخية غير المسجلة لا يمكن استنتاجها من حالة الإرسال.';
+}
+
 const CAKE = {type:'custom_emoji',custom_emoji_id:'5427201480740321598',alternative_text:'🎂'};
 export function birthdayAnnouncement(languageCode, { preview=false, campaign=null }={}) {
   const arabic=/^ar(?:[-_]|$)/i.test(String(languageCode||''));
@@ -209,7 +257,7 @@ export async function runBirthdayBatch(jobId, revision) {
       if(existing && existing.status!=='retry') {
         // A process may die after Telegram accepted a send. Never blindly resend
         // an ambiguous result: retain an explicit uncertain record for review.
-        if(existing.status==='sending') await db.update(goldenAnnouncements).set({status:'uncertain',updatedAt:now()}).where(eq(goldenAnnouncements.key,key)).run();
+        if(existing.status==='sending') { await db.update(goldenAnnouncements).set({status:'uncertain',updatedAt:now()}).where(eq(goldenAnnouncements.key,key)).run(); await recordDeliveryReason(key,'INTERRUPTED','uncertain'); }
         cursor=user.userId;continue;
       }
       if(existing) await db.update(goldenAnnouncements).set({status:'sending',updatedAt:now()}).where(eq(goldenAnnouncements.key,key)).run();
@@ -218,9 +266,10 @@ export async function runBirthdayBatch(jobId, revision) {
       catch(error) {
         // No Telegram send has happened: keep this recipient retryable.
         await db.update(goldenAnnouncements).set({status:'retry',updatedAt:now()}).where(eq(goldenAnnouncements.key,key)).run();
+        await recordDeliveryReason(key,'ENTITLEMENT_LOOKUP','retry');
         throw error;
       }
-      let status='sent';
+      let status='sent', failureReason=null;
       try {
         if(!gift.available)status='skipped';
         else await deliverAnnouncement(user,gift.campaign);
@@ -230,8 +279,10 @@ export async function runBirthdayBatch(jobId, revision) {
         if(failure.code==='PUBLISH_RATE_LIMITED') { status='retry';delay=Math.max(5,Number(failure.retry_after)||60); }
         else if(['PUBLISH_BOT_BLOCKED','PUBLISH_PRIVATE_UNAVAILABLE'].includes(failure.code)) status='unavailable';
         else status=isDefinitePublishRejection(error)?'failed':'uncertain';
+        failureReason=giftDeliveryReason(error);
       }
       await db.update(goldenAnnouncements).set({status,updatedAt:now()}).where(eq(goldenAnnouncements.key,key)).run();
+      if(failureReason) await recordDeliveryReason(key,failureReason,status);
       if(status==='retry') {
         await notifyOnce(row,'rate_limit',
           '⚠️ تليكرام قيّد إرسال حملة القسيمة '+row.month+'.\n'
