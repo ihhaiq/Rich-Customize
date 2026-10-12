@@ -39,7 +39,7 @@ test('one announcement per eligible user, concurrent reminders do not duplicate,
  await h.birthday.runBirthdayBatch(job.jobId,1);
  assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,3);
  assert.equal(h.records.goldenAnnouncements.filter(r=>r.status==='sent').length,3);
- const reports=h.calls.filter(c=>c.method==='sendMessage'&&c.args.chat_id===developer
+ const reports=h.calls.filter(c=>c.method==='sendMessage'&&c.args.chat_id==='@richDonateBot'
   &&c.args.text?.includes('🎁 تقرير إهداء القسيمة'));
  assert.equal(reports.length,1,'developer must receive exactly one completion report');
  assert.match(reports[0].args.text,/قبله تليكرام: 3/);
@@ -118,22 +118,15 @@ test('developer preview sends one private rich gift announcement with inert acti
  assert.equal(h.calls.filter(c=>c.method==='sendMessage').length,0,'preview does not use a relay');
 });
 
-test('welcome never includes the gift button; developer panel offers distinct live and preview actions',async()=>{
- const fs=await import('node:fs');
- const welcome=fs.readFileSync(new URL('../../tgcloud/lib/welcome.js',import.meta.url),'utf8');
- const dev=fs.readFileSync(new URL('../../tgcloud/lib/developer.js',import.meta.url),'utf8');
- assert.doesNotMatch(welcome,/callback_data:\s*['"]gift:show['"]/);
- assert.match(welcome,/callback_data:\s*['"]r:starteditor['"]/);
- assert.match(dev,/🎁 إهداء \(إعادة التذكير\)/);
- assert.match(dev,/🧪 اختبار الإهداء/);
- assert.match(dev,/callback_data:\s*'dev:golden:preview'/);
- assert.match(dev,/await sendBirthdayAnnouncementTest\(query\.from\.id, query\.from\.language_code\)/);
- const guard=dev.indexOf("!isDeveloper(query.from?.id)");
- const preview=dev.indexOf("if (data === 'dev:golden:preview')");
- assert.ok(guard>=0 && preview>guard,'developer-only authentication precedes preview');
- assert.match(dev,/dev:golden:preview:activate/);
+test('editor panel moves gift operations to donation bot',async()=>{
+  const fs=await import('node:fs');
+  const welcome=fs.readFileSync(new URL('../../tgcloud/lib/welcome.js',import.meta.url),'utf8');
+  const dev=fs.readFileSync(new URL('../../tgcloud/lib/developer.js',import.meta.url),'utf8');
+  assert.ok(!welcome.includes("callback_data: 'gift:show'"));
+  assert.ok(!dev.includes("callback_data: 'dev:golden:gift'"));
+  assert.ok(!dev.includes("callback_data: 'dev:golden:preview'"));
+  assert.match(dev,/@richDonateBot/);
 });
-
 test('broadcast status is visible and reports definitive and uncertain failures without double counting',async()=>{
  const h=await fixture(),job=h.records.goldenBroadcasts[0];
  h.apiState.richSendErrors={'1':new Error('BotApiError [403]: bot was blocked by the user'),'2':new Error('Network timeout')};
@@ -148,17 +141,17 @@ test('broadcast status is visible and reports definitive and uncertain failures 
  assert.match(text,/تعذر إيصالها: 1/);
  assert.match(text,/غير مؤكد: 1/);
  assert.match(text,/لم تُرسل بهذه الجولة: 0/);
- const completion=h.calls.filter(c=>c.method==='sendMessage' && c.args.chat_id===developer
+ const completion=h.calls.filter(c=>c.method==='sendMessage' && c.args.chat_id==='@richDonateBot'
    &&c.args.text?.includes('🎁 تقرير'));
  assert.equal(completion.length,1);
  await h.birthday.runBirthdayBatch(job.jobId,1);
  assert.equal(h.calls.filter(c=>c.method==='sendMessage'
-   &&c.args.chat_id===developer && c.args.text?.includes('🎁 تقرير')).length,1);
+   &&c.args.chat_id==='@richDonateBot' && c.args.text?.includes('🎁 تقرير')).length,1);
 });
 
  test('completion notification retries a definite rejection before acknowledging the Cloudflare job',async()=>{
  const h=await fixture(),job=h.records.goldenBroadcasts[0];
- h.apiState.messageSendErrors={[developer]:new Error('BotApiError [429]: retry after 90')};
+ h.apiState.messageSendErrors={'@richDonateBot':new Error('BotApiError [429]: retry after 90'),[developer]:new Error('BotApiError [429]: retry after 90')};
  await h.birthday.runBirthdayBatch(job.jobId,1);
  assert.equal(job.status,'done');
  const notice=h.records.legacyStates.find(r=>r.namespace.endsWith(':complete'));
@@ -170,7 +163,7 @@ test('broadcast status is visible and reports definitive and uncertain failures 
  assert.equal(notice.payload.status,'sent');
  assert.ok(completions().length>0);
  assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,3);
- assert.equal(h.calls.filter(c=>c.args.chat_id===developer&&c.args.text?.includes('انتهت عملية الإرسال')).length,2);
+ assert.equal(h.calls.filter(c=>c.args.chat_id==='@richDonateBot'&&c.args.text?.includes('انتهت عملية الإرسال')).length,2);
  });
  test('crashed recipient and crashed completion are classified without duplicate delivery',async()=>{
  const h=await fixture(),job=h.records.goldenBroadcasts[0];
@@ -221,7 +214,7 @@ test('repeat developer issue starts one new reminder round, skips activated user
  assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,5);
  assert.equal(h.records.goldenClaims[0].expiresAt,expiry);
  assert.equal(firstButton,'gift:activate:'+job.month);
- const notices=h.calls.filter(c=>c.args.chat_id===developer&&c.args.text?.includes('انتهت عملية الإرسال'));
+ const notices=h.calls.filter(c=>c.args.chat_id==='@richDonateBot'&&c.args.text?.includes('انتهت عملية الإرسال'));
  assert.equal(notices.length,2);
 });
 test('pressing issue during an active batch resumes it without a duplicate round',async()=>{
@@ -232,4 +225,16 @@ test('pressing issue during an active batch resumes it without a duplicate round
  job.runAt=h.now;
  await h.birthday.runBirthdayBatch(job.jobId,job.revision);
  assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,25);
+});
+
+test('golden delivery reasons are structured without raw Telegram error strings',async()=>{
+  const h=await fixture(),job=h.records.goldenBroadcasts[0];
+  h.apiState.richSendErrors={'1':new Error('BotApiError [403]: bot was blocked by the user'),
+    '2':new Error('Network timeout')};
+  await h.birthday.runBirthdayBatch(job.jobId,1);
+  assert.equal(h.birthday.giftDeliveryReason(new Error('BotApiError [403]: bot was blocked by the user')),'BOT_BLOCKED');
+  const logs=h.records.legacyStates.filter(r=>r.namespace.startsWith('golden_delivery:'));
+  assert.equal(logs.length,2);
+  assert.deepEqual(logs.map(x=>x.payload.code),['BOT_BLOCKED','UNCONFIRMED_OTHER']);
+  assert.ok(logs.every(r=>!JSON.stringify(r).includes('BotApiError')));
 });
