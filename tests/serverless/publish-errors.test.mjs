@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizePublishError, publishFailureMessage, isDefinitePublishRejection,
+  normalizePublishError, publishFailureMessage, publishErrorDetail, isDefinitePublishRejection,
   shouldForgetDestination, EXPECTED_PUBLISH_FAILURES,
 } from '../../tgcloud/lib/publish-errors.js';
 
@@ -57,4 +57,13 @@ test('already classified errors are idempotent',()=>{
   const e=normalizePublishError(botError('TOPIC_CLOSED'),{kind:'chat'});
   assert.equal(normalizePublishError(e,{kind:'chat'}),e);
   assert.ok(EXPECTED_PUBLISH_FAILURES.has(e.code));
+});
+
+test('error details are extracted safely and bridge classification retains original validation failures',()=>{
+  assert.equal(publishErrorDetail(new Error('EDITOR_LIMIT:characters:24000:20000')),
+    'EDITOR_LIMIT:characters:24000:20000');
+  assert.equal(publishErrorDetail({response:{description:'Bad Request: TOPIC_CLOSED'}}),
+    'Bad Request: TOPIC_CLOSED');
+  assert.equal(publishErrorDetail({message:'native photo block has no reusable media'}),
+    'native photo block has no reusable media');
 });
