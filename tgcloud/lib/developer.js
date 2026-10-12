@@ -343,7 +343,7 @@ export async function openDeveloperPanel(message) {
   await clearState(userId);
   await sendPanel(
     chatId,
-    'نسخة Serverless من لوحة المطور. تقدر تستورد/تصدّر نسخة البوت، تفحص قاعدة Serverless، تعرض الإحصائيات، تنشئ Snapshot، وتحدّث كاش قناة المعاينة.\n\nالاستيراد يُفحص ويطلب تأكيدًا قبل الكتابة، وما يحذف صفحات قديمة بسبب حد 12.'
+    'لوحة أدوات المحرر التشغيلية: نسخ احتياطي، قاعدة البيانات، النشاط، المزامنة والمعاينة.\n\nلإدارة الاشتراكات وإهداء Golden Ticket افتح /dev في @richDonateBot.\n\nالاستيراد يُفحص ويطلب تأكيدًا قبل الكتابة.'
   );
   return true;
 }
@@ -1067,10 +1067,6 @@ export async function handleDeveloperCallback(query) {
   }
   if (data === 'dev:stats') {
     await showStats(query, chatId);
-    return true;
-  }
-  if (data.startsWith('dev:stats:subscribers:')) {
-    await showSubscribers(query,chatId,Number.parseInt(data.split(':').at(-1),10)||0);
     return true;
   }
   if (data.startsWith('dev:stats:users:')) {
