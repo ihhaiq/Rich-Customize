@@ -39,6 +39,12 @@ test('one announcement per eligible user, concurrent reminders do not duplicate,
  await h.birthday.runBirthdayBatch(job.jobId,1);
  assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,3);
  assert.equal(h.records.goldenAnnouncements.filter(r=>r.status==='sent').length,3);
+ const reports=h.calls.filter(c=>c.method==='sendMessage'&&c.args.chat_id===developer
+  &&c.args.text?.startsWith('🎁 تقرير إهداء القسيمة'));
+ assert.equal(reports.length,1,'developer must receive exactly one completion report');
+ assert.match(reports[0].args.text,/قبله تليكرام: 3/);
+ assert.match(reports[0].args.text,/المؤهلون: 3/);
+ assert.equal(h.records.legacyStates.filter(r=>r.namespace.includes('golden_notice:')).length,1);
 });
 test('batches persist progress and continue only via the next reminder revision',async()=>{
  const h=await fixture(25),job=h.records.goldenBroadcasts[0];
@@ -56,7 +62,7 @@ test('blocked and uncertain sends do not halt other users; ambiguous send is not
  const h=await fixture(),job=h.records.goldenBroadcasts[0];
  h.apiState.richSendErrors={'1':new Error('BotApiError [403]: bot was blocked by the user'),'2':new Error('Network timeout')};
  await h.birthday.runBirthdayBatch(job.jobId,1);
- assert.deepEqual(h.records.goldenAnnouncements.map(r=>r.status),['failed','uncertain','sent']);
+ assert.deepEqual(h.records.goldenAnnouncements.map(r=>r.status),['unavailable','uncertain','sent']);
  assert.equal(job.status,'done');
 });
 test('Telegram flood wait leaves recipient retryable, preserving cursor and delay',async()=>{
@@ -126,4 +132,26 @@ test('welcome never includes the gift button; developer panel offers distinct li
  const preview=dev.indexOf("if (data === 'dev:golden:preview')");
  assert.ok(guard>=0 && preview>guard,'developer-only authentication precedes preview');
  assert.match(dev,/dev:golden:preview:activate/);
+});
+
+test('broadcast status is visible and reports definitive and uncertain failures without double counting',async()=>{
+ const h=await fixture(),job=h.records.goldenBroadcasts[0];
+ h.apiState.richSendErrors={'1':new Error('BotApiError [403]: bot was blocked by the user'),'2':new Error('Network timeout')};
+ await h.birthday.runBirthdayBatch(job.jobId,1);
+ const report=await h.birthday.birthdayCampaignStatus();
+ assert.equal(report.eligible,3);
+ assert.equal(report.counts.sent,1);
+ assert.equal(report.counts.unavailable,1);
+ assert.equal(report.counts.uncertain,1);
+ const text=h.birthday.birthdayReportText(report);
+ assert.match(text,/المؤهلون: 3/);
+ assert.match(text,/تعذر إيصالها: 1/);
+ assert.match(text,/غير مؤكد: 1/);
+ assert.match(text,/بانتظار الإرسال أو إعادة المحاولة: 0/);
+ const completion=h.calls.filter(c=>c.method==='sendMessage' && c.args.chat_id===developer
+   &&c.args.text?.startsWith('🎁 تقرير'));
+ assert.equal(completion.length,1);
+ await h.birthday.runBirthdayBatch(job.jobId,1);
+ assert.equal(h.calls.filter(c=>c.method==='sendMessage'
+   &&c.args.chat_id===developer && c.args.text?.startsWith('🎁 تقرير')).length,1);
 });
