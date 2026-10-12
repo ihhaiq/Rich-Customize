@@ -5,6 +5,8 @@ import {
 import { dataRichText, plainRichText } from 'lib/rich-text';
 import { richMessageDirection, validateEditorLimits, validateTableRows } from 'lib/editor-blocks';
 import { brandingFooterBlock } from 'lib/branding';
+import { isDeveloper } from 'lib/developer-access';
+import { resolveEditorEntitlement, safePlanLimit } from 'lib/subscription-policy';
 
 const INPUT_NATIVE_TYPE_ALIASES = Object.freeze({
   text: 'paragraph',
@@ -422,7 +424,7 @@ function validateRenderedTables(blocks, technicalOnly = false) {
   }
 }
 
-function validateRenderedPayloadLimits(payloads) {
+function validateRenderedPayloadLimits(payloads, { userId = null, entitlement = null, technicalOnly = false } = {}) {
   let blocks = 0, media = 0, depth = 0, chars = 0;
   const mediaTypes = new Set(['photo','video','animation','audio','voice_note','document']);
   const textLength = value => {
@@ -463,6 +465,23 @@ function validateRenderedPayloadLimits(payloads) {
   ]) {
     if (actual > limit) throw new Error('EDITOR_LIMIT:' + code + ':' + actual + ':' + limit);
   }
+  // The published rich message also contains generated navigation, anchor
+  // labels and the branding footer. Charge their actual size to the user's
+  // product quota; checking the draft alone can undercount the final message.
+  // Trusted legacy saved-page replay and developers bypass product quotas
+  // only; neither can bypass Telegram's technical limits above.
+  if (!technicalOnly && !isDeveloper(userId)) {
+    const trusted = entitlement || resolveEditorEntitlement();
+    for (const [code, key, actual] of [
+      ['blocks', 'blocks', blocks],
+      ['media_attachments', 'mediaAttachments', media],
+      ['nesting_depth', 'nestingDepth', depth],
+      ['characters', 'text', chars],
+    ]) {
+      const limit = safePlanLimit(trusted, key);
+      if (actual > limit) throw new Error('EDITOR_LIMIT:' + code + ':' + actual + ':' + limit);
+    }
+  }
 }
 
 export function buildInputRichMessage(
@@ -499,7 +518,7 @@ export function buildInputRichMessage(
   validateRenderedTables(payloads, technicalOnly);
   // System-generated navigation/branding is part of the final Telegram
   // message. Reject technical overflows after adding these blocks as well.
-  validateRenderedPayloadLimits(payloads);
+  validateRenderedPayloadLimits(payloads, { userId, entitlement, technicalOnly });
   const direction = richMessageDirection(ordered);
   return {
     blocks: resolveInlinePageCallbacks(
