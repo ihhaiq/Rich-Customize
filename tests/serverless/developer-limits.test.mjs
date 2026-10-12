@@ -60,10 +60,10 @@ test('large developer pages survive sync, inline delivery and block management p
   const blocks = Array.from({length:51},()=>paragraph('x'.repeat(200)));
   h.records.richPages.push({pageId:'large', ownerId:developer, blocks, title:'Large'});
   const event = h.sync.buildPageUpsertSync(h.records.richPages[0]);
-  assert.equal(event.page.blocks.length,31);
+  assert.equal(event.page.blocks.length,51);
   assert.equal(JSON.stringify(event.page.blocks),JSON.stringify(blocks));
   const result = await h.delivery.savedPageQueryResult('large');
-  assert.ok(result.input_message_content.rich_message.blocks.length >= 31);
+  assert.ok(result.input_message_content.rich_message.blocks.length >= 51);
   const preview = h.ui.blockEditorRichMessage(table(26,1), [table(26,1)], 'en', developer);
   assert.ok(preview.blocks.some(block=>block.type==='table' && block.cells?.length===26));
 });
@@ -107,6 +107,6 @@ test('saving an existing developer page preserves over-quota content', async () 
   await h.session.createEditorSession(developer,developer,100);
   await h.session.updateEditorSession(developer,{state:'saving_page_name',currentPageId:'large',blocks});
   await h.pages.handleEditorPageMessage({from:{id:developer,language_code:'en'},chat:{id:developer,type:'private'},message_id:101,text:'Large page'});
-  assert.equal(h.records.richPages[0].blocks.length,31);
+  assert.equal(h.records.richPages[0].blocks.length,51);
   assert.equal(h.records.richPages[0].title,'Large page');
 });
