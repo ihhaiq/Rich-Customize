@@ -2,7 +2,7 @@
 // The platform passes update.message directly as the first argument.
 
 import { api } from 'sdk';
-import { sendSubscriptionStatus } from 'lib/subscription-status.js';
+import { sendSubscriptionStatus } from 'lib/subscription-status';
 import {
   buildWelcomeFallbackText,
   buildWelcomeKeyboard,
