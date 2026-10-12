@@ -91,7 +91,7 @@ test('developer preview sends one private rich gift announcement with inert acti
  const sends=h.calls.filter(c=>c.method==='sendRichMessage');
  assert.equal(sends.length,1,'preview sends only one message');
  assert.equal(sends[0].args.chat_id,developer,'recipient is the authorized developer');
- assert.deepEqual(sends[0].args.rich_message,h.birthday.birthdayAnnouncement('ar',{preview:true}));
+ assert.deepEqual(sends[0].args.rich_message,JSON.parse(JSON.stringify(h.birthday.birthdayAnnouncement('ar',{preview:true}))));
  const previewButton=sends[0].args.rich_message.blocks.flatMap(b=>b.text)
    .find(item=>item?.type==='button')?.button;
  assert.equal(previewButton?.callback_data,'dev:golden:preview:activate');
