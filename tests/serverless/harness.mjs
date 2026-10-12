@@ -18,6 +18,9 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
   const keys = { goldenBroadcasts:'month', goldenAnnouncements:'key', goldenCampaigns:'month', goldenClaims:'key', editorSessions: 'userId', maintenanceLocks: 'name', richPages: 'pageId', usageUsers: 'userId', editorSubscriptions: 'userId', managedBotOrders: 'orderId', managedBotPayments: 'chargeId', managedBotLicenses: 'licenseId', brandingEntitlements: 'userId', forumTopicDefaults: 'chatId' };
   const clone = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
   const db = {
+    async $count(table, predicate = () => true) {
+      return records[table._name].filter(predicate).length;
+    },
     select() {
       let name; let predicate = () => true; let sortColumn; let take = Infinity;
       const q = { from(table) { name = table._name; return q; }, where(p) { predicate = p; return q; },
