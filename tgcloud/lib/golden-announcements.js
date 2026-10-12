@@ -71,7 +71,7 @@ async function campaignSnapshot(row) {
   const campaign=await db.select().from(goldenCampaigns).where(eq(goldenCampaigns.month,row.month)).get();
   const eligible=campaign?await db.$count(usageUsers,lte(usageUsers.firstSeen,campaign.issuedAt)):0;
   return {month:row.month,status:row.status,revision:row.revision,
-    updatedAt:row.runAt,claimUntil:Number(campaign?.claimUntil)||0,
+    nextRunAt:row.runAt,claimUntil:Number(campaign?.claimUntil)||0,
     eligible,counts:await deliveryCounts(row.month)};
 }
 export async function birthdayCampaignStatus() {
@@ -95,6 +95,12 @@ export function birthdayReportText(snapshot, {error=false}={}) {
     +'غير مؤكد: '+(c.uncertain+c.sending)+'\n'
     +'بانتظار الإرسال أو إعادة المحاولة: '+pending+'\n'
     +'منها بانتظار رفع تقييد تليكرام: '+c.retry+'\n'
+    +(snapshot.status==='pending' && pending>0
+      ? 'الحد الأدنى التقريبي للمتبقي: '+Math.ceil(pending/BATCH_SIZE)+' دقيقة عند تشغيل العامل كل دقيقة.\n'
+      : '')
+    +(snapshot.status==='pending' && Number(snapshot.nextRunAt)<now()-180
+      ? '⚠️ الدفعة متأخرة أكثر من 3 دقائق: افحص Cloudflare Worker والجسر.\n'
+      : '')
     +'القبول من تليكرام مو دليل قراءة الرسالة.';
 }
 async function notifyOnce(row,type,body) {
