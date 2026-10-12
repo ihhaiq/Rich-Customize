@@ -166,7 +166,13 @@ export async function runBirthdayBatch(jobId, revision) {
         else status=isDefinitePublishRejection(error)?'failed':'uncertain';
       }
       await db.update(goldenAnnouncements).set({status,updatedAt:now()}).where(eq(goldenAnnouncements.key,key)).run();
-      if(status==='retry') break;
+      if(status==='retry') {
+        await notifyOnce(row,'rate_limit',
+          '⚠️ تليكرام قيّد إرسال حملة القسيمة '+row.month+'.\n'
+          +'الإرسال راح ينتظر إعادة المحاولة بعد '+delay+' ثانية على الأقل.\n'
+          +'افتح /dev ← حالة الإهداء للتفاصيل.');
+        break;
+      }
       cursor=user.userId;
     }
     finished=finished || (users.length<BATCH_SIZE && (users.length===0 || cursor===users.at(-1).userId));
