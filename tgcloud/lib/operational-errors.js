@@ -36,10 +36,10 @@ export function explainOperationalError(error) {
       'رفض تليكرام معرّف إيموجي مخصص أو لا يملك المستهدف صلاحية استخدامه.','تحقق من ID الإيموجي وصلاحيات الوجهة، واستعمل بديله العادي عند الإمكان.');
   if (/LEGACY_PAGE_READ_ONLY/i.test(value))
     return guide('LEGACY_PAGE_READ_ONLY','expected',
-      'هذه صفحة محفوظة قديمة، مسموح تنشرها كما هي لكن ما تگدر تعدلها. افتح مسودة جديدة حتى تنشئ محتوى جديد.',
-      'This saved legacy page can be republished unchanged, but cannot be edited. Start a new draft.',
-      'النسخة المحفوظة تتجاوز واحدة أو أكثر من حدود الباقة الجديدة.',
-      'لا تسمح بالتعديل أو التسمية أو المزامنة؛ استعمل النسخة المخزونة لإعادة النشر.');
+      'هذه الصفحة تتجاوز حدود باقتك الحالية. تگدر تنشرها كما هي، وللتعديل تحتاج باقة تسمح بحجمها.',
+      'This saved page exceeds your active plan. You can republish it unchanged; editing requires a plan that covers its contents.',
+      'النسخة المحفوظة تتجاوز واحداً أو أكثر من حدود الباقة الحالية؛ مو بسبب تاريخ حفظها.',
+      'امنع تعديل النسخة المتجاوزة حتى تتوفر باقة مؤهلة؛ احتفظ بالنسخة المخزونة للنشر دون تغيير.');
   if (/EDITOR_LIMIT:|editor limit exceeded|quota exceeded/i.test(value))
     return guide('EDITOR_LIMIT_REACHED','expected',
       'المحتوى يتجاوز حدود المحرر أو باقتك. قلل المحتوى أو راجع حدود الاشتراك.',
