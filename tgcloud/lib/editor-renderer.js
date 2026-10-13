@@ -424,7 +424,7 @@ function validateRenderedTables(blocks, technicalOnly = false) {
   }
 }
 
-function validateRenderedPayloadLimits(payloads, { userId = null, entitlement = null, technicalOnly = false } = {}) {
+export function validateRenderedPayloadLimits(payloads, { userId = null, entitlement = null, technicalOnly = false } = {}) {
   let blocks = 0, media = 0, depth = 0, chars = 0;
   const mediaTypes = new Set(['photo','video','animation','audio','voice_note','document']);
   const textLength = value => {

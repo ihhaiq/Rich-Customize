@@ -1,3 +1,22 @@
+## 2026-10-13 — تنفيذ محلي للدليل التفاعلي والقوالب
+
+- أُضيفت خمس وحدات tutorial تفصل الحالة والعرض والنماذج والنصوص والتحكم، وربط الدليل بالترحيب والإعلانات الثلاثة. زر المجموعة بجانب بدء المحرر، والكتالوج داخل قائمة الدليل ذات الأزرار الثلاثة بصفين.
+- رسالة دليل واحدة بمعاينة بين فاصلتين، بناء يدوي، اقتراحات «تريد رأيي؟»، خمسة قوالب، تعديل العناصر المتداخلة، وتفاصيل «تريد المزيد👀؟» للحفظ وCBD والضيف. صورتا وصفة الطعام ثابتتان مولدتان للمشروع مع manifest؛ تحتاجان نشر Pages لاحقاً.
+- مسودة مستقلة دائمة في legacy_states تحمي الصفحة المفتوحة وتتفادى انتهاء editorSessions بعد ساعتين. فحص المالك/الخاص/epoch/revision ومعرف الرسالة، CAS وقفل المستخدم، dedupe وترتيب إدخالات الألبوم، cooldown عند 429، وفصل فشل العرض عن نجاح تغيير المحتوى.
+- تصدير persistPage مع خيار حجز ID وتحقق revision يتيح إعادة استعمال الحفظ الحالي بأمان؛ تصدير فاحص الحمولة النهائي لفحص غلاف الدليل. لا تعديل مخطط DB، الباقات، الإنلاين أو سلوك النشر الفعلي.
+- التحقق: 15/15 اختبار دليل ناجحاً. آخر test:ci كامل قبل الاختبار الخامس عشر: 240/241، والفشل الوحيد اختبار admin-stats الذي يتوقع أزراراً أزيلت سابقاً؛ أُثبت فشله على baseline a79c8b9 أيضاً. فحوص الكتالوج وMini App ناجحة. لا اختبار حي في Telegram.
+- تفاصيل الإنجاز والحدود وخطوة الاستئناف في md_files/tutorial.md القسم 18. العربية والإنجليزية جاهزتان؛ بقية ترجمة النصوص الجديدة ولوحة تجميع مراحل الدليل واختبارات الهاتف ما زالت مطلوبة.
+- الحالة: تنفيذ محلي فقط؛ لم يُرفع إلى GitHub ولم ينشر إلى Telegram/Cloudflare. لا migration مطلوبة لهذه الدفعة. الموافقة الصريحة على الرفع الخارجي ما زالت معلقة بعد الرفض السابق؛ لم تعاد محاولة الرفع.
+
+## 2026-10-13 — خطة الدليل التفاعلي وجمع وثائق Markdown
+
+- أُنشئ `md_files/tutorial.md` أولاً لتثبيت قرارات المالك: ترتيب الترحيب، ثلاثة أزرار للدليل بصفين، نقطة دخول الحملات A/B/C، مرساة رسالة واحدة ومعاينة بين فاصلتين، «تريد رأيي؟»، القوالب الخمسة ومنها وصفة الطعام، ودروس الحفظ/CBD/الضيف داخل «تريد المزيد👀؟».
+- الخطة تفصل المتطلبات المؤكدة عن الاقتراحات والفحوص المتبقية، وتحدد إعادة استعمال خدمات المحرر، حماية المسودة/الملكية/revision، منع التكرار، أخطاء التحرير والاستئناف والوسائط، التوطين، مراحل التنفيذ واختبارات القبول. لا ذكر للإنلاين في الدليل ولا تعديل لمساراته.
+- نُقل 28 ملف Markdown إلى `md_files/` مع الاحتفاظ بتسلسل docs/archive. استُثنيت README وAGENT/AGENTS من النقل، وحُدثت روابطها. هذا الملف هو سجل التغيير النشط بموقعه الجديد. بقيت ملفات الاختبارات المؤرشفة غير Markdown في مواقعها.
+- عُدلت الروابط المحلية داخل الملفات المنقولة لتظل تشير إلى ملفات التشغيل والأرشيف الصحيحة؛ لم يتغير runtime أو schema أو منطق المنتج.
+- التحقق: نجح فحص جميع روابط Markdown المحلية (لا روابط مكسورة)، وتحقق نقل الملفات الـ28 وبقاء الملفات المستثناة فقط خارج md_files، ونجح git diff --check. التغييرات كلها توثيقية؛ لم تشغّل اختبارات البوت لأن كود التشغيل لم يتغير.
+- الحالة: حُفظت الدفعة محلياً بالالتزام dd7a3ae. رفضت المراجعة التلقائية git push إلى origin/serverless-cleanup لأنها اعتبرت تفويض الطلب خاصاً بالتوثيق المحلي لا النشر الخارجي لوثائق قد تكون خاصة؛ لم تُعَد محاولة الرفع. بانتظار إذن صريح من المالك لرفع الدفعة. لا تنفيذ تتوريال أو توليد صور أو tgcloud push/migrate أو نشر يدوي إلى Cloudflare.
+
 ## 2026-10-12 — نقل لوحة الاشتراكات والإهداء إلى بوت التبرع (تجهيز تكاملي)
 
 - المحرر يحافظ على قاعدة الاستحقاقات والهدايا الحالية مصدرَ الحقيقة وعلى إرسال الرسائل الخاصة إلى المستخدمين المعروفين؛ نقل الإدارة والواجهة لبوت التبرع لا يعني نقل دفعات الدفع أو حذف السجلات.
@@ -99,7 +118,7 @@
 
 ## 2026-10-12 — تدقيق إخفاقات اختبارات الاشتراكات والقيود (بعد 182/202)
 
-- **السبب:** 20 اختباراً فاشلاً بعد تحديث A1. منها اختبارات تتوقع حدوداً أُلغيَت (30 بلوك، 50 صفاً/25 عموداً، 32,000 حرف ذهبي)، أو تسمح بتعديل محتوى محفوظ قديم، بينما `sups.md` يعتمد Free 50/20,000 وGolden 32,768 وحماية الصفحات القديمة للعرض/النشر فقط.
+- **السبب:** 20 اختباراً فاشلاً بعد تحديث A1. منها اختبارات تتوقع حدوداً أُلغيَت (30 بلوك، 50 صفاً/25 عموداً، 32,000 حرف ذهبي)، أو تسمح بتعديل محتوى محفوظ قديم، بينما `md_files/sups.md` يعتمد Free 50/20,000 وGolden 32,768 وحماية الصفحات القديمة للعرض/النشر فقط.
 - **حد الثقة:** Cloudflare يفحص سقف نقل Telegram التقني فقط، ولا يمنح حصة Free/Plus/Golden من مدخلات المتصفح؛ Telegram Serverless هو جهة قرار الاشتراك والنشر. تم تعديل اختبارات التكامل للتحقق من هذا الفصل بدلاً من افتراض أن Cloudflare يرفض تجاوز 20,000 حرف.
 - **إصلاح إنتاج حقيقي:** `tgcloud/lib/editor-renderer.js` صار يعيد فحص حصص الباقة على **حمولة Rich النهائية** بعد إضافة تذييل الحقوق وأزرار التنقل؛ وكان يفحص الحدود التقنية العامة فقط بعد إضافتها. المطوّر وإعادة نشر صفحة قديمة موثقة يستثنيان من حصص المنتج دون استثناء من سقف Telegram.
 - **إصلاحات الاختبار:** تحميل `plan_catalog.generated.js` قبل `subscription_offers.js` في اختبار واجهة الباقات، واحترام استيرادات `lib/name.js`، وتصحيح افتراضات حدود النص والجداول والبلوكات وتجمد الصفحات القديمة واختبار إضافة إيموجي عند 20,000 حرف. تمت إضافة 3 اختبارات لمنع تجاوز الحصص النهائية.
@@ -178,7 +197,7 @@
 - **السبب:** محرر العرض الحي `live_preview.js` يستبدل `renderBlocks()` ولا يستدعي `updatePublishValidity()` بعد فتح الصفحة أو استعادة المسودة؛ فيبقى `sendBtn` معطلاً من القيمة الابتدائية في HTML، حتى لو كانت ملفات GIF مرفوعة وحالة البلوك «جاهز للإرسال». إذا كان بلوك آخر ناقصاً كان زر الإرسال يُعطّل صامتاً ولا يشرح السبب.
 - **التصحيح:** إعادة تقييم صلاحية النشر فور انتهاء رسم البلوكات؛ زر الإرسال يبقى قابلاً للنقر مهما كانت نتيجة الفحص، لكنه **لا يتجاوز الفحص**. عند وجود مشاكل ينفذ `openPublishIssues()` ويعرض موضع البلوك وسبب المنع، مع مؤشر بصري على زر الإرسال، بدلاً من تعطيل الزر؛ إذا كان المحتوى صالحاً يفتح وجهات النشر بالطريقة الاعتيادية.
 - **الأمان:** لا تغيير على فحص الحمولة قبل الإرسال ولا على سياسات الباقات أو خادم Telegram. إزالة صفة `disabled` القديمة من HTML وتحديث كاش ملفات `app.js` و`live_preview.js` و`send_validation.css` إلى `0.3.97`.
-- **الملفات:** `app/miniapp_static/app.js`، `live_preview.js`، `send_validation.css`، `editor.html`، `tests/serverless/publish-validation.test.mjs` و`log.md`.
+- **الملفات:** `app/miniapp_static/app.js`، `live_preview.js`، `send_validation.css`، `editor.html`، `tests/serverless/publish-validation.test.mjs` و`md_files/log.md`.
 - **الاختبارات:** نجحت ١٠ من ١٠ فحوص محاكاة JavaScript، تشمل صفحة GIF صالحة وبلوك ناقص بجانبه وإعادة الفحص عند فتح صفحة أو مسودة، ونجح فحص صياغة JavaScript لملفي الواجهة. لم يُجر اختبار جهاز Android WebView حقيقي أو `npm test` الكامل.
 - **النشر:** رفع GitHub على فرع `serverless-cleanup` فقط؛ التغيير واجهة Mini App ولا يحتاج `tgcloud push`. نشر Cloudflare Pages التلقائي غير مؤكّد.
 
@@ -187,7 +206,7 @@
 - **التنفيذ:** إضافة `lib/forum-topics.js` و`forum_topic_defaults` بمفتاح `chat_id` لتخزين `thread_id` واحد مشترك لكل المجموعة؛ قبول مالك المجموعة/المسؤول الحقيقي والمسؤول المخفي الذي ينشر باسم المجموعة، ورفض غير المسؤول. دعم `/default status` و`/default clear`، ودعم التعيين الصريح لـ«العام» بلا إعادة توجيه تلقائي إليه عند فشل موضوع آخر.
 - **مسارات الإرسال:** إضافة `message_thread_id` إلى `sendRichMessageSafe` في النشر المباشر وRCB1، واستعلام الإعداد عند موعد نشر الجدولة. لا يتغير مسار القنوات والمجموعات العادية. موضوع المنتدى الذي لا يملك إعداداً يرجع `PUBLISH_TOPIC_NOT_SET` ويمنع النشر لهذه المجموعة فقط.
 - **التقارير:** `publish-errors.js` يعرض أسباب `TOPIC_CLOSED` و`TOPIC_DELETED` و`THREAD_INVALID` وعدم ضبط الموضوع برسائل عربية وإنجليزية، مع تعليمات `/default`. قائمة نتائج النشر المباشر تُظهر أسباباً لما يصل إلى ١٢ وجهة. الجداول تحتفظ بـ`failure_code` لكل وجهة وتعرض عنوان المجموعة وسبب الإخفاق في رسالة النتيجة النهائية؛ الأخطاء المتوقعة لا تُرسل كإنذارات برمجية غامضة.
-- **الملفات:** `tgcloud/schema.js`، `lib/forum-topics.js`، `handlers/message.js`، `lib/publish.js`، `lib/scheduled-publish.js`، `lib/publish-errors.js`، `lib/miniapp-bridge.js`، `app/miniapp_static/app.js`، `tests/serverless/harness.mjs`، `tests/serverless/forum-default.test.mjs`، `docs/forum-default.md`.
+- **الملفات:** `tgcloud/schema.js`، `lib/forum-topics.js`، `handlers/message.js`، `lib/publish.js`، `lib/scheduled-publish.js`، `lib/publish-errors.js`، `lib/miniapp-bridge.js`، `app/miniapp_static/app.js`، `tests/serverless/harness.mjs`، `tests/serverless/forum-default.test.mjs`، `md_files/docs/forum-default.md`.
 - **التحقق:** ١٤ فحص V8 مستقل نجح لحالات تعيين وتغيير الموضوع والصلاحيات والإلغاء والإرسال للوجهة المختارة دون تحويل ضمني، مع إضافة ٦ اختبارات Node انحدارية تشمل المسارات الثلاثة. لم تُجرَ اختبارات `npm test` الكاملة أو اختبار تليكرام/Cloudflare على الإنتاج.
 - **النشر الآمن:** رفع GitHub فقط. **لا `tgcloud push` قبل مراجعة وتنفيذ `tgcloud migrate`** بسبب جدول `forum_topic_defaults` وعمود `scheduled_post_destinations.failure_code` الجديدين، ومراعاة ترحيل `quota_version` السابق في نفس الفرع. لا تغييرات على قاعدة الإنتاج أو Webhooks خلال هذه الجلسة.
 
@@ -220,7 +239,7 @@
 - **السلوك الجديد:** أثناء تمرير الجدول أفقياً يحدث إزاحة متزامنة للعنوان والشريط العلوي بواسطة `--table-pan-x`، دون تغيير حركتهما العمودية. صف عناوين الجدول يظل داخل نفس جدول التمرير، ويتحرك معه أفقياً ويثبت رأسياً.
 - **اللمس:** أول نقرة تختار الخلية وتبرز حدودها فقط، والثانية تبدأ تعديل النص؛ السحب داخل الجدول يمرر أفقياً أو عمودياً دون الضغط المطول أو اختيار النص. تستعاد حالة تحديد الخلية والتمرير بعد إعادة الرسم وتُصفّر عند فتح صفحة أخرى.
 - **المظهر:** طبقة زجاجية داكنة متزنة (صبغة 86%، blur 19px، حافة ولمعة ظل خفيف) لقوائم البلوكات والخلايا وأدواتها، بدل صبغة 6% السابقة التي كانت تُظهر صفوف الجدول بوضوح خلف القائمة. يبقى محتوى الجدول دون blur.
-- **الملفات:** `app/miniapp_static/app.js`، `table_touch_scroll.css`، `editor.html`، `tests/serverless/miniapp-table-scroll.test.mjs`، `log.md`.
+- **الملفات:** `app/miniapp_static/app.js`، `table_touch_scroll.css`، `editor.html`، `tests/serverless/miniapp-table-scroll.test.mjs`، `md_files/log.md`.
 - **الاختبارات:** فحص JavaScript النحوي مرّ، ونجحت ٤ اختبارات سلوك DOM محاكية: حجم ٢٠×٢٦، فصل النقر عن السحب، تحديث التمرير ونمط الزجاج، ومزامنة إزاحة العنوان والأدوات. لا يمكن اعتبارها اختبار WebView الفعلي على هاتف سامسونغ.
 - **النشر:** التغييرات على فرع `serverless-cleanup` في GitHub فقط؛ لا `tgcloud push` ولا `migrate` لهذه التعديلات الأمامية. تحقق من نشر Cloudflare Pages المرتبط بالفرع.
 
@@ -246,7 +265,7 @@
 - **شنو تغيّر:** صار التحقق الخادمي يطبّق على الجداول ٨ أعمدة للمجاني و١٢ لـPlus و٢٠ لـGolden، فوق الحدود التقنية ٢٠ عموداً و٢٦ صفاً للجميع. الاستثناء للمطور يخص حصة الباقة دون حدود الجدول التقنية.
 - **عند التجاوز:** رسالة `limits.table_columns` بدل خطأ نصي أو API غير مفهوم في معالجات الإضافة؛ رفض حفظ جدول زائد مع إبقاء المحتوى القديم دون حذف. واجهة Mini App للمجاني تمنع إضافة العمود التاسع وتعرض مقارنة الباقات (التجريبية وغير متاحة للبيع)؛ حد الصف ٢٦ يظهر تنبيهاً واضحاً.
 - **قيود قائمة:** `subscription-policy.js` ما زال يطبق البلوكات ٣٠/٦٠/١٢٠؛ الأرقام الجديدة ٥٠/٢٠٠/٥٠٠، التداخل، الوسائط وعدّ صفوف الجدول ضمن ميزانية البلوكات لم تكتمل ضمن هذه المهمة. Cloudflare لا يملك حالياً مزامنة خطة Plus/Golden الموثقة، لذلك يعرض سقف المجاني لكل غير مطوّر؛ الخادم يبقى صاحب القرار عند الحفظ والنشر.
-- **الملفات:** `tgcloud/lib/subscription-policy.js`، `tgcloud/lib/editor-blocks.js`، `tgcloud/lib/editor-block-flow.js`، `functions/miniapp/api/me.js`، `app/miniapp_static/app.js`، `app/miniapp_static/subscription_offers.js`، `app/miniapp_static/editor.html`، `tests/serverless/table-limits.test.mjs`، `sups.md`، `log.md`.
+- **الملفات:** `tgcloud/lib/subscription-policy.js`، `tgcloud/lib/editor-blocks.js`، `tgcloud/lib/editor-block-flow.js`، `functions/miniapp/api/me.js`، `app/miniapp_static/app.js`، `app/miniapp_static/subscription_offers.js`، `app/miniapp_static/editor.html`، `tests/serverless/table-limits.test.mjs`، `md_files/sups.md`، `md_files/log.md`.
 - **الاختبارات:** أضيف اختبار الباقات ٨/١٢/٢٠، ومنع التحايل بالبيانات المستوردة و`colspan`، وصُحّح الاختبار القديم إلى استحقاق Golden صريح. لا تنفيذ مثبت لكامل `npm test` أو اختبار Telegram/Cloudflare الحي.
 - **النشر:** GitHub فقط. `tgcloud push` غير منفّذ، وحالة النشر التلقائي لـCloudflare غير متحققة.
 
@@ -258,7 +277,7 @@
 - **إضافي:** عرض موضع الاستثناء بعد التعقيم؛ التنبيه على إشعارات الدفع التي لا تطابق تفاصيل الطلب، وعدم إعادة إرسال إشعار شراء إزالة الحقوق عند تكرار نفس العملية، وتسجيل فشل إرسال إيصال الترخيص بعد إصدار الحقوق.
 - **الاختبارات:** `operational-errors.test.mjs`، `pre-checkout-recovery.test.mjs`، `managed-bot-payment-recovery.test.mjs`، `http-error-safety.test.mjs`، `static-error-guards.test.mjs` وتوسيع Mock SDK.
 - **التأكد:** نجاح فحوص تصنيف وتشغيلات محاكاة محددة، مع نجاح التحليل النحوي للملفات الأساسية. **GitHub Actions ما زال فاشلاً، وكان كذلك في عمليات سابقة لهذه الجولة؛ تعذر جلب Job logs من GitHub.** لا يوجد تأكيد تشغيل كامل `npm test`.
-- **الملفات والتفاصيل:** `docs/error-handling-audit.md`، ملفات المعالجات والاختبارات المذكورة، و`functions/_lib/http.js`.
+- **الملفات والتفاصيل:** `md_files/docs/error-handling-audit.md`، ملفات المعالجات والاختبارات المذكورة، و`functions/_lib/http.js`.
 - **حالة النشر:** GitHub `serverless-cleanup` فقط؛ لا Telegram Serverless push ولا نشر Cloudflare.
 
 ## 2026-10-10 — تحسين معالجات الأخطاء في المحرر الغني
@@ -276,7 +295,7 @@
 - **شنو تغيّر:** اعتماد ٢٠ عموداً و٢٦ صفاً كحدين لكل جدول؛ إزالة إعفاء المطور من حدود الجداول فقط مع الإبقاء على إعفائه من حصص الاشتراك. التحقق من النسخة القابلة للتعديل `rows` والنسخة المستوردة `native_data.cells`، وإعادة فحص الجداول في الحمولة النهائية قبل استدعاء Bot API، بما فيها الجداول المتداخلة.
 - **السبب:** خطأ `RICH_MESSAGE_TABLE_COLS_TOO_MANY` أبلغ عنه مستخدم عادي عند `r:b:`، وكان الكود القديم يقبل ٢٥ عموداً؛ بعض الجداول المستوردة تحتفظ بنسختين مختلفتين.
 - **تجربة المستخدم:** إذا كان جدول قديم متجاوزاً الحد، يعرض المحرر رسالة الحد دون تمرير الجدول المرفوض إلى تليكرام، وتبقى بياناته محفوظة للتعديل. أزرار إضافة صف/عمود في Mini App تتوقف عند السقف.
-- **الملفات:** `tgcloud/lib/editor-blocks.js`، `tgcloud/lib/editor-renderer.js`، `tgcloud/lib/editor-block-ui.js`، `tgcloud/lib/editor-extra-blocks.js`، `app/miniapp_static/app.js`، `tests/serverless/table-limits.test.mjs`، `sups.md`، `log.md`.
+- **الملفات:** `tgcloud/lib/editor-blocks.js`، `tgcloud/lib/editor-renderer.js`، `tgcloud/lib/editor-block-ui.js`، `tgcloud/lib/editor-extra-blocks.js`، `app/miniapp_static/app.js`، `tests/serverless/table-limits.test.mjs`، `md_files/sups.md`، `md_files/log.md`.
 - **الاختبارات:** أضيفت ٦ اختبارات انحدار للحواف، دمج الأعمدة والصفوف، المطور، الجداول المستوردة والمتداخلة. لم يثبت تشغيل مجموعة Node الكاملة أو اختبار Telegram الفعلي ضمن هذه الجلسة.
 - **النشر:** GitHub `serverless-cleanup` فقط؛ لا `tgcloud push` أو Cloudflare نشر يدوي أو migration.
 
@@ -287,28 +306,28 @@
 ## 2026-10-10 — إصلاحات وقائية على جدولة RCB1
 - **شنو تغيّر:** إضافة مخطط تذكيرات D1 للإنشاءات الجديدة أيضاً، مشاركة throttle الجسر عند إرسال ACK، وتصحيح معالجة فشل حفظ موعد الجدولة داخل رسالة المستخدم، وتوضيح أن Cloudflare يحتفظ فقط بمعرّفات وتوقيت المهام.
 - **السبب:** منع ازدحام RCB1 ونشوء واجهة تتوقف بصمت، وتوحيد المخطط عند تجهيز بيئة اختبار جديدة.
-- **الملفات:** `cloudflare/d1/schema.sql`، `functions/_lib/b2b-bridge.js`، `tgcloud/lib/scheduled-publish.js`، `AGENTS.md`، `docs/scheduling.md`، `log.md`.
+- **الملفات:** `cloudflare/d1/schema.sql`، `functions/_lib/b2b-bridge.js`، `tgcloud/lib/scheduled-publish.js`، `AGENTS.md`، `md_files/docs/scheduling.md`، `md_files/log.md`.
 - **الاختبارات:** فحص نحوي سريع لملفات JS المتأثرة؛ لا اختبار D1/Telegram حي أو نجاح CI شامل مثبت.
 - **النشر:** GitHub فقط؛ لا migration، ولا worker deploy، ولا tgcloud push.
 
 ## 2026-10-10 — ربط جدولة المحرر بالتذكير B2B (قيد اختبارات التكامل)
 - **شنو تغيّر:** إضافة تخزين مهام المنشورات ومحتواها ووجهاتها على Serverless، واستقبال DUE/ACK من relay المُتحقق منه، وزر جدولة في إعدادات النشر، وإدخال موعد بغداد، وأمر /scheduled مع الإلغاء، وCAS/lease لمنع إرسال الوجهات المكررة. ربط Worker بالـ throttle المشتركة مع B2B وتقليل الحمل إلى 10 تذكيرات بالدورة.
 - **السبب:** تكملة مسار Cloudflare reminders دون نقل إرسال المنشورات إلى Cloudflare.
-- **الملفات:** `tgcloud/lib/scheduled-publish.js`، `tgcloud/lib/publish.js`، `tgcloud/lib/miniapp-bridge.js`، `tgcloud/schema.js`، `tgcloud/handlers/message.js`، `tgcloud/handlers/callback_query.js`، `tgcloud/lib/editor-session.js`، `functions/_lib/b2b-bridge.js`، `functions/_lib/scheduling-reminders.js`، `workers/schedule-reminders/worker.js`، `docs/scheduling.md`، `sups.md`، `AGENTS.md`، `log.md`.
+- **الملفات:** `tgcloud/lib/scheduled-publish.js`، `tgcloud/lib/publish.js`، `tgcloud/lib/miniapp-bridge.js`، `tgcloud/schema.js`، `tgcloud/handlers/message.js`، `tgcloud/handlers/callback_query.js`، `tgcloud/lib/editor-session.js`، `functions/_lib/b2b-bridge.js`، `functions/_lib/scheduling-reminders.js`، `workers/schedule-reminders/worker.js`، `md_files/docs/scheduling.md`، `md_files/sups.md`، `AGENTS.md`، `md_files/log.md`.
 - **الفحص:** فحص نحوي سريع لدوال الملفات المعدلة ببيئة JavaScript مع إزالة الاستيرادات؛ لم يجر اختبار Telegram Serverless أو D1 حي، ولم يثبت اختبار التكامل الطرفي. GitHub Actions كان يُبلغ الفشل في تشغيلات سابقة.
 - **النشر:** GitHub فقط. لم تُنفَّذ migrations أو tgcloud push أو نشر Worker. يجب تنفيذ الاختبارات قبل الإطلاق.
 
 ## 2026-10-10 — تجهيز توقيت المهام على Cloudflare عبر RCB1 (غير منشور)
 - **شنو تغيّر:** تطوير استقبال REGISTER/CANCEL/RESULT من المحرر داخل webhook الحالي بعد التحقق من هوية B2B، وتخزين ID/الموعد/الإصدار في D1 فقط. تجهيز Worker Cron كل دقيقة لإرسال DUE من Relay Bot بالمهمة المستحقة، مع retries وACK، من دون استضافة بوت المحرر على Cloudflare.
 - **السبب:** حدود تشغيل المهام المؤجلة على Telegram Serverless؛ Cloudflare للتذكير فقط.
-- **الملفات:** `functions/_lib/scheduling-reminders.js`، `functions/_lib/b2b-bridge.js`، `functions/miniapp/api/bridge/webhook.js`، `cloudflare/d1/migrations/0002-schedule-reminders.sql`، `workers/schedule-reminders/*`، `docs/scheduling.md`، `log.md`.
+- **الملفات:** `functions/_lib/scheduling-reminders.js`، `functions/_lib/b2b-bridge.js`، `functions/miniapp/api/bridge/webhook.js`، `cloudflare/d1/migrations/0002-schedule-reminders.sql`، `workers/schedule-reminders/*`، `md_files/docs/scheduling.md`، `md_files/log.md`.
 - **الاختبارات:** لم يتم تشغيل اختبار Telegram/D1 حي. الملفات بحاجة لاختبارات تكامل قبل نشر Worker.
 - **النشر:** GitHub فقط. Worker يحتاج ربط قاعدة D1 نفسها وضبط Secret ونشر مستقل. Migration لم تطبّق، وواجهة وإرسال الجدولة في المحرر لم يكتمل ربطهما.
  
 ## 2026-10-10 — بدء تأسيس جدولة المنشورات (دون تفعيل)
 - **شنو تغيّر:** إضافة سياسة مستقلة لحد محادثتين مجاناً لكل منشور مجدول، واقتراح 5 Plus و15 Golden بانتظار الموافقة، وحراسة الوجهات المكررة والتاريخ خلال 4 أيام؛ توثيق المسار والضمانات.
 - **السبب:** طلب جدولة منشور واحد في محادثة أو عدة محادثات، مع عدم تعريض المستخدم لوعد توقيت لا يدعمه منفّذ آلي مثبت.
-- **الملفات:** `tgcloud/lib/schedule-policy.js`، `tests/serverless/schedule-policy.test.mjs`، `docs/scheduling.md`، `sups.md`، `AGENTS.md`، `docs/subscription-rollout.md`، `log.md`.
+- **الملفات:** `tgcloud/lib/schedule-policy.js`، `tests/serverless/schedule-policy.test.mjs`، `md_files/docs/scheduling.md`، `md_files/sups.md`، `AGENTS.md`، `md_files/docs/subscription-rollout.md`، `md_files/log.md`.
 - **الاختبارات:** 5/5 من اختبارات سياسة الجدولة نجحت محلياً في Node باستعمال نسخة من `schedule-policy.js` و`subscription-policy.js` المطابقتين للمصدر. فحص GitHub Actions لهذا الالتزام فشل قبل إظهار خطوات أو سجل قابل للاسترجاع، كما تكرر في تشغيلات سابقة؛ لا يُعد نجاحاً للاختبارات الشاملة. لا اختبار Telegram حي.
 - **النشر:** GitHub فقط؛ لا `tgcloud push` ولا `migrate`، ولا واجهة جدولة فاعلة حتى يعتمد مشغل موثوق.
 
@@ -317,53 +336,53 @@
 - **السبب:** طلب المالك فتح عربة الشراء وتحديد حزمة إزالة الحقوق تلقائياً.
 - **الاختبارات:** 23/23 اختبارات معالجات بوت التبرع و2/2 اختبارات ربط المحرر نجحت محلياً؛ لا اختبار Telegram حي. فتح الرابط لا يصدر فاتورة أو يثبت دفعاً.
 - **النشر:** GitHub فقط؛ يلزم نشر التحديث في البوتين على Telegram Serverless. لا schema أو migration.
-- **الملفات:** `tgcloud/lib/editor-block-ui.js`، `tgcloud/lib/branding.js`، `tests/serverless/branding-cart-link.test.mjs`، `log.md`.
+- **الملفات:** `tgcloud/lib/editor-block-ui.js`، `tgcloud/lib/branding.js`، `tests/serverless/branding-cart-link.test.mjs`، `md_files/log.md`.
 
 ## 2026-10-10 — رفض أسماء الصفحات المكررة عند الحفظ وإعادة التسمية
 - **شنو تغيّر:** حراسة اسم موحدة ضمن صفحات نفس المالك في حفظ البوت وتغيير الاسم واستعادة الصفحة، وإنشاء/حفظ Mini App في Serverless. الاسم الحالي لنفس الصفحة مستثنى، والأسماء المتطابقة بعد NFC وتوحيد المسافات تعتبر مكررة. رسالة واضحة تطلب اسماً آخر وتبقي المسودة.
 - **السبب:** تصحيح فهم الطلب السابق: المطلوب منع التكرار عند إدخال اسم الصفحة، وليس الاكتفاء برفض الاستدعاء الملتبس.
 - **التزامن:** قفل المالك نفسه لمسارات إنشاء وتغيير أسماء صفحات البوت وMini App؛ قفل ذو مهلة، لا بديل عن اختبار التزامن الحقيقي. مزامنة محتوى جلسة البوت لا تعيد كتابة اسم قديم بعد إعادة التسمية.
-- **الملفات:** `tgcloud/lib/page-names.js`، `editor-pages.js`، `miniapp-bridge.js`، `editor-session.js`، `app/miniapp_static/app.js`، `tests/serverless/page-name-uniqueness.test.mjs`، `log.md`.
+- **الملفات:** `tgcloud/lib/page-names.js`، `editor-pages.js`، `miniapp-bridge.js`، `editor-session.js`، `app/miniapp_static/app.js`، `tests/serverless/page-name-uniqueness.test.mjs`، `md_files/log.md`.
 - **الاختبارات:** Node 6/6 نجحت على رفض الاسم المكرر، المسافات وUnicode، استثناء الصفحة نفسها والمالك الآخر، قفل متزامن بمخزن mock، رفض حفظ البوت قبل الكتابة، وفحوص ربط المسارات؛ syntax نجح. لم يُختبر Telegram/D1 الحقيقي.
 - **النشر:** GitHub فقط؛ لا Telegram push/migrate، ولا حذف صفحات مكررة قديمة أو تغيير schema. Cloudflare Git integration قد ينشر الواجهة؛ حالته غير متحقق منها.
 
 ## 2026-10-10 — استدعاء الصفحة بالاسم في الإنلاين والضيف
 - **شنو تغيّر:** إضافة مطابقة كاملة لأسماء الصفحات ضمن صفحات المستخدم المستدعي، مع دعم المسافات والأسماء متعددة الكلمات في الإنلاين والضيف. الاسم المكرر يرجع تنبيهاً لاختيار كود الصفحة، ولا تُختار صفحة عشوائياً. الاستدعاء بالكود والمشاركة به باقيان.
 - **السبب:** طلب المالك الاستدعاء بالاسم مع رفض الأسماء المتعارضة؛ المطابقة الجزئية غير مستخدمة، والأسماء عند مستخدم آخر لا تكشف صفحاته.
-- **الملفات:** `tgcloud/lib/page-delivery.js`، معالجا `inline_query` و`guest_message`، `tests/serverless/page-name-delivery.test.mjs`، `log.md`.
+- **الملفات:** `tgcloud/lib/page-delivery.js`، معالجا `inline_query` و`guest_message`، `tests/serverless/page-name-delivery.test.mjs`، `md_files/log.md`.
 - **الاختبارات:** 3/3 اختبارات Node نجحت لمطابقة الاسم الكامل، الأسماء المتداخلة، التكرار، عزل المالك، استمرار مشاركة الأكواد، ونص/تعليق الضيف؛ فحص syntax للملفات الثلاثة نجح. لا اختبار Telegram حي.
 - **النشر:** رفع GitHub على `serverless-cleanup` فقط؛ يحتاج المستخدم سحب التعديل ونشره إلى Telegram Serverless.
 
 ## 2026-10-10 — حذف زر بوتاتي من الترحيب
-- **شنو تغيّر:** حذف صف زر «بوتاتي» من `buildWelcomeKeyboard`، وإزالة مهمة الحذف المعلقة من `sups.md` وتوثيق تنفيذ حذف زر الترحيب تحديداً.
+- **شنو تغيّر:** حذف صف زر «بوتاتي» من `buildWelcomeKeyboard`، وإزالة مهمة الحذف المعلقة من `md_files/sups.md` وتوثيق تنفيذ حذف زر الترحيب تحديداً.
 - **السبب:** طلب المالك إزالة الزر من رسالة الترحيب وتطبيق التغيير على الفرع.
-- **الملفات:** `tgcloud/lib/welcome.js`، `sups.md`، `log.md`.
+- **الملفات:** `tgcloud/lib/welcome.js`، `md_files/sups.md`، `md_files/log.md`.
 - **التحقق:** فحص لوحة الأزرار بعد تنفيذ الدالة باللغتين العربية والإنكليزية: صفان، لا زر بوتاتي ولا رابط managed_bots، مع بقاء أزرار المجموعة والعرض وبدء المحرر.
 - **النشر:** GitHub فقط؛ لا Telegram Serverless push/migrate. صفحة Mini App ومساراتها لم تُحذف بهذه المهمة.
 
 ## 2026-10-10 — تحديث خطة الباقات وحدود تليكرام
-- **شنو تغيّر:** إعادة تنظيم `sups.md` للاشتراكات الشخصية؛ اعتماد النص 20000/25000/32768، والبلوكات الإجمالية 50/200/500، والتداخل 4/8/16، والوسائط 10/25/50، والأعمدة 8/12/20. الصفحات والحزم والأسعار وإزالة الحقوق باقية حسب القرارات المعتمدة.
+- **شنو تغيّر:** إعادة تنظيم `md_files/sups.md` للاشتراكات الشخصية؛ اعتماد النص 20000/25000/32768، والبلوكات الإجمالية 50/200/500، والتداخل 4/8/16، والوسائط 10/25/50، والأعمدة 8/12/20. الصفحات والحزم والأسعار وإزالة الحقوق باقية حسب القرارات المعتمدة.
 - **السبب:** اعتماد المالك توزيعاً جديداً ومطابقته لحدود Rich Message الرسمية؛ تصحيح السقف القديم 25 عموداً وتعريف احتساب النص والبلوكات والحمولة النهائية.
 - **النطاق:** إضافة حذف زر «بوتاتي» كمهمة غير منفذة، وإزالة مسار البوتات المدارة من خطة الاشتراكات، والحفاظ على إلغاء القوالب وسجل النسخ وتأجيل الجدولة. لا حذف runtime أو بيانات.
-- **الملفات:** `sups.md` و`log.md`.
+- **الملفات:** `md_files/sups.md` و`md_files/log.md`.
 - **التحقق:** مراجعة وثائق Telegram Bot API وجدول الباقات واتساق الخطة؛ لا اختبارات runtime لأن التغيير توثيقي.
 - **النشر:** تحديث GitHub فقط؛ لا Telegram push/migrate أو تغيير Webhooks. نجاح Cloudflare Git integration غير متحقق منه.
 
 ## 2026-10-09 — إنشاء سجل تغييرات دائم وتعليمات تحديثه
-- **شنو تغيّر:** إنشاء `log.md` وإضافة قاعدة تحديثه إلى `AGENTS.md` لكل تغيير لاحق.
+- **شنو تغيّر:** إنشاء `md_files/log.md` وإضافة قاعدة تحديثه إلى `AGENTS.md` لكل تغيير لاحق.
 - **السبب:** تسهيل متابعة قرارات المشروع ومعرفة سبب كل تعديل، ومنع تضارب تعليمات الإيجنتات بين الجلسات.
-- **الملفات:** `log.md`، `AGENTS.md`.
+- **الملفات:** `md_files/log.md`، `AGENTS.md`.
 - **النشر:** تحديث المستودع فقط؛ هذه الوثائق لا تمثل نشر Telegram Serverless. يتبع Cloudflare إعداد GitHub Integration الخاص بالفرع، ولا نستنتج نجاح نشره دون التحقق منه.
 
 ## 2026-10-09 — إلغاء سجل النسخ المحفوظة من باقات المحرر
-- **شنو تغيّر:** استبعاد ميزة الاحتفاظ بإصدارات الصفحة من Plus وGolden، وحذف مهمة ترحيل `editor_page_versions` من خطة `sups.md`. تصحيح مراجع قديمة في `AGENTS.md` كي لا تعيد الإيجنتات طرح الميزة الملغاة.
+- **شنو تغيّر:** استبعاد ميزة الاحتفاظ بإصدارات الصفحة من Plus وGolden، وحذف مهمة ترحيل `editor_page_versions` من خطة `md_files/sups.md`. تصحيح مراجع قديمة في `AGENTS.md` كي لا تعيد الإيجنتات طرح الميزة الملغاة.
 - **السبب:** قرار المالك إلغاء ميزة سجل النسخ؛ لا يريد تخزين نسخ تاريخية تلقائية لكل صفحة ضمن الاشتراكات.
-- **الملفات:** `sups.md`، `AGENTS.md`.
+- **الملفات:** `md_files/sups.md`، `AGENTS.md`.
 - **غير مشمول بالإلغاء:** حفظ الصفحة العادي، النسخ الاحتياطية التشغيلية، المراجعة `revision` لحماية الكتابة المتزامنة، والتراجع/الإعادة داخل جلسة التحرير. هذه وظائف أخرى وليست سجل نسخ الاشتراكات.
 - **النشر:** لا يوجد تنفيذ نشر Telegram Serverless ضمن هذا التغيير.
 
 ## 2026-10-09 — تثبيت حدود الباقات المعتمدة
-- **شنو تغيّر:** توثيق حدود Free/Plus/Golden للنص والصفحات والبلوكات وحزم الإيموجي وإزالة الحقوق والوصول المبكر في `sups.md` و`tgcloud/lib/subscription-policy.js`، مع عرض اشتراكات Mini App.
+- **شنو تغيّر:** توثيق حدود Free/Plus/Golden للنص والصفحات والبلوكات وحزم الإيموجي وإزالة الحقوق والوصول المبكر في `md_files/sups.md` و`tgcloud/lib/subscription-policy.js`، مع عرض اشتراكات Mini App.
 - **السبب:** وجود مصدر واضح لحدود الاشتراكات قبل الربط النهائي مع استحقاقات الدفع الموثوقة.
 - **الحالة:** لا يُعتبر ظهور السعر أو الحدود في الواجهة إثباتاً بتفعيل صلاحيات مدفوعة على الإنتاج.
 

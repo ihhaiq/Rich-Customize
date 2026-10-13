@@ -1,3 +1,4 @@
+import { tutorialCopy } from 'lib/tutorial-copy';
 import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { marketingCampaignAttribution } from 'schema';
@@ -89,8 +90,8 @@ export async function sendMarketingLanding(message, source) {
           style: 'primary',
         }],
         [{
-          text: copy.examplesButton,
-          callback_data: 'r:showcase',
+          text: tutorialCopy(locale).entry,
+          callback_data: 'tut:open',
         }],
       ],
     },

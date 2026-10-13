@@ -172,7 +172,7 @@ async function allocatePageId() {
   throw new Error('could not allocate a unique page id');
 }
 
-async function persistPage(userId, title, session, existingId = null) {
+export async function persistPage(userId, title, session, existingId = null, { reservedId = null, expectedRevision = null } = {}) {
   // Saved pages can be edited only when their stored content fits the current verified plan.
   async function assertQuota(previousBlocks = null) {
     const entitlement = await getEditorEntitlement(userId);
@@ -192,11 +192,26 @@ async function persistPage(userId, title, session, existingId = null) {
   }
   try {
   const cleanedTitle = String(title || '').trim().slice(0, 64) || 'Untitled page';
+  // A tutorial reserves its creation ID before writing. A retry may only reuse
+  // that exact snapshot; never turn an uncertain create into a second page.
+  if (reservedId) {
+    if (!/^tut_[a-zA-Z0-9_-]{8,40}$/.test(reservedId)) throw new Error('INVALID_RESERVED_PAGE_ID');
+    const prior = await getPage(reservedId);
+    if (prior) {
+      if (Number(prior.ownerId) === Number(userId) && prior.title === cleanedTitle && isSavedPageUnchanged(prior, session)) return reservedId;
+      throw new Error('PAGE_CONFLICT');
+    }
+  }
+
   await assertUniquePageTitle(userId, cleanedTitle, existingId);
   let stamp = nowSeconds();
   if (existingId) {
     const existing = await getPage(existingId);
     if (!existing || Number(existing.ownerId) !== Number(userId)) return null;
+    if (expectedRevision != null && Number(existing.revision || 1) !== Number(expectedRevision)) {
+      if (existing.title === cleanedTitle && isSavedPageUnchanged(existing, session)) return String(existingId);
+      throw new Error('PAGE_CONFLICT');
+    }
     const entitlement = await getEditorEntitlement(userId);
     if (isLegacySavedPage(existing, userId, entitlement)) {
       if (String(existing.title || '') === cleanedTitle
@@ -246,7 +261,7 @@ async function persistPage(userId, title, session, existingId = null) {
       error.pageLimit = true;
       throw error;
     }
-    const id = await allocatePageId();
+    const id = reservedId || await allocatePageId();
     const version = await nextPageSyncVersion(0);
     await db.insert(richPages).values({
       pageId: id,

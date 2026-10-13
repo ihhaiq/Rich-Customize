@@ -7,9 +7,9 @@ describes code in GitHub, **not** production deployment or paid entitlement acti
 ## Single source of truth
 
 All approved numeric quotas are defined in
-[`tgcloud/lib/subscription-policy.js`](../tgcloud/lib/subscription-policy.js)
+[`tgcloud/lib/subscription-policy.js`](../../tgcloud/lib/subscription-policy.js)
 as `PLAN_LIMITS`. The front-end comparison reads
-[`app/miniapp_static/plan_catalog.generated.js`](../app/miniapp_static/plan_catalog.generated.js),
+[`app/miniapp_static/plan_catalog.generated.js`](../../app/miniapp_static/plan_catalog.generated.js),
 which is generated from the server-side policy, not maintained independently.
 To update quotas: edit the Serverless policy, run `npm run generate:plans`,
 review the diff, and run `npm run test:ci`. The CI `check:plans` fails on drift.

@@ -1,7 +1,7 @@
 # AGENTS.md — Rich Customize
 
 Work on `serverless-cleanup`. Active editor runtime is Telegram Serverless JavaScript; Cloudflare hosts the Mini App bridge plus a separate ID-only Cron reminder Worker for scheduled posts, NOT the main bot.
-Read [docs/README.md](docs/README.md), [sups.md](sups.md) and [docs/subscription-rollout.md](docs/subscription-rollout.md). Archived material is historical, never implementation authority.
+Read [docs/README.md](docs/README.md), [sups.md](md_files/sups.md) and [docs/subscription-rollout.md](md_files/docs/subscription-rollout.md). Archived material is historical, never implementation authority.
 
 ## Layout and runtime
 - `tgcloud/schema.js`: persistent schema.
@@ -11,7 +11,7 @@ Read [docs/README.md](docs/README.md), [sups.md](sups.md) and [docs/subscription
 - `functions/**`, `cloudflare/d1/**`: Mini App authentication, bridge, upload, support and scheduled-reminder metadata (never post contents).
 - `workers/schedule-reminders/**`: separate Cron-only Worker using existing D1 and B2B relay credentials.
 - `tests/serverless/*.test.mjs`: active JS suite, `npm test` from root; Node 24.
-- `docs/archive/**`: old plans and Python tests as text, not active runtime/tests.
+- `md_files/docs/archive/**`: historical Markdown plans; `docs/archive/**` retains README files and Python tests as text. Neither is active runtime/tests.
 - Billing is maintained in `ihhaiq/richDonate` on `main`; no active `subscription-bot/` project in this repository.
 
 Use SDK `api`, `db`, `fetch`, `InputFile` in the isolated V8 runtime. No filesystem/npm runtime dependencies.
@@ -53,7 +53,7 @@ Removed locales: fr/fa/ku/he. Catalogs: `tgcloud/lib/lang/`; developer panel Ara
 Arabic copy uses the owner's wording, including «تليكرام».
 
 ## Subscriptions: approved specification versus current runtime
-Root `sups.md` is the approved product specification, dated 2026-10-10:
+`md_files/sups.md` is the approved product specification, dated 2026-10-10:
 - Text: 20000/25000/32768.
 - Total nested blocks/items: 50/200/500.
 - Depth: 4/8/16; media per message: 10/25/50; columns per table: 8/12/20.
@@ -63,9 +63,9 @@ Root `sups.md` is the approved product specification, dated 2026-10-10:
 - Golden early access has no named experimental features yet.
 
 Do NOT claim these new numbers are enforced merely because they appear in docs/donation UI.
-Editor runtime still has older caps; [rollout](docs/subscription-rollout.md) tracks remaining work.
+Editor runtime still has older caps; [rollout](md_files/docs/subscription-rollout.md) tracks remaining work.
 `editor-subscriptions.js` accepts active unexpired records from `richdonate:verified`; complete trusted payment event issuance/ACK remains pending.
-Templates and saved page history are cancelled. Scheduling code and editor UI are present but NOT deployed or live. The new `tgcloud/lib/scheduled-publish.js` stores message snapshots and consumes verified RCB1 reminders; `workers/schedule-reminders/` defines a separate Cloudflare Cron Worker. Cloudflare holds IDs/times only. See `docs/scheduling.md` for migration, secrets, tests and rollout. Do not deploy/migrate before production authorization. Free allows 2 destinations per scheduled post; Plus=5 and Golden=15 are provisional.
+Saved templates and saved page history remain cancelled. The owner approved fixed tutorial starter examples on 2026-10-13; these are a separate onboarding scope documented in [md_files/tutorial.md](md_files/tutorial.md), not a subscription feature or template-management system. Scheduling code and editor UI are present but NOT deployed or live. The new `tgcloud/lib/scheduled-publish.js` stores message snapshots and consumes verified RCB1 reminders; `workers/schedule-reminders/` defines a separate Cloudflare Cron Worker. Cloudflare holds IDs/times only. See `md_files/docs/scheduling.md` for migration, secrets, tests and rollout. Do not deploy/migrate before production authorization. Free allows 2 destinations per scheduled post; Plus=5 and Golden=15 are provisional.
 Operational `page_snapshots`, revision CAS and session undo/redo remain required.
 
 Preserve old saved content over the free text cap without allowing expansion. Trusted baseline must come from owner-verified stored pages, never unsaved session blocks.
@@ -77,9 +77,9 @@ The branding button deep-links to `https://t.me/richDonateBot?start=cart_brandin
 The welcome «بوتاتي» button is removed; legacy runtime/data were not deleted.
 
 ## Cleanup and change log
-- Every completed code, test, schema, UI or documentation change updates root `log.md` in the same batch.
+- Every completed code, test, schema, UI or documentation change updates `md_files/log.md` in the same batch.
 - Record date, change, reason, files, actual tests and GitHub versus deployment state. Never log secrets/private content.
-- Root `log.md` is the only active change history. `PROJECT-LOG.md` is a pointer to its archived baseline.
+- `md_files/log.md` is the only active change history. `md_files/PROJECT-LOG.md` is a pointer to its archived baseline.
 - Remove/move only files proven obsolete; validate imports, links and tests. Keep uncertain runtime modules and SQL until a separate dependency/data audit.
 - No unrelated feature work during cleanup. Do not change financial behavior just to tidy files.
 
@@ -88,3 +88,8 @@ User authorized Cloudflare Pages Git auto-deploy from `serverless-cleanup`; no `
 User runs Telegram CLI locally; supplying commands or pushing GitHub does not prove Telegram deployment.
 For this cleanup: no `tgcloud push`, `migrate`, webhook changes, production data cleanup or architecture change.
 Review schema and diff before any separately authorized production action. Never commit `.tgcloud/`, tokens, `.env` or `node_modules/`.
+
+## Tutorial documentation checkpoint
+- Read [md_files/tutorial.md](md_files/tutorial.md) before tutorial work. This is a plan, not an implemented feature.
+- Markdown documents now live under `md_files/`, retaining their prior relative hierarchy. README and AGENT/AGENTS files stay at their original paths. Keep links current.
+- The tutorial must use one editable guide message and must not mention or modify disabled inline mode.

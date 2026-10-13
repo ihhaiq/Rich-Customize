@@ -1,6 +1,6 @@
 # Historical reference — superseded
 
-This file is archived as historical evidence, not an implementation or deployment instruction. Use the active documentation index in `docs/README.md` and root `sups.md`.
+This file is archived as historical evidence, not an implementation or deployment instruction. Use the active documentation index in `docs/README.md` and root `md_files/sups.md`.
 
 # Editor architecture
 

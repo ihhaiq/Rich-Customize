@@ -1,3 +1,4 @@
+import { handleTutorialCallback, pauseTutorialForCommand } from 'lib/tutorial-controller';
 import { handleGoldenGiftCallback } from 'lib/golden-gifts';
 import { api } from 'sdk';
 import { handlePremiumEmojiCallback } from 'lib/editor-premium-emoji';
@@ -52,6 +53,8 @@ export default async function (query, ctx = {}) {
     if (query?.from && !query.from.language_code) {
       query.from.language_code = await resolveUserLanguage(query.from);
     }
+    if (await handleTutorialCallback(query)) return;
+    await pauseTutorialForCommand({ ...query.message, from: query.from });
     if (await handleDeveloperCallback(query)) return;
     if (await handleGoldenGiftCallback(query)) return;
     if (await handlePageNavigationCallback(query)) return;

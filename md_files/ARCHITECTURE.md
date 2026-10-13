@@ -60,4 +60,4 @@ The documented bridge uses `@Richminiappsbot` as relay and `@RichCustomizebot` a
 2. Trace affected data flow across Serverless, bridge and Cloudflare.
 3. Identify security, ownership, retry, size and data-loss risks.
 4. Test the relevant paths and document actual verification.
-5. Update this file and add a decision entry to `log.md` only for confirmed architectural changes.
+5. Update this file and add a decision entry to `md_files/log.md` only for confirmed architectural changes.

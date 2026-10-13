@@ -1,6 +1,6 @@
 # Historical reference — superseded
 
-This file is archived as historical evidence, not an implementation or deployment instruction. Use the active documentation index in `docs/README.md` and root `sups.md`.
+This file is archived as historical evidence, not an implementation or deployment instruction. Use the active documentation index in `docs/README.md` and root `md_files/sups.md`.
 
 # تقرير تنفيذ Managed Bots
 
@@ -69,8 +69,8 @@ This file is archived as historical evidence, not an implementation or deploymen
 - `app/miniapp_static/managed-bots.html`
 - `app/miniapp_static/managed-bots.js`
 - `cloudflare/d1/migrations/0001-managed-bots-runtime.sql`
-- `docs/managed-bots-report.md`
-- `docs/managed-bots.md`
+- `md_files/docs/managed-bots-report.md`
+- `md_files/docs/managed-bots.md`
 - `functions/_lib/b2b-bridge.js`
 - `functions/_lib/managed-bot-jobs.js`
 - `functions/_lib/managed-bot-licenses.js`
@@ -90,7 +90,7 @@ This file is archived as historical evidence, not an implementation or deploymen
 - `functions/miniapp/api/me.js`
 - `functions/miniapp/api/performance.js`
 - `package.json`
-- `sups.md`
+- `md_files/sups.md`
 - `tests/serverless/developer-limits.test.mjs`
 - `tests/serverless/harness.mjs`
 - `tests/serverless/managed-bots.test.mjs`

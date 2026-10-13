@@ -13,5 +13,5 @@ Updated 2026-10-10. Work on `serverless-cleanup`; payment bot work uses `ihhaiq/
 | Marketing | [Referral.md](Referral.md) | Separate plan; verify actual current behavior |
 
 No templates or saved page history. Scheduling remains deferred.
-Root `log.md` is the only active change log. [Archived decisions](docs/archive/project-decisions-2026-10-08.md) are historical.
+Root `md_files/log.md` is the only active change log. [Archived decisions](docs/archive/project-decisions-2026-10-08.md) are historical.
 Runtime is JavaScript under `tgcloud/`; archived Python tests are not active.

@@ -1,3 +1,4 @@
+import { tutorialCopy } from 'lib/tutorial-copy';
 import { isRtlLocale, resolveLanguage, t } from 'lib/i18n';
 import { buildHelpDetailsBlock } from 'lib/legal';
 
@@ -66,17 +67,10 @@ export function buildWelcomeKeyboard(languageCode) {
   const locale = resolveLanguage(languageCode);
   return {
     inline_keyboard: [
-      [{ text: t(locale, 'welcome.add_group_button'), url: ADD_GROUP_URL }],
+      [{ text: tutorialCopy(locale).entry, callback_data: 'tut:open' }],
       [
-        {
-          text: t(locale, 'welcome.showcase_button'),
-          callback_data: 'r:showcase',
-        },
-        {
-          text: t(locale, 'editor.new_button'),
-          callback_data: 'r:starteditor',
-          style: 'primary',
-        },
+        { text: t(locale, 'editor.new_button'), callback_data: 'r:starteditor', style: 'primary' },
+        { text: t(locale, 'welcome.add_group_button'), url: ADD_GROUP_URL },
       ],
     ],
   };

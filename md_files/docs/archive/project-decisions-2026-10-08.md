@@ -1,6 +1,6 @@
 # Historical reference — superseded
 
-This file is archived as historical evidence, not an implementation or deployment instruction. Use the active documentation index in `docs/README.md` and root `sups.md`.
+This file is archived as historical evidence, not an implementation or deployment instruction. Use the active documentation index in `docs/README.md` and root `md_files/sups.md`.
 
 # Rich Customize — Project Decision Log
 
@@ -22,7 +22,7 @@ Each meaningful future change should record:
 
 **Decision:** Add separate roadmap, decision log and architecture map; leave existing `AGENTS.md` unchanged.
 
-**Scope:** `ROADMAP.md`, `PROJECT-LOG.md`, `ARCHITECTURE.md`.
+**Scope:** `md_files/ROADMAP.md`, `md_files/PROJECT-LOG.md`, `md_files/ARCHITECTURE.md`.
 
 **Verification:** Documentation-only repository changes. No runtime or deployment validation is implied.
 

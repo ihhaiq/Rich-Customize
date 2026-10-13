@@ -1,3 +1,4 @@
+import { handleTutorialMessage, pauseTutorialForCommand } from 'lib/tutorial-controller';
 // Telegram Serverless message handler.
 // The platform passes update.message directly as the first argument.
 
@@ -77,6 +78,7 @@ export default async function (message, ctx = {}) {
     if (await handleDefaultTopicCommand(message)) return;
     const command = commandName(message?.text);
     const languageCode = await resolveUserLanguage(message?.from);
+    if (command.startsWith('/')) await pauseTutorialForCommand(message);
     if (message?.from && !message.from.language_code) {
       message.from.language_code = languageCode;
     }
@@ -132,6 +134,8 @@ export default async function (message, ctx = {}) {
       // In groups/supergroups the bot must stay silent unless a supported command
       // was handled above.
       if (String(message?.chat?.type || '') !== 'private') return;
+
+      if (await handleTutorialMessage(message)) return;
 
       if (
         isForwardedRichMessage(message)
