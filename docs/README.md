@@ -24,4 +24,4 @@
 Compatibility pointers moved under `md_files/`; README files remain in their original locations. Archived instructions are not current deployment guidance.
 
 ## Tutorial plan
-[Interactive tutorial specification](../md_files/tutorial.md) records the approved UI, single-message preview, starter examples, lessons, implementation phases and acceptance checks. Planning only; no tutorial runtime has been deployed.
+[Interactive tutorial specification](../md_files/tutorial.md) records the approved UI, single-message preview, starter examples, lessons, implementation phases and acceptance checks. Implementation and localization are recorded in section 19; Telegram deployment and live acceptance remain pending.

@@ -1,3 +1,4 @@
+import { tutorialWords as words } from 'lib/tutorial-i18n';
 import { makeBlock, textData, listData, tableData, mapData, normalizeBlocks, FINAL_RICH_BLOCK_TYPES } from 'lib/editor-blocks';
 import { messageToBlocks } from 'lib/editor-import';
 
@@ -9,7 +10,7 @@ export function orderBlocks(blocks) {
 export const TEMPLATE_IDS = ['heading_table', 'regular_post', 'announcement', 'task_list', 'recipe'];
 export const TYPES = FINAL_RICH_BLOCK_TYPES;
 export const RECIPE_IMAGES = [1, 2].map(n => 'https://rich-customize.pages.dev/tutorial-assets/recipe-' + n + '.png');
-export function words(locale, ar, en) { return String(locale).startsWith('ar') ? ar : en; }
+export { tutorialWords as words } from 'lib/tutorial-i18n';
 export function textBlock(type, text, position = 0) { return makeBlock(type, textData({text}, type, 1), position); }
 export function templateBlocks(id, locale = 'ar') {
   const w = (ar,en) => words(locale,ar,en);

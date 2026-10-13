@@ -1,4 +1,4 @@
-const words=(locale,ar,en)=>String(locale).startsWith('ar')?ar:en;
+import { tutorialWords as words } from 'lib/tutorial-i18n';
 export function tutorialCopy(locale) {
   const w=(ar,en)=>words(locale,ar,en);
   return {

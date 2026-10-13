@@ -450,7 +450,10 @@ async function openPage(query, requireSubscription) {
   ) {
     await api.answerCallbackQuery({
       callback_query_id: query.id,
-      text: tr(locale(code), 'You are not subscribed.'),
+      // Preserve the owner's original main-branch wording for this CBD alert.
+      text: locale(code) === 'ar'
+        ? 'انت مو من المقربين ابتعد عني .... '
+        : tr(locale(code), 'You are not subscribed.'),
       show_alert: true,
     });
     return true;

@@ -39,6 +39,7 @@ test('verified paid cohorts are checked against Serverless billing source and ac
  assert.match(source,/a\.status='unavailable'/);
  assert.match(panel,/المتاحون تقديرياً/);
  assert.match(panel,/Golden Ticket/);
- assert.match(panel,/dev:stats:subscribers:0/);
- assert.match(panel,/dev:golden:status/);
+ // The management UI moved to the donation bot; keep the operational stats here.
+ assert.match(panel,/@richDonateBot/);
+ assert.match(panel,/تم نقل إدارة الاشتراكات والإهداء/);
 });

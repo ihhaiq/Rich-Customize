@@ -331,6 +331,7 @@ export async function handlePublishCallback(query){
       const publishButtons = legacy ? savedPage.buttons : latest.messageButtons;
       const publishButtonsPerRow = legacy ? savedPage.buttonsPerRow : latest.buttonsPerRow;
       const publishedButtons=await prepareMessageButtons(publishButtons || []);
+      let tutorialDeliveryKey = null;
       const succeeded=[],failed=[],reasons=[];
       for(const chatId of [...new Set(selected.filter(Number.isSafeInteger))]){
         const title=String(registered.get(chatId)?.title||chatId);
@@ -342,7 +343,8 @@ export async function handlePublishCallback(query){
           }
           const topicOptions=await resolveForumDeliveryOptions(chatId,access.chat);
           const markup=publishedButtons.length?buildMessageButtonsKeyboard(publishedButtons,{buttonsPerRow:Number(publishButtonsPerRow||1),sourcePageId:latest.currentPageId||null}):undefined;
-          await sendRichMessageSafe({chat_id:chatId,...topicOptions,rich_message:buildInputRichMessage(publishBlocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,entitlement,technicalOnly:Boolean(legacy)}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
+          const publishedMessage = await sendRichMessageSafe({chat_id:chatId,...topicOptions,rich_message:buildInputRichMessage(publishBlocks||[],{userId:query.from.id,sourcePageId:latest.currentPageId||null,includeBranding,entitlement,technicalOnly:Boolean(legacy)}),...(markup?{reply_markup:markup}:{}),disable_notification:Boolean(latest.postSilent),protect_content:Boolean(latest.postProtected)});
+          if (!tutorialDeliveryKey && Number(publishedMessage?.message_id) > 0) tutorialDeliveryKey = chatId + ':' + publishedMessage.message_id;
           succeeded.push(title);
         }catch(error){
           failed.push(title);
@@ -362,7 +364,7 @@ export async function handlePublishCallback(query){
       try{
         if(succeeded.length){
           await recordOperation('publish',true,succeeded.length);
-          try{await recordMarketingPublish(userId);}catch(error){console.warn('Could not record campaign conversion',error);}
+          try{await recordMarketingPublish(userId, tutorialDeliveryKey);}catch(error){console.warn('Could not record campaign conversion',error);}
         }
         if(failed.length)await recordOperation('publish',false,failed.length);
       }catch(statsError){console.warn('Could not record publish stats',statsError);}
@@ -681,7 +683,7 @@ async function publishBridgePageContent({
 
   try {
     await recordOperation('publish', true, 1);
-    await recordMarketingPublish(userId);
+    await recordMarketingPublish(userId, Number(sent?.message_id) > 0 ? targetChatId + ':' + sent.message_id : null);
   } catch (statsError) {
     console.warn('Could not record successful Mini App publish stats', statsError);
   }

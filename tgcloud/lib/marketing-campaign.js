@@ -1,3 +1,4 @@
+import { recordTutorialPublish, tutorialFunnelRows, tutorialFunnelBlock } from 'lib/tutorial-metrics';
 import { tutorialCopy } from 'lib/tutorial-copy';
 import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
@@ -35,9 +36,12 @@ export async function recordMarketingStart(userId, source) {
   return true;
 }
 
-export async function recordMarketingPublish(userId) {
+export async function recordMarketingPublish(userId, deliveryKey = null) {
   const id = Number(userId);
   if (!Number.isSafeInteger(id)) return false;
+
+  try { await recordTutorialPublish(id, deliveryKey); }
+  catch { console.warn('Could not record tutorial conversion'); }
 
   const row = await db.select().from(marketingCampaignAttribution)
     .where(eq(marketingCampaignAttribution.userId, id))
@@ -197,6 +201,12 @@ export async function sendMarketingCampaignSummary(message) {
       type: 'footer',
       text: 'روابط التجربة: /start ad_a · /start ad_b · /start ad_c',
     });
+  }
+
+  try { blocks.push(tutorialFunnelBlock(await tutorialFunnelRows())); }
+  catch {
+    console.warn('Could not load tutorial funnel');
+    blocks.push({ type: 'paragraph', text: 'تعذّر تحميل مراحل الدليل حالياً. إحصائيات الحملات أعلاه متاحة؛ جرّب التقرير لاحقاً.' });
   }
 
   await api.sendRichMessage({

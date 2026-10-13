@@ -90,6 +90,6 @@ For this cleanup: no `tgcloud push`, `migrate`, webhook changes, production data
 Review schema and diff before any separately authorized production action. Never commit `.tgcloud/`, tokens, `.env` or `node_modules/`.
 
 ## Tutorial documentation checkpoint
-- Read [md_files/tutorial.md](md_files/tutorial.md) before tutorial work. This is a plan, not an implemented feature.
+- Read [md_files/tutorial.md](md_files/tutorial.md) before tutorial work. Section 19 is the current implementation checkpoint; Telegram deployment and live acceptance remain pending.
 - Markdown documents now live under `md_files/`, retaining their prior relative hierarchy. README and AGENT/AGENTS files stay at their original paths. Keep links current.
 - The tutorial must use one editable guide message and must not mention or modify disabled inline mode.
