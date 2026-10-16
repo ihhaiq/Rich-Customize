@@ -7,9 +7,16 @@ const operationalSource = fs.readFileSync(new URL('../../tgcloud/lib/operational
   .replace(/^import .*?;\s*$/gm, '');
 const errors = new Function(
   publishSource.replace(/\bexport /g, '') + '\n' + operationalSource.replace(/\bexport /g, '')
-  + '\nreturn {explainOperationalError,userOperationalError};',
+  + '\nreturn {explainOperationalError,userOperationalError,isEditorLimitFailure};',
 )();
-const { explainOperationalError, userOperationalError } = errors;
+const { explainOperationalError, userOperationalError, isEditorLimitFailure } = errors;
+
+test('editor quota rejections are recognized as expected preview failures', () => {
+  const failure = new Error('EDITOR_LIMIT:media_attachments:11:10');
+  assert.equal(isEditorLimitFailure(failure), true);
+  assert.equal(explainOperationalError(failure).expected, true);
+  assert.equal(isEditorLimitFailure(new Error('RICH_MESSAGE_TABLE_COLS_TOO_MANY')), false);
+});
 
 test('expired callbacks and unchanged edits are harmless, not internal errors', () => {
   for (const [message, code] of [

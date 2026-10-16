@@ -1,9 +1,10 @@
 import { db } from 'sdk';
 import { and, eq, lt } from 'sdk/db';
-import { editorSessions, maintenanceLocks, richPages } from 'schema';
+import { editorSessions, legacyStates, maintenanceLocks, richPages } from 'schema';
 import { validateEditorLimits } from 'lib/editor-blocks';
 import { isLegacySavedPage, isSavedPageUnchanged } from 'lib/saved-page-policy';
 import {
+  blockId,
   EDITOR_SESSION_TTL_SECONDS,
   normalizeBlockScrollOffset,
   normalizeBlocks,
@@ -26,9 +27,33 @@ const SAVED_DRAFT_FIELDS = Object.freeze([
   'buttonsPerRow',
   'buttonsAlign',
 ]);
+const SESSION_CONTEXT_MARKER = '__rich_customize_session_context';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function unpackPendingUserState(value) {
+  if (
+    value
+    && typeof value === 'object'
+    && value[SESSION_CONTEXT_MARKER] === 1
+  ) {
+    return {
+      pendingUserState: value.pendingUserState ?? null,
+      channelPostTarget: value.channelPostTarget ?? null,
+    };
+  }
+  return { pendingUserState: value ?? null, channelPostTarget: null };
+}
+
+function packPendingUserState(pendingUserState, channelPostTarget) {
+  if (!channelPostTarget) return pendingUserState ?? null;
+  return {
+    [SESSION_CONTEXT_MARKER]: 1,
+    pendingUserState: pendingUserState ?? null,
+    channelPostTarget: clone(channelPostTarget),
+  };
 }
 
 function stable(value) {
@@ -322,6 +347,9 @@ export async function loadEditorSession(userId, { touch = true } = {}) {
     row.lastActivityAt = stamp;
   }
 
+  const sessionContext = unpackPendingUserState(row.pendingUserState);
+  row.pendingUserState = sessionContext.pendingUserState;
+  row.channelPostTarget = sessionContext.channelPostTarget;
   row.blocks = safeDraft(row).blocks;
   row.messageButtons = safeDraft(row).messageButtons;
   row.blockScrollOffset = normalizeBlockScrollOffset(
@@ -335,6 +363,43 @@ export async function updateEditorSession(userId, changes, { touch = true } = {}
   const id = Number(userId);
   if (!Number.isSafeInteger(id)) return null;
   const payload = { ...changes };
+  const hasChannelPostTarget = Object.hasOwn(payload, 'channelPostTarget');
+  const hasPendingUserState = Object.hasOwn(payload, 'pendingUserState');
+  if (
+    hasChannelPostTarget
+    || hasPendingUserState
+    || Object.hasOwn(payload, 'currentPageId')
+  ) {
+    const stored = await db.select({
+      pendingUserState: editorSessions.pendingUserState,
+      currentPageId: editorSessions.currentPageId,
+    }).from(editorSessions).where(eq(editorSessions.userId, id)).get();
+    const sessionContext = unpackPendingUserState(stored?.pendingUserState);
+    let channelPostTarget = hasChannelPostTarget
+      ? payload.channelPostTarget
+      : sessionContext.channelPostTarget;
+    const pendingUserState = hasPendingUserState
+      ? payload.pendingUserState
+      : sessionContext.pendingUserState;
+
+    if (
+      channelPostTarget
+      && !hasChannelPostTarget
+      && Object.hasOwn(payload, 'currentPageId')
+      && String(payload.currentPageId || '') !== String(stored?.currentPageId || '')
+    ) {
+      channelPostTarget = null;
+    }
+    delete payload.channelPostTarget;
+    if (
+      hasChannelPostTarget
+      || hasPendingUserState
+      || channelPostTarget
+      || sessionContext.channelPostTarget
+    ) {
+      payload.pendingUserState = packPendingUserState(pendingUserState, channelPostTarget);
+    }
+  }
   const currentForMutation = SAVED_DRAFT_FIELDS.some((field) => Object.hasOwn(payload, field))
     ? await loadEditorSession(id, { touch:false })
     : null;
@@ -641,4 +706,26 @@ export async function releaseEditorMutationLock(lock) {
       eq(maintenanceLocks.expiresAt, Number(lock.expiresAt)),
     ))
     .run();
+}
+
+
+const key=id=>'tutorial:v1:'+Number(id);
+export async function readTutorial(userId) {
+  const row=await db.select().from(legacyStates).where(eq(legacyStates.namespace,key(userId))).get();
+  if(!row)return null;
+  const state=row.payload;
+  if(state?.version!==1 || Number(state.userId)!==Number(userId))throw new Error('TUTORIAL_STATE_VERSION');
+  return {...state,storageRevision:row.updatedAt};
+}
+export function initialTutorial(userId,chatId,messageId) {
+  return {version:1,userId:Number(userId),chatId:Number(chatId),messageId:Number(messageId),epoch:blockId().slice(0,8),revision:0,step:'home',navigationStack:[],active:true,blocks:[],undo:null,pending:null,pageId:null,pageRevision:null,pageTitle:null,events:{},lastInputId:0,createdAt:Math.floor(Date.now()/1000)};
+}
+export async function writeTutorial(state,previous) {
+  const updatedAt=Math.max(Date.now(),Number(previous?.storageRevision||0)+1);
+  const payload={...state,revision:Number(previous?.revision||0)+1};delete payload.storageRevision;
+  let rows;
+  if(previous)rows=await db.update(legacyStates).set({payload,updatedAt}).where(and(eq(legacyStates.namespace,key(state.userId)),eq(legacyStates.updatedAt,previous.storageRevision))).returning({namespace:legacyStates.namespace}).run();
+  else rows=await db.insert(legacyStates).values({namespace:key(state.userId),payload,updatedAt}).onConflictDoNothing({target:legacyStates.namespace}).returning({namespace:legacyStates.namespace}).run();
+  if(!rows?.length)throw new Error('TUTORIAL_CONFLICT');
+  return {...payload,storageRevision:updatedAt};
 }

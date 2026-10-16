@@ -34,6 +34,7 @@ const EXACT = new Set([
   'r:psort',
   'r:prestore',
   'r:buttons',
+  'r:limit',
   'r:ba',
   'r:brow',
   'r:bpreview',
@@ -47,7 +48,9 @@ const EXACT = new Set([
 
 const PREFIXES = [
   'r:import:',
+  'r:channel:',
   'r:emoji:',
+  'r:limit:',
   'r:add:',
   'r:addlist:',
   'r:at:',
@@ -174,7 +177,7 @@ function legacyNavigationCallback(data) {
   ].includes(data) || [
     'r:postchat:','r:pt:','r:pages:','r:presults:',
     'r:pageopen:','r:psortset:','r:b:','r:blockscroll:',
-    'r:import:','r:pdelete:','r:pdeleteok:',
+    'r:import:','r:channel:','r:pdelete:','r:pdeleteok:',
   ].some(prefix => data.startsWith(prefix));
 }
 

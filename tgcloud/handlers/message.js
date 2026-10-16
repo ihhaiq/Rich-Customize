@@ -1,4 +1,4 @@
-import { handleTutorialMessage, pauseTutorialForCommand } from 'lib/tutorial-controller';
+import { handleTutorialMessage, pauseTutorialForCommand } from 'lib/editor-core';
 // Telegram Serverless message handler.
 // The platform passes update.message directly as the first argument.
 

@@ -425,7 +425,27 @@ export const MESSAGE_KEYS = Object.freeze([
   "emoji.cancel",
   "emoji.reorder",
   "emoji.reorder_choose",
-  "emoji.reorder_empty"
+  "emoji.reorder_empty",
+  "media.received",
+  "media.done",
+  "media.add_more",
+  "publish.bot_added",
+  "publish.bot_no_post_right",
+  "publish.add_hint",
+  "media.send_collage",
+  "media.send_slideshow",
+  "media.finish_batch",
+  "channel_post.choice",
+  "channel_post.edit",
+  "channel_post.import",
+  "channel_post.warning",
+  "channel_post.confirm",
+  "channel_post.success",
+  "channel_post.no_access",
+  "channel_post.expired",
+  "channel_post.busy",
+  "channel_post.close_editor_warning",
+  "channel_post.close_editor_confirm"
 ]);
 
 export const SUPPORTED_LOCALES = Object.freeze([

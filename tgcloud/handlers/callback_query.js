@@ -1,4 +1,8 @@
-import { handleTutorialCallback, pauseTutorialForCommand } from 'lib/tutorial-controller';
+import {
+  handleEditorChannelPostCallback,
+  handleTutorialCallback,
+  pauseTutorialForCommand,
+} from 'lib/editor-core';
 import { handleGoldenGiftCallback } from 'lib/golden-gifts';
 import { api } from 'sdk';
 import { handlePremiumEmojiCallback } from 'lib/editor-premium-emoji';
@@ -12,6 +16,7 @@ import { explainOperationalError, userOperationalError } from 'lib/operational-e
 import { handleBrandingCallback } from 'lib/branding';
 import { handleManagedBotCallback } from 'lib/managed-bot-billing';
 import { handleEditorBlockCallback } from 'lib/editor-block-flow';
+import { handleEditorLimitConfirmation } from 'lib/editor-limit-confirmation';
 import { handlePageNavigationCallback } from 'lib/page-navigation';
 import { handleEditorPageCallback } from 'lib/editor-pages';
 import { handleEditorButtonCallback } from 'lib/editor-buttons';
@@ -34,10 +39,12 @@ function isPublishEditorCallback(data) {
 }
 
 async function routeNonPublishEditorCallback(query) {
+  if (await handleEditorChannelPostCallback(query)) return true;
   if (await handleEditorImportCallback(query)) return true;
   if (await handlePremiumEmojiCallback(query)) return true;
   if (await handleEditorPageCallback(query)) return true;
   if (await handleEditorButtonCallback(query)) return true;
+  if (await handleEditorLimitConfirmation(query)) return true;
   if (await handleEditorBlockCallback(query)) return true;
   return false;
 }
@@ -54,7 +61,7 @@ export default async function (query, ctx = {}) {
       query.from.language_code = await resolveUserLanguage(query.from);
     }
     if (await handleTutorialCallback(query)) return;
-    await pauseTutorialForCommand({ ...query.message, from: query.from });
+    await pauseTutorialForCommand({ ...query.message, from: query.from, data: query.data });
     if (await handleDeveloperCallback(query)) return;
     if (await handleGoldenGiftCallback(query)) return;
     if (await handlePageNavigationCallback(query)) return;
@@ -95,6 +102,7 @@ export default async function (query, ctx = {}) {
       }
       if (locked.value) return;
     } else {
+      if (await handleEditorChannelPostCallback(query)) return;
       if (await handleEditorImportCallback(query)) return;
       if (await handlePremiumEmojiCallback(query)) return;
       if (await handleEditorPageCallback(query)) return;

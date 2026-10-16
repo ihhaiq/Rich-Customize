@@ -7,24 +7,24 @@ import { BOT_PROFILES } from 'lib/bot-profiles';
 import { MAIN_AR_BY_EN } from 'lib/main-ar-source';
 import enValues from 'lib/lang/en';
 import arValues from 'lib/lang/ar';
-import esValues from 'lib/lang/es';
-import deValues from 'lib/lang/de';
-import itValues from 'lib/lang/it';
-import ptValues from 'lib/lang/pt';
-import nlValues from 'lib/lang/nl';
-import plValues from 'lib/lang/pl';
-import ukValues from 'lib/lang/uk';
-import ruValues from 'lib/lang/ru';
-import trValues from 'lib/lang/tr';
-import urValues from 'lib/lang/ur';
-import hiValues from 'lib/lang/hi';
-import idValues from 'lib/lang/id';
-import jaValues from 'lib/lang/ja';
-import koValues from 'lib/lang/ko';
-import viValues from 'lib/lang/vi';
-import thValues from 'lib/lang/th';
-import zhHansValues from 'lib/lang/zh-hans';
-import zhHantValues from 'lib/lang/zh-hant';
+import esValues, { tutorialCatalog as esTutorial } from 'lib/lang/es';
+import deValues, { tutorialCatalog as deTutorial } from 'lib/lang/de';
+import itValues, { tutorialCatalog as itTutorial } from 'lib/lang/it';
+import ptValues, { tutorialCatalog as ptTutorial } from 'lib/lang/pt';
+import nlValues, { tutorialCatalog as nlTutorial } from 'lib/lang/nl';
+import plValues, { tutorialCatalog as plTutorial } from 'lib/lang/pl';
+import ukValues, { tutorialCatalog as ukTutorial } from 'lib/lang/uk';
+import ruValues, { tutorialCatalog as ruTutorial } from 'lib/lang/ru';
+import trValues, { tutorialCatalog as trTutorial } from 'lib/lang/tr';
+import urValues, { tutorialCatalog as urTutorial } from 'lib/lang/ur';
+import hiValues, { tutorialCatalog as hiTutorial } from 'lib/lang/hi';
+import idValues, { tutorialCatalog as idTutorial } from 'lib/lang/id';
+import jaValues, { tutorialCatalog as jaTutorial } from 'lib/lang/ja';
+import koValues, { tutorialCatalog as koTutorial } from 'lib/lang/ko';
+import viValues, { tutorialCatalog as viTutorial } from 'lib/lang/vi';
+import thValues, { tutorialCatalog as thTutorial } from 'lib/lang/th';
+import zhHansValues, { tutorialCatalog as zhHansTutorial } from 'lib/lang/zh-hans';
+import zhHantValues, { tutorialCatalog as zhHantTutorial } from 'lib/lang/zh-hant';
 
 const LANGUAGE_VALUES = Object.freeze({
   en: enValues,
@@ -47,6 +47,27 @@ const LANGUAGE_VALUES = Object.freeze({
   th: thValues,
   'zh-hans': zhHansValues,
   'zh-hant': zhHantValues,
+});
+
+export const TUTORIAL_TRANSLATIONS = Object.freeze({
+  "de": deTutorial,
+  "es": esTutorial,
+  "hi": hiTutorial,
+  "id": idTutorial,
+  "it": itTutorial,
+  "ja": jaTutorial,
+  "ko": koTutorial,
+  "nl": nlTutorial,
+  "pl": plTutorial,
+  "pt": ptTutorial,
+  "ru": ruTutorial,
+  "th": thTutorial,
+  "tr": trTutorial,
+  "uk": ukTutorial,
+  "ur": urTutorial,
+  "vi": viTutorial,
+  "zh-hans": zhHansTutorial,
+  "zh-hant": zhHantTutorial,
 });
 
 function placeholders(value) {
@@ -730,4 +751,47 @@ export function botProfile(locale) {
 
 export function supportedLocales() {
   return [...SUPPORTED_LOCALES];
+}
+
+
+export function tutorialWords(locale, ar, en) {
+  const language = resolveLanguage(locale);
+  if (language === 'ar') return ar;
+  return TUTORIAL_TRANSLATIONS[language]?.[en] ?? en;
+}
+
+
+export function tutorialCopy(locale) {
+  const w=(ar,en)=>tutorialWords(locale,ar,en);
+  return {
+    entry:w('شلون استعمل البوت 🤔','How do I use the bot? 🤔'),
+    build:w('أبني منشوري خطوة بخطوة','Build my post step by step'), templates:w('أستعمل قالب جاهز','Use a ready-made layout'), all:w('عرض كل البلوكات 🧩','Explore all blocks 🧩'),
+    homeDescription:w('المنشور الغني يتكوّن من بلوكات مثل النص والصورة والجدول. تگدر تضيف أزرار تفتح صفحاتك المحفوظة أو تفعّل وضع الضيف.','A rich post is built from blocks such as text, photos, and tables. Add buttons to open saved pages or enable guest access.'),
+    optionsTitle:w('خيارات إضافية','More options'),
+    completeOptions:w('منشورك جاهز للمراجعة. افتح «خيارات إضافية» للحفظ وأزرار الصفحات ووضع الضيف، أو أكمل بالمحرر حتى تنشر.','Your post is ready to review. Open “More options” for saving, page buttons, and guest mode, or continue to the editor to publish.'),
+    fullPreview:w('هاي معاينة كاملة لمنشورك. عدّل أي بلوك أو أكمل من يصير جاهز.','Full preview of your post. Edit any block, or continue when it is ready.'),
+    previewTooLarge:w('المنشور أطول من حد رسالة تليكرام، فما أگدر أعرضه كاملاً هنا. قلّل المحتوى أو كمل تعديله بالمحرر.','This post is too long to show fully in one Telegram message. Edit it to make it shorter, or continue to the editor.'),
+    startHint:w('اختَر البداية: نبني منشورك خطوة خطوة، أو تختار قالباً وتعدّله.','Choose a starting point: build step by step or pick a layout to edit.'),
+    intro:w('البلوك جزء من منشورك، مثل عنوان أو جدول. اختَر طريقتك، ونرتّب منشورك خطوة بخطوة.','A block is part of your post, such as a heading or table. Choose how you want to begin.'),
+    choose:w('شنو تحب تضيف بالبداية؟','What would you like to add first?'),heading:w('عنوان كبير','Large heading'),table:w('جدول','Table'),own:w('أختار بنفسي 🧩','Choose a block 🧩'),
+    opinion:w('تريد رأيي؟','Want my suggestion?'),apply:w('طبّق الاقتراح','Apply suggestion'),done:w('أكمل','Continue'),back:w('رجوع','Back'),home:w('قائمة الدليل','Guide menu'),exit:w('أوقف الدليل','Pause guide'),resume:w('كمّل منشوري','Continue my post'),
+    preview:w('هاي معاينة منشورك. تگدر تضيف بلوك، أو تعدّل الموجود قبل ما تكمل.','This is your post preview. Add a block or edit the content before continuing.'),
+    edit:w('أعدّل المحتوى','Edit content'),undo:w('تراجع عن آخر تعديل','Undo last edit'),select:w('اختَر البلوك اللي تريد تعدّله. التفاصيل والصور الداخلية تظهر أيضاً.','Choose a block to edit, including nested details and images.'),
+    template:w('اختَر قالباً حتى تشوف معاينته. محتواه مثال، وتگدر تغيّره بعد الاختيار.','Choose a layout to preview it. You can edit all sample content after selecting it.'),use:w('استعمل هذا القالب','Use this layout'),
+    replace:w('عندك منشور بالدليل. استعمال القالب يستبدله؛ تگدر تتراجع عن آخر تغيير. تريد تستبدله؟','You have a guide draft. Applying this layout replaces it; you can undo the last change. Replace it?'),confirm:w('نعم، استبدل','Yes, replace'),
+    complete:w('منشورك جاهز للمراجعة. افتح «تريد المزيد👀؟» حتى تتعلّم الحفظ والكود ووضع الضيف، أو انتقل للمحرر للنشر.','Your post is ready to review. Open “Want more? 👀” for saving, page buttons and guest mode, or continue to the editor to publish.'),
+    more:w('تريد المزيد👀؟','Want more? 👀'),save:w('حفظ الصفحة','Save page'),cbd:w('استعمال الكود في زر CBD','Use the code in a CBD button'),guest:w('وضع الضيف','Guest mode'),editor:w('أكمل بالمحرر والنشر','Continue in editor / publish'),
+    publishHow:w('شلون أنشر؟','How to publish'),publishSteps:w('حتى تنشر: اضغط «أكمل بالمحرر والنشر»، بعدها «أدوات إضافية» ثم «نشر». اختَر قناة أو مجموعة أنت والبوت مشرفين بيها. اضغط «إعدادات وإرسال»، ثم «متابعة إلى التأكيد». راجع المنشور واضغط «نعم، انشر الآن».','To publish: tap “Continue in editor / publish”, then “More tools” > “Publish”. Choose a channel or group where you and the bot are admins. Tap “Settings and Send”, then “Continue to confirmation”. Review the post and tap “Yes, publish now.”'),
+    savePrompt:w('الحفظ يخلي منشورك موجود في «صفحاتي». أرسل اسماً واضحاً للصفحة، بحد أقصى 64 حرفاً.','Saving keeps your post in My Pages. Send a clear page name, up to 64 characters.'),saved:w('انحفظت صفحتك ✅ هذا كودها:','Page saved ✅ Your page code:'),
+    needSave:w('احفظ الصفحة أولاً حتى تحصل على كودها.','Save the page first to get its code.'),copy:w('نسخ الكود','Copy code'),
+    cbdText:w('هذا المثال ينشئ زرّاً يفتح صفحتك المحفوظة. انسخه وضعه داخل نص بلوك، وغيّر اسم الزر إذا تحب. المثال يستعمل كود صفحتك الحقيقي.','This example creates a button that opens your saved page. Copy it into a text block and change the button label if you like. It uses your actual page code.'),
+    guestText:w('انسخ المثال وأرسله برسالة داخل مجموعة أو محادثة خاصة غير سرية، والبوت يرد بصفحتك حتى لو مو عضو. المجموعات المحمية من حفظ المحتوى ما تدعم هالطريقة. تگدر تستعمل اسم صفحتك المطابق بدل الكود.','Send this example in a group or a non-secret private chat. The bot replies with your page even if it is not a member. Content-protected groups are not supported. You can also use the exact name of your own page.'),
+    paused:w('توقف الدليل، ومنشورك محفوظ حتى ترجع تكمله.','Guide paused. Your draft is kept for your return.'),empty:w('أضف محتوى لمنشورك أولاً.','Add some content first.'),stale:w('هذا الزر من خطوة قديمة. افتح الدليل حتى تكمل آخر خطوة.','This button is from an older step. Open the guide to continue.'),busy:w('لحظة، كاعد نحفظ خطوتك. جرّب مرة ثانية.','Your step is being saved. Please try again.'),
+    input:w('أرسل محتوى البلوك حتى تظهر النتيجة هنا.','Send the block content to see the result here.'),tableInput:w('أرسل كل صف بسطر، وافصل الأعمدة بعلامة |. مثال:\nالاسم | السعر\nمنتج | 5000','Send each row on a new line, with | between columns. Example:\nName | Price\nItem | 5000'),
+    listInput:w('كل مهمة بسطر. اكتب [x] قبل المهمة المنجزة، و[ ] قبل الباقي.','One task per line. Use [x] for completed tasks and [ ] for pending tasks.'),detailsInput:w('أرسل عنوان التفاصيل. بعدها تگدر تعدّل البلوكات داخلها من «أعدّل المحتوى».','Send the details title. You can then edit its child blocks using Edit content.'),mediaInput:w('أرسل الوسائط المطلوبة. لعرض الشرائح والكولاج أرسل الصور أو الفيديوهات، ثم اضغط «تمت إضافة الصور».','Send the requested media. For slideshows and collages, send photos or videos, then tap Done adding media.'),mediaDone:w('تمت إضافة الصور','Done adding media'),locationInput:w('أرسل موقعاً من مرفقات تليكرام.','Send a location from Telegram attachments.'),
+    invalid:w('نوع المحتوى مو مناسب لهالخطوة. اتبع التوضيح وجرب مرة ثانية.','This content does not match the step. Follow the instructions and try again.'),failed:w('تعذّر إكمال العملية. منشورك محفوظ؛ جرّب مرة ثانية.','Could not complete the operation. Your draft is kept; try again.'),limit:w('المحتوى تجاوز حدود باقتك أو حدود الرسالة. قلّل المحتوى وجرب مرة ثانية.','This exceeds your plan or message limits. Reduce the content and try again.'),name:w('اختَر اسماً مختلفاً وغير فارغ، بحد أقصى 64 حرفاً.','Choose a different, non-empty name of up to 64 characters.'),pageLimit:w('وصلت لحد الصفحات المحفوظة. تگدر تكمل بالمحرر وتدير صفحاتك.','You reached the saved-page limit. Continue in the editor to manage your pages.'),
+    handoff:w('عندك مسودة مفتوحة بالمحرر. احفظها أو كمّلها أولاً، وبعدها ارجع للدليل. مسودة الدليل باقية.','You have an open editor draft. Save or finish it first, then return here. Your guide draft is kept.'),openExisting:w('افتح مسودتي الحالية','Open my current draft'),
+    partial:w('معاينة جزء من المنشور — التنقل ما يغيّر المحتوى المحفوظ.','Preview of part of your post — navigation does not change your draft.'),next:w('التالي','Next'),previous:w('السابق','Previous'),
+    templateNames:[w('عنوان وجدول','Heading and table'),w('منشور عادي','Regular post'),w('إعلان','Announcement'),w('عنوان وقائمة مهام','Heading and checklist'),w('وصفة طعام 🍖','Food recipe 🍖')],
+  };
 }

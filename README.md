@@ -16,6 +16,7 @@ Authoritative application state and bot behavior live in:
 - `tgcloud/lib/lang/*.js`
 
 Telegram Serverless is the source of truth for:
+|hu|hh|h
 
 - saved pages
 - editor sessions

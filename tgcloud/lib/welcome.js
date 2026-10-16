@@ -1,4 +1,4 @@
-import { tutorialCopy } from 'lib/tutorial-copy';
+import { tutorialCopy } from 'lib/i18n';
 import { isRtlLocale, resolveLanguage, t } from 'lib/i18n';
 import { buildHelpDetailsBlock } from 'lib/legal';
 

@@ -642,6 +642,7 @@ export function validateTableRows(rows, _userId = null, { technicalOnly = false 
       code: 'table_rows',
       limit: MAX_TABLE_ROWS,
       actual: height,
+      source: 'telegram',
     };
   }
   if (width > MAX_TABLE_COLUMNS) {
@@ -650,6 +651,7 @@ export function validateTableRows(rows, _userId = null, { technicalOnly = false 
       code: 'table_columns',
       limit: MAX_TABLE_COLUMNS,
       actual: width,
+      source: 'telegram',
     };
   }
   return { ok: true };
@@ -668,7 +670,7 @@ export function validateEditorLimits(blocks, userId = null, { previousBlocks = n
     ['nesting_depth', usage.nestingDepth, MAX_RICH_NESTING],
     ['media_attachments', usage.mediaAttachments, MAX_RICH_MEDIA],
   ]) {
-    if (actual > limit) return { ok: false, code, limit, actual };
+    if (actual > limit) return { ok: false, code, limit, actual, source: 'telegram' };
   }
 
   if (!developer && !technicalOnly) {
@@ -678,14 +680,20 @@ export function validateEditorLimits(blocks, userId = null, { previousBlocks = n
       ['media_attachments', 'mediaAttachments', usage.mediaAttachments],
     ]) {
       const limit = safePlanLimit(trustedEntitlement, key);
-      if (actual > limit) return { ok: false, code, limit, actual };
+      if (actual > limit) return { ok: false, code, limit, actual, source: 'plan' };
     }
     // Historical text allowances are no longer writable: old saved content
     // can be sent unchanged only through the trusted saved-page publish path.
     const quota = checkEditorTextQuota(trustedEntitlement, usage.text, {
       previousCount: Array.isArray(previousBlocks) ? visibleCharacterCount(previousBlocks) : 0,
     });
-    if (!quota.allowed) return { ok: false, code: 'characters', limit: quota.limit, actual: usage.text };
+    if (!quota.allowed) return {
+      ok: false,
+      code: 'characters',
+      limit: quota.limit,
+      actual: usage.text,
+      source: 'plan',
+    };
   }
 
   const visit = (items) => {
@@ -704,7 +712,13 @@ export function validateEditorLimits(blocks, userId = null, { previousBlocks = n
           if (!developer && !technicalOnly) {
             const limit = safePlanLimit(trustedEntitlement, 'tableColumns');
             const actual = tableDimensions(Array.isArray(rows) ? rows.filter(Array.isArray) : []).width;
-            if (actual > limit) return { ok: false, code: 'table_columns', limit, actual };
+            if (actual > limit) return {
+              ok: false,
+              code: 'table_columns',
+              limit,
+              actual,
+              source: 'plan',
+            };
           }
         }
       }
@@ -714,6 +728,310 @@ export function validateEditorLimits(blocks, userId = null, { previousBlocks = n
     return { ok: true };
   };
   return visit(list);
+}
+
+const VISIBLE_NATIVE_TEXT_KEYS = new Set([
+  'text', 'summary', 'caption', 'credit', 'expression', 'alternative_text', 'name',
+]);
+
+function keepRichPrefix(value, budget) {
+  if (typeof value === 'string') {
+    const kept = value.slice(0, Math.max(0, budget));
+    return { value: kept, remaining: Math.max(0, budget - kept.length) };
+  }
+  if (Array.isArray(value)) {
+    let remaining = Math.max(0, budget);
+    const kept = [];
+    for (const item of value) {
+      if (remaining <= 0) break;
+      const result = keepRichPrefix(item, remaining);
+      if (result.value != null) kept.push(result.value);
+      remaining = result.remaining;
+    }
+    return { value: kept, remaining };
+  }
+  if (!value || typeof value !== 'object') {
+    return { value, remaining: Math.max(0, budget) };
+  }
+  if (value.type === 'custom_emoji') {
+    const text = String(value.alternative_text || '');
+    return text.length <= budget
+      ? { value: clone(value), remaining: budget - text.length }
+      : { value: null, remaining: budget };
+  }
+  const key = ['text', 'children', 'content', 'alternative_text']
+    .find((name) => Object.hasOwn(value, name) && value[name] != null);
+  if (!key) return { value: clone(value), remaining: Math.max(0, budget) };
+  const result = keepRichPrefix(value[key], budget);
+  return {
+    value: result.value == null ? null : { ...clone(value), [key]: result.value },
+    remaining: result.remaining,
+  };
+}
+
+function trimVisibleField(data, keys, budget) {
+  const key = keys.find((name) => data[name] != null && data[name] !== '');
+  if (!key || budget <= 0) return budget;
+  const value = data[key];
+  if (key.endsWith('_html') || key === 'html') {
+    const plain = stripHtml(String(value));
+    if (plain.length <= budget) return budget - plain.length;
+    for (const name of [key, key.replace(/_html$/, '_rich_text'), key.replace(/_html$/, '_text')]) {
+      if (name !== key) delete data[name];
+    }
+    data[key.replace(/_html$/, '_text').replace(/^html$/, 'text')] = plain.slice(0, budget);
+    delete data[key];
+    return 0;
+  }
+  const result = keepRichPrefix(value, budget);
+  data[key] = result.value;
+  return result.remaining;
+}
+
+function trimNativeText(value, budget, key = '') {
+  if (typeof value === 'string') {
+    if (!VISIBLE_NATIVE_TEXT_KEYS.has(key)) return { value, remaining: budget };
+    const kept = value.slice(0, Math.max(0, budget));
+    return { value: kept, remaining: Math.max(0, budget - kept.length) };
+  }
+  if (Array.isArray(value)) {
+    let remaining = budget;
+    const values = [];
+    for (const item of value) {
+      const result = trimNativeText(item, remaining, key);
+      values.push(result.value);
+      remaining = result.remaining;
+    }
+    return { value: values, remaining };
+  }
+  if (!value || typeof value !== 'object') return { value, remaining: budget };
+  const output = {};
+  let remaining = budget;
+  for (const [childKey, child] of Object.entries(value)) {
+    const result = trimNativeText(child, remaining, childKey);
+    output[childKey] = result.value;
+    remaining = result.remaining;
+  }
+  return { value: output, remaining };
+}
+
+function trimBlockText(block, budget) {
+  const data = block?.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return budget;
+  if (data.native && data.native_data && typeof data.native_data === 'object') {
+    const result = trimNativeText(data.native_data, budget);
+    data.native_data = result.value;
+    return result.remaining;
+  }
+
+  const type = String(block.type || '');
+  if (type === 'table') {
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+    let remaining = budget;
+    for (const row of rows) {
+      for (const cell of Array.isArray(row) ? row : []) {
+        if (!cell || typeof cell !== 'object' || Array.isArray(cell)) continue;
+        remaining = trimVisibleField(cell, ['rich_text', 'text', 'html'], remaining);
+      }
+    }
+    return remaining;
+  }
+  if (type === 'list') {
+    let remaining = budget;
+    for (const item of Array.isArray(data.items) ? data.items : []) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      remaining = trimVisibleField(item, ['rich_text', 'text', 'html'], remaining);
+      remaining = trimBlocksText(item.blocks, remaining);
+    }
+    return remaining;
+  }
+  if (type === 'details') {
+    let remaining = trimVisibleField(
+      data,
+      ['summary_rich_text', 'summary_text', 'summary_html'],
+      budget,
+    );
+    return trimBlocksText(data.children, remaining);
+  }
+  if (type === 'collage' || type === 'slideshow') {
+    let remaining = trimVisibleField(
+      data,
+      ['caption_rich_text', 'caption_text', 'caption_html'],
+      budget,
+    );
+    return trimBlocksText(data.children, remaining);
+  }
+  if (type === 'blockquote' || type === 'pullquote') {
+    let remaining = trimVisibleField(
+      data,
+      ['quote_rich_text', 'quote_text', 'quote_html', 'html'],
+      budget,
+    );
+    remaining = trimVisibleField(data, ['credit_rich_text', 'credit_text', 'credit_html'], remaining);
+    return trimBlocksText(data.media_children, remaining);
+  }
+  let remaining = trimVisibleField(data, ['rich_text', 'text', 'html'], budget);
+  remaining = trimVisibleField(data, ['caption_rich_text', 'caption_text', 'caption_html'], remaining);
+  return trimVisibleField(data, ['credit_rich_text', 'credit_text', 'credit_html'], remaining);
+}
+
+function trimBlocksText(blocks, budget) {
+  let remaining = budget;
+  for (const block of Array.isArray(blocks) ? blocks : []) {
+    remaining = trimBlockText(block, remaining);
+  }
+  return remaining;
+}
+
+function childLists(block) {
+  const data = block?.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return [];
+  const source = data.native && data.native_data && typeof data.native_data === 'object'
+    ? data.native_data : data;
+  const lists = [];
+  for (const key of ['children', 'media_children', 'blocks']) {
+    if (Array.isArray(source[key])) lists.push(source[key]);
+  }
+  if (Array.isArray(source.items)) {
+    for (const item of source.items) {
+      if (Array.isArray(item?.blocks)) lists.push(item.blocks);
+    }
+  }
+  return lists;
+}
+
+function removeLastMatching(blocks, matches, trimStructuredContent = false) {
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const block = blocks[index];
+    if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
+    for (const children of childLists(block)) {
+      if (removeLastMatching(children, matches, trimStructuredContent)) {
+        const required = ['details', 'collage', 'slideshow'].includes(String(block.type || ''));
+        if (required && !children.length) blocks.splice(index, 1);
+        return true;
+      }
+    }
+    if (trimStructuredContent) {
+      const data = block.data && typeof block.data === 'object' ? block.data : {};
+      if (block.type === 'table') {
+        const rows = data.native && Array.isArray(data.native_data?.cells)
+          ? data.native_data.cells
+          : data.rows;
+        if (Array.isArray(rows) && rows.length > 1) {
+          rows.pop();
+          if (Array.isArray(data.rows) && data.rows !== rows && data.rows.length > rows.length) data.rows.pop();
+          return true;
+        }
+      }
+      if (block.type === 'list' && Array.isArray(data.items) && data.items.length > 1) {
+        data.items.pop();
+        return true;
+      }
+    }
+    if (matches(block)) {
+      blocks.splice(index, 1);
+      return true;
+    }
+    if (!trimStructuredContent) continue;
+    blocks.splice(index, 1);
+    return true;
+  }
+  return false;
+}
+
+function removeLastMedia(blocks) {
+  return removeLastMatching(blocks, (block) => MEDIA_BLOCK_TYPES.has(String(block.type || '')));
+}
+
+function removeLastContentUnit(blocks) {
+  return removeLastMatching(blocks, () => true, true);
+}
+
+function trimLastTable(blocks, code, limit) {
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const block = blocks[index];
+    if (!block || typeof block !== 'object' || Array.isArray(block)) continue;
+    for (const children of childLists(block)) {
+      if (trimLastTable(children, code, limit)) return true;
+    }
+    if (block.type !== 'table') continue;
+    const data = block.data && typeof block.data === 'object' ? block.data : {};
+    const arrays = [];
+    if (Array.isArray(data.rows)) arrays.push(data.rows);
+    if (Array.isArray(data.native_data?.cells) && !arrays.includes(data.native_data.cells)) {
+      arrays.push(data.native_data.cells);
+    }
+    if (!arrays.length) continue;
+    let changed = false;
+    for (const rows of arrays) {
+      if (code === 'table_rows') {
+        if (rows.length > limit) {
+          rows.splice(limit);
+          changed = true;
+        }
+        for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+          for (const cell of Array.isArray(rows[rowIndex]) ? rows[rowIndex] : []) {
+            const maxSpan = limit - rowIndex;
+            if (cell && Number(cell.rowspan) > maxSpan) {
+              cell.rowspan = Math.max(1, maxSpan);
+                changed = true;
+            }
+          }
+        }
+      } else {
+        for (const row of rows) {
+          if (!Array.isArray(row)) continue;
+          let used = 0;
+          for (let cellIndex = 0; cellIndex < row.length; cellIndex += 1) {
+            const cell = row[cellIndex];
+            const span = Math.max(1, Number(cell?.colspan) || 1);
+            if (used + span > limit) {
+              if (used < limit && cell && typeof cell === 'object') {
+                cell.colspan = limit - used;
+                row.splice(cellIndex + 1);
+              } else {
+                row.splice(cellIndex);
+              }
+              changed = true;
+              break;
+            }
+            used += span;
+          }
+        }
+      }
+    }
+    if (changed) return true;
+    blocks.splice(index, 1);
+    return true;
+  }
+  return false;
+}
+
+export function trimEditorBlocksToLimits(blocks, userId = null, options = {}) {
+  const result = clone(Array.isArray(blocks) ? blocks : []);
+  const validationOptions = { ...options };
+  const maxPasses = MAX_RICH_BLOCKS + MAX_RICH_MEDIA + MAX_TABLE_ROWS + 4;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const limit = validateEditorLimits(result, userId, validationOptions);
+    if (limit.ok) return { blocks: result, changed: pass > 0 };
+    let changed = false;
+    if (limit.code === 'media_attachments') {
+      changed = removeLastMedia(result);
+    } else if (limit.code === 'characters') {
+      const budget = Math.max(0, limit.limit);
+      const remaining = trimBlocksText(result, budget);
+      changed = remaining < budget;
+      if (!changed) changed = removeLastContentUnit(result);
+    } else if (limit.code === 'table_columns' || limit.code === 'table_rows') {
+      changed = trimLastTable(result, limit.code, limit.limit);
+    } else {
+      changed = removeLastContentUnit(result);
+    }
+    if (!changed) {
+      throw new Error('EDITOR_LIMIT_TRIM_FAILED:' + limit.code);
+    }
+  }
+  throw new Error('EDITOR_LIMIT_TRIM_FAILED:iteration_limit');
 }
 
 export function preformattedData(plain) {

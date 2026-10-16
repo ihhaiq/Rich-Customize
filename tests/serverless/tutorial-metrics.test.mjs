@@ -9,7 +9,7 @@ function fixture(t) {
   t.after(() => sqlite.close());
   sqlite.exec(`CREATE TABLE legacy_states(namespace TEXT PRIMARY KEY,payload TEXT,updated_at INTEGER);
     CREATE TABLE marketing_campaign_attribution(user_id INTEGER PRIMARY KEY,source TEXT,first_publish_at INTEGER);`);
-  const source = readFileSync('tgcloud/lib/tutorial-metrics.js', 'utf8').replace(/^import .*;$/gm, '').replace(/export /g, '');
+  const source = readFileSync('tgcloud/lib/marketing-campaign.js', 'utf8').replace(/^import .*;$/gm, '').replace(/export /g, '');
   const metrics = new Function('db', 'sql', source + ';return {tutorialFunnelRows,tutorialFunnelBlock};')(
     { all: async query => sqlite.prepare(query).all() }, { raw: query => query },
   );
@@ -47,7 +47,7 @@ test('funnel aggregates optional stages, real publishes and seven-day return wit
 });
 
 test('publish receipts deduplicate deliveries and preserve tutorial draft CAS', async () => {
-  const h = await harness({ extraModules: { metrics: 'lib/tutorial-metrics' } });
+  const h = await harness({ extraModules: { metrics: 'lib/marketing-campaign' } });
   h.records.legacyStates.push({ namespace: 'tutorial:v1:42', payload: { version: 1, userId: 42, events: { started: 100 }, revision: 9, blocks: [] }, updatedAt: 999 });
   const before = h.clone(h.records.legacyStates[0]);
   assert.equal(await h.metrics.recordTutorialPublish(42, null, 101), false);

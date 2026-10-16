@@ -23,8 +23,9 @@ export async function resolveForumDeliveryOptions(chatId, chat = null) {
   const target=chat || await api.getChat({chat_id:Number(chatId)});
   const chosen=await getDefaultForumTopic(chatId);
   if(!forum(target)){
-    if(chosen)throw publishFailure('PUBLISH_THREAD_INVALID',
-      'The destination chat no longer supports forum topics. Clear and reset /default.');
+    // A stored topic applies only while Telegram reports topics enabled.
+    // Keep the configuration in case the group enables topics again, but
+    // never send a stale message_thread_id to a non-forum supergroup.
     return {};
   }
   if(!chosen){

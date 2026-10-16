@@ -7,6 +7,10 @@ const rawDetail = (error) => String(
 );
 const codes = (error) => String(error?.code ?? error?.error_code ?? error?.response?.error_code ?? '');
 
+export function isEditorLimitFailure(error) {
+  return /(?:^|\s)EDITOR_LIMIT:[a-z_]+:\d+:\d+(?:$|\s)/.test(rawDetail(error));
+}
+
 function guide(code, kind, ar, en, reason, action, { silent = false } = {}) {
   return {
     code, kind, silent, expected: kind !== 'internal',

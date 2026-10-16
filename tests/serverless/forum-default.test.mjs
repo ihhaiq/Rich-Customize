@@ -64,6 +64,17 @@ test('/default status and clear report state, and clearing disables forum delive
   assert.deepEqual(JSON.parse(JSON.stringify(await h.forum.resolveForumDeliveryOptions(forumChat.id,ordinary))),{});
 });
 
+test('a saved forum topic is ignored when the group disables topics',async()=>{
+  const h=await fixture();
+  await h.forum.handleDefaultTopicCommand(topicMessage(77));
+  const ordinary={...forumChat,is_forum:false};
+  assert.deepEqual(JSON.parse(JSON.stringify(
+    await h.forum.resolveForumDeliveryOptions(forumChat.id,ordinary)
+  )),{});
+  assert.equal(h.records.forumTopicDefaults[0].threadId,77,
+    'keep the saved topic in case the group enables topics again');
+});
+
 test('/default in General is explicit; never route there as an implicit fallback',async()=>{
   const h=await fixture();
   const noThread=topicMessage(null,'/default',{message_thread_id:undefined,is_topic_message:false});

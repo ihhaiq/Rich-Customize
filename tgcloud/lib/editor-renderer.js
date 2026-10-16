@@ -1,3 +1,6 @@
+import { blockLabel } from 'lib/editor-blocks';
+import { tutorialCopy, isRtlLocale } from 'lib/i18n';
+import { advice, applyAdvice, blockAt, clone, blockPaths, templateBlocks, TEMPLATE_IDS, TYPES, words } from 'lib/editor-import';
 import {
   anchorName,
   anchorNavigationRichText,
@@ -532,4 +535,157 @@ export function buildInputRichMessage(
 
 export function buildSingleBlockRichMessage(block, options = {}) {
   return buildInputRichMessage([{ ...block, position: 0 }], options);
+}
+
+
+export function guideCallback(state,action) { return 'tut:'+state.epoch+':'+state.revision+':'+action; }
+function inert(value) {
+  if(Array.isArray(value))return value.map(inert);
+  if(!value||typeof value!=='object')return value;
+  if(value.type==='button')return String(value.button?.text||'');
+  return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,inert(item)]));
+}
+export function tutorialView(state,locale,entitlement,notice='') {
+  const c=tutorialCopy(locale),w=(ar,en)=>words(locale,ar,en);
+  const b=(text,action)=>({text,callback_data:guideCallback(state,action)});
+  const allBlocks=text=>({text,callback_data:'r:showcase'});
+  const richButton=(text,action)=>({type:'button',button:b(text,action)});
+  const paragraph=text=>({type:'paragraph',text});
+  let text=c.intro,rows=[],extra=[],preview=state.blocks||[],backButton=null,previousButton=null,nextButton=null;
+  const back=()=>{backButton=b(c.back,'back');};
+  const options=()=>({type:'details',summary:c.optionsTitle,blocks:[
+    {type:'button',button:b(c.save,'save')},
+    {type:'button',button:b(c.cbd,'cbd')},
+    {type:'button',button:b(c.guest,'guest')},
+    {type:'button',button:b(c.publishHow,'publish')},
+  ]});
+  switch(state.step) {
+    case 'home':
+      text=c.homeDescription;
+      rows=[
+        [b(c.build,'build'),b(c.templates,'templates')],
+        [allBlocks(c.all)],
+      ];
+      extra.push(options());
+      if(state.handedOff)extra.push(paragraph(w('هاي نسخة الدليل قبل الانتقال للمحرر. تعديلاتك اللاحقة بالمحرر تبقى هناك.','This is the guide snapshot from before the editor handoff. Later editor changes remain in the editor.')));
+      if(preview.length)extra.push(paragraph([richButton(c.resume,'preview')]));
+      preview=[];break;
+    case 'build':text=c.choose;rows=[[b(c.heading,'add:heading'),b(c.table,'add:table')],[b(c.own,'choose')]];back();break;
+    case 'catalog':case 'choose': {
+      text=state.step==='catalog'?w('اختَر بلوكاً حتى تتعرّف عليه وتجرّبه داخل الدليل.','Choose a block to learn about it and try it in the guide.'):c.choose;
+      const start=Math.min(state.listOffset||0,Math.max(0,TYPES.length-1));
+      const buttons=TYPES.slice(start,start+8).map(type=>b(blockLabel(type,locale),(state.step==='catalog'?'inspect:':'add:')+type));
+      for(let i=0;i<buttons.length;i+=2)rows.push(buttons.slice(i,i+2));
+      if(start)previousButton=b(c.previous,'list:'+Math.max(0,start-8));
+      if(start+8<TYPES.length)nextButton=b(c.next,'list:'+(start+8));
+      back();break;
+    }
+    case 'inspect':
+      preview=state.example?[state.example]:[];
+      text=blockLabel(state.inspectType,locale)+' — '+inputHelp(state.inspectType,c);
+      rows=[[b(w('أضيفه لمنشوري','Add it to my post'),'add:'+state.inspectType),allBlocks(c.all)]];back();break;
+    case 'input':
+      text=blockLabel(state.pending.type,locale)+'\n'+inputHelp(state.pending.type,c);
+      if(['slideshow','collage'].includes(state.pending.type)){
+        rows.push([b(c.mediaDone,'mediaDone')]);
+        const children=state.pending.children||[];
+        text+='\n'+w('الوسائط المضافة: ','Media added: ')+children.length;
+        if(children.length){
+          preview=clone(preview);
+          const draft={type:state.pending.type,position:preview.length,data:{children}};
+          const target=state.pending.path!=null?blockAt(preview,state.pending.path):null;
+          if(target)target.data={children};else preview.push(draft);
+        }
+      }
+      back();break;
+    case 'preview':
+      text=c.fullPreview;rows=[[b(c.opinion,'advice'),b(c.own,'choose')],[b(c.edit,'edit'),b(c.done,'complete')]];
+      if(state.undo)rows.push([b(c.undo,'undo'),b(c.exit,'pause')]);
+      else rows.push([b(c.exit,'pause')]);
+      back();break;
+    case 'advice': {
+      const suggestion=advice(preview,locale);text=suggestion.text+'\n\n'+c.preview;
+      if(suggestion.kind!=='none') {
+        preview=applyAdvice(preview,locale);
+        rows.push([b(c.apply,'apply')]);
+      }
+      rows.push([b(c.own,'choose')]);back();break;
+    }
+    case 'templates':
+      text=c.template;{
+        const buttons=TEMPLATE_IDS.map((id,i)=>b(c.templateNames[i],'template:'+id));
+        for(let i=0;i<buttons.length;i+=2)rows.push(buttons.slice(i,i+2));
+      }back();preview=[];break;
+    case 'template':case 'replace':
+      text=state.step==='replace'?c.replace:c.template;
+      preview=templateBlocks(state.template,locale);
+      rows=[[b(state.step==='replace'?c.confirm:c.use,state.step==='replace'?'replaceTemplate':'useTemplate')]];back();break;
+    case 'edit': {
+      text=c.select;
+      const items=blockPaths(preview),offset=state.listOffset||0;
+      rows=items.slice(offset,offset+8).map(({path,block})=>[b(path+' · '+blockLabel(block.type,locale),'edit:'+path)]);
+      if(offset)previousButton=b(c.previous,'list:'+Math.max(0,offset-8));
+      if(offset+8<items.length)nextButton=b(c.next,'list:'+(offset+8));
+      back();break;
+    }
+    case 'complete':
+      text=c.completeOptions;
+      rows=[[b(c.editor,'handoff'),b(c.edit,'edit')]];
+      extra.push(options());back();break;
+    case 'publish':
+      text=state.blocks.length?c.publishSteps:c.empty+'\n\n'+c.publishSteps;
+      if(state.blocks.length)rows=[[b(c.editor,'handoff')]];
+      else rows=[[b(c.build,'build'),b(c.templates,'templates')]];
+      back();break;
+    case 'save':text=c.savePrompt;back();break;
+    case 'saved':
+      text=c.saved;extra.push(paragraph({type:'code',text:state.pageId}));
+      extra.push(paragraph({type:'button',button:{text:c.copy,copy_text:{text:state.pageId}}}));
+      rows=[[b(c.cbd,'cbd'),b(c.guest,'guest')]];back();break;
+    case 'cbd':case 'guest': {
+      const saved=state.pageId&&!state.dirty;
+      text=saved?(state.step==='cbd'?c.cbdText:c.guestText):c.needSave;
+      if(saved){const code=state.step==='cbd'?'{'+w('افتح الصفحة','Open page')+' - CBD:'+state.pageId+' #b}':'@RichCustomizebot '+state.pageId;
+        extra.push(paragraph({type:'code',text:code}),paragraph({type:'button',button:{text:c.copy,copy_text:{text:code}}}));}
+      else rows.push([b(c.save,'save')]);
+      if(saved && state.step==='cbd')extra.push(paragraph([richButton(w('جرّب فتح الصفحة هنا','Try opening the page here'),'trycbd')]));
+      if(state.demoBlocks)preview=state.demoBlocks;
+      back();break;
+    }
+    case 'handoff':text=c.handoff;rows=[[b(c.openExisting,'existing')]];back();break;
+    case 'paused':text=c.paused;rows=[[b(c.resume,'preview')]];back();break;
+    case 'save_retry':text=c.failed;rows=[[b(c.save,'retrySave')]];back();break;
+    default:text=c.intro;rows=[[b(c.home,'home')]];
+  }
+  if(state.previewFailed){preview=[];rows.push([b(w('أعد تحميل المعاينة','Reload preview'),'refresh')]);notice=notice||w('تعذّر عرض الوسائط. محتوى منشورك محفوظ؛ تگدر تعيد المحاولة أو تختار قالباً آخر.','Media could not be displayed. Your draft is kept; retry or choose another layout.');}
+  const header=[{type:'heading',size:2,text:c.entry},paragraph(text)];
+  if(notice)header.push(paragraph(notice));
+  let blocks=[...header,...extra];
+  try{
+    if(preview.length){
+      const content=inert(buildInputRichMessage(preview,{userId:state.userId,entitlement,technicalOnly:true})).blocks;
+      blocks=[...header,{type:'divider'},...content,{type:'divider'},...extra];
+    }
+    validateRenderedPayloadLimits(blocks,{technicalOnly:true});
+  }
+  catch(error){
+    if(!preview.length||!/^EDITOR_LIMIT:(?:blocks|media_attachments|nesting_depth|characters):/.test(String(error?.message||'')))throw error;
+    blocks=[{type:'heading',size:2,text:c.entry},paragraph(c.previewTooLarge)];
+    rows=[[b(c.edit,'edit'),b(c.editor,'handoff')]];
+    previousButton=null;nextButton=null;
+    backButton=null;
+    validateRenderedPayloadLimits(blocks,{technicalOnly:true});
+  }
+  if(previousButton||backButton||nextButton){
+    rows.push([...(previousButton?[previousButton]:[]),...(backButton?[backButton]:[]),...(nextButton?[nextButton]:[])]);
+  } else if(backButton)rows.push([backButton]);
+  return {rich_message:{blocks,...(isRtlLocale(locale)?{is_rtl:true}:{})},reply_markup:{inline_keyboard:rows.filter(row=>row.length)}};
+}
+function inputHelp(type,c) {
+  if(type==='table')return c.tableInput;
+  if(type==='list')return c.listInput;
+  if(type==='details')return c.detailsInput;
+  if(type==='map')return c.locationInput;
+  if(['photo','video','animation','audio','voice','document','slideshow','collage'].includes(type))return c.mediaInput;
+  return c.input;
 }

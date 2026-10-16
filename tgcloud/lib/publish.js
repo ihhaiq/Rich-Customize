@@ -37,7 +37,7 @@ function copy(languageCode){
     locale,
     create:i18nT(locale,'create_post'),
     none:tr(locale,'There is no group or channel where both you and the bot are administrators.'),
-    addHint:tr(locale,'Add the bot using one of the buttons. This panel updates after access is granted.'),
+    addHint:i18nT(locale,'publish.add_hint'),
     choose:tr(locale,'Select every group or channel you want to publish to.'),
     selected:tr(locale,'Selected: '),
     select:tr(locale,'Select'),
@@ -69,8 +69,8 @@ function copy(languageCode){
     again:tr(locale,'You can change settings and send the post again.'),
     shortened:tr(locale,'… result list shortened'),
     reason:tr(locale,'Failure reason: '),
-    reached:(title)=>tr(locale,'✅ Reached “{title}”.',{title}),
-    noPostRight:tr(locale,'The bot was added, but it cannot post messages in this channel.'),
+    reached:(title)=>i18nT(locale,'publish.bot_added',{title}),
+    noPostRight:(title)=>i18nT(locale,'publish.bot_no_post_right',{title}),
     publish:i18nT(locale,'ux.editor.publish'),
   };
 }
@@ -390,7 +390,7 @@ export async function handleMyChatMember(update){
   if(!isAdmin(newMember)){await removeChatEverywhere(chat.id);return;}
   const chatType=String(chat.type||'');
   if(chatType==='channel'&&!Boolean(newMember?.can_post_messages)){
-    if(actor?.id){try{await api.sendMessage({chat_id:actor.id,text:copy(actor.language_code).noPostRight});}catch{}}
+    if(actor?.id){try{await api.sendMessage({chat_id:actor.id,text:copy(actor.language_code).noPostRight(chat.title||String(chat.id))});}catch{}}
     return;
   }
   if(!actor?.id||actor?.is_bot)return;

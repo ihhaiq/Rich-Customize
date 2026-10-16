@@ -14,10 +14,11 @@
 | Short roadmap / next actions | [ROADMAP.md](../md_files/ROADMAP.md), [soon.md](../md_files/soon.md) |
 | Change history | [log.md](../md_files/log.md) |
 | Test layout | [tests/README.md](../tests/README.md) |
+| Channel-post edit/import | [channel-post edit/import](../md_files/docs/channel-post-edit-import-plan.md) |
 | Billing source and contract | [richDonate](https://github.com/ihhaiq/richDonate), [B2B contract](https://github.com/ihhaiq/richDonate/blob/main/docs/editor-b2b-contract.md) |
 
 ## Separate plans
-[Referral strategy](../md_files/Referral.md) and [search design](../md_files/search-engine.md) are plans; verify code before treating their contents as implemented.
+[Referral strategy](../md_files/Referral.md) and [search design](../md_files/search-engine.md) remain plans; verify code before treating their contents as implemented.
 
 ## Historical evidence
 [Archive](archive/README.md) preserves superseded plans, Python-era tests and the unused billing scaffold.

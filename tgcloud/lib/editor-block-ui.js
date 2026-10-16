@@ -104,6 +104,7 @@ export function editorDashboardText(session, languageCode, notice = null) {
 }
 
 const PAGE_INFO_EMOJI_ID = '5334544901428229844';
+const PAGE_SAVE_EMOJI_ID = '5188563846415014158';
 
 function pageInfoTitle(languageCode) {
   const locale = resolveLanguage(languageCode);
@@ -115,8 +116,20 @@ function pageUnsavedText(languageCode) {
   return locale === 'ar' ? 'غير محفوظة' : tr(locale, 'Unsaved');
 }
 
-function pageSyncText(languageCode) {
+function pageSyncText(languageCode, session) {
   const locale = resolveLanguage(languageCode);
+  if (session?.channelPostTarget) return t(locale, 'channel_post.edit') + ' ✏️';
+  if (!session?.currentPageId) {
+    const saveText = locale === 'ar' ? 'حفظ' : tr(locale, 'Save');
+    return [
+      saveText + ' ',
+      {
+        type:'custom_emoji',
+        custom_emoji_id:PAGE_SAVE_EMOJI_ID,
+        alternative_text:'⬇️',
+      },
+    ];
+  }
   return (locale === 'ar' ? 'مزامنة الصفحة' : tr(locale, 'Sync page')) + ' 🔄';
 }
 
@@ -151,8 +164,8 @@ function pageInfoButtons(session, languageCode) {
     buttons:[
       pageButton,
       {
-        text:pageSyncText(languageCode),
-        callback_data:'r:syncpage',
+        text:pageSyncText(languageCode, session),
+        callback_data:session?.channelPostTarget ? 'r:channel:confirm' : 'r:syncpage',
         style:'success',
       },
     ],
@@ -208,6 +221,13 @@ export function blockEditorRichMessage(block, blocks, languageCode, userId = nul
   const header = [
     t(locale, 'block.manage_title', { name }),
     t(locale, 'block.position_text', { current: index + 1, total: ordered.length }),
+    t(locale, 'block.order_text'),
+    ...ordered.map((item, position) => (
+      (String(item?.id) === String(block?.id) ? '◀️ ' : '')
+      + (position + 1)
+      + '. '
+      + blockLabel(item?.type, languageCode)
+    )),
   ].join('\n');
 
   try {
@@ -433,6 +453,7 @@ export function buildBlockEditorKeyboard(block, blocks, languageCode) {
   const position = Math.max(0, ordered.findIndex((item) => String(item?.id) === String(block?.id)));
   const id = String(block.id);
   const linkedAnchor = block.type === 'anchor' && Boolean(anchorTargetId(block));
+  const positionLabel = (position + 1) + '/' + ordered.length;
   const rows = [];
 
   function containsCustomEmoji(value) {
@@ -512,11 +533,11 @@ export function buildBlockEditorKeyboard(block, blocks, languageCode) {
   if (!linkedAnchor) {
     rows.push([
       position <= 0
-        ? { text: copy.moveUp, disabled: {} }
-        : { text: copy.moveUp, callback_data: 'r:mu:' + id },
+        ? { text: copy.moveUp + ' · ' + positionLabel, disabled: {} }
+        : { text: copy.moveUp + ' · ' + positionLabel, callback_data: 'r:mu:' + id },
       position >= ordered.length - 1
-        ? { text: copy.moveDown, disabled: {} }
-        : { text: copy.moveDown, callback_data: 'r:md:' + id },
+        ? { text: copy.moveDown + ' · ' + positionLabel, disabled: {} }
+        : { text: copy.moveDown + ' · ' + positionLabel, callback_data: 'r:md:' + id },
     ]);
   }
   rows.push([{ text: copy.back, callback_data: 'r:back' }]);

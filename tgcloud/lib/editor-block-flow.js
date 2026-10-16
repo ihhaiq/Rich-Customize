@@ -75,6 +75,8 @@ import {
 import { resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import { shouldIncludeBranding } from 'lib/branding';
+import { isEditorLimitFailure } from 'lib/operational-errors';
+import { requestEditorLimitConfirmation } from 'lib/editor-limit-confirmation';
 
 function languageCode(source) {
   return source?.from?.language_code || 'en';
@@ -167,6 +169,27 @@ async function editMessage(chatId, messageId, content, replyMarkup) {
     const reason = String(error?.description || error?.message || error).toLowerCase();
     if (!reason.includes('message is not modified')) throw error;
   }
+}
+
+function isMissingMessageTarget(error) {
+  const reason = String(error?.description || error?.message || error).toLowerCase();
+  return reason.includes('message to edit not found')
+    || reason.includes('message_id_invalid');
+}
+
+async function replaceMissingManagementMessage(userId, session, fallbackChatId, richMessage, replyMarkup) {
+  const chatId = session?.managementChatId || session?.chatId || fallbackChatId;
+  if (!chatId) return false;
+  const sent = await api.sendRichMessage({
+    chat_id: chatId,
+    rich_message: richMessage,
+    reply_markup: replyMarkup,
+  });
+  await updateEditorSession(userId, {
+    managementChatId: sent.chat?.id || chatId,
+    managementMessageId: sent.message_id,
+  });
+  return true;
 }
 
 async function editManagement(session, text, replyMarkup) {
@@ -481,6 +504,17 @@ async function finishAdd(userId, session, triggerMessage, block, code) {
   alignLinkedAnchors(blocks);
   const limit = validateEditorLimits(blocks, session.userId);
   if (!limit.ok) {
+    const requested = await requestEditorLimitConfirmation({
+      userId: session.userId,
+      session,
+      candidateBlocks: blocks,
+      limit,
+      languageCode: code,
+      action: 'commit',
+      changes: { currentBlockId: null },
+      inputMessage: triggerMessage,
+    });
+    if (requested) return true;
     await api.sendMessage({
       chat_id: triggerMessage.chat.id,
       text: limitText(limit, code),
@@ -837,12 +871,14 @@ async function previewBlock(query, session, block) {
     });
     await recordOperation('preview', true);
   } catch (error) {
-    console.error('Single block preview failed', error);
-    await logError('editor.preview.block', error, {
-      userId: query?.from?.id,
-      chatId: query?.message?.chat?.id,
-      callbackData: query?.data,
-    });
+    if (!isEditorLimitFailure(error)) {
+      console.error('Single block preview failed', error);
+      await logError('editor.preview.block', error, {
+        userId: query?.from?.id,
+        chatId: query?.message?.chat?.id,
+        callbackData: query?.data,
+      });
+    }
     await recordOperation('preview', false);
     await api.sendMessage({
       chat_id: query.from.id,
@@ -910,17 +946,20 @@ async function previewResult(query, session) {
     }
     await recordOperation('preview', true);
   } catch (error) {
-    console.error('Rich result preview failed', error);
-    await logError('editor.preview.result', error, {
-      userId: query?.from?.id,
-      chatId: query?.message?.chat?.id,
-      callbackData: query?.data,
-    });
+    if (!isEditorLimitFailure(error)) {
+      console.error('Rich result preview failed', error);
+      await logError('editor.preview.result', error, {
+        userId: query?.from?.id,
+        chatId: query?.message?.chat?.id,
+        callbackData: query?.data,
+      });
+    }
     await recordOperation('preview', false);
-    panelNotice = '⚠️ ' + t(resolveLanguage(code), 'preview_failed');
+    const failure = friendlyRichError(error, code);
+    panelNotice = '⚠️ ' + failure;
     await api.sendMessage({
       chat_id: query.from.id,
-      text: copy.previewFailed + '\n' + friendlyRichError(error, code),
+      text: copy.previewFailed + '\n' + failure,
       reply_markup: buildErrorRecoveryKeyboard(code),
     });
   }
@@ -950,6 +989,7 @@ export async function handleEditorBlockCallback(query) {
     || data === 'r:dir'
     || data === 'r:undo'
     || data === 'r:redo'
+    || data.startsWith('r:limit:')
     || data.startsWith('r:add:')
     || data.startsWith('r:hs:')
     || data.startsWith('r:b:')
@@ -1626,7 +1666,20 @@ export async function handleEditorBlockCallback(query) {
       await rememberEditorState(query.from.id, lockedSession);
       const updated = await updateEditorSession(query.from.id, { blocks });
       const moved = getBlockById(updated.blocks, id);
-      await editMessage(chatId, messageId, blockEditorRichMessage(moved, updated.blocks, code, session.userId), buildBlockEditorKeyboard(moved, updated.blocks, code));
+      const richMessage = blockEditorRichMessage(moved, updated.blocks, code, session.userId);
+      const replyMarkup = buildBlockEditorKeyboard(moved, updated.blocks, code);
+      try {
+        await editMessage(chatId, messageId, richMessage, replyMarkup);
+      } catch (error) {
+        if (!isMissingMessageTarget(error)) throw error;
+        await replaceMissingManagementMessage(
+          query.from.id,
+          updated,
+          chatId,
+          richMessage,
+          replyMarkup,
+        );
+      }
       await api.answerCallbackQuery({ callback_query_id: query.id, text: p.moved });
       return true;
     } finally {

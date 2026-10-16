@@ -1,3 +1,92 @@
+## 2026-10-16 — تبسيط تنقل الدليل ومراجعة المقترحات
+
+- **السبب:** طلب المستخدم تقليل ازدحام أزرار الدليل، إصلاح الرجوع الذي لا يعيد الشاشة السابقة، وجعل تطبيق النصائح مطابقاً لما تعرضه.
+- **التغيير:** تثبيت كل زر من لوحة الدليل في صف مستقل مع إبقاء الحفظ وCBD والضيف والنشر ظاهرة من البداية. يستعيد زر الرجوع الشاشة السابقة وسياقها، ويُحفظ سجل التنقل خلال التحرير والحفظ. تعرض شاشة الرأي معاينة الناتج قبل التطبيق؛ تُمنع إضافة تفاصيل جدول أو تذييل مكرر، ويُضاف محتوى أساسي عندما لا يتجاوز المنشور عنواناً.
+- **الملفات:** `tgcloud/lib/editor-core.js`, `tgcloud/lib/editor-import.js`, `tgcloud/lib/editor-renderer.js`, `tgcloud/lib/editor-session.js`, `tests/serverless/tutorial.test.mjs`, `tests/serverless/tutorial-i18n.test.mjs`, `md_files/tutorial.md`, `md_files/log.md`.
+- **التحقق:** اختبارات الدليل والتوطين المركزة 21/21؛ `npm.cmd run test:ci` نجح بفحوص الخطط وMini App و272/272 اختباراً؛ `node --check` للوحدات الثلاث و`git diff --check` نجحا.
+- **النشر:** أكد المالك تنفيذ `npx tgcloud push` بنجاح للوحدات الخمس `editor-block-ui.js`, `editor-core.js`, `editor-import.js`, `editor-renderer.js`, `editor-session.js`. وأكد `npx tgcloud migrate` أن لا تغييرات مخطط وأن قاعدة البيانات متزامنة. اختبار القبول الحي للمستخدم ما زال مطلوباً؛ لم يؤكد هذا الإخراج رفع GitHub.
+
+## 2026-10-16 — إصلاح إيموجي زر الحفظ وتنظيف رسالة اختيار تعديل القناة
+
+- أصبح زر حفظ الصفحة يرسل نصه كـRichText يتضمن عقدة `custom_emoji` بمعرّف `5188563846415014158` بدلاً من تضمين وسم HTML كنص؛ هذا يسمح للعميل بعرض الإيموجي المخصص فعلياً.
+- تُحذف رسالة اختيار تعديل/استيراد المنشور بعد فتح المحرر بنجاح. عند الحاجة إلى تأكيد استبدال مسودة، يُحتفظ بمعرّف الرسالة حتى إكمال التأكيد أو الإلغاء ثم تُحذف كي لا تبقى عناصر اختيار قديمة.
+- الملفات: `tgcloud/lib/editor-block-ui.js`, `tgcloud/lib/editor-core.js`, `tests/serverless/channel-post-edit-import.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `md_files/log.md`. لا schema change أو migration.
+- التحقق الفعلي: الاختبارات المركزة `channel-post-edit-import.test.mjs` نجحت 11/11؛ `npm.cmd run test:ci` نجح بفحوصات الخطط وMini App و269/269 اختباراً؛ `node --check` و`git diff --check` نجحا. لا deployment أو GitHub.
+
+## 2026-10-16 — استعادة واجهة البلوك وإظهار موضعه الحي
+
+- عند فشل تعديل معاينة البلوك لأن Telegram لم يعثر على رسالة الواجهة، يُرسل المحرر المعاينة المحدّثة وأزرارها برسالة جديدة ويحدّث معرّفها في الجلسة؛ أخطاء Telegram الأخرى تبقى ظاهرة ولا تتحول إلى نجاح صامت.
+- تعرض معاينة البلوك موضعه الحالي وترتيب جميع البلوكات مع تمييز العنصر المحدد. تعرض أزرار التحريك نسبة الموضع الحالية وتتجدد بعد كل حركة.
+- الملفات: `tgcloud/lib/editor-block-flow.js`, `tgcloud/lib/editor-block-ui.js`, `tests/serverless/editor-block-flow-recovery.test.mjs`, `md_files/log.md`. لا schema change أو migration.
+- التحقق الفعلي: الاختبارات المركزة 3/3؛ `npm.cmd run test:ci` نجح بفحوصات الخطط وMini App و268/268 اختباراً؛ فحص JavaScript و`git diff --check` ناجحان. لا deployment أو GitHub.
+
+## 2026-10-16 — توضيح زر حفظ الصفحة غير المحفوظة
+
+- تعرض لوحة المحرر «حفظ» مع الإيموجي المخصص `5188563846415014158` عندما لا تكون الصفحة محفوظة بعد؛ بعد نجاح الحفظ يعاد بناء اللوحة فيظهر زر «مزامنة الصفحة». يبقى زر «تعديل المنشور» أعلى أولوية عند وجود هدف قناة.
+- أضيف اختبار لعلامة الحفظ والإيموجي المحددين ولتحول الزر بعد الحفظ؛ وحدثت خطة تعديل/استيراد منشور القناة لتوثيق ترتيب الأزرار.
+- الملفات: `tgcloud/lib/editor-block-ui.js`, `tests/serverless/channel-post-edit-import.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `md_files/log.md`. لا schema change أو migration.
+- التحقق الفعلي: اختبارات `channel-post-edit-import.test.mjs` نجحت 10/10. لا deployment أو GitHub؛ النشر يحتاج تفويضاً منفصلاً.
+
+## 2026-10-16 — حذف تحذير إغلاق المحرر وإبقاء سياق تعديل المنشور
+
+- صارت رسالة تحذير إغلاق المحرر تُحذف بعد قبول الإغلاق أو رفضه. وبعد نجاح تعديل المنشور يبقى مرجع القناة/المنشور في الجلسة، فيظل زر «تعديل المنشور» ظاهراً بدلاً من زر مزامنة الصفحة في التعديلات اللاحقة.
+- أضيفت اختبارات تثبت حذف رسالة التحذير في الخيارين، بقاء سياق الهدف بعد التعديل وزر التعديل في لوحة المحرر، مع الحفاظ على مسار رفض إغلاق المحرر.
+- الملفات: `tgcloud/lib/editor-core.js`, `tests/serverless/channel-post-edit-import.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `md_files/log.md`. لا schema change أو migration.
+- التحقق الفعلي: الاختبارات المركزة 10/10؛ `npm.cmd run test:ci` نجح مع check:plans وcheck:miniapp و264/264 اختباراً؛ `node --check` و`git diff --check` نجحا. رُفع `tgcloud/lib/editor-core.js` وحده؛ أكد `npm.cmd run status` revision 78، والـwebhook in sync وWorking directory clean. لا migration أو GitHub.
+
+## 2026-10-16 — فصل إشعار تحويل القناة عن المحرر
+
+- أصبح كل تحويل مؤهل لمنشور قناة يرسل رسالة خيار جديدة بدلاً من استبدال رسالة لوحة المحرر. إذا كانت هناك مسودة أو عملية تحرير نشطة، يظهر تحذير وموافقة إضافيان قبل إغلاق المحرر وحذف محتواه غير المحفوظ؛ الصفحات المحفوظة تبقى كما هي. الرفض يعيد جلسة التحرير كما كانت، والموافقة تتابع بخياري التعديل/الاستيراد.
+- أضيفت مفاتيح وتحذيرات مترجمة للغات العشرين واختبارات لتدفق الإغلاق والرفض، وعدم استبدال رسالة اللوحة، ومواصلة الاستيراد.
+- الملفات: `tgcloud/lib/editor-core.js`, `tgcloud/lib/i18n-keys.js`, `tgcloud/lib/lang/*.js`, `tests/serverless/channel-post-edit-import.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `md_files/log.md`. لا schema change أو migration.
+- التحقق الفعلي: اختبارات مسار القناة والوسائط 10/10؛ `npm.cmd run test:ci` نجح مع فحوصات الخطط وMini App و264/264 اختباراً؛ `node --check` لكل كتالوجات اللغة والوحدات المعدلة و`git diff --check` نجحت. رُفعت 22 وحدة محددة؛ أكد `npm.cmd run status` revision 77، والـwebhook in sync وWorking directory clean. لا migration أو GitHub.
+
+## 2026-10-16 — تنفيذ تعديل منشور القناة أو استيراده
+
+- نُفذ مسار المنشور المحوّل من القناة: عند امتلاك المستخدم والبوت صلاحية تعديل المنشورات يظهر اختيار تعديل المنشور أو استيراده. يبقى الاستيراد مسودة مستقلة؛ أما التعديل فيحمّل المحتوى للمحرر ويحوّل زر مزامنة الصفحة إلى تعديل المنشور. لا يتغير الأصل إلا بعد تحذير وموافقة نهائية، مع فحص الصلاحيات مرة أخرى. فقدان الصلاحية يلغي هدف التعديل؛ إلغاء التحذير لا يغيّره.
+- حد Telegram المعروف: لا تتيح Bot API قراءة النسخة الحالية للمنشور أو شرط CAS بعد التحويل. أكد المالك قبول هذا القيد وطلب تحذيراً وموافقة صريحة أخيرة؛ قد يستبدل التعديل محتوى أحدث إذا تغيّر المصدر بعد التحويل.
+- الملفات: `tgcloud/lib/editor-core.js`, `tgcloud/lib/editor-session.js`, `tgcloud/lib/editor-block-ui.js`, `tgcloud/lib/editor-guard.js`, `tgcloud/handlers/callback_query.js`, `tgcloud/lib/i18n-keys.js`, `tgcloud/lib/lang/*.js`, `tests/serverless/channel-post-edit-import.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `docs/README.md`, `md_files/log.md`. لا schema change أو migration.
+- التحقق الفعلي: اختبارات القناة ونسخ الوسائط 8/8؛ `npm.cmd run test:ci` نجح مع فحوصات الخطط وMini App و262/262 اختباراً؛ `node --check` للوحدات المعدلة و`git diff --check` نجحا. رُفعت 29 وحدة محددة عبر `npm.cmd run deploy -- ...`، وأكد `npm.cmd run status` revision 76، والـwebhook in sync وWorking directory clean. لا migration أو GitHub.
+
+## 2026-10-16 — إصلاح نشر المجموعات وترجمة رسائل الوسائط وخطة تحرير منشور القناة
+
+- تجاهل وجهة الموضوع المحفوظة عند تعطيل وضع الموضوعات في المجموعة، مع الاحتفاظ بالإعداد لاحتمال إعادة تفعيلها. أُضيف اختبار انحدار يثبت عدم إرسال `message_thread_id` لمجموعة لم تعد منتدى، مع بقاء رفض المنتدى النشط بلا موضوع افتراضي.
+- أُضيفت تسع رسائل مترجمة إلى اللغات العشرين: توجيهات رفع الكولاج وعرض الشرائح، إنهاء الدفعة وأزرار الوسائط، ورسائل إضافة البوت وصلاحيات النشر. رُبطت المفاتيح بمسارات الوسائط ولوحة وجهات النشر، وأُضيف اختبار يغطي القيم والعناصر النائبة في كل اللغات.
+- أُنشئت خطة Markdown مستقلة لمسار تعديل منشور القناة أو استيراده، ورُبطت بفهرس الوثائق. لم يبدأ تنفيذ هذه الميزة.
+- الملفات: `tgcloud/lib/forum-topics.js`, `tests/serverless/forum-default.test.mjs`, `tgcloud/lib/i18n-keys.js`, `tgcloud/lib/lang/*.js`, `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/publish.js`, `tests/serverless/workflow-copy.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `docs/README.md`, `md_files/log.md`.
+- التحقق الفعلي: `node --experimental-vm-modules --test tests/serverless/forum-default.test.mjs tests/serverless/workflow-copy.test.mjs tests/serverless/publish-validation.test.mjs tests/serverless/tutorial-i18n.test.mjs` نجح، 20/20. لم يُنفذ `tgcloud push` أو migration أو تغيير webhook؛ لم يُحدّث GitHub.
+
+## 2026-10-16 — إصلاح ابتلاع callback إضافة البلوك
+
+- سبب توقف زر الإضافة: `handleEditorLimitConfirmation` كانت ترجع `{ handled: false }` للـcallbacks غير التابعة لتأكيد الحد. هذا كائن truthy، فكان مسار التوجيه يعتبر `r:add:*` قد عولج ويخرج دون تشغيل معالجه أو إظهار استثناء؛ لذلك لم يظهر تنبيه في قناة الأخطاء.
+- أصبح callback غير المطابق يرجع `false` حتى يستمر التوجيه الطبيعي، وأضيف اختبار يثبت أن callback إضافة فقرة لا يُستهلك بواسطة معالج تأكيد الحد.
+- التحقق الفعلي: `node --experimental-vm-modules --test tests/serverless/editor-limit-trim.test.mjs` نجح 4/4. نُشر التعديل المحدد عبر `npx.cmd tgcloud push tgcloud/lib/editor-limit-confirmation.js` بنجاح؛ أكد `npm.cmd run status` revision 75، والـwebhook in sync وWorking directory clean. لا تغيير للمخطط أو GitHub.
+
+## 2026-10-16 — ربط ونشر تأكيد تجاوز الحد داخل المحرر
+
+- أُضيف مسار تأكيد تجاوز الحد إلى callbacks المحرر بحيث تُعرف `r:limit:*` كاستجابة جلسة محرر وتُعرض رسالة تأكيد قبل حذف المحتوى الزائد أو اعتماد الحد. تم ربط هذا المسار مع فتحات إضافة/استبدال البلوك، بحيث يظهر خيار ترقية الحدود / موافق / رفض، وتبقى المسودة سليمة حتى الموافقة.
+- تم توسيع فحص الـ editor guard لتشمل `r:limit:` وربط ردّ التأكيد في `callback_query.js`. لا تغييرات على المخطط أو بيانات الإنتاج.
+- التحقق الفعلي: `npm.cmd run test:ci` نجح؛ فحوصات الخطط وMini App ناجحة و252/252 اختباراً بلا فشل أو تخطٍ. تم تنفيذ `npm.cmd run deploy` بنجاح، ورفع 7 وحدات إلى Telegram Serverless. أكد `npm.cmd run status` أن النسخة المحلية 74، وبيئة العمل المنشورة متزامنة، والـ webhook in sync. لم يُحدّث GitHub.
+
+## 2026-10-16 — تمييز تجاوز حد الوسائط في معاينة النتيجة
+
+- سبب التنبيه: فشلت معاينة نتيجة فيها 11 مرفق وسائط مقابل حد 10 الفعّال للحساب. هذا رفض متوقع، وليس خللاً في بلوك الجدول الذي يعرض تفاصيل سجل الأخطاء.
+- بقي حد المعاينة كما هو، وتظل المسودة محفوظة؛ تعرض لوحة المعاينة الآن سبب الحد المحدد، ولا يُرسل تجاوز `EDITOR_LIMIT` المتوقع إلى قناة الأعطال. ينطبق تصنيف التجاوز نفسه على معاينة البلوك المفرد. بقية أخطاء المعاينة تستمر في التسجيل.
+- التحقق الفعلي: `node --experimental-vm-modules --test tests/serverless/operational-errors.test.mjs` نجح، 10/10. لم يُنفذ `tgcloud push` أو نشر Telegram؛ GitHub لم يُحدّث.
+
+## 2026-10-14 — تبسيط الدليل وتعليم النشر
+
+- صار زر «عرض كل البلوكات» داخل الدليل يستخدم callback `r:showcase` نفسه لمسار `/draft`، مع إبقاء المسودة نشطة عند الضغط من مرساتها فقط والحفاظ على callback `catalog` القديم. استُبدل تعريف البلوك التقني باختيار مبسط للبداية.
+- أضيف درس «شلون أنشر؟» الاختياري إلى «تريد المزيد؟» وترجم في اللغات الـ18. يشرح أدوات المحرر، اختيار قناة/مجموعة، إعدادات الإرسال والتأكيد، ويظهر الإرشاد على لوحة المحرر بعد تسليم المسودة. لا ينفذ الدليل نشراً دون اختيار المستخدم.
+- التحقق الفعلي: اختبارات الدليل والتوطين والقياس 21/21؛ `npm.cmd run test:ci` ناجح مع check:plans وcheck:miniapp و248/248 اختباراً بلا فشل أو تخطٍ. لم يجرِ نشر Telegram لهذه المتابعة. تأكيد المالك لنجاح النشر يخص إصدار تقليل الوحدات السابق فقط.
+## 2026-10-14 — تقليل وحدات Telegram Serverless مع حفظ الدليل
+
+- أثبت ماسح `@tgcloud/cli` 0.2.0 وجود 124 وحدة محلية مقابل 99 في snapshot المرتبط بـrevision 71، منها 25 وحدة جديدة و8 معدلة قبل هذا الإصلاح. الماسح يرسل كل ملفات JavaScript ضمن مجلدات الوحدات؛ لا يقتصر على imports المستخدمة. لا توثيق رسمي أو capability descriptor متاح يحدد الرقم الأعلى الدقيق، لذلك لم يُفترض حد 100.
+- نُقلت كتالوجات اللغات الـ18 كـnamed exports إلى ملفات اللغة القائمة، وأُدمج اختيار اللغة والنصوص في `i18n.js`. نُقلت وظائف الدليل إلى `editor-core.js` و`editor-import.js` و`editor-renderer.js` و`editor-session.js` و`marketing-campaign.js`، وحُدثت imports والاختبارات. حُذفت 25 وحدة مصدرية زائدة بعد مقارنة الكتالوجات واختبار عدم سقوط المفاتيح؛ لم تُحذف ميزة أو ترجمة أو أصل صورة.
+- التحقق الفعلي: `npm.cmd run test:ci` ناجح؛ `check:plans` و`check:miniapp` ناجحان و247/247 اختباراً بلا فشل أو تخطٍ. الاختبارات المركزة للدليل نجحت 20/20. `git diff --check` والنتيجة النهائية لـCLI موثقان بعد إتمام الفحص.
+- عدد الوحدات وفق scanner/snapshot: 99 قبل التحديث و99 في manifest الحالي؛ `tgcloud status` لا يعرض وحدات جديدة. هذا يعيد التطبيق إلى مجموعة منشورة سابقاً، ولا يزعم كشف السقف العددي الدقيق أو نجاح نشر جديد.
+- حُفظت نسخة الملف المحلي السابق `app/miniapp_static/plan_catalog.generated.js` خارج المستودع وتطابق SHA-256؛ لم يُعدّل الملف. الفرع `fix/tgcloud-module-limit`، HEAD الحالي `18e9d5bc40826155742ff8c6512eda42bcccfbd5`؛ لا commit جديد ولا GitHub push ولا `tgcloud push` أو migration أو webhook.
+
 ## 2026-10-13 — إكمال لغات الدليل وتنبيه CBD وتقرير المراحل
 
 - اكتملت 90 رسالة للدليل وقوالبه في 20 لغة مدعومة؛ أضيفت 18 كتالوجاً تحت `tgcloud/lib/lang/tutorial/` ومسار `tutorial-i18n.js` مشترك لاختيار اللغة. العربية والإنجليزية محفوظتان، والأمثلة التقنية قابلة للنسخ كما هي.

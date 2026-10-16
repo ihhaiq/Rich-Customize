@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^node --experimental-vm-modules --test tests/serverless/editor-limit-trim\\.test\\.mjs tests/serverless/table-limits\\.test\\.mjs tests/serverless/editor-unified-limits\\.test\\.mjs$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

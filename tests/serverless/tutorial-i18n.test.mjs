@@ -5,7 +5,7 @@ import { harness } from './harness.mjs';
 
 function sourcePairs() {
   const pairs = new Map();
-  for (const file of ['tutorial-copy', 'tutorial-model', 'tutorial-view']) {
+  for (const file of ['i18n', 'editor-import', 'editor-renderer']) {
     const source = readFileSync('tgcloud/lib/' + file + '.js', 'utf8');
     const pattern = /(?:\bw\(|\bwords\([^,]*,)\s*('(?:\\.|[^'\\])*')\s*,\s*('(?:\\.|[^'\\])*')/g;
     for (const [, ar, en] of source.matchAll(pattern)) {
@@ -17,9 +17,9 @@ function sourcePairs() {
 }
 
 test('all 20 tutorial locales cover every UI, lesson and starter-content string', async () => {
-  const h = await harness({ extraModules: { tutorialI18n: 'lib/tutorial-i18n', copy: 'lib/tutorial-copy', model: 'lib/tutorial-model', view: 'lib/tutorial-view', store: 'lib/tutorial-store' } });
+  const h = await harness({ extraModules: { tutorialI18n: 'lib/i18n', copy: 'lib/i18n', model: 'lib/editor-import', view: 'lib/editor-renderer', store: 'lib/editor-session' } });
   const pairs = sourcePairs();
-  assert.equal(pairs.size, 90, 'review new tutorial strings and translate them in every catalog');
+  assert.equal(pairs.size, 98, 'review new tutorial strings and translate them in every catalog');
   const locales = h.i18n.supportedLocales();
   assert.deepEqual(Object.keys(h.tutorialI18n.TUTORIAL_TRANSLATIONS).sort(), Array.from(locales).filter(l => !['ar', 'en'].includes(l)).sort());
   for (const locale of locales) {

@@ -71,6 +71,7 @@ import {
   rememberAlbumPart,
 } from 'lib/editor-albums';
 import { resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
+import { requestEditorLimitConfirmation } from 'lib/editor-limit-confirmation';
 
 const SIMPLE_TEXT_TYPES = new Set([
   'mathematical_expression',
@@ -258,6 +259,17 @@ async function finishAdd(userId, session, message, block, languageCode) {
     entitlement: await getEditorEntitlement(userId),
   });
   if (!limit.ok) {
+    const requested = await requestEditorLimitConfirmation({
+      userId,
+      session,
+      candidateBlocks: blocks,
+      limit,
+      languageCode,
+      action: 'commit',
+      changes: { currentBlockId: null },
+      inputMessage: message,
+    });
+    if (requested) return true;
     await api.sendMessage({ chat_id: message.chat.id, text: limitText(limit, languageCode) });
     return false;
   }
@@ -305,6 +317,17 @@ async function replaceTopBlock(userId, session, message, block, replacement, lan
     entitlement: await getEditorEntitlement(userId),
   });
   if (!limit.ok) {
+    const requested = await requestEditorLimitConfirmation({
+      userId,
+      session,
+      candidateBlocks: blocks,
+      limit,
+      languageCode,
+      action: 'commit',
+      changes: { currentBlockId: null },
+      inputMessage: message,
+    });
+    if (requested) return true;
     await api.sendMessage({ chat_id: message.chat.id, text: limitText(limit, languageCode) });
     return false;
   }
@@ -443,7 +466,7 @@ function collageConfirmationKeyboard(token, languageCode, nested = false) {
   return {
     inline_keyboard: [
       [{
-        text: tr(localeOf(languageCode), 'Continue'),
+        text: t(localeOf(languageCode), 'media.done'),
         callback_data: 'r:collage:done:' + token,
         style: 'success',
       }],
@@ -459,7 +482,7 @@ function albumConfirmationKeyboard(token, languageCode, backData = 'r:back') {
   return {
     inline_keyboard: [
       [{
-        text: tr(localeOf(languageCode), 'Continue'),
+        text: t(localeOf(languageCode), 'media.done'),
         callback_data: 'r:album:done:' + token,
         style: 'success',
       }],
@@ -672,13 +695,13 @@ function newAnchorNames(blocks) {
 function slideshowKeyboard(token, count, nested, languageCode, userId) {
   const locale = localeOf(languageCode);
 const row = [{
-    text: tr(locale, "Continue"),
+    text: t(locale, 'media.done'),
     callback_data: 'r:slides:done:' + token,
     style: 'success',
   }];
   if (isDeveloper(userId) || count < SLIDESHOW_LIMIT) {
     row.push({
-      text: tr(locale, "Add more"),
+      text: t(locale, 'media.add_more'),
       callback_data: 'r:slides:more:' + token,
       style: 'primary',
     });
@@ -2181,7 +2204,7 @@ async function handleSlideshowMessage(message, session, languageCode, nested = f
     if (upload.active_group && String(upload.active_group) !== collected.groupId) {
       await api.sendMessage({
         chat_id: message.chat.id,
-        text: tr(localeOf(languageCode), 'Finish the current batch first with Continue or Add more.'),
+        text: t(localeOf(languageCode), 'media.finish_batch'),
       });
       return true;
     }
@@ -2197,7 +2220,7 @@ async function handleSlideshowMessage(message, session, languageCode, nested = f
     if (!children.length) {
       await api.sendMessage({
         chat_id: message.chat.id,
-        text: tr(localeOf(languageCode), 'Send photos or videos for this type.'),
+        text: t(localeOf(languageCode), 'media.send_slideshow'),
       });
       return true;
     }
@@ -2214,7 +2237,10 @@ async function handleSlideshowMessage(message, session, languageCode, nested = f
   await sendPrompt(
     message.from.id,
     message.chat.id,
-    (tr(localeOf(languageCode), 'Received: ')) + visibleCount + (isDeveloper(message.from.id) ? '' : '/' + SLIDESHOW_LIMIT),
+    t(localeOf(languageCode), 'media.received', {
+      count: visibleCount + (isDeveloper(message.from.id) ? '' : '/' + SLIDESHOW_LIMIT),
+      type: t(localeOf(languageCode), 'block.slideshow'),
+    }),
     slideshowKeyboard(upload.token, visibleCount, nested, languageCode, message.from.id),
   );
   return true;
@@ -2366,14 +2392,17 @@ async function handleAddMessage(message, session, languageCode) {
       await sendPrompt(
         userId,
         message.chat.id,
-        (tr(localeOf(languageCode), 'Collage items received: ')) + children.length,
+        t(localeOf(languageCode), 'media.received', {
+          count: children.length,
+          type: t(localeOf(languageCode), 'block.collage'),
+        }),
         collageConfirmationKeyboard(collected.token, languageCode),
       );
       return true;
     }
     const children = mediaChildren(message);
     if (!children.length) {
-      await api.sendMessage({ chat_id: message.chat.id, text: tr(localeOf(languageCode), 'Send photos or videos for this type.') });
+      await api.sendMessage({ chat_id: message.chat.id, text: t(localeOf(languageCode), 'media.send_collage') });
       return true;
     }
     await finishAdd(userId, session, message, makeBlock('collage', { children, caption_html: null, credit_html: null }), languageCode);
@@ -2550,14 +2579,17 @@ async function handleDetailsAddMessage(message, session, languageCode) {
         await sendPrompt(
           userId,
           message.chat.id,
-          (tr(localeOf(languageCode), 'Collage items received: ')) + children.length,
+          t(localeOf(languageCode), 'media.received', {
+            count: children.length,
+            type: t(localeOf(languageCode), 'block.collage'),
+          }),
           collageConfirmationKeyboard(collected.token, languageCode, true),
         );
         return true;
       }
       const children = mediaChildren(message);
       if (!children.length) {
-        await api.sendMessage({ chat_id: message.chat.id, text: tr(localeOf(languageCode), 'Send photos or videos for this type.') });
+        await api.sendMessage({ chat_id: message.chat.id, text: t(localeOf(languageCode), 'media.send_collage') });
         return true;
       }
       await storeDetailsChild(userId, session, message, makeBlock('collage', { children, caption_html: null, credit_html: null }), languageCode);
