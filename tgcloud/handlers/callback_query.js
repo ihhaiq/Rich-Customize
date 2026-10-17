@@ -12,7 +12,11 @@ import { handleDeveloperCallback } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
-import { explainOperationalError, userOperationalError } from 'lib/operational-errors';
+import {
+  explainOperationalError,
+  isDatabaseFailure,
+  userOperationalError,
+} from 'lib/operational-errors';
 import { handleBrandingCallback } from 'lib/branding';
 import { handleManagedBotCallback } from 'lib/managed-bot-billing';
 import { handleEditorBlockCallback } from 'lib/editor-block-flow';
@@ -49,9 +53,38 @@ async function routeNonPublishEditorCallback(query) {
   return false;
 }
 
+async function logErrorSafely(scope, error, context) {
+  try {
+    await logError(scope, error, context);
+  } catch (loggingError) {
+    console.warn('Could not persist callback error log', loggingError?.name || 'Error');
+  }
+}
+
+async function reportDatabaseFailure(query, error) {
+  console.error('Telegram Serverless database unavailable while handling a callback');
+  if (!query?.id) return;
+  const notice = userOperationalError(error, query?.from?.language_code || 'ar');
+  try {
+    await api.answerCallbackQuery({
+      callback_query_id: query.id,
+      text: notice.slice(0, 200),
+      show_alert: true,
+    });
+  } catch (feedbackError) {
+    console.warn('Could not answer callback during database outage', feedbackError?.name || 'Error');
+  }
+}
+
 export default async function (query, ctx = {}) {
   const updateId = ctx?.update?.update_id;
-  if (!await claimUpdate(updateId)) return;
+  try {
+    if (!await claimUpdate(updateId)) return;
+  } catch (error) {
+    if (!isDatabaseFailure(error)) throw error;
+    await reportDatabaseFailure(query, error);
+    return;
+  }
   const started = Date.now();
   let failed = false;
   try {
@@ -130,6 +163,10 @@ export default async function (query, ctx = {}) {
     await api.answerCallbackQuery({ callback_query_id: query.id });
   } catch (error) {
     failed = true;
+    if (isDatabaseFailure(error)) {
+      await reportDatabaseFailure(query, error);
+      return;
+    }
     const guide = explainOperationalError(error);
     if (guide.silent) {
       console.warn('Harmless callback response rejected by Telegram', guide.code);
@@ -148,7 +185,7 @@ export default async function (query, ctx = {}) {
       console.warn('Could not report failed callback to user', alertError);
     }
     if (!['EDITOR_LIMIT_REACHED','LEGACY_PAGE_READ_ONLY'].includes(guide.code)) {
-      await logError('callback_query', error, {
+      await logErrorSafely('callback_query', error, {
         updateId, userId: query?.from?.id,
         chatId: query?.message?.chat?.id,
         threadId: query?.message?.message_thread_id,

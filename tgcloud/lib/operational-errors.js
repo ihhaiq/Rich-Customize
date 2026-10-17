@@ -7,6 +7,11 @@ const rawDetail = (error) => String(
 );
 const codes = (error) => String(error?.code ?? error?.error_code ?? error?.response?.error_code ?? '');
 
+export function isDatabaseFailure(error) {
+  const value = [codes(error), rawDetail(error)].join(' ');
+  return /\bsqlite(?:3)?\b|\bSQLITE_[A-Z_]+\b|database (?:is )?(?:locked|busy|unavailable|malformed)|no such (?:table|column)/i.test(value);
+}
+
 export function isEditorLimitFailure(error) {
   return /(?:^|\s)EDITOR_LIMIT:[a-z_]+:\d+:\d+(?:$|\s)/.test(rawDetail(error));
 }
@@ -21,6 +26,12 @@ export function explainOperationalError(error) {
   const message = rawDetail(error);
   const code = codes(error);
   const value = [code, message].join(' ');
+  if (isDatabaseFailure(error))
+    return guide('DATABASE_UNAVAILABLE','temporary',
+      'قاعدة البيانات غير متاحة مؤقتاً. تعذر تأكيد حفظ هذه الخطوة؛ تحقق من حالتها قبل إعادة المحاولة. لا تكرر الدفع أو النشر قبل التحقق.',
+      'The database is temporarily unavailable. This step could not be confirmed; check its status before retrying. Do not repeat a payment or publish until you verify the result.',
+      'فشل الوصول إلى قاعدة بيانات Telegram Serverless أو إلى مخطط مطلوب.',
+      'أوقف العمليات المعتمدة على الحالة، وأظهر تنبيهاً آمناً دون تسجيل الخطأ في قاعدة البيانات المتعطلة.');
   if (/query is too old|query_id_invalid|query has expired|query id is invalid|QUERY_ID_INVALID/i.test(value))
     return guide('CALLBACK_EXPIRED','benign','انتهت صلاحية الزر. افتح الواجهة من جديد.','This button expired. Reopen the screen.',
       'انتهت صلاحية إجابة Callback قبل وصول الطلب.','لا تعاود إرسال إجابة الـ Callback المنتهي، وافتح الواجهة مجدداً.',{silent:true});

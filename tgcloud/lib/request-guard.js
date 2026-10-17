@@ -9,7 +9,6 @@ import {
 } from 'schema';
 import { recordOperation } from 'lib/usage-stats';
 import { EDITOR_SESSION_TTL_SECONDS } from 'lib/editor-blocks';
-import { logError } from 'lib/error-log';
 import { resolveUserLanguage, t } from 'lib/i18n';
 
 const IDEMPOTENCY_TTL_SECONDS = 15 * 60;
@@ -32,24 +31,18 @@ export async function claimUpdate(updateId) {
   const id = updateIdValue(updateId);
   if (id == null) return true;
   const stamp = nowSeconds();
-  try {
-    await db.delete(processedUpdates)
-      .where(lt(processedUpdates.expiresAt, stamp))
-      .run();
-    const rows = await db.insert(processedUpdates).values({
-      updateId: id,
-      expiresAt: stamp + IDEMPOTENCY_TTL_SECONDS,
-    }).onConflictDoNothing({
-      target: processedUpdates.updateId,
-    }).returning({
-      updateId: processedUpdates.updateId,
-    }).run();
-    return Array.isArray(rows) && rows.length > 0;
-  } catch (error) {
-    // claimUpdate is invoked before most handler try/catch blocks.
-    await logError('request_guard.claim', error, { updateId: id });
-    throw error;
-  }
+  await db.delete(processedUpdates)
+    .where(lt(processedUpdates.expiresAt, stamp))
+    .run();
+  const rows = await db.insert(processedUpdates).values({
+    updateId: id,
+    expiresAt: stamp + IDEMPOTENCY_TTL_SECONDS,
+  }).onConflictDoNothing({
+    target: processedUpdates.updateId,
+  }).returning({
+    updateId: processedUpdates.updateId,
+  }).run();
+  return Array.isArray(rows) && rows.length > 0;
 }
 
 export async function releaseUpdate(updateId) {

@@ -1,3 +1,19 @@
+## 2026-10-17 — استجابة آمنة عند تعذر SQLite
+
+- **السبب:** فشل `claimUpdate` كان يحدث قبل `try/catch` في معالجات الرسائل والأزرار، ومحاولة تسجيل الخطأ في SQLite المتعطلة قد تمنع المستخدم من رؤية أي رد.
+- **التغيير:** تصنيف أخطاء SQLite/المخطط، وإرسال تنبيه مؤقت مترجم للرسائل الخاصة أو callback، مع إيقاف العمل المعتمد على البيانات وعدم محاولة كتابة سجل الخطأ في القاعدة المتعطلة. تبقى الصفحات والجلسات معتمدة على Telegram Serverless؛ لم يُنفذ بعد محرر كامل دون اتصال أو مخزن مسودات في Cloudflare.
+- **الملفات:** `tgcloud/lib/operational-errors.js`, `tgcloud/lib/request-guard.js`, `tgcloud/handlers/message.js`, `tgcloud/handlers/callback_query.js`, `tests/serverless/operational-errors.test.mjs`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق الفعلي:** `node --experimental-vm-modules --test tests/serverless/operational-errors.test.mjs` نجح 11/11؛ `npm.cmd test` نجح 274/274؛ `node --check` للملفات الأربعة و`git diff --check` نجحا.
+- **GitHub/النشر:** لا commit أو push إلى GitHub، ولا `tgcloud push` أو `migrate` أو نشر Telegram. تغييرات الكود محلية؛ لم يُعد تشغيل الترحيل الفاشل.
+
+## 2026-10-16 — إصلاح أزرار «خيارات إضافية» في الدليل
+
+- **السبب:** Telegram رفض تحديث رسالة الدليل لأن `InputRichBlock` لا يقبل `type: "button"` مباشرة ضمن `details.blocks`؛ الرفض أعاد خطأ 400 عند callback.
+- **التغيير:** صارت أزرار الخيارات أبناءً لنص `paragraph` بصيغة RichText المعتمدة، بدلاً من إرسالها كأنواع بلوكات مستقلة. بقيت callbacks والإجراءات كما هي. أضيف تأكيد بنيوي يمنع إعادة هذا الشكل غير المدعوم.
+- **الملفات:** `tgcloud/lib/editor-renderer.js`, `tests/serverless/tutorial.test.mjs`, `md_files/tutorial.md`, `md_files/log.md`.
+- **التحقق الفعلي:** اختبارات الدليل والتوطين 22/22؛ `node --check tgcloud/lib/editor-renderer.js` و`git diff --check` ناجحان. لم يُشغّل CI كاملاً لهذه الدفعة.
+- **GitHub/النشر:** لا commit أو push إضافي لهذه المعالجة. لا `tgcloud push` أو migration؛ التصحيح محلي بانتظار الإذن/الإجراء المنفصل لنشر Telegram.
+
 ## 2026-10-16 — تبسيط تنقل الدليل ومراجعة المقترحات
 
 - **السبب:** طلب المستخدم تقليل ازدحام أزرار الدليل، إصلاح الرجوع الذي لا يعيد الشاشة السابقة، وجعل تطبيق النصائح مطابقاً لما تعرضه.

@@ -22,7 +22,11 @@ import { handleShowcaseMessage } from 'lib/showcase';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
-import { explainOperationalError, userOperationalError } from 'lib/operational-errors';
+import {
+  explainOperationalError,
+  isDatabaseFailure,
+  userOperationalError,
+} from 'lib/operational-errors';
 import { handleBrandingSuccessfulPayment } from 'lib/branding';
 import { handleManagedBotSuccessfulPayment, sendManagedBotPlans } from 'lib/managed-bot-billing';
 import { sendMarketingCampaignSummary, sendMarketingLanding } from 'lib/marketing-campaign';
@@ -59,9 +63,39 @@ function commandArgument(text, name) {
   return String(parts.slice(1).join(' ') || '').trim();
 }
 
+async function logErrorSafely(scope, error, context) {
+  try {
+    await logError(scope, error, context);
+  } catch (loggingError) {
+    console.warn('Could not persist message error log', loggingError?.name || 'Error');
+  }
+}
+
+async function reportDatabaseFailure(message, error) {
+  console.error('Telegram Serverless database unavailable while handling a message');
+  if (message?.chat?.type !== 'private' || message?.from?.is_bot) return;
+  const locale = String(message?.from?.language_code || 'ar');
+  const notice = message?.successful_payment
+    ? (locale.startsWith('ar')
+      ? 'قاعدة البيانات غير متاحة مؤقتاً. إذا انخصمت النجوم لا تعيد الدفع؛ تحقق من الترخيص أو تواصل مع الدعم.'
+      : 'The database is temporarily unavailable. If Stars were charged, do not pay again; check your entitlement or contact support.')
+    : userOperationalError(error, locale);
+  try {
+    await api.sendMessage({ chat_id: message.chat.id, text: notice });
+  } catch (feedbackError) {
+    console.warn('Could not send database outage notice', feedbackError?.name || 'Error');
+  }
+}
+
 export default async function (message, ctx = {}) {
   const updateId = ctx?.update?.update_id;
-  if (!await claimUpdate(updateId)) return;
+  try {
+    if (!await claimUpdate(updateId)) return;
+  } catch (error) {
+    if (!isDatabaseFailure(error)) throw error;
+    await reportDatabaseFailure(message, error);
+    return;
+  }
   const started = Date.now();
   let failed = false;
   let bridgeHandled = false;
@@ -172,7 +206,7 @@ export default async function (message, ctx = {}) {
           });
         } catch (error) {
           console.error('idle welcome rich message failed; using plain fallback', error);
-          await logError('welcome.idle_rich_fallback', error, {
+          await logErrorSafely('welcome.idle_rich_fallback', error, {
             updateId,
             userId: message?.from?.id,
             chatId: message?.chat?.id,
@@ -199,7 +233,7 @@ export default async function (message, ctx = {}) {
       });
     } catch (error) {
       console.error('sendRichMessage welcome failed; using plain fallback', error);
-      await logError('welcome.start_rich_fallback', error, {
+      await logErrorSafely('welcome.start_rich_fallback', error, {
         updateId,
         userId: message?.from?.id,
         chatId: message?.chat?.id,
@@ -212,11 +246,15 @@ export default async function (message, ctx = {}) {
     }
   } catch (error) {
     failed = true;
+    if (isDatabaseFailure(error)) {
+      await reportDatabaseFailure(message, error);
+      return;
+    }
     const guide = explainOperationalError(error);
     // Normal plan quota rejections and old-page editing attempts are
     // expected user actions, not production incident alerts.
     if (!['EDITOR_LIMIT_REACHED','LEGACY_PAGE_READ_ONLY'].includes(guide.code)) {
-      await logError('message', error, {
+      await logErrorSafely('message', error, {
         updateId,
         userId: message?.from?.id,
         chatId: message?.chat?.id,

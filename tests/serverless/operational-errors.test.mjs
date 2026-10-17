@@ -7,9 +7,9 @@ const operationalSource = fs.readFileSync(new URL('../../tgcloud/lib/operational
   .replace(/^import .*?;\s*$/gm, '');
 const errors = new Function(
   publishSource.replace(/\bexport /g, '') + '\n' + operationalSource.replace(/\bexport /g, '')
-  + '\nreturn {explainOperationalError,userOperationalError,isEditorLimitFailure};',
+  + '\nreturn {explainOperationalError,userOperationalError,isEditorLimitFailure,isDatabaseFailure};',
 )();
-const { explainOperationalError, userOperationalError, isEditorLimitFailure } = errors;
+const { explainOperationalError, userOperationalError, isEditorLimitFailure, isDatabaseFailure } = errors;
 
 test('editor quota rejections are recognized as expected preview failures', () => {
   const failure = new Error('EDITOR_LIMIT:media_attachments:11:10');
@@ -70,6 +70,23 @@ test('unknown failures have a safe fallback without revealing technical text', (
   assert.equal(explainOperationalError(e).code, 'UNCLASSIFIED_ERROR');
   assert.doesNotMatch(userOperationalError(e, 'ar'), /SECRET_INTERNAL_DATABASE_MESSAGE/);
   assert.match(userOperationalError(e, 'en'), /contact support/i);
+});
+
+test('SQLite outages receive a safe, retryable notice without leaking details', () => {
+  for (const failure of [
+    new Error('Sqlite error'),
+    Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' }),
+    new Error('no such table: editor_sessions'),
+  ]) {
+    assert.equal(isDatabaseFailure(failure), true);
+    const result = explainOperationalError(failure);
+    assert.equal(result.code, 'DATABASE_UNAVAILABLE');
+    assert.equal(result.kind, 'temporary');
+    assert.match(userOperationalError(failure, 'ar'), /قاعدة البيانات/);
+    assert.match(userOperationalError(failure, 'en'), /temporarily unavailable/i);
+    assert.doesNotMatch(userOperationalError(failure, 'en'), /editor_sessions|Sqlite error/i);
+  }
+  assert.equal(isDatabaseFailure(new Error('Telegram Bad Request: CHAT_NOT_FOUND')), false);
 });
 
 test('editor validation failures are actionable and never shown as raw exceptions', () => {

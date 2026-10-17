@@ -24,7 +24,8 @@ test('welcome layout, uncluttered guide home and rich options have the required 
  const allBlocks=homeKeyboard[1][0];assert.equal(allBlocks.callback_data,'r:showcase');
  const options=view.rich_message.blocks.find(block=>block.type==='details');
  assert.equal(options.summary,'خيارات إضافية');
- const homeActions=options.blocks.map(block=>block.button.callback_data.split(':').at(-1));
+ assert.ok(options.blocks.every(block=>block.type==='paragraph'));
+ const homeActions=options.blocks.map(block=>block.text[0].button.callback_data.split(':').at(-1));
  for(const action of ['save','cbd','guest','publish'])assert.ok(homeActions.includes(action),action);
  await h.tutorial.pauseTutorialForCommand({chat:h.chat,message_id:h.messageId,from:h.user,data:allBlocks.callback_data});
  assert.equal((await h.state()).active,true);

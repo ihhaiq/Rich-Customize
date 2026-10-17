@@ -12,6 +12,7 @@ Primary reference: https://core.telegram.org/bots/serverless
 - `api.getFileContent(file_id)` returns a `Uint8Array`; Bot API downloads are capped at 20 MB.
 - `InputFile` uploads raw bytes through Bot API methods.
 - `push` and `migrate` are separate operations.
+- If SQLite or a required table is unavailable, private message updates receive a localized temporary-failure notice and callbacks receive an alert. Database-backed work fails closed; this does not provide offline editing or buffer page contents in Cloudflare.
 
 ## Current persistent tables
 

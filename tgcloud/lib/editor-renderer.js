@@ -554,10 +554,10 @@ export function tutorialView(state,locale,entitlement,notice='') {
   let text=c.intro,rows=[],extra=[],preview=state.blocks||[],backButton=null,previousButton=null,nextButton=null;
   const back=()=>{backButton=b(c.back,'back');};
   const options=()=>({type:'details',summary:c.optionsTitle,blocks:[
-    {type:'button',button:b(c.save,'save')},
-    {type:'button',button:b(c.cbd,'cbd')},
-    {type:'button',button:b(c.guest,'guest')},
-    {type:'button',button:b(c.publishHow,'publish')},
+    paragraph([richButton(c.save,'save')]),
+    paragraph([richButton(c.cbd,'cbd')]),
+    paragraph([richButton(c.guest,'guest')]),
+    paragraph([richButton(c.publishHow,'publish')]),
   ]});
   switch(state.step) {
     case 'home':
