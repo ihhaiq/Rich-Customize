@@ -41,6 +41,7 @@ import { handleEditorPageMessage } from 'lib/editor-pages';
 import { handleEditorButtonMessage } from 'lib/editor-buttons';
 import { loadEditorSession } from 'lib/editor-session';
 import { handleScheduledTimeMessage, showScheduledPosts } from 'lib/scheduled-publish';
+import { handleInfoCommand } from 'lib/user-info';
 import {
   allowMessageRequest,
   claimUpdate,
@@ -115,6 +116,11 @@ export default async function (message, ctx = {}) {
     if (command.startsWith('/')) await pauseTutorialForCommand(message);
     if (message?.from && !message.from.language_code) {
       message.from.language_code = languageCode;
+    }
+
+    if (matchesCommand(command, 'info')) {
+      await handleInfoCommand(message, commandArgument(message?.text, 'info'), languageCode);
+      return;
     }
 
     if (message?.chat?.type === 'private' && (matchesCommand(command, 'mybots') || message?.text?.trim() === 'بوتاتي')) {

@@ -7,14 +7,9 @@ import { BOT_PROFILES } from 'lib/bot-profiles';
 import { MAIN_AR_BY_EN } from 'lib/main-ar-source';
 import enValues from 'lib/lang/en';
 import arValues from 'lib/lang/ar';
-import esValues, { tutorialCatalog as esTutorial } from 'lib/lang/es';
-import deValues, { tutorialCatalog as deTutorial } from 'lib/lang/de';
-import itValues, { tutorialCatalog as itTutorial } from 'lib/lang/it';
-import ptValues, { tutorialCatalog as ptTutorial } from 'lib/lang/pt';
-import nlValues, { tutorialCatalog as nlTutorial } from 'lib/lang/nl';
-import plValues, { tutorialCatalog as plTutorial } from 'lib/lang/pl';
-import ukValues, { tutorialCatalog as ukTutorial } from 'lib/lang/uk';
-import ruValues, { tutorialCatalog as ruTutorial } from 'lib/lang/ru';
+import { localeValues as germanicValues, tutorialCatalogs as germanicTutorials } from 'lib/lang/germanic';
+import { localeValues as romanceValues, tutorialCatalogs as romanceTutorials } from 'lib/lang/romance';
+import { localeValues as slavicValues, tutorialCatalogs as slavicTutorials } from 'lib/lang/slavic';
 import trValues, { tutorialCatalog as trTutorial } from 'lib/lang/tr';
 import urValues, { tutorialCatalog as urTutorial } from 'lib/lang/ur';
 import hiValues, { tutorialCatalog as hiTutorial } from 'lib/lang/hi';
@@ -29,14 +24,14 @@ import zhHantValues, { tutorialCatalog as zhHantTutorial } from 'lib/lang/zh-han
 const LANGUAGE_VALUES = Object.freeze({
   en: enValues,
   ar: arValues,
-  es: esValues,
-  de: deValues,
-  it: itValues,
-  pt: ptValues,
-  nl: nlValues,
-  pl: plValues,
-  uk: ukValues,
-  ru: ruValues,
+  es: romanceValues.es,
+  de: germanicValues.de,
+  it: romanceValues.it,
+  pt: romanceValues.pt,
+  nl: germanicValues.nl,
+  pl: slavicValues.pl,
+  uk: slavicValues.uk,
+  ru: slavicValues.ru,
   tr: trValues,
   ur: urValues,
   hi: hiValues,
@@ -50,20 +45,20 @@ const LANGUAGE_VALUES = Object.freeze({
 });
 
 export const TUTORIAL_TRANSLATIONS = Object.freeze({
-  "de": deTutorial,
-  "es": esTutorial,
+  "de": germanicTutorials.de,
+  "es": romanceTutorials.es,
   "hi": hiTutorial,
   "id": idTutorial,
-  "it": itTutorial,
+  "it": romanceTutorials.it,
   "ja": jaTutorial,
   "ko": koTutorial,
-  "nl": nlTutorial,
-  "pl": plTutorial,
-  "pt": ptTutorial,
-  "ru": ruTutorial,
+  "nl": germanicTutorials.nl,
+  "pl": slavicTutorials.pl,
+  "pt": romanceTutorials.pt,
+  "ru": slavicTutorials.ru,
   "th": thTutorial,
   "tr": trTutorial,
-  "uk": ukTutorial,
+  "uk": slavicTutorials.uk,
   "ur": urTutorial,
   "vi": viTutorial,
   "zh-hans": zhHansTutorial,

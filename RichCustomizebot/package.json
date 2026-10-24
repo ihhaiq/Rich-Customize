@@ -1,0 +1,7 @@
+{
+  "name": "RichCustomizebot",
+  "private": true,
+  "devDependencies": {
+    "@tgcloud/cli": "^0.2.0"
+  }
+}

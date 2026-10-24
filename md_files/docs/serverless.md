@@ -26,6 +26,7 @@ Primary reference: https://core.telegram.org/bots/serverless
 - `miniapp_bridge_requests` — short-lived RCB1 Mini App bridge request IDs/status for deduplication and mutation-response replay.
 - `miniapp_user_picker_requests` — short-lived native Mini App `request_users` state, bound to owner/page/block/revision.
 - `usage_users`, `usage_minutes`, `usage_runtime` — persistent Serverless usage/operational statistics.
+- `/info @username` or `/info <user-id>` looks up a stored account in any chat; replying to a user's message or sending `/info` without an argument also works. It uses only profile fields already present in Telegram updates or `usage_users`; usernames are not resolved from Telegram unless the account has appeared in the bot's data.
 - `page_snapshots` — bounded page recovery snapshots.
 - `maintenance_locks` — prevents duplicate import/export/snapshot/refresh operations.
 

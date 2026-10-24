@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { localeValues as germanicValues } from '../../tgcloud/lib/lang/germanic.js';
+import { localeValues as romanceValues } from '../../tgcloud/lib/lang/romance.js';
+import { localeValues as slavicValues } from '../../tgcloud/lib/lang/slavic.js';
 import { harness } from './harness.mjs';
 const emoji = { type: 'custom_emoji', custom_emoji_id: '5368324170671202286', alternative_text: '👍' };
 const html = '<tg-emoji emoji-id="5368324170671202286">👍</tg-emoji>';
@@ -137,8 +140,14 @@ test('picker has exact three columns, merged finish/more rows and complete extra
 test('all 20 catalogs contain every emoji key with matching placeholders', async () => {
   const h = await harness();
   const { MESSAGE_KEYS, SUPPORTED_LOCALES } = await import('../../tgcloud/lib/i18n-keys.js');
+  const bundledValues = {
+    ...germanicValues,
+    ...romanceValues,
+    ...slavicValues,
+  };
   for (const locale of SUPPORTED_LOCALES) {
-    const { default: values } = await import('../../tgcloud/lib/lang/' + locale + '.js');
+    const values = bundledValues[locale]
+      || (await import('../../tgcloud/lib/lang/' + locale + '.js')).default;
     assert.equal(values.length, MESSAGE_KEYS.length);
     for (const key of MESSAGE_KEYS.filter(key => key.startsWith('emoji.'))) assert.ok(h.i18n.t(locale, key));
     assert.doesNotMatch(h.i18n.t(locale, 'emoji.range', { start: 10, end: 27, total: 60 }), /\{\w+\}/);

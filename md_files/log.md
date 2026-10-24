@@ -1,3 +1,11 @@
+## 2026-10-23 — إضافة أمر /info للبحث عن الحسابات
+
+- **السبب:** طلب إظهار معرّف المستخدم واسمه كرابط لحسابه واسم المستخدم، مع رد مترجم عند عدم العثور على الحساب.
+- **التغيير:** أضيف `/info @username` و`/info <user-id>` في المحادثات الخاصة والمجموعات، مع دعم الرد على رسالة مستخدم أو عرض بيانات مرسل الأمر دون وسيط. يعتمد البحث على بيانات الملفات الشخصية الموجودة في تحديثات Telegram وجدول `usage_users`، وتُعرض حالة عدم وجود اسم مستخدم علناً بدل اختلاقه. رسالة الحساب غير المعروف مترجمة للغات العشرين المدعومة.
+- **الملفات:** `tgcloud/handlers/message.js`, `tgcloud/lib/user-info.js`, `tgcloud/lib/user-info-copy.js`, `tests/serverless/user-info.test.mjs`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق الفعلي:** اختبارات `user-info.test.mjs` نجحت 5/5؛ `npm.cmd test` نجح 279/279؛ `node --check` لوحدات التنفيذ ومعالج الرسائل و`git diff --check` نجحت.
+- **GitHub/النشر:** نُشرت وحدات `/info` الثلاث إلى Telegram Serverless في revision 89، وأظهر الفحص أن webhook متزامن. أعاد CLI خطأً محلياً بعد تأكيد رفع الوحدات أثناء تحديث snapshot؛ جرى جلب snapshot والتحقق من revision 89 وعدم بقاء تغييرات محلية لهذه الوحدات. لم يُنفذ migration أو commit أو push إلى GitHub، ولم تُرفع التغييرات الأخرى في مساحة العمل.
+
 ## 2026-10-17 — استجابة آمنة عند تعذر SQLite
 
 - **السبب:** فشل `claimUpdate` كان يحدث قبل `try/catch` في معالجات الرسائل والأزرار، ومحاولة تسجيل الخطأ في SQLite المتعطلة قد تمنع المستخدم من رؤية أي رد.
@@ -5,6 +13,14 @@
 - **الملفات:** `tgcloud/lib/operational-errors.js`, `tgcloud/lib/request-guard.js`, `tgcloud/handlers/message.js`, `tgcloud/handlers/callback_query.js`, `tests/serverless/operational-errors.test.mjs`, `md_files/docs/serverless.md`, `md_files/log.md`.
 - **التحقق الفعلي:** `node --experimental-vm-modules --test tests/serverless/operational-errors.test.mjs` نجح 11/11؛ `npm.cmd test` نجح 274/274؛ `node --check` للملفات الأربعة و`git diff --check` نجحا.
 - **GitHub/النشر:** لا commit أو push إلى GitHub، ولا `tgcloud push` أو `migrate` أو نشر Telegram. تغييرات الكود محلية؛ لم يُعد تشغيل الترحيل الفاشل.
+
+## 2026-10-17 — خفض وحدات Serverless مع حفظ كتالوجات اللغات
+
+- **السبب:** طلب المالك خفض عدد الوحدات المنشورة من 100 إلى 95 احتياطاً من حد الملفات، مع عدم فقد أي ترجمة. هذا لا يفسر وحده خطأ SQLite؛ حالة التطبيق الحالية revision 86 والـwebhook متزامن.
+- **التغيير:** جُمعت كتالوجات DE/NL وES/IT/PT وPL/RU/UK في ثلاث وحدات، مع الإبقاء على قيم الرسائل ودليل الترجمة لكل لغة كما هي. انخفض العدد الصافي 5 وحدات (8 ملفات إلى 3)، دون إزالة لغة أو مفتاح.
+- **الملفات:** `tgcloud/lib/i18n.js`, `tgcloud/lib/lang/germanic.js`, `tgcloud/lib/lang/romance.js`, `tgcloud/lib/lang/slavic.js`, ملفات اللغات الثمانية السابقة، `tests/serverless/premium-emoji.test.mjs`, `md_files/docs/I18N_GUIDE.md`, `md_files/log.md`.
+- **التحقق الفعلي:** `npm.cmd run test:ci` نجح: فحوص الخطة وMini App، و274/274 اختباراً؛ جرى التحقق من تطابق بيانات الكتالوجات المجمعة مع الأصول قبل حذف الملفات المنفصلة، ومن العدد النهائي 95، ونجح `node --check` و`git diff --check`.
+- **GitHub/النشر:** التغييرات محلية فقط؛ يجب اختبارها قبل أي `tgcloud push`. لم تُلمس قاعدة البيانات.
 
 ## 2026-10-16 — إصلاح أزرار «خيارات إضافية» في الدليل
 

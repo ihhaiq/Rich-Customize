@@ -67,19 +67,26 @@ export function activeSubscribersSql(stamp=Math.floor(Date.now()/1000)) {
   const time=Math.max(0,Math.floor(Number(stamp)||0));
   const developers=DEVELOPER_IDS.filter(id=>Number.isSafeInteger(id)&&id>0).join(',')||'-1';
   return `WITH gifts AS (
-    SELECT user_id,MAX(expires_at) AS expires_at FROM golden_claims
-    WHERE expires_at>${time} GROUP BY user_id
+    SELECT user_id,activated_at,expires_at FROM (
+      SELECT user_id,activated_at,expires_at,
+        ROW_NUMBER() OVER(PARTITION BY user_id
+          ORDER BY expires_at DESC,activated_at DESC) AS rank
+      FROM golden_claims WHERE expires_at>${time}
+    ) WHERE rank=1
   ), paid AS (
-    SELECT user_id,plan,expires_at FROM editor_subscriptions
+    SELECT user_id,plan,started_at,expires_at FROM editor_subscriptions
     WHERE status='active' AND source='richdonate:verified'
       AND plan IN ('plus','golden') AND expires_at>${time}
   ), owners AS (
     SELECT user_id FROM gifts UNION SELECT user_id FROM paid
   ) SELECT o.user_id,
+    u.username,u.first_name,u.last_name,
     CASE WHEN g.user_id IS NOT NULL THEN 'golden' ELSE p.plan END AS plan,
+    CASE WHEN g.user_id IS NOT NULL THEN g.activated_at ELSE p.started_at END AS started_at,
     CASE WHEN g.user_id IS NOT NULL THEN g.expires_at ELSE p.expires_at END AS expires_at
   FROM owners o LEFT JOIN gifts g ON g.user_id=o.user_id
   LEFT JOIN paid p ON p.user_id=o.user_id
+  LEFT JOIN usage_users u ON u.user_id=o.user_id
   WHERE o.user_id>0 AND o.user_id NOT IN (${developers})`;
 }
 export async function activeSubscribersPage(requestedPage=0,stamp=Math.floor(Date.now()/1000)) {

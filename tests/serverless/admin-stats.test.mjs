@@ -37,9 +37,30 @@ test('verified paid cohorts are checked against Serverless billing source and ac
  assert.match(source,/ROW_NUMBER\(\) OVER\(PARTITION BY user_id/);
  assert.match(source,/a\.updated_at>=u\.last_seen/);
  assert.match(source,/a\.status='unavailable'/);
+ assert.match(source,/u\.username,u\.first_name,u\.last_name/);
+ assert.match(source,/g\.activated_at/);
+ assert.match(source,/p\.started_at/);
  assert.match(panel,/المتاحون تقديرياً/);
  assert.match(panel,/Golden Ticket/);
  // The management UI moved to the donation bot; keep the operational stats here.
  assert.match(panel,/@richDonateBot/);
  assert.match(panel,/تم نقل إدارة الاشتراكات والإهداء/);
+});
+
+test('donation console subscriber response is a paginated rich account table',()=>{
+ const source=readFileSync(new URL('../../tgcloud/lib/donate-console.js',import.meta.url),'utf8');
+ assert.match(source,/type:'table',cells,is_bordered:true,is_striped:true/);
+ assert.match(source,/رابط الحساب/);
+ assert.match(source,/بداية الاشتراك \(UTC\)/);
+ assert.match(source,/نهاية الاشتراك \(UTC\)/);
+ assert.match(source,/max_page:result\.maxPage/);
+ assert.match(source,/callback_data/);
+});
+
+test('donation console /info uses the editor stored-profile lookup without exposing subscription data',()=>{
+ const source=readFileSync(new URL('../../tgcloud/lib/donate-console.js',import.meta.url),'utf8');
+ assert.match(source,/findUserInfoTarget\(p\.target\)/);
+ assert.match(source,/اسم المستخدم:/);
+ assert.match(source,/المعرف:/);
+ assert.match(source,/p\.action!=='info'&&!isDeveloper\(actor\)/);
 });
