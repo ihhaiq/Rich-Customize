@@ -4,7 +4,7 @@
 - **التغيير:** إضافة الترجمات الروسية لـ`button.large` و`button.large_desc`، وإضافة اختبار يتحقق من حل مفاتيح البلوكة وإجراءاتها في اللغات العشرين المدعومة. تحديث إصدار `miniapp_i18n.js` لمنع استخدام نسخة مخزنة قديمة.
 - **الملفات:** `app/miniapp_static/miniapp_i18n.js`, `app/miniapp_static/editor.html`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
 - **التحقق الفعلي:** نجحت الاختبارات المركزة مع تغطية مفاتيح البلوكة في جميع اللغات المدعومة (`large-button-block` و`publish-validation`: 14/14)، ونجح `node --check` و`git diff --check`.
-- **GitHub/النشر:** نُشرت أصول Mini App الثابتة على Telegram Serverless (13 ملفاً، 345.5 KB؛ الحالة تؤكد 67 أصلاً متزامناً والـwebhook متزامن). فحص المخطط `--local --dry-run` أكد عدم وجود ترحيل مطلوب. نشر Cloudflare Pages ينتظر push الفرع.
+- **GitHub/النشر:** نُشرت أصول Mini App الثابتة على Telegram Serverless (13 ملفاً، 345.5 KB؛ الحالة تؤكد 67 أصلاً متزامناً والـwebhook متزامن)، ثم دُفع commit `2bb73d4` إلى `serverless-cleanup`. أعاد Cloudflare HTTP 200 للأصل وظهرت الترجمات العربية والروسية؛ فحص مخطط `--local --dry-run` أكد عدم الحاجة إلى ترحيل.
 
 ## 2026-10-30 — استعادة فحوص الإصدار قبل النشر
 
@@ -12,7 +12,7 @@
 - **التغيير:** استعادة نوع وحدات ESM وأوامر الاختبار والتحقق في `package.json`، وتصحيح نمط reduced-motion في الاختبار ليطابق CSS الحالي.
 - **الملفات:** `package.json`, `tests/serverless/miniapp-motion.test.mjs`, `md_files/log.md`.
 - **التحقق الفعلي:** نجح `npm run test:ci`: فحص كتالوج الخطط وفحص الأصول الثابتة (57 أصلاً) والاختبارات كاملة (327/327).
-- **GitHub/النشر:** تغييرات محلية فقط؛ لم يتم push أو نشر Telegram/Cloudflare أو ترحيل قاعدة بيانات.
+- **GitHub/النشر:** ضُمّ التصحيح إلى commit `2bb73d4` المنشور على `serverless-cleanup`؛ لم يُنفذ ترحيل قاعدة بيانات.
 
 ## 2026-10-30 — إصلاح مسارات نشر Mini App ورفع الوسائط
 
@@ -20,7 +20,7 @@
 - **التغيير:** ربط `npm run deploy` ببناء الأصول ثم `tgcloud push`؛ توجيه XHR من أصل Telegram إلى Cloudflare مع الحفاظ على ترويسة `initData`، وتحديث cache-busting للأصول المعدلة. تصحيح اختبار الحركة الذي كان يبحث عن تهريب regex حرفي بدل المسافات.
 - **الملفات:** `package.json`, `app/miniapp_static/editor.html`, `app/miniapp_static/media_upload.js`, `app/miniapp_static/miniapp_serverless_api.js`, `tests/serverless/miniapp-motion.test.mjs`, `md_files/docs/cloudflare-pages-miniapp.md`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/log.md`.
 - **التحقق الفعلي:** نجح `npm run test:ci` (328/328)، وبناء أصول Serverless، وفحص `git diff --check`. فحص مخطط الإنتاج التجريبي أكد أن قاعدة البيانات متزامنة؛ لم يُنفذ ترحيل.
-- **GitHub/النشر:** دفع `tgcloud` الأصول الثابتة (13 ملفاً، 345.5 KB؛ 67 ملفاً متزامناً). لم يتغير كود runtime في ذلك الدفع. نشر Cloudflare Pages ينتظر push الفرع؛ اختبار Telegram WebView الحي لم يُنفذ.
+- **GitHub/النشر:** دفع `tgcloud` الأصول الثابتة (13 ملفاً، 345.5 KB؛ 67 ملفاً متزامناً). لم يتغير كود runtime في ذلك الدفع. دُفع commit `2bb73d4` إلى `serverless-cleanup`، وتأكد HTTP 200 للأصول ونجاح CORS preflight للرفع من أصل Telegram. لم يُختبر الإرسال أو رفع ملف داخل Telegram WebView الحي.
 
 ## 2026-10-28 — إضافة بلوكة زر كبير لمحرر Mini App
 
