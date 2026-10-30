@@ -2,7 +2,7 @@ import { handleTutorialMessage, pauseTutorialForCommand } from 'lib/editor-core'
 // Telegram Serverless message handler.
 // The platform passes update.message directly as the first argument.
 
-import { api } from 'sdk';
+import { api, BotApiError } from 'sdk';
 import { sendSubscriptionStatus } from 'lib/subscription-status';
 import { handleDonateConsoleMessage } from 'lib/donate-console';
 import {
@@ -41,7 +41,8 @@ import { handleEditorPageMessage } from 'lib/editor-pages';
 import { handleEditorButtonMessage } from 'lib/editor-buttons';
 import { loadEditorSession } from 'lib/editor-session';
 import { handleScheduledTimeMessage, showScheduledPosts } from 'lib/scheduled-publish';
-import { handleInfoCommand } from 'lib/user-info';
+import { handleInfoCommand, infoCommandArgument } from 'lib/user-info';
+import { userInfoText } from 'lib/user-info-copy';
 import {
   allowMessageRequest,
   claimUpdate,
@@ -72,6 +73,42 @@ async function logErrorSafely(scope, error, context) {
   }
 }
 
+function infoRequestFailureText(languageCode, error, updateId) {
+  const locale = languageCode || 'ar';
+  let reasonKey;
+  if (isDatabaseFailure(error)) {
+    reasonKey = 'guestDatabaseError';
+  } else if (error instanceof BotApiError) {
+    reasonKey = 'guestTelegramError';
+  } else {
+    reasonKey = 'guestInternalError';
+  }
+  const reference = Number.isSafeInteger(Number(updateId))
+    ? String(Number(updateId))
+    : '—';
+  return userInfoText(locale, reasonKey)
+    + '\n' + userInfoText(locale, 'guestErrorReference') + ': ' + reference;
+}
+
+async function reportInfoRequestFailure(message, error, updateId) {
+  await logErrorSafely('info.guest', error, {
+    updateId,
+    userId: message?.from?.id,
+    chatId: message?.chat?.id,
+    request: 'info',
+  });
+  if (!message?.chat?.id || message?.from?.is_bot) return;
+  const languageCode = String(message?.from?.language_code || 'ar');
+  try {
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      text: infoRequestFailureText(languageCode, error, updateId),
+    });
+  } catch (feedbackError) {
+    console.warn('Could not send /info failure notice', feedbackError?.name || 'Error');
+  }
+}
+
 async function reportDatabaseFailure(message, error) {
   console.error('Telegram Serverless database unavailable while handling a message');
   if (message?.chat?.type !== 'private' || message?.from?.is_bot) return;
@@ -90,10 +127,15 @@ async function reportDatabaseFailure(message, error) {
 
 export default async function (message, ctx = {}) {
   const updateId = ctx?.update?.update_id;
+  const infoArgument = infoCommandArgument(message?.text);
   try {
     if (!await claimUpdate(updateId)) return;
   } catch (error) {
     if (!isDatabaseFailure(error)) throw error;
+    if (infoArgument !== null) {
+      await reportInfoRequestFailure(message, error, updateId);
+      return;
+    }
     await reportDatabaseFailure(message, error);
     return;
   }
@@ -118,8 +160,8 @@ export default async function (message, ctx = {}) {
       message.from.language_code = languageCode;
     }
 
-    if (matchesCommand(command, 'info')) {
-      await handleInfoCommand(message, commandArgument(message?.text, 'info'), languageCode);
+    if (infoArgument !== null) {
+      await handleInfoCommand(message, infoArgument, languageCode);
       return;
     }
 
@@ -252,6 +294,10 @@ export default async function (message, ctx = {}) {
     }
   } catch (error) {
     failed = true;
+    if (infoArgument !== null) {
+      await reportInfoRequestFailure(message, error, updateId);
+      return;
+    }
     if (isDatabaseFailure(error)) {
       await reportDatabaseFailure(message, error);
       return;

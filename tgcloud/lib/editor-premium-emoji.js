@@ -10,6 +10,7 @@ import { explainOperationalError } from 'lib/operational-errors';
 import { logError } from 'lib/error-log';
 import { richTextToHtml, plainRichText } from 'lib/rich-text';
 import { emojiTargets, applyEmojiTarget } from 'lib/editor-emoji-targets';
+import { getBrandingSettings } from 'lib/branding';
 import {
   customEmojiEntries,
   existingEmojiPosition,
@@ -373,8 +374,9 @@ export async function handlePremiumEmojiCallback(query) {
     if (action === 'back') {
       if (flow.stage === 'link' || flow.stage === 'pack') {
         await resetEditorTransientState(query.from.id);
+        const branding = await getBrandingSettings(query.from.id);
         await api.editMessageText({ chat_id: session.managementChatId, message_id: session.managementMessageId,
-          text: editorCopy(locale).toolsText, reply_markup: buildEditorToolsKeyboard(locale) });
+          text: editorCopy(locale).toolsText, reply_markup: buildEditorToolsKeyboard(locale, branding) });
         await answer(); return true;
       }
       flow.stage = 'pack';

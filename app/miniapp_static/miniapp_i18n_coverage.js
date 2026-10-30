@@ -32,6 +32,11 @@
   const terms = Object.fromEntries(
     TERM_KEYS.map((key, index) => [key, TERM_ROWS[i18n.language]?.[index] || ""]),
   );
+  terms.large = ({
+    es:"Grande",de:"Groß",it:"Grande",pt:"Grande",nl:"Groot",pl:"Duży",
+    uk:"Великий",tr:"Büyük",ur:"بڑا",hi:"बड़ा",id:"Besar",ja:"大きい",
+    ko:"큰",vi:"Lớn",th:"ใหญ่","zh-hans":"大型","zh-hant":"大型",
+  })[i18n.language] || "";
   if (!terms.button) return;
 
   const EXPLICIT_KEYS = new Set([
@@ -96,6 +101,10 @@
     if (key === "editor.canvas") return originalT("top.text");
     if (key === "editor.block_actions") return originalT("editor.add_block");
     if (key === "button.url") return terms.link;
+    if (key === "button.large") return `${terms.large} ${terms.button}`.trim();
+    if (key === "button.large_desc") return `${terms.add} · ${terms.large} · ${terms.button}`.trim();
+    if (key === "send.problem.invalid_button") return `${terms.error} · ${terms.button}`;
+    if (key === "send.problem.invalid_button_layout") return `${terms.error} · ${terms.button}`;
     if (key === "button.page" || key === "button.linked_page") return originalT("pages.title");
     if (key === "button.callback" || key === "button.callback_data") return `${terms.write} · ${terms.button}`;
     if (key === "button.popup") return `${terms.open} · ${terms.button}`;

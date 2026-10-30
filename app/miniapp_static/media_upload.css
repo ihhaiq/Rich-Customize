@@ -7,6 +7,14 @@ video.media-live-preview{object-fit:contain}
 .media-picker-card:not(.invalid) .media-upload-status,.media-picker-card:not(.invalid) .photo-upload-status{color:color-mix(in srgb,var(--text) 72%,var(--muted))}
 .media-picker-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:13px;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
 .media-picker-icon svg{display:block;width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.large-button-card{align-items:stretch}
+.large-button-item{display:flex;align-items:center;gap:8px;width:100%}
+.large-button-preview{display:grid;place-items:center;flex:1;min-height:44px;padding:8px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);color:var(--text);font-weight:650;text-align:center;overflow-wrap:anywhere}
+.large-button-preview.is-primary{border-color:color-mix(in srgb,#3390ec 54%,var(--line));background:color-mix(in srgb,#3390ec 22%,var(--panel2))}
+.large-button-preview.is-success{border-color:color-mix(in srgb,#31b545 54%,var(--line));background:color-mix(in srgb,#31b545 22%,var(--panel2))}
+.large-button-preview.is-danger{border-color:color-mix(in srgb,#e53935 54%,var(--line));background:color-mix(in srgb,#e53935 22%,var(--panel2))}
+.large-button-actions{display:flex;gap:6px;flex:0 0 auto}
+.large-button-actions button{min-height:38px}
 
 
 .media-preview-loading{
@@ -40,6 +48,42 @@ video.media-live-preview{object-fit:contain}
   object-fit:cover;
   background:#000;
 }
+.media-upload-progress{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:24px;
+  color:var(--muted);
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+}
+.media-upload-progress-track{
+  position:relative;
+  display:block;
+  flex:1;
+  height:5px;
+  overflow:hidden;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--text) 12%,transparent);
+  direction:ltr;
+}
+.media-upload-progress-fill{
+  display:block;
+  width:0;
+  height:100%;
+  border-radius:inherit;
+  background:var(--accent);
+  transition:width .12s linear;
+}
+.media-upload-progress.is-indeterminate .media-upload-progress-fill{
+  width:35%!important;
+  animation:media-upload-indeterminate .9s ease-in-out infinite alternate;
+}
+.media-upload-progress-value{min-width:3ch;text-align:end}
+@keyframes media-upload-indeterminate{
+  from{transform:translateX(-10%)}
+  to{transform:translateX(185%)}
+}
 .media-container-more{
   display:grid;
   place-items:center;
@@ -55,4 +99,6 @@ video.media-live-preview{object-fit:contain}
 }
 @media(prefers-reduced-motion:reduce){
   .media-preview-loading{animation:none}
+  .media-upload-progress-fill{transition:none}
+  .media-upload-progress.is-indeterminate .media-upload-progress-fill{animation:none}
 }

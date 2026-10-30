@@ -25,7 +25,11 @@
   }
 
   function syncChildPositions(detailsBlock) {
-    orderedChildren(detailsBlock).forEach((child, index) => child.position = index);
+    const d = detailsBlock.data || (detailsBlock.data = {});
+    if (!Array.isArray(d.children)) d.children = [];
+    d.children.forEach((child, index) => {
+      if (child && typeof child === "object") child.position = index;
+    });
   }
 
   function focusNestedChild(parentId, childId) {

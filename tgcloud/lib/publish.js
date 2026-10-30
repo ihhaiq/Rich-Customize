@@ -18,8 +18,9 @@ import { resolveLanguage, resolveUserLanguage, t as i18nT, tr } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import { EXPECTED_PUBLISH_FAILURES, publishFailure, publishErrorDetail, normalizePublishError,
   shouldForgetDestination, publishFailureMessage } from 'lib/publish-errors';
-import { shouldIncludeBranding } from 'lib/branding';
+import { getBrandingSettings, setBrandingPreference, shouldIncludeBranding } from 'lib/branding';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
+import { scheduleMaxAheadTimestamp, SCHEDULE_MAX_AHEAD_SECONDS } from 'lib/schedule-policy';
 import { isLegacySavedPage, isSavedPageUnchanged, legacyPagePublishOptions } from 'lib/saved-page-policy';
 import { recordMarketingPublish } from 'lib/marketing-campaign';
 import { resolveForumDeliveryOptions } from 'lib/forum-topics';
@@ -49,6 +50,11 @@ function copy(languageCode){
     silentOff:i18nT(locale,'ux.publish.silent_off'),
     protectedOn:i18nT(locale,'ux.publish.protected_on'),
     protectedOff:i18nT(locale,'ux.publish.protected_off'),
+    showBranding:locale==='ar'?'إظهار الحقوق':tr(locale,'Show branding'),
+    hideBranding:locale==='ar'?'إخفاء الحقوق':tr(locale,'Hide branding'),
+    brandingUnavailable:locale==='ar'
+      ?'هذا الخيار متاح فقط لحساب لديه اشتراك نشط أو وصول المطور أو شراء إزالة الحقوق.'
+      :tr(locale,'This setting requires an active subscription, developer access, or a branding-removal purchase.'),
     send:(n)=>i18nT(locale,'ux.publish.send',{count:n}),
     settingsTitle:i18nT(locale,'post_settings'),
     selectedChats:tr(locale,'Selected chats: '),
@@ -158,16 +164,37 @@ function pickerRich(chats,selected,channelUrl,groupUrl,c){
   return {blocks:[{type:'paragraph',text},{type:'table',cells:rows,is_bordered:true,is_compact:true}]};
 }
 function settingsText(n,c){const cc=copy(c);return cc.settingsTitle+'\n\n'+cc.selectedChats+n+'\n'+cc.settingsHint;}
-function settingsRich(n,silent,protectedValue,c,body=null){
-  const cc=copy(c),text=body||settingsText(n,c),rows=[
-    [cell(richButton(silent?cc.silentOn:cc.silentOff,{callback_data:'r:pt:silent',style:silent?'success':'primary'}),2)],
-    [cell(richButton(protectedValue?cc.protectedOn:cc.protectedOff,{callback_data:'r:pt:protected',style:protectedValue?'success':'primary'}),2)],
-    [cell(richButton(cc.send(n),{callback_data:'r:postconfirm',style:'success'}),2)],
-    [cell(richButton(resolveLanguage(c)==='ar'?'جدولة المنشور':'Schedule post',{callback_data:'r:postschedule',style:'primary'}),2)],
+function brandingFlag(data,prefix){
+  if(data===prefix)return null;
+  const suffix=data.slice(prefix.length+1);
+  if(suffix==='set:1')return true;
+  if(suffix==='set:0')return false;
+  if(suffix==='0')return true;
+  if(suffix==='1')return false;
+  return null;
+}
+async function brandingOptions(userId){
+  return getBrandingSettings(userId);
+}
+function settingsRich(n,silent,protectedValue,includeBranding,canManageBranding,c,body=null){
+  const cc=copy(c),text=body||settingsText(n,c),flag=includeBranding?'1':'0',rows=[
+    [cell(richButton(silent?cc.silentOn:cc.silentOff,{callback_data:'r:pt:silent:'+flag,style:silent?'success':'primary'}),2)],
+    [cell(richButton(protectedValue?cc.protectedOn:cc.protectedOff,{callback_data:'r:pt:protected:'+flag,style:protectedValue?'success':'primary'}),2)],
   ];
+  if(canManageBranding){
+    const nextIncludeBranding=!includeBranding;
+    rows.push([cell(richButton(includeBranding?cc.hideBranding:cc.showBranding,{
+      callback_data:'r:pt:branding:set:'+(nextIncludeBranding?'1':'0'),
+      style:includeBranding?'primary':'success',
+    }),2)]);
+  }
+  rows.push(
+    [cell(richButton(cc.send(n),{callback_data:'r:postconfirm:'+flag,style:'success'}),2)],
+    [cell(richButton(resolveLanguage(c)==='ar'?'جدولة المنشور':'Schedule post',{callback_data:'r:postschedule:'+flag,style:'primary'}),2)],
+  );
   return {blocks:[{type:'paragraph',text},{type:'table',cells:rows,is_bordered:true,is_compact:true}]};
 }
-function confirmRich(n,c){const cc=copy(c);return {blocks:[{type:'paragraph',text:cc.confirm(n)},{type:'table',cells:[[cell(richButton(cc.yes,{callback_data:'r:postsend',style:'success'}),2)]],is_bordered:true,is_compact:true}]};}
+function confirmRich(n,c,includeBranding){const cc=copy(c),flag=includeBranding?'1':'0';return {blocks:[{type:'paragraph',text:cc.confirm(n)},{type:'table',cells:[[cell(richButton(cc.yes,{callback_data:'r:postsend:'+flag,style:'success'}),2)]],is_bordered:true,is_compact:true}]};}
 function backKeyboard(data='r:back',c='en'){return {inline_keyboard:[[{text:copy(c).back,callback_data:data}]]};}
 function editErrorText(error){return String(error?.description||error?.message||error).toLowerCase();}
 async function editRich(query,rich,markup){
@@ -220,7 +247,7 @@ async function refreshPanel(userId, languageCode='en'){
 
 export async function handlePublishCallback(query){
   const data=String(query?.data||'');
-  const relevant=data==='r:post'||data==='r:postlist'||data==='r:postsettings'||data==='r:postconfirm'||data==='r:postsend'||data==='r:postschedule'||data.startsWith('r:postchat:')||data.startsWith('r:pt:');
+  const relevant=data==='r:post'||data==='r:postlist'||data==='r:postsettings'||data.startsWith('r:postsettings:')||data==='r:postconfirm'||data.startsWith('r:postconfirm:')||data==='r:postsend'||data.startsWith('r:postsend:')||data==='r:postschedule'||data.startsWith('r:postschedule:')||data.startsWith('r:postchat:')||data.startsWith('r:pt:');
   if(!relevant)return false;
   const userId=query?.from?.id,c=code(query),cc=copy(c);
   const existing=await loadEditorSession(userId,{touch:false});if(!existing)return false;
@@ -260,13 +287,14 @@ export async function handlePublishCallback(query){
       await renderPicker(query,selected);await api.answerCallbackQuery({callback_query_id:query.id,text:notice});return true;
     });
   }
-  if(data==='r:postsettings'){
+  if(data==='r:postsettings'||data.startsWith('r:postsettings:')){
     return withPublishUiLock(query,async()=>{
       const latest=await loadEditorSession(userId);if(!latest)return true;
       const chats=await eligible(userId),ids=new Set(chats.map(x=>Number(x.chatId))),selected=(latest.postSelectedChatIds||[]).map(Number).filter(x=>ids.has(x));
       if(!selected.length){await updateEditorSession(userId,{postSelectedChatIds:[]});await api.answerCallbackQuery({callback_query_id:query.id,text:cc.needChat,show_alert:true});return true;}
+      const branding=await brandingOptions(userId);
       await updateEditorSession(userId,{postSelectedChatIds:selected});await clearPublishPanel(userId);
-      await editRich(query,settingsRich(selected.length,Boolean(latest.postSilent),Boolean(latest.postProtected),c),backKeyboard('r:postlist',c));
+      await editRich(query,settingsRich(selected.length,Boolean(latest.postSilent),Boolean(latest.postProtected),branding.includeBranding,branding.canManage,c),backKeyboard('r:postlist',c));
       await api.answerCallbackQuery({callback_query_id:query.id});return true;
     });
   }
@@ -274,13 +302,28 @@ export async function handlePublishCallback(query){
     return withPublishUiLock(query,async()=>{
       const latest=await loadEditorSession(userId);if(!latest)return true;
       const selected=(latest.postSelectedChatIds||[]).map(Number);if(!selected.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.needChat,show_alert:true});return true;}
-      const option=data.slice('r:pt:'.length);let silent=Boolean(latest.postSilent),protectedValue=Boolean(latest.postProtected);
-      if(option==='silent')silent=!silent;else if(option==='protected')protectedValue=!protectedValue;else{await api.answerCallbackQuery({callback_query_id:query.id,text:cc.invalidChat,show_alert:true});return true;}
+      const parts=data.split(':'),option=parts[2];
+      let branding=await brandingOptions(userId);
+      let silent=Boolean(latest.postSilent),protectedValue=Boolean(latest.postProtected),includeBranding=branding.includeBranding;
+      if(option==='silent')silent=!silent;
+      else if(option==='protected')protectedValue=!protectedValue;
+      else if(option==='branding'){
+        const desired=brandingFlag(data,'r:pt:branding');
+        if(!branding.canManage||typeof desired!=='boolean'){
+          await api.answerCallbackQuery({callback_query_id:query.id,text:cc.brandingUnavailable,show_alert:true});return true;
+        }
+        if(!await setBrandingPreference(userId,desired)){
+          await api.answerCallbackQuery({callback_query_id:query.id,text:cc.brandingUnavailable,show_alert:true});return true;
+        }
+        branding=await brandingOptions(userId);
+        includeBranding=branding.includeBranding;
+      }
+      else{await api.answerCallbackQuery({callback_query_id:query.id,text:cc.invalidChat,show_alert:true});return true;}
       await updateEditorSession(userId,{postSilent:silent?1:0,postProtected:protectedValue?1:0});
-      await editRich(query,settingsRich(selected.length,silent,protectedValue,c),backKeyboard('r:postlist',c));await api.answerCallbackQuery({callback_query_id:query.id});return true;
+      await editRich(query,settingsRich(selected.length,silent,protectedValue,includeBranding,branding.canManage,c),backKeyboard('r:postlist',c));await api.answerCallbackQuery({callback_query_id:query.id});return true;
     });
   }
-  if(data==='r:postschedule'){
+  if(data==='r:postschedule'||data.startsWith('r:postschedule:')){
     return withPublishUiLock(query,async()=>{
       const latest=await loadEditorSession(userId);
       if(!latest||!Array.isArray(latest.blocks)||!latest.blocks.length){
@@ -288,30 +331,49 @@ export async function handlePublishCallback(query){
       }
       const ids=[...new Set((latest.postSelectedChatIds||[]).map(Number))];
       if(!ids.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.needChat,show_alert:true});return true;}
-      await updateEditorSession(userId,{postSchedulePending:1});
+      const branding=await brandingOptions(userId);
+      const pendingState=branding.canManage
+        ?branding.includeBranding?2:3
+        :1;
+      await updateEditorSession(userId,{postSchedulePending:pendingState});
+      const entitlement=await getEditorEntitlement(userId);
+      const maximum=scheduleMaxAheadTimestamp(entitlement,nowSeconds());
+      const hasExtendedWindow=maximum>nowSeconds()+SCHEDULE_MAX_AHEAD_SECONDS;
+      const text=resolveLanguage(c)==='ar'
+        ?'أرسل موعد الجدولة\n\nMM-DD hh:mm AM/PM\nمثال: 10-28 10:19 PM\nتوقيت بغداد (GMT+3). الحد الأقصى '+(hasExtendedWindow?'شهران.':'٤ أيام.')
+        :'Send the scheduled time\n\nMM-DD hh:mm AM/PM\nExample: 10-28 10:19 PM\nBaghdad time (GMT+3). Maximum: '+(hasExtendedWindow?'two months.':'4 days.');
       await api.answerCallbackQuery({callback_query_id:query.id,text:resolveLanguage(c)==='ar'?'أرسل تاريخ ووقت الجدولة في الخاص':'Send the date and time in private chat'});
-      await api.sendMessage({chat_id:userId,text:resolveLanguage(c)==='ar'
-        ?'أرسل موعد الجدولة بصيغة YYYY-MM-DD HH:mm حسب توقيت بغداد، مثال: 2026-10-12 18:00. المدة القصوى ٤ أيام. للإلغاء /cancel.'
-        :'Send scheduled date as YYYY-MM-DD HH:mm (Baghdad UTC+3), at most 4 days ahead. /cancel to cancel.'});
+      await api.sendMessage({
+        chat_id:userId,
+        text,
+        reply_markup:{
+          keyboard:[[{text:resolveLanguage(c)==='ar'?'إلغاء':'Cancel'}]],
+          resize_keyboard:true,
+          one_time_keyboard:true,
+        },
+      });
       return true;
     });
   }
-  if(data==='r:postconfirm'){
+  if(data==='r:postconfirm'||data.startsWith('r:postconfirm:')){
     return withPublishUiLock(query,async()=>{
       const latest=await loadEditorSession(userId);if(!latest)return true;
       if(!Array.isArray(latest.blocks)||!latest.blocks.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.emptyContent,show_alert:true});return true;}
       const selected=(latest.postSelectedChatIds||[]).map(Number);if(!selected.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.needChat,show_alert:true});return true;}
-      await editRich(query,confirmRich(selected.length,c),backKeyboard('r:postsettings',c));await api.answerCallbackQuery({callback_query_id:query.id});return true;
+      const branding=await brandingOptions(userId);
+      const flag=branding.includeBranding?'1':'0';
+      await editRich(query,confirmRich(selected.length,c,branding.includeBranding),backKeyboard('r:postsettings:'+flag,c));await api.answerCallbackQuery({callback_query_id:query.id});return true;
     });
   }
-  if(data==='r:postsend'){
+  if(data==='r:postsend'||data.startsWith('r:postsend:')){
     const mutationLock=await acquireEditorMutationLock(userId);if(!mutationLock){await api.answerCallbackQuery({callback_query_id:query.id});return true;}
     try{
       const latest=await loadEditorSession(userId);if(!latest)return true;
       if(!Array.isArray(latest.blocks)||!latest.blocks.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.emptyContent,show_alert:true});return true;}
       const selected=(latest.postSelectedChatIds||[]).map(Number);if(!selected.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.needChat,show_alert:true});return true;}
       const registered=new Map((await listChats(userId)).map(x=>[Number(x.chatId),x]));
-      const includeBranding=await shouldIncludeBranding(userId);
+      const branding=await brandingOptions(userId);
+      const includeBranding=branding.includeBranding;
       const quotaSavedPage=latest.currentPageId
         ? await db.select().from(richPages).where(eq(richPages.pageId,String(latest.currentPageId))).get()
         : null;
@@ -374,7 +436,7 @@ export async function handlePublishCallback(query){
       if(succeeded.length+failed.length>20)lines.push(cc.shortened);
       lines.push('',cc.again);
       const ui=await withEditorMessageLock(query.message.chat.id,query.message.message_id,async()=>{
-        await editRich(query,settingsRich(selected.length,Boolean(latest.postSilent),Boolean(latest.postProtected),c,lines.join('\n')),backKeyboard('r:postlist',c));
+        await editRich(query,settingsRich(selected.length,Boolean(latest.postSilent),Boolean(latest.postProtected),includeBranding,branding.canManage,c,lines.join('\n')),backKeyboard('r:postlist',c));
       });
       if(!ui.acquired)console.warn('Skipped publish result UI update because the message is busy',query.message.chat.id,query.message.message_id);
       return true;

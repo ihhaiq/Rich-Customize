@@ -222,7 +222,7 @@ Review/apply them with:
 ```bash
 npx tgcloud diff
 npx tgcloud migrate
-npx tgcloud push
+npm run deploy
 npx tgcloud webhook sync
 ```
 
@@ -255,4 +255,4 @@ The subscription comparison is a pricing-first compact card layout: price (Stars
 
 ## Current documentation
 
-The approved limits and canceled features are recorded in [sups.md](../sups.md). Saved-page version history and templates are canceled; scheduling is deferred. [Subscription rollout](subscription-rollout.md) distinguishes approved benefits from enforced runtime limits. Earlier deployment notes above describe their dated rollout stage.
+The approved limits and canceled features are recorded in [sups.md](../sups.md). Saved-page version history and templates are canceled. Scheduled publishing is available and owner-confirmed in use; its Cloudflare Cron relay is documented in [scheduling.md](scheduling.md). [Subscription rollout](subscription-rollout.md) distinguishes approved benefits from enforced runtime limits. Earlier deployment notes above describe their dated rollout stage.

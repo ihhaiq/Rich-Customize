@@ -107,7 +107,15 @@ async function orderedPackNames(db, owner) {
     .filter(Boolean);
 }
 
-export async function customEmojiPackAccess(env, userId, {unlimited = false} = {}) {
+async function pinnedPackName(db, owner) {
+  const row = await db.prepare(
+    'SELECT pack_name FROM miniapp_custom_emoji_pack_state '
+    + 'WHERE user_id=? AND pinned=1 LIMIT 1'
+  ).bind(owner).first();
+  return String(row?.pack_name || '');
+}
+
+export async function customEmojiPackAccess(env, userId, {unlimited = false, includeMigrationData = false} = {}) {
   const db = requireDb(env);
   await ensureSchema(db);
   const owner = safeUserId(userId);
@@ -119,7 +127,9 @@ export async function customEmojiPackAccess(env, userId, {unlimited = false} = {
       unlimited:false,
       limit:giftLimit,
       packNames:stored.slice(0, giftLimit),
+      allPackNames:includeMigrationData ? stored : undefined,
       packCount:stored.length,
+      pinnedPack:includeMigrationData ? await pinnedPackName(db, owner) : '',
     };
   }
 
@@ -128,7 +138,9 @@ export async function customEmojiPackAccess(env, userId, {unlimited = false} = {
     unlimited:true,
     limit:null,
     packNames,
+    allPackNames:includeMigrationData ? packNames : undefined,
     packCount:packNames.length,
+    pinnedPack:includeMigrationData ? await pinnedPackName(db, owner) : '',
   };
 }
 

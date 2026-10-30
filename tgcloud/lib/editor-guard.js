@@ -44,6 +44,7 @@ const EXACT = new Set([
   'r:postsettings',
   'r:postconfirm',
   'r:postsend',
+  'r:postschedule',
 ]);
 
 const PREFIXES = [
@@ -115,6 +116,10 @@ const PREFIXES = [
   'r:browcustompage:',
   'r:postchat:',
   'r:pt:',
+  'r:postsettings:',
+  'r:postconfirm:',
+  'r:postsend:',
+  'r:postschedule:',
 ];
 
 export function isEditorSessionCallback(data) {
@@ -171,11 +176,12 @@ export async function guardEditorCallback(query) {
 
 function legacyNavigationCallback(data) {
   return [
-    'r:back','r:no','r:pages','r:psearch','r:psort',
+    'r:back','r:no','r:pages','r:psearch','r:psort','r:postschedule',
     'r:post','r:postlist','r:postsettings','r:postconfirm','r:postsend',
     'r:savepage','r:syncpage','r:prestore','r:tools',
   ].includes(data) || [
-    'r:postchat:','r:pt:','r:pages:','r:presults:',
+    'r:postchat:','r:postsettings:','r:postconfirm:','r:postsend:',
+    'r:postschedule:','r:pt:','r:pages:','r:presults:',
     'r:pageopen:','r:psortset:','r:b:','r:blockscroll:',
     'r:import:','r:channel:','r:pdelete:','r:pdeleteok:',
   ].some(prefix => data.startsWith(prefix));

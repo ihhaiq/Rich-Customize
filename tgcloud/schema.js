@@ -309,6 +309,12 @@ export const brandingEntitlements = table('branding_entitlements', {
   updatedAt: integer('updated_at').notNull(),
 });
 
+export const brandingPreferences = table('branding_preferences', {
+  userId: integer('user_id').primaryKey(),
+  includeBranding: integer('include_branding').notNull().default(0),
+  updatedAt: integer('updated_at').notNull(),
+});
+
 export const managedBotOrders = table('managed_bot_orders', {
   orderId: text('order_id').primaryKey(),
   userId: integer('user_id').notNull(),

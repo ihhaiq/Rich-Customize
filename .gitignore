@@ -1,4 +1,5 @@
 .tgcloud/
+.tgcloud-miniapp-static/
 node_modules/
 .env
 

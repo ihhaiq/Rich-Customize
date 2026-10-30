@@ -16,6 +16,8 @@ function accessPayload(access, developer) {
       custom_emoji_pack_limit:access.limit,
       custom_emoji_pack_count:access.packCount,
       custom_emoji_packs:access.packNames,
+      custom_emoji_all_packs:access.allPackNames,
+      custom_emoji_pinned_pack:access.pinnedPack,
     },
   };
 }
@@ -24,7 +26,10 @@ export async function onRequestGet(context) {
   try {
     const user = await miniAppUser(context);
     const developer = isDeveloper(user.id);
-    const access = await customEmojiPackAccess(context.env, user.id, {unlimited:developer});
+    const access = await customEmojiPackAccess(context.env, user.id, {
+      unlimited:developer,
+      includeMigrationData:true,
+    });
     return json(accessPayload(access, developer));
   } catch (error) {
     return handleError(error);

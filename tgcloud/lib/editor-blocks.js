@@ -516,6 +516,12 @@ function generatedVisibleText(block) {
     return nativeVisibleText(native);
   }
 
+  if (kind === 'buttons') {
+    return (Array.isArray(data.buttons) ? data.buttons : [])
+      .map((button) => plainRichText(button?.text))
+      .join('');
+  }
+
   if (kind === 'list') {
     const items = Array.isArray(data.items) ? data.items : [];
     return items.map((item) => {
@@ -825,6 +831,14 @@ function trimBlockText(block, budget) {
   }
 
   const type = String(block.type || '');
+  if (type === 'buttons') {
+    let remaining = budget;
+    for (const button of Array.isArray(data.buttons) ? data.buttons : []) {
+      if (!button || typeof button !== 'object' || Array.isArray(button)) continue;
+      remaining = trimVisibleField(button, ['text'], remaining);
+    }
+    return remaining;
+  }
   if (type === 'table') {
     const rows = Array.isArray(data.rows) ? data.rows : [];
     let remaining = budget;

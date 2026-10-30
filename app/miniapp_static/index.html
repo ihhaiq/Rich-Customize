@@ -18,6 +18,7 @@
     @keyframes spin{to{transform:rotate(360deg)}}
   </style>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="/miniapp/static/miniapp_serverless_api.js?v=0.3.83"></script>
   <script>
     (() => {
       const webApp = window.Telegram?.WebApp;
@@ -51,7 +52,8 @@
           const startParam = new URLSearchParams(initData).get("start_param");
           window.location.replace(startParam === "managed_bots" ? "/managed-bots.html" : "/editor.html");
         } catch (_) {
-          window.location.replace("/open-in-telegram.html?reason=verification");
+          const reason = window.RichMiniAppServerless?.isHosted ? "serverless" : "verification";
+          window.location.replace(`/open-in-telegram.html?reason=${reason}`);
         } finally {
           clearTimeout(timer);
         }

@@ -53,8 +53,8 @@ test('donation console subscriber response is a paginated rich account table',()
  assert.match(source,/رابط الحساب/);
  assert.match(source,/بداية الاشتراك \(UTC\)/);
  assert.match(source,/نهاية الاشتراك \(UTC\)/);
+ assert.match(source,/page:result\.page/);
  assert.match(source,/max_page:result\.maxPage/);
- assert.match(source,/callback_data/);
 });
 
 test('donation console /info uses the editor stored-profile lookup without exposing subscription data',()=>{

@@ -3,6 +3,13 @@
 Work on `serverless-cleanup`. Active editor runtime is Telegram Serverless JavaScript; Cloudflare hosts the Mini App bridge plus a separate ID-only Cron reminder Worker for scheduled posts, NOT the main bot.
 Read [docs/README.md](docs/README.md), [sups.md](md_files/sups.md) and [docs/subscription-rollout.md](md_files/docs/subscription-rollout.md). Archived material is historical, never implementation authority.
 
+## Critical engineering stance and scale target
+- Be direct, skeptical, and evidence-led. Do not flatter, rubber-stamp plans, or call a feature reliable, production-ready, secure, or scalable without evidence. State material defects and tradeoffs plainly.
+- For every project task, inspect the relevant code and tests for critical reliability, authorization, data-integrity, UX, operational, and scale risks. Surface only issues supported by repository evidence; separate confirmed defects from unverified risks and suggestions. Do not derail a narrow change with unrelated nitpicks.
+- Treat 250,000 to 1,000,000 registered users as an aspiration, not a capacity claim or a concurrent-user assumption. Never promise readiness from code inspection or unit tests alone.
+- Before claiming scale readiness, require an explicit workload model (active/concurrent users, update and publish rates, payload sizes, destination fan-out, and retention), representative load and soak tests, measured Telegram/Serverless/Cloudflare/D1 limits, and documented SLOs, backpressure, recovery, monitoring, and cost. Report measured capacity and bottlenecks; do not invent a pass threshold.
+- Prioritize critical/high-impact risks and fixes by severity, likelihood, evidence, and user impact. Prefer concrete remediation and verification steps over generic advice; distinguish implemented, locally tested, deployed, and production-validated states.
+
 ## Layout and runtime
 - `tgcloud/schema.js`: persistent schema.
 - `tgcloud/handlers/*.js`: flat Telegram update handlers.
@@ -20,7 +27,7 @@ Await DB calls. Code deployment and schema migration are separate. Do not reintr
 
 ## Data and authorization
 Telegram Serverless owns `rich_pages`, editor sessions, publish destinations/permissions, user-picker state, usage, error configuration and compatibility.
-D1 retains existing bridge correlation/identity, owner-scoped advisory page mirrors and transitional emoji packs. It must not become a second authoritative page database or billing store.
+D1 retains existing bridge correlation/identity, owner-scoped advisory page mirrors and legacy emoji-pack records pending verified migration. The Mini App's active custom-emoji pack registry moves to Telegram Serverless on per-user import; keep D1 records for recovery until migration is verified. D1 must not become a second authoritative page database or billing store.
 Binding is `DB`. Do not silently remove/migrate existing packs or mirrors.
 Authenticate Telegram initData before UI access and on the server. No client owner/plan/developer flag can grant access.
 Check owner and revision before page changes; preserve CAS, request deduplication, mutation locks and global backpressure.
@@ -38,6 +45,7 @@ Fetch user pages at every Mini App startup; block editing until startup succeeds
 Preserve native-picker resume and explicit Save; local drafts are not authoritative saved pages.
 Startup failure retains the blocking X state and localized retry behavior.
 Never send an empty rich message. Telemetry failure must not turn successful Telegram publication into a failed publish result.
+Branding visibility is a persistent Telegram Serverless account preference, separate from the financial `branding_entitlements` record. Only a trusted active plan, developer entitlement or permanent branding purchase may change it; eligible accounts default to hidden, while other users retain the purchase link.
 Saved rendering uses authenticated stored owner and quota baseline, including inline/guest/page navigation.
 Content sync must not overwrite a saved page's name with a stale session title.
 Exact normalized own-page names can be called in inline/guest; duplicate names refuse selection. Shared page-code behavior is preserved.
@@ -65,7 +73,7 @@ Arabic copy uses the owner's wording, including «تليكرام».
 Do NOT claim these new numbers are enforced merely because they appear in docs/donation UI.
 Editor runtime still has older caps; [rollout](md_files/docs/subscription-rollout.md) tracks remaining work.
 `editor-subscriptions.js` accepts active unexpired records from `richdonate:verified`; complete trusted payment event issuance/ACK remains pending.
-Saved templates and saved page history remain cancelled. The owner approved fixed tutorial starter examples on 2026-10-13; these are a separate onboarding scope documented in [md_files/tutorial.md](md_files/tutorial.md), not a subscription feature or template-management system. Scheduling code and editor UI are present but NOT deployed or live. The new `tgcloud/lib/scheduled-publish.js` stores message snapshots and consumes verified RCB1 reminders; `workers/schedule-reminders/` defines a separate Cloudflare Cron Worker. Cloudflare holds IDs/times only. See `md_files/docs/scheduling.md` for migration, secrets, tests and rollout. Do not deploy/migrate before production authorization. Free allows 2 destinations per scheduled post; Plus=5 and Golden=15 are provisional.
+Saved templates and saved page history remain cancelled. The owner approved fixed tutorial starter examples on 2026-10-13; these are a separate onboarding scope documented in [md_files/tutorial.md](md_files/tutorial.md), not a subscription feature or template-management system. Scheduled publishing is deployed and the owner confirmed using it on 2026-10-25. `tgcloud/lib/scheduled-publish.js` stores message snapshots and consumes verified RCB1 reminders; `workers/schedule-reminders/` is the separate Cloudflare Cron Worker. Cloudflare holds IDs/times only. `/scheduled` supports listing and canceling pending jobs; rescheduling an existing job is not implemented. Date entry uses Baghdad `MM-DD hh:mm AM/PM`; Free is limited to four days and active Plus/Golden to two calendar months. See `md_files/docs/scheduling.md` for architecture, known reliability gaps and tests. Free allows 2 destinations per scheduled post; Plus=5 and Golden=15 remain provisional.
 Operational `page_snapshots`, revision CAS and session undo/redo remain required.
 
 Preserve old saved content over the free text cap without allowing expansion. Trusted baseline must come from owner-verified stored pages, never unsaved session blocks.
@@ -73,7 +81,7 @@ Cloudflare PUT may use a matching owner-specific mirror; missing/stale mirrors f
 Serverless independently rechecks. Unsaved direct publication has no grandfather exception.
 Final Telegram message limits include branding/generated text/blocks. Developer cannot bypass Telegram limits.
 Do not assume `String.length`, Unicode characters and UTF-8 byte counts are identical.
-The branding button deep-links to `https://t.me/richDonateBot?start=cart_branding`; old paid receipts/branding rights must remain valid.
+The branding purchase button deep-links to `https://t.me/richDonateBot?start=cart_branding` only for users without branding rights. Permanent-rights holders and active Plus/Golden subscribers can choose to show or hide branding per post; old paid receipts/branding rights must remain valid.
 The welcome «بوتاتي» button is removed; legacy runtime/data were not deleted.
 
 ## Cleanup and change log

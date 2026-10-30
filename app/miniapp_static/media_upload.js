@@ -215,7 +215,45 @@ function mediaFileData(data, file) {
   };
 }
 
-async function uploadOneMedia(file, kind, previewKey) {
+function updateMediaUploadProgress(block, progress) {
+  const article = Array.from(blocksEl.querySelectorAll(".block[data-id]"))
+    .find(item => String(item.dataset.id) === String(block?.id));
+  const meter = article?.querySelector("[data-media-progress]");
+  if (!meter) return;
+  if (!Number.isFinite(progress)) {
+    meter.classList.add("is-indeterminate");
+    return;
+  }
+  const value = Math.max(0, Math.min(100, Math.round(progress)));
+  meter.classList.remove("is-indeterminate");
+  meter.setAttribute("aria-valuenow", String(value));
+  meter.querySelector(".media-upload-progress-fill").style.width = `${value}%`;
+  meter.querySelector(".media-upload-progress-value").textContent = `${value}%`;
+}
+
+function createMediaProgress(block) {
+  const meter = document.createElement("div");
+  meter.className = "media-upload-progress";
+  meter.dataset.mediaProgress = "";
+  meter.setAttribute("role", "progressbar");
+  meter.setAttribute("aria-label", mt("media.uploading"));
+  meter.setAttribute("aria-valuemin", "0");
+  meter.setAttribute("aria-valuemax", "100");
+  meter.setAttribute("aria-valuenow", String(Number(block?.data?._upload_progress)||0));
+  const track = document.createElement("span");
+  track.className = "media-upload-progress-track";
+  const fill = document.createElement("span");
+  fill.className = "media-upload-progress-fill";
+  fill.style.width = `${Number(block?.data?._upload_progress)||0}%`;
+  track.appendChild(fill);
+  const value = document.createElement("span");
+  value.className = "media-upload-progress-value";
+  value.textContent = `${Number(block?.data?._upload_progress)||0}%`;
+  meter.append(track,value);
+  return meter;
+}
+
+async function uploadOneMedia(file, kind, previewKey, onProgress) {
   const config = mediaConfig(kind);
   if (!config) throw new Error(mt("media.unsupported"));
   if (!file) throw new Error(mt("media.no_file"));
@@ -228,16 +266,28 @@ async function uploadOneMedia(file, kind, previewKey) {
 
   const form = new FormData();
   form.append("file", file, file.name || `${kind}.bin`);
-  const response = await fetch(`/miniapp/api/upload/${encodeURIComponent(kind)}`, {
-    method: "POST",
-    headers: {"X-Telegram-Init-Data": tg?.initData || ""},
-    body: form,
+  return new Promise((resolve,reject)=>{
+    const request=new XMLHttpRequest();
+    const uploadPath=`/miniapp/api/upload/${encodeURIComponent(kind)}`;
+    const uploadUrl=window.RichMiniAppServerless?.isHosted
+      ? `${window.RichMiniAppServerless.cloudflareApiOrigin}${uploadPath}`
+      : uploadPath;
+    request.open("POST",uploadUrl);
+    request.setRequestHeader("X-Telegram-Init-Data",tg?.initData||"");
+    request.upload.addEventListener("progress",event=>{
+      if(typeof onProgress==="function")onProgress(event.lengthComputable?event.loaded/event.total*100:null);
+    });
+    request.addEventListener("load",()=>{
+      if(request.status<200||request.status>=300){
+        reject(new Error(uploadErrorText(request.responseText,request.status)));
+        return;
+      }
+      try{resolve(JSON.parse(request.responseText))}
+      catch(error){reject(error)}
+    });
+    request.addEventListener("error",()=>reject(new Error("Network error during media upload")));
+    request.send(form);
   });
-  if (!response.ok) {
-    const code = await response.text();
-    throw new Error(uploadErrorText(code, response.status));
-  }
-  return response.json();
 }
 
 async function uploadMediaToTelegram(file, block) {
@@ -247,20 +297,26 @@ async function uploadMediaToTelegram(file, block) {
 
   const d = block.data || (block.data = {});
   d._uploading = true;
+  d._upload_progress = 0;
   d._local_preview_name = file?.name || config.label;
   renderBlocks();
 
   try {
-    const data = await uploadOneMedia(file, kind, block.id);
+    const data = await uploadOneMedia(file, kind, block.id,progress=>{
+      d._upload_progress=Number.isFinite(progress)?progress:null;
+      updateMediaUploadProgress(block,progress);
+    });
     d.file = mediaFileData(data, file);
     d._draft = false;
     d._uploading = false;
+    delete d._upload_progress;
     markDirty();
     renderBlocks();
     pushHistory();
     toast(mt("media.uploaded", {name: config.label}));
   } catch (error) {
     d._uploading = false;
+    delete d._upload_progress;
     renderBlocks();
     toast(mt("media.upload_failed", {error: error.message}));
   }
@@ -321,7 +377,8 @@ function pickerMediaEditor(block) {
     uploadMediaToTelegram(file, block);
   });
 
-  box.append(header, pickButton, picker);
+  if(d._uploading)box.append(header,createMediaProgress(block),pickButton,picker);
+  else box.append(header, pickButton, picker);
   return box;
 }
 
@@ -334,27 +391,42 @@ async function addContainerMedia(block, files) {
   }
 
   d._uploading = true;
+  d._upload_progress = 0;
   renderBlocks();
+  let added = 0;
   try {
-    for (const file of chosen) {
+    for (let index=0;index<chosen.length;index+=1) {
+      const file=chosen[index];
       const kind = file.type.startsWith("video/") ? "video" : "photo";
       const child = defaultBlock(kind);
-      const data = await uploadOneMedia(file, kind, child.id);
+      const data = await uploadOneMedia(file, kind, child.id,progress=>{
+        const overall=Number.isFinite(progress)?(index+progress/100)/chosen.length*100:null;
+        d._upload_progress=overall;
+        updateMediaUploadProgress(block,overall);
+      });
       child.data.file = mediaFileData(data, file);
       child.data._draft = false;
       child.data._local_preview_name = file.name || info(kind).label;
       child.position = (d.children || []).length;
       (d.children || (d.children = [])).push(child);
+      added += 1;
     }
     d._draft = !(d.children || []).length;
     d._uploading = false;
+    delete d._upload_progress;
     markDirty();
     renderBlocks();
     pushHistory();
     toast(mt("media.added_count", {count: chosen.length}));
   } catch (error) {
     d._uploading = false;
+    delete d._upload_progress;
+    if (added) {
+      d._draft = !(d.children || []).length;
+      markDirty();
+    }
     renderBlocks();
+    if (added) pushHistory();
     toast(mt("media.some_failed", {error: error.message}));
   }
 }
@@ -397,8 +469,13 @@ function containerMediaEditor(block) {
     selectBlock(block.id);
     picker.click();
   });
-  picker.addEventListener("change", () => addContainerMedia(block, picker.files));
-  box.append(header, button, picker);
+  picker.addEventListener("change", () => {
+    const files = Array.from(picker.files || []);
+    picker.value = "";
+    void addContainerMedia(block, files);
+  });
+  if(d._uploading)box.append(header,createMediaProgress(block),button,picker);
+  else box.append(header, button, picker);
   return box;
 }
 
@@ -462,10 +539,126 @@ function locationEditor(block) {
   return box;
 }
 
+function largeButtonValues(block) {
+  const data = block.data || (block.data = {});
+  const isNative = data.native === true
+    && data.native_data
+    && typeof data.native_data === "object"
+    && !Array.isArray(data.native_data);
+  const payload = isNative ? data.native_data : data;
+  return {
+    data,
+    isNative,
+    payload,
+    buttons:Array.isArray(payload.buttons) ? payload.buttons : [],
+  };
+}
+
+function saveLargeButtonValues(block, buttons) {
+  const {data,isNative,payload} = largeButtonValues(block);
+  if (isNative) {
+    data.native_type = "buttons";
+    data.native_data = {...payload,type:"buttons",buttons};
+  } else {
+    data.buttons = buttons;
+    data.align = ["left","center","right"].includes(data.align) ? data.align : "center";
+  }
+  data._draft = buttons.length === 0;
+  markDirty();
+  renderBlocks();
+  pushHistory();
+}
+
+function largeButtonEditor(block) {
+  const {buttons} = largeButtonValues(block);
+  const box = document.createElement("div");
+  box.className = `media-placeholder media-picker-card large-button-card${buttons.length ? "" : " invalid"}`;
+  const header = document.createElement("div");
+  header.className = "media-picker-head";
+  const icon = createMediaIcon("button");
+  const copy = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = mt("button.large");
+  const status = document.createElement("small");
+  status.textContent = mt("button.large_desc");
+  copy.append(title,status);
+  header.append(icon,copy);
+  box.appendChild(header);
+
+  buttons.forEach((value,index) => {
+    const button = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const row = document.createElement("div");
+    row.className = "large-button-item";
+    const preview = document.createElement("div");
+    preview.className = `large-button-preview${button.style === "primary" ? " is-primary" : button.style === "success" ? " is-success" : button.style === "danger" ? " is-danger" : ""}`;
+    preview.textContent = String(button.text || mt("button.generic"));
+    const actions = document.createElement("div");
+    actions.className = "large-button-actions";
+    const editableAction = ["url","callback_data","copy_text"]
+      .filter(key => Object.hasOwn(button,key));
+    if (editableAction.length === 1
+      && !["web_app","login_url","switch_inline_query","switch_inline_query_current_chat","disabled"].some(key => Object.hasOwn(button,key))
+      && (!button.style || ["default","primary","success","danger"].includes(button.style))) {
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "primary-soft";
+      edit.textContent = mt("button.edit_name");
+      edit.addEventListener("click",event => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectBlock(block.id);
+        window.RichButtonDialog?.open?.({
+          button,
+          onSave:updated => {
+            const next = largeButtonValues(block).buttons.slice();
+            next[index] = updated;
+            saveLargeButtonValues(block,next);
+          },
+        });
+      });
+      actions.appendChild(edit);
+    }
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "danger";
+    remove.setAttribute("aria-label",mt("button.delete"));
+    remove.title = mt("button.delete");
+    MiniAppIcons.mount(remove,"delete");
+    remove.addEventListener("click",event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const next = largeButtonValues(block).buttons.slice();
+      next.splice(index,1);
+      saveLargeButtonValues(block,next);
+    });
+    actions.appendChild(remove);
+    row.append(preview,actions);
+    box.appendChild(row);
+  });
+
+  if (!buttons.length) {
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "primary-soft media-pick-btn";
+    add.textContent = mt("button.add");
+    add.addEventListener("click",event => {
+      event.preventDefault();
+      event.stopPropagation();
+      selectBlock(block.id);
+      window.RichButtonDialog?.open?.({
+        onSave:button => saveLargeButtonValues(block,[button]),
+      });
+    });
+    box.appendChild(add);
+  }
+  return box;
+}
+
 const fallbackMediaEditor = mediaEditor;
 mediaEditor = function(block) {
   if (MEDIA_UPLOADS[block.type]) return pickerMediaEditor(block);
   if (block.type === "collage" || block.type === "slideshow") return containerMediaEditor(block);
+  if (block.type === "buttons") return largeButtonEditor(block);
   if (block.type === "map") return locationEditor(block);
   return fallbackMediaEditor(block);
 };

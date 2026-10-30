@@ -73,6 +73,16 @@
         if(native&&!hasText(data.name))fail('missing_anchor');
       }else if(kind==='buttons'){
         if(!Array.isArray(data.buttons)||!data.buttons.length)fail('missing_buttons');
+        else if(!native&&data.buttons.length!==1)fail('invalid_button_layout');
+        else if(data.buttons.some(button=>{
+          if(!object(button)||!String(button.text||'').trim()||String(button.text).length>64)return true;
+          const actions=['url','callback_data','copy_text','web_app','login_url','switch_inline_query','switch_inline_query_current_chat','disabled'];
+          if(!actions.some(key=>button[key]!=null))return true;
+          if(button.url!=null&&!/^(https?:\/\/|tg:\/\/)[^\s]+$/i.test(String(button.url)))return true;
+          if(button.callback_data!=null&&(!String(button.callback_data)||new TextEncoder().encode(String(button.callback_data)).length>64))return true;
+          if(button.copy_text!=null&&(!object(button.copy_text)||!String(button.copy_text.text||'')||String(button.copy_text.text).length>256))return true;
+          return false;
+        }))fail('invalid_button');
       }
       const children=native?data.blocks:(
         ['blockquote','expandable_blockquote','pullquote'].includes(kind)?data.media_children:data.children

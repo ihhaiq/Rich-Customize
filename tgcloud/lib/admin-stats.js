@@ -1,5 +1,5 @@
 // Read-only statistics from Serverless-owned subscription and delivery data.
-// Reachability is an estimate, never a claim that every tracked user is contactable.
+// Reachability is an estimate, never a claim that every tracked user is contactable. 0000
 import { db } from 'sdk';
 import { sql } from 'sdk/db';
 import { DEVELOPER_IDS } from 'lib/developer-access';

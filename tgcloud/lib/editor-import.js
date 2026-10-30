@@ -459,7 +459,7 @@ export function orderBlocks(blocks) {
 }
 export const TEMPLATE_IDS = ['heading_table', 'regular_post', 'announcement', 'task_list', 'recipe'];
 export const TYPES = FINAL_RICH_BLOCK_TYPES;
-export const RECIPE_IMAGES = [1, 2].map(n => 'https://rich-customize.pages.dev/tutorial-assets/recipe-' + n + '.png');
+export const RECIPE_IMAGES = [1, 2].map(n => 'https://app8416656269.tgcloud.ai/tutorial-assets/recipe-' + n + '.png');
 export { words };
 export function textBlock(type, text, position = 0) { return makeBlock(type, textData({text}, type, 1), position); }
 export function templateBlocks(id, locale = 'ar') {

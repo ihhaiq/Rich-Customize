@@ -1,23 +1,22 @@
 {
-  "name": "rich-customize-serverless",
+  "name": "RichCustomizebot",
   "private": true,
-  "version": "0.1.0",
   "type": "module",
   "devDependencies": {
     "@tgcloud/cli": "^0.2.0"
   },
   "scripts": {
     "test:emoji": "node --experimental-vm-modules --test tests/serverless/premium-emoji.test.mjs",
-    "status": "tgcloud status",
-    "deploy": "tgcloud push",
-    "run": "tgcloud run",
-    "migrate": "tgcloud migrate",
-    "webhook": "tgcloud webhook",
     "test": "node --experimental-vm-modules --test tests/serverless/*.test.mjs",
     "test:managed": "node --experimental-vm-modules --test tests/serverless/managed-bots.test.mjs",
     "generate:plans": "node scripts/generate-plan-catalog.mjs",
     "check:plans": "node scripts/generate-plan-catalog.mjs --check",
     "check:miniapp": "node scripts/check-miniapp-static.mjs",
-    "test:ci": "npm run check:plans && npm run check:miniapp && npm test"
+    "test:ci": "npm run check:plans && npm run check:miniapp && npm test",
+    "deploy": "node scripts/build-miniapp-serverless.mjs && tgcloud push",
+    "migrate": "tgcloud migrate",
+    "status": "tgcloud status",
+    "webhook": "tgcloud webhook",
+    "run": "tgcloud run"
   }
 }

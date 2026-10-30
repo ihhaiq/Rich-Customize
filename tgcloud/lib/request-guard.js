@@ -125,7 +125,7 @@ async function allowSlidingWindow(key, limit, windowSeconds = RATE_WINDOW_SECOND
 function callbackRule(data) {
   const value = String(data || '');
   if (value.startsWith('dev:')) return ['developer', 5, 10];
-  if (value === 'r:postsend') return ['publish', 2, 10];
+  if (value === 'r:postsend' || value.startsWith('r:postsend:')) return ['publish', 2, 10];
   if (
     value === 'r:savepage'
     || value.startsWith('r:pdelete')
@@ -213,6 +213,44 @@ export async function allowBridgeRequest(senderBotId, action = 'request', ownerI
   return perUserAllowed;
 }
 
+export async function allowMiniAppEndpointRequest(ownerId, action = 'request') {
+  const userId = Number(ownerId);
+  if (!Number.isSafeInteger(userId) || userId <= 0) return false;
+
+  const globalAllowed = await allowSlidingWindow(
+    'miniapp_endpoint:global',
+    120,
+    10,
+  );
+  if (!globalAllowed) {
+    await recordOperation('rate_limit', true);
+    return false;
+  }
+
+  if (isDeveloper(userId)) return true;
+
+  const name = String(action || 'request');
+  const mutation = new Set([
+    'create',
+    'save',
+    'delete',
+    'publish',
+    'user_picker',
+    'client_error',
+    'custom_emoji_pack',
+    'custom_emoji_manage',
+    'custom_emoji_import',
+  ]).has(name);
+  const perUserLimit = name === 'custom_emoji_pack_read' ? 60 : (mutation ? 6 : 15);
+  const perUserAllowed = await allowSlidingWindow(
+    'miniapp_endpoint:user:' + userId + ':' + name,
+    perUserLimit,
+    10,
+  );
+  if (!perUserAllowed) await recordOperation('rate_limit', true);
+  return perUserAllowed;
+}
+
 export async function allowCallbackRequest(query) {
   const rule = callbackRule(query?.data);
   const allowed = await enforceRule(query?.from?.id, rule);
@@ -228,11 +266,11 @@ export async function allowCallbackRequest(query) {
   return false;
 }
 
-export async function allowMessageRequest(message) {
+export async function allowMessageRequest(message, { respond = true } = {}) {
   const rule = await messageRule(message);
   const allowed = await enforceRule(message?.from?.id, rule);
   if (allowed) return true;
-  if (message?.chat?.id) {
+  if (respond && message?.chat?.id) {
     const locale = rule?.[0] === 'developer'
       ? 'ar'
       : await resolveUserLanguage(message?.from);

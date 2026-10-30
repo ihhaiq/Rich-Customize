@@ -21,7 +21,7 @@ import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { safePlanLimit } from 'lib/subscription-policy';
 import { isLegacySavedPage } from 'lib/saved-page-policy';
-import { allowBridgeRequest } from 'lib/request-guard';
+import { allowBridgeRequest, allowMiniAppEndpointRequest } from 'lib/request-guard';
 import { validateStoredButtons } from 'lib/button-validation';
 import {
   listMiniAppDestinations,
@@ -33,6 +33,8 @@ import {
   acknowledgeMiniAppSync,
   buildPageDeleteSync,
   buildPageUpsertSync,
+  enqueuePageDeleteSync,
+  enqueuePageUpsertSync,
   flushMiniAppSyncOutbox,
   nextPageSyncVersion,
   reactMiniAppSyncSuccess,
@@ -41,6 +43,14 @@ import {
 } from 'lib/miniapp-sync';
 import { DEVELOPER_IDS } from 'lib/developer-access';
 import { receiveScheduleRelayControl } from 'lib/scheduled-publish';
+import {
+  addMiniAppCustomEmojiPack,
+  getMiniAppCustomEmojiPack,
+  getMiniAppCustomEmojiPacks,
+  getMiniAppCustomEmojiPreview,
+  importMiniAppCustomEmojiPacks,
+  manageMiniAppCustomEmojiPacks,
+} from 'lib/miniapp-custom-emoji';
 
 export const MINIAPP_BRIDGE_CHAT_ID = -1003993506865;
 export const MINIAPP_BRIDGE_BOT_USERNAME = 'richminiappsbot';
@@ -98,6 +108,23 @@ const EXPECTED_PUBLISH_ERROR_CODES = new Set([
   'PUBLISH_FORBIDDEN',
   'EMPTY_PAGE',
   'PAGE_NOT_FOUND',
+]);
+const EXPECTED_MINIAPP_EMOJI_ERROR_CODES = new Set([
+  'INVALID_CUSTOM_EMOJI_PACKS',
+  'CUSTOM_EMOJI_PACK_LIMIT',
+  'CUSTOM_EMOJI_MIGRATION_REQUIRED',
+  'INVALID_CUSTOM_EMOJI_PACK',
+  'NOT_A_CUSTOM_EMOJI_PACK',
+  'INCOMPLETE_CUSTOM_EMOJI_PACK',
+  'INCOMPLETE_CUSTOM_EMOJI_METADATA',
+  'CUSTOM_EMOJI_PACK_NOT_FOUND',
+  'CUSTOM_EMOJI_PACK_ORDER_CONFLICT',
+  'INVALID_CUSTOM_EMOJI_PACK_ACTION',
+  'INVALID_CUSTOM_EMOJI_ID',
+  'CUSTOM_EMOJI_NOT_FOUND',
+  'CUSTOM_EMOJI_PREVIEW_UNAVAILABLE',
+  'CUSTOM_EMOJI_PREVIEW_TOO_LARGE',
+  'CUSTOM_EMOJI_PREVIEW_TYPE_UNSUPPORTED',
 ]);
 
 function isExpectedPublishErrorCode(code) {
@@ -658,13 +685,16 @@ async function handlePages(message, id, ownerId) {
       updated_at: Number(row.updatedAt || 0),
     })),
   };
-  await sendJson(
-    message,
-    'pages_' + id + '.json',
-    '✅ ' + BRIDGE_PROTOCOL + ' GET_PAGES_OK\nrequest_id: ' + id + '\nuser_id: ' + ownerId + '\npages: ' + payload.pages.length,
-    payload,
-  );
-  return { status: 'ok', page_count: payload.pages.length };
+  if (message) {
+    await sendJson(
+      message,
+      'pages_' + id + '.json',
+      '✅ ' + BRIDGE_PROTOCOL + ' GET_PAGES_OK\nrequest_id: ' + id + '\nuser_id: ' + ownerId + '\npages: ' + payload.pages.length,
+      payload,
+    );
+    return { status: 'ok', page_count: payload.pages.length };
+  }
+  return payload;
 }
 
 async function handlePage(message, id, ownerId, idValue) {
@@ -678,17 +708,20 @@ async function handlePage(message, id, ownerId, idValue) {
     user_id: Number(ownerId),
     legacy_read_only:isLegacySavedPage(row, ownerId, await getEditorEntitlement(ownerId)),
   };
-  await sendJson(
-    message,
-    'page_' + idValue + '_' + id + '.json',
-    '✅ ' + BRIDGE_PROTOCOL + ' GET_PAGE_OK\nrequest_id: ' + id + '\nuser_id: ' + ownerId + '\npage_id: ' + idValue,
-    payload,
-  );
-  return { status: 'ok', page_id: idValue, updated_at: Number(row.updatedAt || 0) };
+  if (message) {
+    await sendJson(
+      message,
+      'page_' + idValue + '_' + id + '.json',
+      '✅ ' + BRIDGE_PROTOCOL + ' GET_PAGE_OK\nrequest_id: ' + id + '\nuser_id: ' + ownerId + '\npage_id: ' + idValue,
+      payload,
+    );
+    return { status: 'ok', page_id: idValue, updated_at: Number(row.updatedAt || 0) };
+  }
+  return payload;
 }
 
-async function handleCreate(message, id, envelope) {
-  const documentPayload = await readJsonDocument(message, envelope);
+async function handleCreate(message, id, envelope, directPayload = null) {
+  const documentPayload = directPayload || await readJsonDocument(message, envelope);
   const input = await validatePageInput(documentPayload, { requirePageId: false });
   await validateButtonPageTargets(input.ownerId, input.buttons);
   const lock = await acquireCreateLock(input.ownerId);
@@ -755,8 +788,8 @@ async function handleCreate(message, id, envelope) {
   }
 }
 
-async function handleSave(message, id, envelope) {
-  const documentPayload = await readJsonDocument(message, envelope);
+async function handleSave(message, id, envelope, directPayload = null) {
+  const documentPayload = directPayload || await readJsonDocument(message, envelope);
   const input = await validatePageInput(documentPayload, { skipQuota: true });
   await validateButtonPageTargets(input.ownerId, input.buttons);
   const baseRevision = positiveInteger(documentPayload.base_revision);
@@ -845,16 +878,19 @@ async function handleDestinations(message, id, ownerId) {
     user_id: Number(ownerId),
     destinations,
   };
-  await sendJson(
-    message,
-    'destinations_' + id + '.json',
-    '✅ ' + BRIDGE_PROTOCOL + ' GET_DESTINATIONS_OK\n'
-      + 'request_id: ' + id + '\n'
-      + 'user_id: ' + ownerId + '\n'
-      + 'destinations: ' + destinations.length,
-    payload,
-  );
-  return { status: 'ok', destination_count: destinations.length };
+  if (message) {
+    await sendJson(
+      message,
+      'destinations_' + id + '.json',
+      '✅ ' + BRIDGE_PROTOCOL + ' GET_DESTINATIONS_OK\n'
+        + 'request_id: ' + id + '\n'
+        + 'user_id: ' + ownerId + '\n'
+        + 'destinations: ' + destinations.length,
+      payload,
+    );
+    return { status: 'ok', destination_count: destinations.length };
+  }
+  return payload;
 }
 
 async function handleUserPicker(message, id, ownerId, idValue, envelope) {
@@ -917,11 +953,16 @@ async function handleClientError(message, id, ownerId, envelope) {
   };
 }
 
-async function handlePublish(message, id, ownerId, idValue, envelope) {
+async function handlePublish(message, id, ownerId, idValue, envelope, directPayload = null) {
   let directInput = null;
-  let destination = envelope;
+  let destination = directPayload || envelope;
 
-  if (message?.document?.file_id) {
+  if (directPayload && Array.isArray(directPayload.blocks)) {
+    const documentPayload = { ...directPayload, user_id: ownerId };
+    directInput = await validatePageInput(documentPayload, { requirePageId: false });
+    await validateButtonPageTargets(directInput.ownerId, directInput.buttons);
+    destination = documentPayload;
+  } else if (message?.document?.file_id) {
     const documentPayload = await readJsonDocument(message, envelope);
     directInput = await validatePageInput(documentPayload, { requirePageId: false });
     await validateButtonPageTargets(directInput.ownerId, directInput.buttons);
@@ -974,9 +1015,9 @@ async function handlePublish(message, id, ownerId, idValue, envelope) {
   }
 }
 
-async function handleDelete(message, id, ownerId, idValue, envelope, retry = false) {
-  let documentPayload = null;
-  if (message?.document?.file_id) {
+async function handleDelete(message, id, ownerId, idValue, envelope, retry = false, directPayload = null) {
+  let documentPayload = directPayload;
+  if (!documentPayload && message?.document?.file_id) {
     documentPayload = await readJsonDocument(message, envelope);
   }
   const baseRevision = positiveInteger(documentPayload?.base_revision ?? envelope.base_revision);
@@ -1080,6 +1121,185 @@ async function sendMutationAck(message, id, action, result, replay = false) {
 
 async function replayCompletedMutation(message, id, action, result) {
   return sendMutationAck(message, id, action, result, true);
+}
+
+function miniAppEndpointRequestId(value) {
+  const generated = 'sls_' + String(globalThis.crypto.randomUUID()).replaceAll('-', '');
+  return requestId(value || generated);
+}
+
+async function enqueueDirectPageSync(action, result, requestIdValue) {
+  try {
+    if (action === 'delete') {
+      await enqueuePageDeleteSync({
+        ownerId: result.user_id,
+        pageId: result.page_id,
+        revision: result.revision,
+        syncSeq: result.sync_seq,
+        updatedAt: result.sync_event?.deleted_at,
+        requestId: requestIdValue,
+      });
+    } else {
+      const page = await getOwnedPage(result.user_id, result.page_id);
+      if (page) await enqueuePageUpsertSync(page);
+    }
+    await flushMiniAppSyncOutbox({ limit: 1 });
+  } catch (error) {
+    await logError('miniapp_sync.serverless_endpoint', error, {
+      userId: result.user_id,
+      extra: 'action=' + action + '; request=' + requestIdValue,
+    });
+  }
+}
+
+async function handleMiniAppEmojiAction(operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    const code = String(error?.message || '');
+    if (EXPECTED_MINIAPP_EMOJI_ERROR_CODES.has(code)) {
+      throw new BridgeError(code, 'The custom emoji request could not be completed.');
+    }
+    throw error;
+  }
+}
+
+export async function handleMiniAppServerlessEndpoint(input, context) {
+  const ownerId = positiveInteger(context?.initData?.user?.id);
+  if (!ownerId) throw new BridgeError('UNAUTHORIZED', 'Telegram user identity is unavailable.');
+  if (!input || Array.isArray(input) || typeof input !== 'object') {
+    throw new BridgeError('INVALID_REQUEST', 'Request must be an object.');
+  }
+  const inputBytes = new TextEncoder().encode(JSON.stringify(input)).length;
+  if (inputBytes > MAX_DOCUMENT_BYTES) {
+    throw new BridgeError('REQUEST_TOO_LARGE', 'Request exceeds the 2 MB limit.');
+  }
+
+  const action = String(input.action || '').trim();
+  const supportedActions = new Set([
+    'me', 'pages', 'page', 'destinations', 'create', 'save', 'delete',
+    'publish', 'user_picker', 'client_error', 'custom_emoji_packs',
+    'custom_emoji_pack', 'custom_emoji_manage', 'custom_emoji_import',
+    'custom_emoji_pack_read', 'custom_emoji_preview',
+  ]);
+  if (!supportedActions.has(action)) {
+    throw new BridgeError('UNKNOWN_ACTION', 'Unsupported Mini App operation.');
+  }
+  if (!await allowMiniAppEndpointRequest(ownerId, action)) {
+    throw new BridgeError('RATE_LIMITED', 'Request rate limit exceeded. Retry shortly.');
+  }
+
+  const id = miniAppEndpointRequestId(input.request_id);
+  const envelope = { ...input, request_id: id, user_id: ownerId };
+  const pageIdValue = ['page', 'save', 'delete', 'user_picker'].includes(action)
+    || (action === 'publish' && !Array.isArray(input.blocks))
+    ? pageId(input.page_id)
+    : null;
+
+  if (action === 'me') {
+    const entitlement = await getEditorEntitlement(ownerId);
+    const developer = isDeveloper(ownerId);
+    return {
+      ok: true,
+      user: { id: ownerId },
+      beta: '0.3',
+      is_developer: developer,
+      limits: {
+        custom_emoji_packs: safePlanLimit(entitlement, 'emojiPacks'),
+        table_columns: developer ? 20 : safePlanLimit(entitlement, 'tableColumns'),
+        table_rows: 26,
+      },
+    };
+  }
+  if (action === 'pages') {
+    const result = await handlePages(null, id, ownerId);
+    return {
+      ok: true,
+      ...result,
+      Golden_ticket: result.golden_gift?.Golden_ticket === true,
+    };
+  }
+  if (action === 'page') {
+    const result = await handlePage(null, id, ownerId, pageIdValue);
+    return { ok: true, page: result };
+  }
+  if (action === 'destinations') {
+    const result = await handleDestinations(null, id, ownerId);
+    return { ok: true, ...result };
+  }
+  if (action === 'custom_emoji_packs') {
+    return await handleMiniAppEmojiAction(
+      () => getMiniAppCustomEmojiPacks(ownerId),
+    );
+  }
+  if (action === 'custom_emoji_preview') {
+    return await handleMiniAppEmojiAction(
+      () => getMiniAppCustomEmojiPreview(input.custom_emoji_id),
+    );
+  }
+  if (action === 'custom_emoji_pack_read') {
+    return await handleMiniAppEmojiAction(
+      () => getMiniAppCustomEmojiPack(ownerId, input.set),
+    );
+  }
+
+  const claim = await claimRequest(id, action, 0, ownerId);
+  if (!claim.fresh) {
+    if (claim.row?.status === 'completed' && claim.row.result) {
+      return { ok: true, ...claim.row.result };
+    }
+    throw new BridgeError(
+      claim.row?.status === 'processing' ? 'REQUEST_IN_PROGRESS' : 'DUPLICATE_REQUEST',
+      'This request is already being processed. Retry with the same request ID.',
+    );
+  }
+
+  try {
+    let result;
+    if (action === 'create') {
+      result = await handleCreate(null, id, envelope, envelope);
+      await enqueueDirectPageSync(action, result, id);
+    } else if (action === 'save') {
+      result = await handleSave(null, id, envelope, envelope);
+      await enqueueDirectPageSync(action, result, id);
+    } else if (action === 'delete') {
+      result = await handleDelete(null, id, ownerId, pageIdValue, envelope, Boolean(claim.retry), envelope);
+      await enqueueDirectPageSync(action, result, id);
+    } else if (action === 'publish') {
+      result = await handlePublish(null, id, ownerId, pageIdValue, envelope, envelope);
+    } else if (action === 'user_picker') {
+      result = await handleUserPicker(null, id, ownerId, pageIdValue, envelope);
+    } else if (action === 'custom_emoji_pack') {
+      result = await handleMiniAppEmojiAction(
+        () => addMiniAppCustomEmojiPack(ownerId, input.set),
+      );
+    } else if (action === 'custom_emoji_manage') {
+      result = await handleMiniAppEmojiAction(
+        () => manageMiniAppCustomEmojiPacks(ownerId, input.manage_action, input),
+      );
+    } else if (action === 'custom_emoji_import') {
+      result = await handleMiniAppEmojiAction(
+        () => importMiniAppCustomEmojiPacks(ownerId, input.pack_names, input.pinned_pack),
+      );
+    } else {
+      result = await handleClientError(null, id, ownerId, envelope);
+    }
+
+    await finishRequest(id, 'completed', result);
+    const response = { ...result };
+    delete response.sync_event;
+    return { ok: true, ...response };
+  } catch (error) {
+    try {
+      await finishRequest(id, 'failed', { code: String(error?.code || 'INTERNAL_ERROR') });
+    } catch (stateError) {
+      await logError('miniapp_bridge.state', stateError, {
+        userId: ownerId,
+        extra: 'action=' + action + '; request=' + id,
+      });
+    }
+    throw error;
+  }
 }
 
 export async function handleMiniAppBridgeMessage(message, context = {}) {

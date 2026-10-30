@@ -57,15 +57,24 @@ export async function savedPageQueryResult(pageId, languageCode = 'en') {
   };
 }
 
+export function guestPageRequest(message) {
+  let raw = String(message?.text || message?.caption || '');
+  raw = raw.replace(/@RichCustomizebot\b/gi, '').trim();
+  const pageCommand = raw.match(/^\/page(?:@richcustomizebot)?(?:\s+|$)/i);
+  const preferName = Boolean(pageCommand);
+  if (pageCommand) raw = raw.slice(pageCommand[0].length).trim();
+  const reference = normalizePageTitle(raw);
+  const code = normalizePageCode(reference);
+  return {
+    reference,
+    preferName,
+    preferCode: !preferName && Boolean(code),
+    codeCandidates: !preferName && code ? [code] : [],
+  };
+}
+
 export function guestPageCodes(message) {
-  const raw = String(message?.text || message?.caption || '');
-  const result = [];
-  for (const token of raw.split(/\s+/)) {
-    if (!token || token.startsWith('@')) continue;
-    const candidate = normalizePageCode(token.replace(/^[.,،؛:!?؟]+|[.,،؛:!?؟]+$/g, ''));
-    if (candidate) result.push(candidate);
-  }
-  return result;
+  return guestPageRequest(message).codeCandidates;
 }
 
 export function guestPageCode(message) {
@@ -77,14 +86,21 @@ export function normalizePageTitle(value) {
 }
 
 export function guestPageReference(message) {
-  const raw = String(message?.text || message?.caption || '');
-  // Remove only the summoned bot's mention, leaving mentions in page names intact.
-  return normalizePageTitle(raw.replace(/@RichCustomizebot\b/gi, ''));
+  return guestPageRequest(message).reference;
 }
 
-export async function resolveSavedPageReference(reference, userId, codeCandidates = null) {
+export async function resolveSavedPageReference(
+  reference,
+  userId,
+  codeCandidates = null,
+  { preferName = false, preferCode = false } = {},
+) {
   const title = normalizePageTitle(reference);
   if (!title) return { status: 'missing' };
+  const exactCode = normalizePageCode(title);
+  if (preferCode && exactCode && await getPage(exactCode)) {
+    return { status: 'found', pageId: exactCode };
+  }
   const id = Number(userId);
   if (Number.isSafeInteger(id) && id > 0) {
     const pages = await db.select().from(richPages).where(eq(richPages.ownerId, id)).all();
@@ -92,8 +108,10 @@ export async function resolveSavedPageReference(reference, userId, codeCandidate
     if (matches.length > 1) return { status: 'ambiguous' };
     if (matches.length === 1) return { status: 'found', pageId: String(matches[0].pageId) };
   }
-  const candidates = codeCandidates || [normalizePageCode(title.split(/\s+/, 1)[0])];
-  for (const candidate of candidates) {
+  if (!preferName && exactCode && await getPage(exactCode)) {
+    return { status: 'found', pageId: exactCode };
+  }
+  for (const candidate of codeCandidates || []) {
     const code = normalizePageCode(candidate);
     if (code && await getPage(code)) return { status: 'found', pageId: code };
   }

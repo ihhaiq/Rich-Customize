@@ -1,92 +1,77 @@
-# جدولة المنشورات — تصميم التطوير (غير مفعّل)
+# جدولة المنشورات — متاحة
 
-آخر مراجعة: 2026-10-10. المصدر: فرع `serverless-cleanup`.
+آخر مراجعة: 2026-10-25. أكد المالك أن خيار الجدولة ظاهر ويستخدمه فعلياً.
+يوثق هذا الملف الكود الحالي والقيود المتبقية؛ تأكيد الإتاحة لا يعني وجود
+ضمان زمني بالثانية أو ضمان exactly-once.
 
-## قرار المنتج ونطاقه
-- جدولة إرسال رسالة غنية إلى محادثة واحدة أو عدة محادثات مختارة؛ لا تعني إرسالاً دورياً تلقائياً.
-- مجاناً: محادثة واحدة أو محادثتان في عملية الجدولة الواحدة (حد أقصى 2).
-- Plus: 5 وجهات لكل منشور، وGolden Ticket: 15 وجهة، **أرقام مقترحة بانتظار موافقة المالك** وليست حدود بيع معتمدة.
-- الحد يخص وجهات **منشور مجدول واحد** وليس عدد المحادثات المربوطة أو عدد المنشورات الجارية.
-- مدة الجدولة القصوى 4 أيام (الحد السابق المطلوب في المحرر). يبدأ الإرسال بعد 60 ثانية على الأقل.
-- الإرسال الفوري الحالي مستقل تماماً: لا تطبّق عليه حدود الجدولة تلقائياً.
-- يمكن للمطور تجاوز حصص الباقات فقط؛ لا يتجاوز صلاحيات الوجهة، أو حدود تليكرام، أو فحوص الصحة.
-- الفئة المدفوعة لا تُقبل إلا باستحقاق نشط من `getEditorEntitlement(userId)` على خادم Telegram Serverless؛ لا يقبل `plan` من العميل.
+## السلوك المتاح
 
-## تدفق الاستخدام المقترح
-1. المستخدم يفتح واجهة النشر الحالية `r:post`، ويحدد محادثة أو عدة محادثات مسجلة.
-2. بعد إعداد الصامت/حماية المحتوى، يختار «إرسال الآن» أو «جدولة المنشور».
-3. تعرض الجدولة تاريخاً ووقتاً ومنطقة زمنية ظاهرة (افتراض واجهة عربية: Asia/Baghdad)، ثم تأكيداً فيه عدد الوجهات وأسماؤها والتوقيت النهائي.
-4. يرفض تجاوز حد الباقة برسالة تتضمن الحد الفعلي ورابط عرض الباقات، دون إلغاء تحديد الوجهات سراً.
-5. يعرض قسم «منشوراتي المجدولة» حالة كل منشور مع الإلغاء وتعديل الموعد قبل أن تبدأ عملية الإرسال.
-6. يثبت Snapshot لمحتوى الرسالة والأزرار والتذييل وإعدادات النشر عند تأكيد الجدولة؛ لا تغيّر تعديلات الصفحة اللاحقة محتوى المهمة سراً.
+- من إعدادات النشر في المحرر يحدد المستخدم الوجهات ثم يختار «جدولة المنشور»،
+  ويرسل الموعد في الخاص بصيغة `MM-DD hh:mm AM/PM` حسب توقيت بغداد (GMT+3)،
+  مثال `10-28 10:19 PM`. السنة تستنتج تلقائياً؛ إذا كان التاريخ قد مضى
+  يعتمد النظام السنة التالية.
+- يقبل النظام موعداً بعد 60 ثانية على الأقل. المجاني محدود بأربعة أيام،
+  والاشتراك النشط Plus أو Golden يسمح بموعد حتى شهرين تقويميين.
+- تظهر للمستفيدين من إزالة الحقوق، سواء بالشراء الدائم أو اشتراك نشط،
+  أداة إظهار/إخفاء الحقوق في المحرر وإعدادات النشر. الاختيار تفضيل دائم
+  للحساب؛ يبدأ المستفيد والحقوق مخفية، ويعرض الزر الإجراء التالي.
+- عند إنشاء الجدولة تُحفظ حالة الحقوق الحالية ضمن لقطة الرسالة؛ تغيير
+  التفضيل لاحقاً لا يغيّر مهمة مجدولة موجودة.
+- عند طلب موعد يظهر زر «إلغاء» بدلاً من طلب إرسال أمر؛ يبقى `/cancel`
+  و`إلغاء` مدعومين للتوافق، ويقبل زر لوحة المفاتيح أيضاً `Cancel`.
+- يحفظ Telegram Serverless نسخة ثابتة من الرسالة والأزرار وخيارات النشر؛
+  تعديلات الصفحة بعد إنشاء المهمة لا تغيّر محتواها المجدول.
+- يعرض `/scheduled` آخر عشر مهام، مع زر إلغاء للمهام التي ما زالت
+  `registering` أو `pending`. لا يدعم تعديل موعد مهمة موجودة.
+- الحد المجاني وجهتان لكل منشور. حدود Plus=5 وGolden=15 مطبقة في الكود
+  حالياً كقيم مؤقتة بانتظار اعتماد المنتج النهائي؛ لا تعاملها كحدود بيع مؤكدة.
+- الإرسال الفوري مستقل عن حصص الجدولة. إعفاء المطور من الحصص لا يتجاوز
+  صلاحيات الوجهة أو حدود Telegram.
 
-## ضمانات المخزن والمنفّذ المطلوب قبل تفعيل الزر
-- قاعدة الحقيقة الواحدة: جداول `scheduled_posts` و`scheduled_post_destinations` في Telegram Serverless؛ لا توضع وظيفة تشغيل البوت أو بيانات الصفحات في Cloudflare/D1.
-- `scheduled_posts`: id عشوائي، owner_id، snapshot، scheduled_at UTC، timezone، created_at، status، page_id اختياري، snapshot hash، فاصل المراجعة، الخطأ الأخير.
-- `scheduled_post_destinations`: job_id، chat_id، status، lease، attempt، sent_message_id، last_error؛ مفتاح مركب فريد `(job_id, chat_id)`.
-- يجب إثبات وجود مشغّل زمني مضمون قبل استقبال أي جدولة حقيقية. عند توفره، يفحص العمل المستحق ثم يتحقق من الصلاحيات لكل وجهة قبل الإرسال.
-- عامل التنفيذ يستعمل claim ذرياً مع lease، وسجل نتيجة لكل وجهة، وعدم إعادة إرسال الوجهات الناجحة. في حالة انقطاع بعد طلب الإرسال وقبل تخزين النتيجة، تعتبر الوجهة `uncertain` وتحتاج تسوية؛ لا تعاد عميانياً لتجنب التكرار.
-- كل وظيفة تقبل تغييرات الطلب من مالكها فقط. إعادة فحص الصلاحيات/الحظر/المشاركة عند التنفيذ؛ تعطل وجهة واحدة لا يمنع نجاح بقية الوجهات.
-- حد الاشتراك يُتحقق منه عند إنشاء المهمة، مع سياسة واضحة عند انتهاء الاشتراك؛ المقترح احترام المهام المقبولة سابقاً ضمن أفق الأربعة أيام.
-- تجاهل تكرار الضغط والطلبات المتزامنة، واستعمال API limits/backoff 429 بدون فترات نوم طويلة داخل handler.
-- دعم حالات pending / running / sent / partially_sent / failed / canceled / uncertain، وسجل مختصر مرئي للمستخدم.
-- النشر النهائي يستعمل `buildInputRichMessage` و`sendRichMessageSafe` ومكونات الأزرار القائمة، مع إعادة فحص حدود الرسالة.
+## التنفيذ والمعمارية
 
-## القيد التقني الحاسم
-توثيق Telegram Serverless بتاريخ 2026-10-10 يصف معالجات تُستدعى عند حدث، ولا يذكر Cron أو delayed jobs يمكن الاعتماد عليها. Bot API `sendRichMessage` لا يوفّر `schedule_date`؛ حقل `schedule_date` في واجهة MTProto للمستخدمين ليس حلاً معتمداً للروبوتات (تظهر حالة `SCHEDULE_BOT_NOT_ALLOWED`).
+- `tgcloud/lib/schedule-policy.js` يتحقق من الوجهات والموعد والاستحقاق
+  الموثوق من Serverless؛ لا تُقبل خطة يرسلها العميل.
+- `tgcloud/lib/scheduled-publish.js` ينشئ المهام ويحفظ المحتوى والوجهات
+  في Telegram Serverless، ويتحقق من الصلاحيات عند الإنشاء والتنفيذ، ويعالج
+  الإلغاء والنتائج لكل وجهة.
+- Cloudflare D1 يحفظ بيانات التذكير التشغيلية فقط: معرّف المهمة وإصدارها
+  وموعدها وحالتها ومحاولاتها؛ لا يحفظ محتوى المنشور أو الوجهات.
+- `workers/schedule-reminders/worker.js` يستخدم Cloudflare Cron كل دقيقة،
+  ويرسل تذكير التنفيذ عبر RCB1 إلى Serverless. عامل النشر نفسه يبقى في
+  Telegram Serverless، لا في Cloudflare.
+- تعتمد المهام على تأكيد `REGISTERED` قبل اعتبار التسجيل `pending`. وعند
+  `DUE` يتحقق Serverless من المالك والإصدار والموعد والصلاحيات، ويستخدم
+  CAS/lease لمنع تنفيذ المهمة بالتوازي.
+- يقرأ Serverless تفضيل الحقوق من `branding_preferences`، وهو جدول إعدادات
+  منفصل عن سجلات الدفع. يحتاج الجدول إلى migration قبل نشر هذا السلوك؛
+  تعديل schema في المستودع وحده لا يثبت أن الإنتاج يملكه.
 
-مصادر المراجعة:
-- https://blogfork.telegram.org/bots/serverless
-- https://core.telegram.org/bots/api#sendrichmessage
-- https://core.telegram.org/method/messages.sendMessage
+## الاعتمادية والقيود المتبقية
 
-لا تعتمد على وصول رسالة من عضو المجموعة لتحريك قائمة الانتظار؛ ذلك يخرق وعد الإرسال في وقت محدد. لا تُظهر رسالة «تمت الجدولة» أو تقبل وظائف إنتاج قبل اعتماد منفّذ مضمون واختباره.
+- دقة Cron بالدقائق وقد يتأخر التنفيذ بسبب ازدحام عامل التذكير أو أعطال
+  Telegram/الترحيل؛ لا يوجد SLA بموعد دقيق بالثانية.
+- يرسل Worker حتى 10 تذكيرات في دورة الدقيقة لتقليل الضغط على RCB1. يلزم
+  قياس الحمل إذا زاد عدد المهام المتزامنة.
+- إذا لم يصل `REGISTERED` تبقى المهمة `registering`؛ استعادة التسجيلات
+  العالقة التي لم تتلق ACK تحتاج تحسيناً قبل اعتبار كل حالات الفشل مستعادة تلقائياً.
+- إلغاء إدخال الموعد متاح بزر لوحة المفاتيح؛ إلغاء المنشور المجدول نفسه
+  متاح قبل بدء التنفيذ فقط، وتعديل وقت مهمة قائمة غير منفذ.
+- إذا انقطع الاتصال بعد احتمال إرسال الرسالة وقبل حفظ النتيجة، تصنف الوجهة
+  `uncertain` ولا يعاد إرسالها تلقائياً تفادياً للتكرار. هذا ليس ضمان
+  exactly-once؛ قد يحتاج المستخدم إلى تسوية النتيجة الملتبسة.
+- توجد اختبارات وحدة وتكامل للمسارات والـrelay، لكن يلزم استكمال اختبار
+  ضغط للمهام المتزامنة، والإلغاء أثناء بدء التنفيذ، وتعطل Worker واستعادته،
+  وانقطاع النقل في الحالات الملتبسة. استخدام المالك يؤكد عمل المسار المعتاد،
+  ولا يثبت اجتياز اختبارات الضغط أو كل حالات الأعطال.
 
-## حالة التنفيذ
-- أضيف `tgcloud/lib/schedule-policy.js` لفحص عدد الوجهات والتاريخ بنطاق Serverless فقط.
-- أضيفت اختبارات policy مستقلة.
-- **غير منفذ:** واجهة المستخدم، قاعدة الوظائف، مجدول الوقت، إرسال المؤجلات، إلغاء وتعديل المهام، ترجمات البوت والتطبيق المصغر، وتجارب Telegram الحية.
-- لا schema migration ولا push للإنتاج ضمن هذه المرحلة.
+## اشتراكات وتذكيرات أخرى
 
-## اعتماد معماري جديد — Cloudflare reminder relay (2026-10-10)
+يستخدم Worker نفسه أيضاً تذكيراً يومياً لمسح إشعارات انتهاء الاشتراك،
+وهذا مسار منفصل عن جدولة منشورات المستخدمين. تفاصيل الإرسال المحدود،
+المتابعة، ومعالجة الحالات الملتبسة موثقة في [subscription-rollout.md](./subscription-rollout.md).
 
-- Cloudflare يستعمل D1 لتخزين `{job_id, revision, run_at, status, attempts}` فقط، **ولا يحتفظ بالمحتوى أو قائمة الوجهات**.
-- يرسل المحرر من Telegram Serverless عبر نفس مجموعة RCB1 أمر `/rcb_schedule_register@Richminiappsbot` يتضمن ID والموعد والإصدار؛ webhook الحالي يتحقق من توقيع Telegram ومرسل البوت المثبت قبل الحفظ. عند الإلغاء يرسل `/rcb_schedule_cancel@Richminiappsbot`.
-- Worker مستقل صغير بـ Cron كل دقيقة ويقرأ D1 ويرسل عبر حساب relay الموجود `/rcb_schedule_due@RichCustomizebot` مع ID والإصدار. لا يشغّل بوت المحرر، ولا يتلقى توكن المحرر.
-- المحرر يتحقق من job_id في قاعدة بياناته، ويمنع النشر المبكر أو المتكرر أو بعد الإلغاء، ثم يرسل `/rcb_schedule_result@Richminiappsbot` بالحالة النهائية.
-- Cloudflare يعيد المحاولة عند غياب تأكيد النتيجة، لكن المحرر يمنع إعادة إرسال أي وجهة سبق إرسالها. Cron دقته دقيقة تقريباً، ولا وعد بالتنفيذ في ثانية محددة.
-- بروتوكول Cloudflare / webhook وWorker ومخطط D1 مكتوبان في هذه المرحلة؛ **لا يصبح النظام عاملاً حتى يُكمل المحرر حفظ وظائفه واستهلاك أوامر due وack ويرفع Worker ويطبق D1 migration**.
-- Cloudflare Pages لا يشغّل `scheduled()` عبر ملفات `functions/` مباشرة؛ يجب نشر Worker مستقل وضبط D1 binding لنفس DB وSecret `B2B_BOT_TOKEN` الموجود على Pages. ملف `workers/schedule-reminders/wrangler.toml` يحتاج ضبط المعرفات من مالك الحساب.
-
-## تنفيذ النشر داخل المحرر (GitHub فقط)
-- إضافة `tgcloud/lib/scheduled-publish.js` وقاعدتي `scheduled_posts` و`scheduled_post_destinations` إلى مخطط Telegram Serverless.
-- أضيف زر «جدولة المنشور» إلى إعدادات النشر (بعد تحديد الوجهات)، وطلب تاريخ بصيغة `YYYY-MM-DD HH:mm` حسب بغداد UTC+3. الأمر `/scheduled` يستعرض المهام ويتيح الإلغاء قبل بدء النشر.
-- محتوى الرسالة والأزرار تحفظ كـ snapshot وقت إنشاء المهمة في Serverless؛ Cloudflare لا يستلم سوى المعرف والإصدار والوقت.
-- عند `DUE` يتحقق المحرر من B2B sender pinned، ثم الملكية والموعد والإصدار والحالة، ويستعمل CAS lease ونجاح كل وجهة لمنع إرسال النسخ السابقة أو المهام الملغاة. الحالات الملتبسة `uncertain` لا تعاد تلقائياً.
-- `REGISTERED` ACK يبدل حالة المهمة من registering إلى pending ويخبر صاحبها. إرسال REGISTER الذي لم يُؤكد يظل registering، ولا يُصنّف مفعلاً حتى تؤكد الخدمة. ينبغي إضافة آلية استعادة للطلبات التي لم تتلق ACK واختبارها قبل الإطلاق العام.
-- Worker يستعمل throttle مشتركة مع عمليات الجسر الموجودة ويحدد 10 رسائل تذكير لكل دورة Cron لتقليل الاصطدام بمعدل بوت الجسر. هذا حد تشغيل تجريبي لا يكفي لوعد الدقة عند ازدحام عدد كبير من المهام، ويحتاج قياس وتحسين.
-
-## خطوات تفعيل بيئة تجريبية (لا تنفذها على الإنتاج دون موافقة)
-1. جهز نسخة احتياطية لمخطط Telegram Serverless وD1. راجع تغيرات schema الجديدة، ثم نفذ `npx tgcloud migrate` مع المشروع الصحيح (طبق المخطط قبل نشر كود المحرر).
-2. طبق `cloudflare/d1/migrations/0002-schedule-reminders.sql` على قاعدة D1 المستخدمة حالياً من Pages، وليس قاعدة جديدة.
-3. في `workers/schedule-reminders/wrangler.toml` ضع اسم ومعرف قاعدة D1 القائمة. نفذ `npx wrangler secret put B2B_BOT_TOKEN --config workers/schedule-reminders/wrangler.toml` بإدخال **توكن relay بوت Mini App** عبر مطالبة Wrangler. لا تحفظه في Git.
-4. انشر Worker مستقلاً: `npx wrangler deploy --config workers/schedule-reminders/wrangler.toml`. هذا ليس استضافة لبوت المحرر.
-5. ارفع كود البوت بعد الهجرة عبر `npx tgcloud push` من المجلد المحلي. Cloudflare Pages يحتاج استقبال webhook المحدّث من ربط Git.
-6. جرّب قناة اختبار ومهمة بعد دقيقتين: REGISTER -> REGISTERED -> DUE -> RESULT، وأعد إرسال DUE وCANCEL بأمان، وتحقق من حالات الصلاحيات والتوقف والتكرار. لا تفتح الميزة للجميع قبل نجاح اختبار حي.
-
-## القيود الحالية والاختبارات المطلوبة
-- لا توجد ضمانة زمنية بالثانية: Cloudflare Cron يبدأ بالدقيقة، وقد يتأخر عند الازدحام أو الأعطال. التغيير في Cron قد يحتاج حتى 15 دقيقة ليُفعّل عالمياً.
-- B2B webhook يثق بالمصدر المثبت للرسائل وليس بنص مفتوح من المتصفح.
-- لم يتم تشغيل ترحيل حي أو اختبار نشر محادثات حقيقية، ولم تتحقق إتاحة Cloudflare Worker. هذه مرحلة كود وتوثيق.
-- اختبار مطلوب: 20 مهمة متزامنة، إلغاء وقت التنفيذ، إيقاف Worker ثم استعادته، انقطاع بعد إرسال Telegram وقبل تسجيل message ID، وعدم إرسال نسخة ثانية للمحادثة نفسها.
-
-## انتباه قبل تشغيل المستخدمين
-- هذا المسار يحتاج تأكيد صلاحيات Bot-to-Bot في المجموعة الحالية، وأن bot relay يستلم الرسائل الصادرة من المحرر ثم يستطيع تنبيه المحرر. التحقق الحي واجب.
-- الاستدعاء كل دقيقة ليس SLA زمنياً دقيقاً. معدل B2B المشترك قد يؤخر المهام المتزامنة؛ حد 10 تذكيرات بالدورة حماية أولية فقط.
-- عند إعداد نسخة D1 جديدة نفذ `cloudflare/d1/schema.sql`؛ في قاعدة الإنتاج القائمة نفذ ملف الترحيل `0002-schedule-reminders.sql` فقط حتى لا تغير البيانات القائمة.
-
-
-## Golden broadcast recovery and repeat reminders — 2026-10-12
+## Golden gift recovery and repeat reminders — 2026-10-12
 
 `gfb_` reminders recover exhausted rows and keep retrying until Serverless
 returns a terminal result, with backoff up to 15 minutes. Each revision
@@ -113,17 +98,14 @@ Completion notices retry definite retryable rejections. Ambiguous sends
 remain uncertain to avoid duplicates. This is not an exactly-once delivery
 guarantee or proof that users read the notification.
 
-### Required rollout
+### Gift-reminder rollout checks
 
-1. Apply the Telegram schema migration **before** deploying new code:
-   `golden_broadcasts.round` and `golden_announcements.round`, integer NOT NULL
-   DEFAULT 1. Existing delivery rows belong to round 1 and must be preserved.
-2. Deploy Serverless code with the new callback handler, claim resolution,
-   recipient ledger and developer panel. Do not press the repeat button before
-   migration and deployment succeed.
-3. Deploy the separate reminder Worker to pick up the earlier persistent retry
-   fix. Pages deployment alone does not deploy that Worker. No new D1 columns
-   are introduced by the round feature.
-4. Check a real campaign, click an old and new notification for the same test
-   recipient, and confirm one unchanged expiry in `/sup`. This live check was
-   not run by the local test suite.
+1. Preserve existing delivery rows when applying the Serverless schema
+   migration for `golden_broadcasts.round` and `golden_announcements.round`.
+2. Deploy Serverless code with the callback handler, claim resolution,
+   recipient ledger and developer panel before using the repeat button.
+3. The separate Cloudflare reminder Worker must also include the persistent
+   retry behavior; Pages deployment alone does not deploy that Worker.
+4. Live-check a real test campaign, old/new notification callbacks for one
+   recipient, and unchanged `/sup` expiry. Local tests do not prove this
+   production acceptance.

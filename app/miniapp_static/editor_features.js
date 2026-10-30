@@ -102,7 +102,16 @@
     blocksEl?.querySelectorAll?.(".block[data-id]").forEach(el => {
       el.classList.toggle("multi-selected", state.selected.has(String(el.dataset.id)));
       const check = el.querySelector(".multi-select-check");
-      if (check) check.setAttribute("aria-pressed", state.selected.has(String(el.dataset.id)) ? "true" : "false");
+      if (check) {
+        const selected=state.selected.has(String(el.dataset.id));
+        check.setAttribute("aria-pressed", selected ? "true" : "false");
+        if(selected&&!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches){
+          check.classList.remove("selection-pop");
+          void check.offsetWidth;
+          check.classList.add("selection-pop");
+          check.addEventListener("animationend",()=>check.classList.remove("selection-pop"),{once:true});
+        }
+      }
     });
     updateMultiBar();
     haptic();
@@ -132,6 +141,7 @@
   function moveSelected(direction) {
     if (!current?.blocks?.length || !state.selected.size) return;
     const selected = state.selected;
+    const previous=window.RichBlockMotion?.capture?.();
     if (direction < 0) {
       for (let i = 1; i < current.blocks.length; i += 1) {
         if (selected.has(String(current.blocks[i].id)) && !selected.has(String(current.blocks[i - 1].id))) {
@@ -147,6 +157,7 @@
     }
     normalizePositions();
     renderBlocks();
+    window.RichBlockMotion?.reorder?.(previous);
     markDirty();
     pushHistory();
     haptic("medium");
@@ -154,11 +165,13 @@
 
   function deleteSelected() {
     if (!current?.blocks || !state.selected.size) return;
+    const previous=window.RichBlockMotion?.capture?.();
     current.blocks = current.blocks.filter(block => !state.selected.has(String(block.id)));
     state.selected.clear();
     normalizePositions();
     selectedBlockId = null;
     renderBlocks();
+    window.RichBlockMotion?.reorder?.(previous);
     markDirty();
     pushHistory();
     updateMultiBar();
@@ -221,8 +234,16 @@
     const target = document.elementFromPoint(event.clientX, event.clientY)?.closest?.(".block[data-id]");
     if (target && target !== drag.article && target.parentElement === drag.article.parentElement) {
       const rect = target.getBoundingClientRect();
-      if (event.clientY < rect.top + rect.height / 2) target.before(drag.article);
-      else target.after(drag.article);
+      const beforeTarget=event.clientY < rect.top + rect.height / 2;
+      const needsMove=beforeTarget
+        ? drag.article.nextElementSibling!==target
+        : drag.article.previousElementSibling!==target;
+      if(needsMove){
+        const previous=window.RichBlockMotion?.capture?.();
+        if(beforeTarget)target.before(drag.article);
+        else target.after(drag.article);
+        requestAnimationFrame(()=>window.RichBlockMotion?.reorder?.(previous,drag.article.dataset.id));
+      }
     }
     const main = document.querySelector(".editor-main");
     const rect = main?.getBoundingClientRect?.();
@@ -263,6 +284,11 @@
   function togglePreview(force = !state.preview) {
     const next = Boolean(force);
     if (next && state.multi) toggleMulti(false);
+    root.classList.remove("preview-entering","preview-leaving");
+    if (!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+      root.classList.add(next?"preview-entering":"preview-leaving");
+      setTimeout(()=>root.classList.remove("preview-entering","preview-leaving"),240);
+    }
     if (next) {
       document.querySelectorAll(".math-done-button").forEach(btn => btn.click());
       hideMenus?.();
@@ -306,29 +332,47 @@
     card.className = "rich-button-dialog glass-panel";
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-modal", "true");
-    card.setAttribute("aria-label", tr("button.add", "Add button"));
+    card.setAttribute("aria-label", options.button
+      ? tr("button.edit_name", "Edit button")
+      : tr("button.add", "Add button"));
 
-    const preset = BUTTON_TYPES.some(item => item.value === options.presetType) ? options.presetType : "url";
+    const initial = options.button && typeof options.button === "object" ? options.button : null;
+    const initialType = initial
+      ? initial.copy_text ? "copy"
+        : initial.callback_data?.startsWith?.("r:cbd:") ? "page_callback"
+          : initial.callback_data?.startsWith?.("r:poptext:") ? "popup"
+            : initial.callback_data ? "callback_data"
+              : initial.url?.startsWith?.("tg://user?id=") ? "user"
+                : "url"
+      : options.presetType;
+    const preset = BUTTON_TYPES.some(item => item.value === initialType) ? initialType : "url";
     let chosenType = preset;
-    let chosenColor = null;
+    let chosenColor = ({primary:"b",success:"g",danger:"r"})[initial?.style] || null;
 
     card.innerHTML = `
-      <h3>${escapeHtml(tr("button.add", "Add button"))}</h3>
-      <label class="button-dialog-field"><span>${escapeHtml(tr("button.title", "Button text"))}</span><input class="button-title-input" maxlength="64" value="${escapeHtml(options.title || "")}" placeholder="${escapeHtml(tr("button.title_placeholder", "Enter button title"))}"></label>
+      <h3>${escapeHtml(options.button
+        ? tr("button.edit_name", "Edit button")
+        : tr("button.add", "Add button"))}</h3>
+      <label class="button-dialog-field"><span>${escapeHtml(tr("button.title", "Button text"))}</span><input class="button-title-input" maxlength="64" value="${escapeHtml(initial?.text || options.title || "")}" placeholder="${escapeHtml(tr("button.title_placeholder", "Enter button title"))}"></label>
       <label class="button-separate-option"><input type="checkbox" class="button-separate-input"><span class="button-check"></span><span>${escapeHtml(tr("button.separate", "Button on a separate line"))}</span></label>
       <div class="button-style-row" aria-label="${escapeHtml(tr("button.style", "Button style"))}"></div>
       <div class="button-type-list" role="radiogroup"></div>
       <label class="button-dialog-field button-value-field"><span class="button-value-label">${escapeHtml(tr("button.url", "Link"))}</span><input class="button-value-input" dir="ltr" placeholder="https://example.com"></label>
       <div class="button-dialog-actions"><button type="button" data-button-dialog="cancel">${escapeHtml(tr("common.cancel", "Cancel"))}</button><button type="button" class="save" data-button-dialog="save">${escapeHtml(tr("common.save", "Save"))}</button></div>`;
 
+    if (typeof options.onSave === "function") {
+      card.querySelector(".button-separate-option")?.remove();
+    }
+
     const styleRow = card.querySelector(".button-style-row");
     BUTTON_STYLES.forEach((style, index) => {
       const btn = document.createElement("button");
+      const currentColor = style.color || null;
       btn.type = "button";
-      btn.className = `button-style-pill style-${style.color || "default"}${index === 0 ? " active" : ""}`;
+      btn.className = `button-style-pill style-${style.color || "default"}${currentColor === chosenColor ? " active" : ""}`;
       btn.textContent = style.label;
       btn.addEventListener("click", () => {
-        chosenColor = style.color;
+        chosenColor = currentColor;
         styleRow.querySelectorAll("button").forEach(item => item.classList.toggle("active", item === btn));
         haptic();
       });
@@ -338,6 +382,14 @@
     const typeList = card.querySelector(".button-type-list");
     const valueLabel = card.querySelector(".button-value-label");
     const valueInput = card.querySelector(".button-value-input");
+    valueInput.value = initial
+      ? initial.copy_text?.text
+        ?? (initial.callback_data?.startsWith?.("r:cbd:") ? initial.callback_data.slice(6)
+          : initial.callback_data?.startsWith?.("r:poptext:") ? initial.callback_data.slice(10)
+            : initial.callback_data)
+        ?? (initial.url?.startsWith?.("tg://user?id=") ? initial.url.slice("tg://user?id=".length) : initial.url)
+        ?? ""
+      : "";
     const updateTypeField = () => {
       const meta = BUTTON_TYPES.find(item => item.value === chosenType) || BUTTON_TYPES[0];
       valueLabel.textContent = chosenType === "url" ? "URL" : meta.label;
@@ -371,6 +423,39 @@
       if (type === "user" && /^@[A-Za-z0-9_]{4,}$/.test(value)) {
         type = "url";
         value = `https://t.me/${value.slice(1)}`;
+      }
+      if (typeof options.onSave === "function") {
+        const button = {text:title};
+        const style = ({b:"primary",g:"success",r:"danger"})[chosenColor]
+          || (initial?.style === "link" && chosenColor === "link" ? "link" : null);
+        if (style) button.style = style;
+        if (type === "url") {
+          if (!/^(https?:\/\/|tg:\/\/)/i.test(value)) { toast(tr("inline.invalid_link", "The link must start with https:// or tg://")); return; }
+          button.url = value;
+        } else if (type === "user") {
+          if (!/^\d+$/.test(value)) { toast(tr("button.value_required", "Enter the button value")); return; }
+          button.url = `tg://user?id=${value}`;
+        } else if (type === "page_callback") {
+          if (!/^[A-Za-z0-9_-]{1,58}$/.test(value)) { toast(tr("button.value_required", "Enter the button value")); return; }
+          button.callback_data = `r:cbd:${value}`;
+        } else if (type === "callback_data") {
+          if (!value || new TextEncoder().encode(value).length > 64) { toast(tr("button.value_required", "Enter the button value")); return; }
+          button.callback_data = value;
+        } else if (type === "copy") {
+          if (value.length > 256) { toast(tr("button.value_required", "Enter the button value")); return; }
+          button.copy_text = {text:value};
+        } else if (type === "popup") {
+          const callback = `r:poptext:${value}`;
+          if (!value || new TextEncoder().encode(callback).length > 64) { toast(tr("button.value_required", "Enter the button value")); return; }
+          button.callback_data = callback;
+        } else {
+          toast(tr("button.create_failed", "Could not create the button"));
+          return;
+        }
+        options.onSave(button);
+        closeButtonDialog();
+        haptic("medium");
+        return;
       }
       const created = window.InlineTextTools?.createButton?.(type, title, Boolean(options.fromSelection), {
         value,

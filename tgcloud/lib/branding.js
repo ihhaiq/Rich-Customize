@@ -1,9 +1,10 @@
 import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
-import { brandingEntitlements } from 'schema';
+import { brandingEntitlements, brandingPreferences } from 'schema';
 import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { planBenefit } from 'lib/subscription-policy';
+import { resolveLanguage, tr } from 'lib/i18n';
 
 export const BRANDING_PRICE_STARS = 99;
 export const BRANDING_INVOICE_PAYLOAD = 'remove_branding:v1';
@@ -17,6 +18,16 @@ function nowSeconds() {
   return Math.floor(Date.now() / 1000);
 }
 
+function brandingToggleButton(settings, languageCode) {
+  const locale = resolveLanguage(languageCode);
+  return {
+    text: locale === 'ar'
+      ? (settings.includeBranding ? 'إخفاء الحقوق' : 'إظهار الحقوق')
+      : tr(locale, settings.includeBranding ? 'Hide branding' : 'Show branding'),
+    callback_data: 'r:branding-toggle:' + (settings.includeBranding ? '0' : '1'),
+  };
+}
+
 export function brandingFooterBlock() {
   return {
     type: 'footer',
@@ -26,7 +37,7 @@ export function brandingFooterBlock() {
 
 export async function isBrandingRemoved(userId) {
   const id = Number(userId);
-  if (!Number.isSafeInteger(id)) return false;
+  if (!Number.isSafeInteger(id) || id <= 0) return false;
   const row = await db.select({
     rightsRemoved: brandingEntitlements.rightsRemoved,
   }).from(brandingEntitlements)
@@ -35,15 +46,61 @@ export async function isBrandingRemoved(userId) {
   return Boolean(Number(row?.rightsRemoved || 0));
 }
 
+export async function canManageBranding(userId) {
+  const id = Number(userId);
+  if (!Number.isSafeInteger(id) || id <= 0) return false;
+  if (await isBrandingRemoved(id)) return true;
+  return planBenefit(await getEditorEntitlement(id), 'brandingIncluded');
+}
+
+export async function getBrandingPreference(userId) {
+  const id = Number(userId);
+  if (!Number.isSafeInteger(id) || id <= 0) return false;
+  const row = await db.select({
+    includeBranding: brandingPreferences.includeBranding,
+  }).from(brandingPreferences)
+    .where(eq(brandingPreferences.userId, id))
+    .get();
+  return Number(row?.includeBranding) === 1;
+}
+
+export async function getBrandingSettings(userId) {
+  const canManage = await canManageBranding(userId);
+  return {
+    canManage,
+    includeBranding: canManage ? await getBrandingPreference(userId) : true,
+  };
+}
+
+export async function setBrandingPreference(userId, includeBranding) {
+  const id = Number(userId);
+  if (!Number.isSafeInteger(id) || id <= 0 || typeof includeBranding !== 'boolean') {
+    return false;
+  }
+  if (!await canManageBranding(id)) return false;
+  const stamp = nowSeconds();
+  await db.insert(brandingPreferences).values({
+    userId: id,
+    includeBranding: includeBranding ? 1 : 0,
+    updatedAt: stamp,
+  }).onConflictDoUpdate({
+    target: brandingPreferences.userId,
+    set: {
+      includeBranding: includeBranding ? 1 : 0,
+      updatedAt: stamp,
+    },
+  }).run();
+  return true;
+}
+
 export async function shouldIncludeBranding(userId) {
-  if (await isBrandingRemoved(userId)) return false;
-  return !planBenefit(await getEditorEntitlement(userId),'brandingIncluded');
+  return (await getBrandingSettings(userId)).includeBranding;
 }
 
 export async function createBrandingRemovalInvoiceLink() {
   return api.createInvoiceLink({
     title: 'إزالة حقوق Rich Customize',
-    description: 'ادفع 99 نجمة مرة وحدة وتنشال حقوق Rich Customize من كل المعاينات والصفحات والمنشورات الجديدة بحسابك.',
+    description: 'ادفع 99 نجمة مرة وحدة لإخفاء حقوق Rich Customize افتراضياً، وتقدر تظهرها أو تخفيها من أدوات المحرر.',
     payload: BRANDING_INVOICE_PAYLOAD,
     currency: 'XTR',
     prices: [{
@@ -147,8 +204,8 @@ export async function handleBrandingSuccessfulPayment(message) {
       text: [
         '✅ تم الدفع.',
         '',
-        'انشالت حقوق Rich Customize من حسابك بالكامل.',
-        'من هسه المعاينات والصفحات والمنشورات الجديدة تطلع بدون التذييل.',
+        'الحقوق مخفية افتراضياً عن المعاينات والصفحات والمنشورات الجديدة.',
+        'تقدر تظهرها أو تخفيها بأي وقت من زر الحقوق في أدوات المحرر.',
       ].join('\n'),
     });
   } catch (notificationError) {
@@ -160,7 +217,8 @@ export async function handleBrandingSuccessfulPayment(message) {
 }
 
 export async function handleBrandingCallback(query) {
-  if (String(query?.data || '') !== 'r:branding') return false;
+  const data = String(query?.data || '');
+  if (data !== 'r:branding' && !data.startsWith('r:branding-toggle:')) return false;
 
   const userId = Number(query.from?.id);
   if (!Number.isSafeInteger(userId)) {
@@ -168,11 +226,78 @@ export async function handleBrandingCallback(query) {
     return true;
   }
 
-  if (await isBrandingRemoved(userId)) {
+  if (data.startsWith('r:branding-toggle:')) {
+    if (
+      !query?.message?.chat?.id
+      || !query?.message?.message_id
+      || String(query.message.chat.type || '') !== 'private'
+      || Number(query.message.chat.id) !== userId
+    ) {
+      await api.answerCallbackQuery({ callback_query_id: query.id });
+      return true;
+    }
+    const requested = data.slice('r:branding-toggle:'.length);
+    if (requested !== '0' && requested !== '1') {
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: 'إعداد الحقوق غير صالح. أعد فتح لوحة الأدوات.',
+        show_alert: true,
+      });
+      return true;
+    }
+    const saved = await setBrandingPreference(userId, requested === '1');
+    if (!saved) {
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: 'هذا الخيار متاح فقط لحساب لديه اشتراك نشط أو وصول المطور أو شراء إزالة الحقوق.',
+        show_alert: true,
+      });
+      return true;
+    }
+    const settings = await getBrandingSettings(userId);
+    const keyboard = query.message.reply_markup?.inline_keyboard;
+    if (!Array.isArray(keyboard)) {
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: 'تم حفظ الإعداد. أعد فتح لوحة الأدوات لتحديث الزر.',
+      });
+      return true;
+    }
+    let replaced = false;
+    const inlineKeyboard = keyboard.map((row) => row.map((button) => {
+      if (!String(button?.callback_data || '').startsWith('r:branding-toggle:')) return button;
+      replaced = true;
+      return brandingToggleButton(settings, query.from.language_code || 'ar');
+    }));
+    if (!replaced) {
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: 'تم حفظ الإعداد. أعد فتح لوحة الأدوات لتحديث الزر.',
+      });
+      return true;
+    }
+    await api.editMessageReplyMarkup({
+      chat_id: query.message.chat.id,
+      message_id: query.message.message_id,
+      reply_markup: { inline_keyboard: inlineKeyboard },
+    });
     await api.answerCallbackQuery({
       callback_query_id: query.id,
-      text: '✅ الحقوق مشالة من حسابك أصلًا.',
-      show_alert: true,
+      text: settings.includeBranding ? 'تم إظهار الحقوق.' : 'تم إخفاء الحقوق.',
+    });
+    return true;
+  }
+
+  if (await canManageBranding(userId)) {
+    const settings = await getBrandingSettings(userId);
+    await api.answerCallbackQuery({
+      callback_query_id: query.id,
+      text: settings.includeBranding ? 'الحقوق ظاهرة حالياً.' : 'الحقوق مخفية حالياً.',
+    });
+    await api.sendMessage({
+      chat_id: userId,
+      text: 'تفضيل الحقوق الحالي محفوظ لحسابك.',
+      reply_markup: { inline_keyboard: [[brandingToggleButton(settings, query.from.language_code || 'ar')]] },
     });
     return true;
   }
@@ -184,7 +309,7 @@ export async function handleBrandingCallback(query) {
       'إزالة حقوق Rich Customize',
       '',
       '99 ⭐️ — دفعة وحدة.',
-      'بعد الدفع تنشال الحقوق من حسابك بالكامل، وأي معاينة أو صفحة أو منشور جديد يطلع بدون التذييل.',
+      'بعد الدفع تصير الحقوق مخفية افتراضياً في المعاينات والصفحات والمنشورات الجديدة، وتقدر تظهرها بأي وقت من أدوات المحرر.',
     ].join('\n'),
     reply_markup: {
       inline_keyboard: [[{

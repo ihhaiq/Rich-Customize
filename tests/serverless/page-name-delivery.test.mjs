@@ -9,7 +9,7 @@ function delivery(rows) {
     get: async () => rows.find(p => p[condition.key] === condition.value),
   }) }) }) };
   return new Function('db', 'eq', 'richPages', 'resolveLanguage', source +
-    ';return {resolveSavedPageReference,guestPageReference,ambiguousPageQueryResult};')(
+    ';return {resolveSavedPageReference,guestPageReference,guestPageCodes,guestPageRequest,ambiguousPageQueryResult};')(
     db, (key,value)=>({key,value}), {pageId:'pageId',ownerId:'ownerId'}, l=>l||'en');
 }
 const rows = [
@@ -17,6 +17,8 @@ const rows = [
   {pageId:'two',ownerId:1,title:'دليل المستخدم الجديد'},
   {pageId:'other',ownerId:2,title:'دليل المستخدم'},
   {pageId:'english',ownerId:1,title:'My page'},
+  {pageId:'reference',ownerId:2,title:'Page reference'},
+  {pageId:'plain',ownerId:1,title:'reference'},
 ];
 test('exact multiword own names work, longer names and other owners do not collide', async () => {
   const d=delivery(rows);
@@ -34,8 +36,20 @@ test('duplicate normalized names refuse selection, codes still select the page',
 test('shared codes and guest token fallback remain available', async () => {
   const d=delivery(rows);
   assert.deepEqual(await d.resolveSavedPageReference('one',2),{status:'found',pageId:'one'});
-  assert.deepEqual(await d.resolveSavedPageReference('send one',2,['send','one']),{status:'found',pageId:'one'});
+  assert.deepEqual(await d.resolveSavedPageReference('send one',2,['one']),{status:'found',pageId:'one'});
   assert.deepEqual(await d.resolveSavedPageReference('',1),{status:'missing'});
   assert.equal(d.guestPageReference({text:'@RichCustomizebot دليل المستخدم'}),'دليل المستخدم');
   assert.equal(d.guestPageReference({caption:'دليل المستخدم @RichCustomizebot'}),'دليل المستخدم');
+  assert.deepEqual(d.guestPageCodes({text:'@RichCustomizebot دليل المستخدم'}),[]);
+  assert.deepEqual(d.guestPageCodes({text:'@RichCustomizebot one'}),['one']);
+});
+test('exact page codes beat colliding names; explicit page command preserves username-like names', async () => {
+  const d=delivery(rows);
+  assert.deepEqual(await d.resolveSavedPageReference('reference',1),{status:'found',pageId:'plain'});
+  assert.deepEqual(await d.resolveSavedPageReference('reference',1,[],{preferCode:true}),{status:'found',pageId:'reference'});
+  assert.equal(d.guestPageReference({text:'@RichCustomizebot /page @noor_ali'}),'@noor_ali');
+  assert.deepEqual(d.guestPageCodes({text:'@RichCustomizebot /page @noor_ali'}),[]);
+  const named = d.guestPageRequest({text:'@RichCustomizebot /page reference'});
+  assert.deepEqual(named,{reference:'reference',preferName:true,preferCode:false,codeCandidates:[]});
+  assert.deepEqual(await d.resolveSavedPageReference(named.reference,1,named.codeCandidates,named),{status:'found',pageId:'plain'});
 });

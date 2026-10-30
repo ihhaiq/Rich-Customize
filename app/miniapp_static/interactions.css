@@ -261,3 +261,69 @@ html.mobile-performance .sheet:not(.hidden){
     animation:none!important;
   }
 }
+
+.block.motion-enter{
+  animation:blockEnter .18s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.block-motion-ghost{
+  position:fixed!important;
+  z-index:9999!important;
+  margin:0!important;
+  pointer-events:none!important;
+  transform-origin:center;
+  animation:blockExit .16s ease-in both;
+}
+
+.save-state.is-saved{
+  animation:saveConfirmed .34s ease-out;
+}
+
+.multi-select-check.selection-pop{
+  animation:selectionPop .18s cubic-bezier(.2,.8,.2,1);
+}
+
+.editor-screen.preview-entering .content-flow{
+  animation:previewEnter .2s ease-out both;
+}
+
+.editor-screen.preview-leaving .content-flow{
+  animation:previewLeave .18s ease-in both;
+}
+
+@keyframes blockEnter{
+  from{opacity:0;transform:translateY(7px) scale(.99)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes blockExit{
+  to{opacity:0;transform:translateY(-5px) scale(.985)}
+}
+@keyframes saveConfirmed{
+  0%{opacity:.68;transform:scale(.97)}
+  58%{opacity:1;transform:scale(1.035)}
+  100%{transform:scale(1)}
+}
+@keyframes selectionPop{
+  0%{transform:scale(.72)}
+  72%{transform:scale(1.12)}
+  100%{transform:scale(1)}
+}
+@keyframes previewEnter{
+  from{opacity:.72;transform:translateY(5px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes previewLeave{
+  from{opacity:.72;transform:translateY(-3px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .block.motion-enter,
+  .block-motion-ghost,
+  .save-state.is-saved,
+  .multi-select-check.selection-pop,
+  .editor-screen.preview-entering .content-flow,
+  .editor-screen.preview-leaving .content-flow{
+    animation:none!important;
+  }
+}

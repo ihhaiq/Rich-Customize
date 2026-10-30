@@ -22,10 +22,17 @@
 <body>
   <main class="card">
     <div class="mark" aria-hidden="true">✦</div>
-    <h1>هذا التطبيق يعمل من داخل تيليجرام فقط</h1>
-    <p>افتح بوت Rich Customize داخل تيليجرام، ثم استخدم زر فتح التطبيق المصغر.</p>
+    <h1 id="entryTitle">هذا التطبيق يعمل من داخل تيليجرام فقط</h1>
+    <p id="entryMessage">افتح بوت Rich Customize داخل تيليجرام، ثم استخدم زر فتح التطبيق المصغر.</p>
     <a href="https://t.me/RichCustomizebot">فتح البوت في تيليجرام</a>
-    <small>لن يتم تحميل صفحاتك أو مكونات المحرر من المتصفح الخارجي.</small>
+    <small id="entryHint">لن يتم تحميل صفحاتك أو مكونات المحرر من المتصفح الخارجي.</small>
   </main>
+  <script>
+    if (new URLSearchParams(location.search).get("reason") === "serverless") {
+      document.getElementById("entryTitle").textContent = "تعذر تحميل التطبيق";
+      document.getElementById("entryMessage").textContent = "تم فتح التطبيق من تيليجرام، لكن تعذر الاتصال بخدمة التطبيق أو تحميل صفحاتك. أغلق النافذة وحاول مرة أخرى.";
+      document.getElementById("entryHint").textContent = "إذا استمرت المشكلة، أرسل بلاغاً إلى الدعم مع وقت المحاولة. لا ترسل بيانات تسجيل الدخول.";
+    }
+  </script>
 </body>
 </html>

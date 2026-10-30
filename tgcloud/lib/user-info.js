@@ -1,7 +1,29 @@
-import { api, db } from 'sdk';
+import { api, BotApiError, db } from 'sdk';
 import { eq, sql } from 'sdk/db';
 import { usageUsers } from 'schema';
 import { buildUserInfoMessage, userInfoText } from 'lib/user-info-copy';
+import { subscriptionSnapshot } from 'lib/subscription-status';
+import { subscriptionPlanTitle } from 'lib/subscription-rich';
+
+export function infoCommandArgument(text) {
+  if (typeof text !== 'string') return null;
+  const parts = text.trim().split(/\s+/);
+  const first = String(parts[0] || '').toLowerCase();
+  if (/^\/info(?:@richcustomizebot)?$/.test(first)) {
+    return parts.slice(1).join(' ').trim();
+  }
+  if (/^\/id(?:@richcustomizebot)?$/.test(first)) {
+    return parts.length === 1 ? '' : null;
+  }
+  if (first === '@richcustomizebot') {
+    const target = parts.slice(1).join(' ').trim();
+    if (/^\/page(?:@richcustomizebot)?(?:\s+|$)/i.test(target)) return null;
+    if (/^\/(?:info|id)(?:@richcustomizebot)?$/i.test(target)) return '';
+    if (!target) return '';
+    return /^@[A-Za-z0-9_]{5,32}$/.test(target) ? target : null;
+  }
+  return null;
+}
 
 function validUserId(value) {
   const id = Number(value);
@@ -40,6 +62,19 @@ async function findStoredUserByUsername(username) {
   return profileFromStored(row);
 }
 
+async function profilePhotoFileId(userId) {
+  const profilePhotos = await api.getUserProfilePhotos({ user_id: userId, limit: 1 });
+  const sizes = profilePhotos?.photos?.[0];
+  const photo = Array.isArray(sizes) ? sizes.at(-1) : null;
+  return typeof photo?.file_id === 'string' ? photo.file_id : '';
+}
+
+export function isProfilePhotoSendingForbidden(error) {
+  if (!(error instanceof BotApiError) || Number(error.code) !== 400) return false;
+  return /CHAT_SEND_PHOTOS_FORBIDDEN|(?:not enough rights|not allowed|forbidden|can't|cannot) to send photos?|photos? (?:are )?(?:not allowed|forbidden)/i
+    .test(String(error.description || error.message || ''));
+}
+
 export async function findUserInfoTarget(argument) {
   const target=commandTarget({},String(argument||''));
   if(target.kind==='id')return findStoredUserById(target.id);
@@ -59,7 +94,9 @@ function mergeProfile(current, stored) {
 
 function commandTarget(message, argument) {
   if (message?.reply_to_message) {
-    return { kind: 'reply', user: message.reply_to_message.from || null };
+    const repliedUser = message.reply_to_message.from || null;
+    if (validUserId(repliedUser?.id)) return { kind: 'reply', user: repliedUser };
+    return { kind: 'current', user: message?.from || null };
   }
   if (!argument) return { kind: 'current', user: message?.from || null };
 
@@ -74,11 +111,13 @@ function commandTarget(message, argument) {
   return { kind: 'invalid' };
 }
 
-export async function handleInfoCommand(message, argument, languageCode) {
+export async function prepareUserInfoMessage(message, argument, languageCode) {
   const target = commandTarget(message, argument);
   let user = null;
 
-  if (target.kind === 'reply' || target.kind === 'current') {
+  if (target.kind === 'current') {
+    user = target.user;
+  } else if (target.kind === 'reply') {
     const userId = validUserId(target.user?.id);
     if (userId) {
       const stored = await findStoredUserById(userId);
@@ -96,9 +135,59 @@ export async function handleInfoCommand(message, argument, languageCode) {
       : await findStoredUserByUsername(target.username);
   }
 
-  const result = buildUserInfoMessage(user, languageCode);
-  await api.sendMessage({
-    chat_id: message.chat.id,
-    ...(result || { text: userInfoText(languageCode, 'unknown') }),
-  });
+  if (!user) return null;
+
+  let photoFileId = '';
+  let photoError = false;
+  try {
+    photoFileId = await profilePhotoFileId(user.id);
+  } catch (error) {
+    photoError = true;
+    console.warn('Could not load Telegram user profile photo', error?.code || error?.name || 'Error');
+  }
+
+  const subscription = await subscriptionSnapshot(user.id);
+  const subscriptionTitle = subscriptionPlanTitle(
+    subscription.plan,
+    languageCode,
+    subscription.gift,
+  );
+  return {
+    message: buildUserInfoMessage(user, languageCode, {
+      photoFileId,
+      photoError,
+      subscription: subscriptionTitle,
+    }),
+    photoFileId,
+    subscription: subscriptionTitle,
+    user,
+  };
+}
+
+export async function handleInfoCommand(message, argument, languageCode) {
+  const prepared = await prepareUserInfoMessage(message, argument, languageCode);
+  if (!prepared?.message) {
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      text: userInfoText(languageCode, 'unknown'),
+    });
+    return;
+  }
+
+  try {
+    await api.sendRichMessage({
+      chat_id: message.chat.id,
+      rich_message: prepared.message.rich_message,
+    });
+  } catch (error) {
+    if (!prepared.photoFileId || !isProfilePhotoSendingForbidden(error)) throw error;
+    console.warn('Telegram rejected the user-info photo; retrying the Rich Message without media');
+    const richWithoutPhoto = buildUserInfoMessage(prepared.user, languageCode, {
+      subscription: prepared.subscription,
+    });
+    await api.sendRichMessage({
+      chat_id: message.chat.id,
+      rich_message: richWithoutPhoto.rich_message,
+    });
+  }
 }

@@ -6,7 +6,12 @@ import { scheduledPosts, scheduledPostDestinations, editorSessions, richPages } 
 import { loadEditorSession, updateEditorSession } from 'lib/editor-session';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { isLegacySavedPage, isSavedPageUnchanged } from 'lib/saved-page-policy';
-import { validateScheduleRequest } from 'lib/schedule-policy';
+import {
+  parseBaghdadDate,
+  scheduleMaxAheadTimestamp,
+  SCHEDULE_MAX_AHEAD_SECONDS,
+  validateScheduleRequest,
+} from 'lib/schedule-policy';
 import { canPublish, inspectPublishAccess, sendRichMessageSafe } from 'lib/publish';
 import { resolveForumDeliveryOptions } from 'lib/forum-topics';
 import { isDefinitePublishRejection, normalizePublishError, publishFailureMessage, EXPECTED_PUBLISH_FAILURES } from 'lib/publish-errors';
@@ -14,6 +19,7 @@ import { buildInputRichMessage } from 'lib/editor-renderer';
 import { prepareMessageButtons, buildMessageButtonsKeyboard } from 'lib/page-buttons';
 import { shouldIncludeBranding } from 'lib/branding';
 import { logError } from 'lib/error-log';
+import { resolveLanguage, tr } from 'lib/i18n';
 
 const CHAT_ID = -1003993506865;
 const JOB_RE = /^sch_[a-f0-9]{32}$/;
@@ -21,24 +27,25 @@ const B2B = 'Richminiappsbot';
 const STATUS_PENDING = new Set(['registering','pending']);
 
 function now(){return Math.floor(Date.now()/1000);}
+function scheduleBrandingOverride(pendingState) {
+  if (Number(pendingState) === 2) return true;
+  if (Number(pendingState) === 3) return false;
+  return null;
+}
 function newJobId(){
   const data = new Uint8Array(16);
   globalThis.crypto.getRandomValues(data);
   return 'sch_' + Array.from(data,b=>b.toString(16).padStart(2,'0')).join('');
 }
-export function parseBaghdadDate(value){
-  const match=String(value||'').trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/);
-  if(!match)return null;
-  const [y,m,d,h,minute]=match.slice(1).map(Number);
-  if(y<2020||m<1||m>12||d<1||d>31||h>23||minute>59)return null;
-  const timestamp=Date.UTC(y,m-1,d,h-3,minute,0)/1000;
-  const roundTrip=new Date((timestamp+3*3600)*1000);
-  if(roundTrip.getUTCFullYear()!==y||roundTrip.getUTCMonth()+1!==m||roundTrip.getUTCDate()!==d||roundTrip.getUTCHours()!==h||roundTrip.getUTCMinutes()!==minute)return null;
-  return timestamp;
-}
 function formatBaghdad(timestamp){
   const d=new Date((Number(timestamp)+3*3600)*1000);
-  return d.toISOString().slice(0,16).replace('T',' ')+' (بغداد)';
+  const hour=d.getUTCHours();
+  const twelveHour=hour%12||12;
+  const minute=String(d.getUTCMinutes()).padStart(2,'0');
+  const meridiem=hour<12?'AM':'PM';
+  return String(d.getUTCMonth()+1).padStart(2,'0')+'-'
+    +String(d.getUTCDate()).padStart(2,'0')+' '
+    +String(twelveHour).padStart(2,'0')+':'+minute+' '+meridiem+' (بغداد GMT+3)';
 }
 async function relay(action, jobId, revision, extras={}){
   return api.sendMessage({
@@ -55,7 +62,7 @@ async function userTasks(userId){
   const result=await db.select().from(scheduledPosts).where(eq(scheduledPosts.ownerId,Number(userId))).all();
   return result.sort((a,b)=>Number(b.createdAt)-Number(a.createdAt));
 }
-export async function createScheduledPublish(ownerId, session, selected, runAt){
+export async function createScheduledPublish(ownerId, session, selected, runAt, brandingOverride=null){
   const userId=Number(ownerId);
   const entitlement=await getEditorEntitlement(userId);
   const decision=validateScheduleRequest(entitlement,{chatIds:selected,sendAt:runAt});
@@ -72,9 +79,12 @@ export async function createScheduledPublish(ownerId, session, selected, runAt){
   if(legacy && !isSavedPageUnchanged(savedPage,session)) {
     return {ok:false,code:'LEGACY_PAGE_READ_ONLY'};
   }
+  const defaultBranding=await shouldIncludeBranding(userId);
+  const includeBranding=defaultBranding||typeof brandingOverride!=='boolean'
+    ?defaultBranding:brandingOverride;
   const richMessage=buildInputRichMessage(legacy?savedPage.blocks:session.blocks,{
     userId,sourcePageId:session.currentPageId||null,
-    includeBranding:await shouldIncludeBranding(userId),
+    includeBranding,
     entitlement,technicalOnly:legacy,
   });
   const buttons=await prepareMessageButtons(legacy?savedPage.buttons||[]:session.messageButtons||[]);
@@ -117,21 +127,47 @@ export async function handleScheduledTimeMessage(message){
   const id=Number(message?.from?.id);
   const session=await loadEditorSession(id,{touch:false});
   if(!session?.postSchedulePending)return false;
+  const locale=resolveLanguage(message?.from?.language_code);
+  const cancelText=locale==='ar'?'إلغاء':tr(locale,'Cancel');
+  const cancelKeyboard={
+    keyboard:[[{text:cancelText}]],
+    resize_keyboard:true,
+    one_time_keyboard:true,
+  };
   const content=String(message?.text||'').trim();
-  if(content==='/cancel'||content==='إلغاء'){
+  if(content.toLowerCase()==='/cancel'||content.toLowerCase()==='cancel'||content===cancelText||content==='إلغاء'){
     await updateEditorSession(id,{postSchedulePending:0});
-    await api.sendMessage({chat_id:id,text:'تم إلغاء إدخال موعد الجدولة.'});
+    await api.sendMessage({
+      chat_id:id,
+      text:'تم إلغاء إدخال موعد الجدولة.',
+      reply_markup:{remove_keyboard:true},
+    });
     return true;
   }
   const runAt=parseBaghdadDate(content);
   if(runAt==null){
-    await api.sendMessage({chat_id:id,text:'أرسل الموعد بهذه الصيغة: 2026-10-12 18:00\nالتوقيت حسب بغداد (UTC+3)، أو أرسل /cancel.'});
+    await api.sendMessage({
+      chat_id:id,
+      text:locale==='ar'
+        ?'أرسل الموعد بهذه الصيغة: MM-DD hh:mm AM/PM\nمثال: 10-28 10:19 PM\nالتوقيت حسب بغداد (GMT+3).'
+        :'Send the time as MM-DD hh:mm AM/PM.\nExample: 10-28 10:19 PM\nBaghdad time (GMT+3).',
+      reply_markup:cancelKeyboard,
+    });
     return true;
   }
+  const entitlement=await getEditorEntitlement(id);
+  const maximum=scheduleMaxAheadTimestamp(entitlement,now());
+  const rangeText=maximum>now()+SCHEDULE_MAX_AHEAD_SECONDS?'شهرين':'٤ أيام';
   const targets=(session.postSelectedChatIds||[]).map(Number);
   let outcome;
   try {
-    outcome=await createScheduledPublish(id,session,targets,runAt);
+    outcome=await createScheduledPublish(
+      id,
+      session,
+      targets,
+      runAt,
+      scheduleBrandingOverride(session.postSchedulePending),
+    );
   } catch (error) {
     await logError('schedule.create',error,{userId:id});
     await api.sendMessage({chat_id:id,text:'تعذر حفظ طلب الجدولة مؤقتاً. حاول مجدداً. لم يتم تأكيد جدولة المنشور.'});
@@ -139,15 +175,19 @@ export async function handleScheduledTimeMessage(message){
   }
   if(!outcome.ok){
     const text=outcome.code==='SCHEDULE_PLAN_LIMIT'
-      ?'وصلت حد الجدولة لباقتك: '+outcome.limit+' محادثات لكل منشور مجدول. قلل الوجهات أو راجع الباقات.'
+      ?'وصلت حد الجدولة لباقتك: '+outcome.limit+' محادثات لكل منشور مجدول. قلل الوجهات أو راجع الباقات.\nhttps://t.me/richDonateBot?start=rich_plans_limits'
       :outcome.code?.startsWith('SCHEDULE_DATE_')
-        ?'اختر موعداً بعد دقيقة على الأقل وخلال ٤ أيام من الآن.'
+        ?'اختر موعداً بعد دقيقة على الأقل وخلال '+rangeText+' من الآن.'
         :'تعذر الجدولة: تحقق من المحادثات، وصلاحيات النشر، ومحتوى الرسالة.';
-    await api.sendMessage({chat_id:id,text,reply_markup:{inline_keyboard:[[{text:'عرض الباقات',url:'https://t.me/richDonateBot?start=rich_plans_limits'}]]}});
+    await api.sendMessage({chat_id:id,text,reply_markup:cancelKeyboard});
     return true;
   }
   await updateEditorSession(id,{postSchedulePending:0});
-  await api.sendMessage({chat_id:id,text:'تم إنشاء طلب جدولة المنشور.\nالموعد: '+formatBaghdad(runAt)+'\nالمحادثات: '+targets.length+'\nالمعرف: '+outcome.jobId+'\nالحالة: بانتظار تأكيد Cloudflare.\n/scheduled لإدارة مهامك.'});
+  await api.sendMessage({
+    chat_id:id,
+    text:'تم إنشاء طلب جدولة المنشور.\nالموعد: '+formatBaghdad(runAt)+'\nالمحادثات: '+targets.length+'\nالمعرف: '+outcome.jobId+'\nالحالة: بانتظار تأكيد Cloudflare.\n/scheduled لإدارة مهامك.',
+    reply_markup:{remove_keyboard:true},
+  });
   return true;
 }
 export async function showScheduledPosts(message){

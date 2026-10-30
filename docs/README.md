@@ -7,6 +7,8 @@
 | Runtime and storage map | [ARCHITECTURE.md](../md_files/ARCHITECTURE.md) |
 | Serverless workflow | [serverless.md](../md_files/docs/serverless.md) |
 | Mini App / Cloudflare | [cloudflare-pages-miniapp.md](../md_files/docs/cloudflare-pages-miniapp.md) |
+| خطة نقل Mini App إلى Serverless | [miniapp-serverless-migration.md](../md_files/docs/miniapp-serverless-migration.md) |
+| نواقص Mini App المعتمدة على Cloudflare | [miniapp-serverless-cloudflare-dependencies.md](../md_files/docs/miniapp-serverless-cloudflare-dependencies.md) |
 | Subscription specification | [sups.md](../md_files/sups.md) |
 | Implementation status | [subscription-rollout.md](../md_files/docs/subscription-rollout.md) |
 | Localization | [I18N_GUIDE.md](../md_files/docs/I18N_GUIDE.md) |

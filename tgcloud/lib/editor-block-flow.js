@@ -74,7 +74,7 @@ import {
 } from 'lib/editor-extra-blocks';
 import { resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
 import { logError } from 'lib/error-log';
-import { shouldIncludeBranding } from 'lib/branding';
+import { getBrandingSettings, shouldIncludeBranding } from 'lib/branding';
 import { isEditorLimitFailure } from 'lib/operational-errors';
 import { requestEditorLimitConfirmation } from 'lib/editor-limit-confirmation';
 
@@ -1105,11 +1105,12 @@ export async function handleEditorBlockCallback(query) {
 
   if (data === 'r:tools') {
     await updateEditorSession(query.from.id, { blockScrollEnabled: 0 });
+    const branding = await getBrandingSettings(query.from.id);
     await editMessage(
       chatId,
       messageId,
       editorCopy(code).toolsText,
-      buildEditorToolsKeyboard(code),
+      buildEditorToolsKeyboard(code, branding),
     );
     await api.answerCallbackQuery({ callback_query_id: query.id });
     return true;

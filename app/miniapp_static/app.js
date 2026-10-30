@@ -113,6 +113,7 @@ const BLOCKS = [
   {type:"divider",icon:"divider",label:mt("block.divider"),desc:mt("block.divider_desc"),keys:"divider line فاصل"},
   {type:"anchor",icon:"anchor",label:mt("block.anchor"),desc:mt("block.anchor_desc"),keys:"anchor مرساة"},
   {type:"list",icon:"list",label:mt("block.list"),desc:mt("block.list_desc"),keys:"list bullets numbered checklist قائمة"},
+  {type:"buttons",icon:"button",label:mt("button.large"),desc:mt("button.large_desc"),keys:"button large_button زر كبير"},
   {type:"details",icon:"details",label:mt("block.details"),desc:mt("block.details_desc"),keys:"details summary accordion تفاصيل"},
   {type:"table",icon:"table",label:mt("block.table"),desc:mt("block.table_desc"),keys:"table grid جدول"},
   {type:"mathematical_expression",icon:"math",label:mt("block.math"),desc:mt("block.math_desc"),keys:"math equation formula معادلة"},
@@ -128,7 +129,7 @@ const BLOCKS = [
 ];
 
 const CATEGORIES = {
-  text:["paragraph","heading","footer","preformatted","blockquote","pullquote","divider","anchor"],
+  text:["paragraph","heading","footer","preformatted","blockquote","pullquote","divider","anchor","buttons"],
   list:["list","details"],
   table:["table"],
   math:["mathematical_expression"],
@@ -302,6 +303,7 @@ function offlineDraftPayload(){
     page_id:current.page_id||null,
     base_revision:Number(current.revision||0),
     base_updated_at:Number(current.updated_at||0),
+    create_request_id:String(current.create_request_id||""),
     title:pageTitle.value||current.title||mt("editor.untitled"),
     blocks:copySessionValue(current.blocks||[]),
     buttons:copySessionValue(current.buttons||[]),
@@ -350,6 +352,7 @@ function applyOfflineDraft(draft){
     buttons_align:String(draft.buttons_align||"center"),
     revision:Number(draft.base_revision||0),
     updated_at:Number(draft.base_updated_at||0),
+    create_request_id:String(draft.create_request_id||""),
   };
   normalizePositions();
   pageTitle.value=current.title;
@@ -487,9 +490,89 @@ function newDraft({preserveOffline=false}={}){
   renderBlocks();updateSaveState(mt("editor.unsaved"));pushHistory();hideMenus();closeSheets();
 }
 
-function updateSaveState(text,{saving=false}={}){
+function captureBlockLayout(){
+  return new Map(Array.from(blocksEl.querySelectorAll(".block[data-id]"),block=>[
+    String(block.dataset.id),
+    block.getBoundingClientRect().top,
+  ]));
+}
+function editorMotionAllowed(){
+  return !window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+}
+function animateBlockLayout(previous,excludedId=null){
+  if(!(previous instanceof Map)||!editorMotionAllowed())return;
+  let animated=0;
+  for(const block of blocksEl.querySelectorAll(".block[data-id]")){
+    if(animated>=50)break;
+    if(String(block.dataset.id)===String(excludedId))continue;
+    const oldTop=previous.get(String(block.dataset.id));
+    if(!Number.isFinite(oldTop))continue;
+    const delta=oldTop-block.getBoundingClientRect().top;
+    if(Math.abs(delta)<1)continue;
+    const duration=document.documentElement.classList.contains("mobile-performance")?130:180;
+    if(typeof block.animate==="function"){
+      block.animate(
+        [{transform:`translateY(${delta}px)`},{transform:"translateY(0)"}],
+        {duration,easing:"cubic-bezier(.2,.8,.2,1)"},
+      );
+    }
+    animated+=1;
+  }
+}
+function animateBlockEntry(id){
+  if(!editorMotionAllowed())return;
+  const block=Array.from(blocksEl.querySelectorAll(".block[data-id]"))
+    .find(item=>String(item.dataset.id)===String(id));
+  if(!block)return;
+  block.classList.remove("motion-enter");
+  void block.offsetWidth;
+  block.classList.add("motion-enter");
+  block.addEventListener("animationend",()=>block.classList.remove("motion-enter"),{once:true});
+}
+function animateBlockExit(id){
+  if(!editorMotionAllowed())return;
+  const block=Array.from(blocksEl.querySelectorAll(".block[data-id]"))
+    .find(item=>String(item.dataset.id)===String(id));
+  if(!block)return;
+  const rect=block.getBoundingClientRect();
+  if(!rect.width||!rect.height)return;
+  const ghost=block.cloneNode(true);
+  const sourceControls=block.querySelectorAll("input,textarea,select");
+  ghost.querySelectorAll("input,textarea,select").forEach((control,index)=>{
+    const source=sourceControls[index];
+    if(source&&"value" in control)control.value=source.value;
+    if(source&&"checked" in control)control.checked=source.checked;
+  });
+  ghost.classList.remove("selected","multi-selected","press-surface","is-pressed");
+  ghost.classList.add("block-motion-ghost");
+  Object.assign(ghost.style,{
+    top:`${rect.top}px`,
+    left:`${rect.left}px`,
+    width:`${rect.width}px`,
+    height:`${rect.height}px`,
+  });
+  document.body.appendChild(ghost);
+  const remove=()=>ghost.remove();
+  ghost.addEventListener("animationend",remove,{once:true});
+  setTimeout(remove,240);
+}
+window.RichBlockMotion={
+  capture:captureBlockLayout,
+  reorder:animateBlockLayout,
+  enter:animateBlockEntry,
+  exit:animateBlockExit,
+};
+
+function updateSaveState(text,{saving=false,saved=false}={}){
   saveState.textContent=text;
   saveState.classList.toggle("is-saving",Boolean(saving));
+  saveState.classList.remove("is-saved");
+  if(saved&&editorMotionAllowed()){
+    void saveState.offsetWidth;
+    saveState.classList.add("is-saved");
+    saveState.addEventListener("animationend",()=>saveState.classList.remove("is-saved"),{once:true});
+    setTimeout(()=>saveState.classList.remove("is-saved"),500);
+  }
 }
 function hasSavablePageContent(){return Array.isArray(current?.blocks)&&current.blocks.length>0}
 function emptyPageSaveError(){
@@ -532,11 +615,15 @@ async function saveNow(){
     if(doc.page_id){
       data=await api(`/miniapp/api/pages/${encodeURIComponent(doc.page_id)}`,{method:"PUT",body:JSON.stringify(body)});
     }else{
+      doc.create_request_id=doc.create_request_id||uid();
+      body.request_id=doc.create_request_id;
+      persistOfflineDraftNow();
       data=await api("/miniapp/api/pages",{method:"POST",body:JSON.stringify(body)});
       doc.page_id=data.page_id;
       doc.updated_at=Number(data.updated_at||0);
       doc.revision=Number(data.revision||1);
       doc.sync_seq=Number(data.sync_seq||0);
+      delete doc.create_request_id;
     }
     if(doc.page_id&&data?.updated_at)doc.updated_at=Number(data.updated_at);
     if(doc.page_id&&data?.revision)doc.revision=Number(data.revision);
@@ -546,7 +633,7 @@ async function saveNow(){
     recordPerf("page_save",performance.now()-perfStarted);
     if(current===doc&&mutationVersion===saveVersion){
       dirty=false;current.title=doc.title;clearOfflineDraft();
-      updateSaveState(mt("save.saved_at",{time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}))
+      updateSaveState(mt("save.saved_at",{time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}),{saved:true})
     }else if(current===doc){
       dirty=true;scheduleOfflineDraft();updateSaveState(mt("editor.unsaved"))
     }
@@ -579,6 +666,7 @@ function defaultBlock(type){
   else if(type==="anchor")Object.assign(d,{text:"anchor",html:'<a name="anchor"></a>'});
   else if(type==="list"){const item=mt("list.item");Object.assign(d,{kind:"bullet",items:[{text:item}],text:item,html:`<ul><li>${escapeHtml(item)}</li></ul>`})}
   else if(type==="details"){const title=mt("details.title");Object.assign(d,{summary_html:escapeHtml(title),summary_text:title,children:[]})}
+  else if(type==="buttons")Object.assign(d,{buttons:[],align:"center"});
   else if(type==="table")Object.assign(d,{rows:[["",""] ,["",""]],is_bordered:true,is_striped:null,is_compact:null,native:false});
   else if(type==="mathematical_expression")Object.assign(d,{text:"",html:"<tg-math-block></tg-math-block>"});
   else if(["photo","video","animation","audio","voice","document"].includes(type))Object.assign(d,{file:{file_id:""},_draft:true});
@@ -604,11 +692,11 @@ function addBlock(type,at=insertIndex,initialText=""){
   if(!current||!canEditCurrent())return;
   const block=defaultBlock(type);if(initialText&&["paragraph","heading","footer","preformatted","blockquote","pullquote","mathematical_expression"].includes(type))applyText(block,initialText);
   const index=Number.isInteger(at)?Math.max(0,Math.min(at,current.blocks.length)):current.blocks.length;
-  current.blocks.splice(index,0,block);normalizePositions();selectedBlockId=block.id;insertIndex=index+1;slashInput.value="";hideMenus();renderBlocks();markDirty();pushHistory();
+  current.blocks.splice(index,0,block);normalizePositions();selectedBlockId=block.id;insertIndex=index+1;slashInput.value="";hideMenus();renderBlocks();animateBlockEntry(block.id);markDirty();pushHistory();
   requestAnimationFrame(()=>{const target=blocksEl.querySelector(`[data-id="${block.id}"] textarea,[data-id="${block.id}"] input,[data-id="${block.id}"] [contenteditable="true"]`);target?.scrollIntoView({block:"center",behavior:"smooth"})});
 }
-function deleteBlock(id){if(!canEditCurrent())return;const i=current.blocks.findIndex(b=>b.id===id);if(i<0)return;current.blocks.splice(i,1);normalizePositions();selectedBlockId=null;renderBlocks();hideMenus();markDirty();pushHistory()}
-function moveBlock(id,delta){if(!canEditCurrent())return;const i=current.blocks.findIndex(b=>b.id===id),j=i+delta;if(i<0||j<0||j>=current.blocks.length)return;[current.blocks[i],current.blocks[j]]=[current.blocks[j],current.blocks[i]];normalizePositions();renderBlocks();markDirty();pushHistory()}
+function deleteBlock(id){if(!canEditCurrent())return;const i=current.blocks.findIndex(b=>b.id===id);if(i<0)return;const previous=captureBlockLayout();animateBlockExit(id);current.blocks.splice(i,1);normalizePositions();selectedBlockId=null;renderBlocks();animateBlockLayout(previous);hideMenus();markDirty();pushHistory()}
+function moveBlock(id,delta){if(!canEditCurrent())return;const i=current.blocks.findIndex(b=>b.id===id),j=i+delta;if(i<0||j<0||j>=current.blocks.length)return;const previous=captureBlockLayout();[current.blocks[i],current.blocks[j]]=[current.blocks[j],current.blocks[i]];normalizePositions();renderBlocks();animateBlockLayout(previous);markDirty();pushHistory()}
 function selectBlock(id){selectedBlockId=id;const i=current.blocks.findIndex(b=>b.id===id);insertIndex=i<0?null:i+1;blocksEl.querySelectorAll(".block").forEach(el=>el.classList.toggle("selected",el.dataset.id===id))}
 
 function textEditor(block){

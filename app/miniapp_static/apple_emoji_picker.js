@@ -1196,6 +1196,7 @@
       customEmojiPackLimit:access.custom_emoji_pack_limit==null?null:Number(access.custom_emoji_pack_limit),
       customEmojiPackCount:Math.max(0,Number(access.custom_emoji_pack_count||0)),
       customEmojiPacks:names,
+      customEmojiPinnedPack:String(access.custom_emoji_pinned_pack || ""),
     };
     if (names.length) {
       const order = new Map(names.map((name,index) => [name,index]));
@@ -1216,13 +1217,11 @@
   async function fetchPackFromServer(name) {
     const initData = String(window.Telegram?.WebApp?.initData || "");
     if (!initData || !name) return null;
-    const response = await fetch("/miniapp/api/custom-emoji/pack", {
-      method:"POST",
+    const response = await fetch(`/miniapp/api/custom-emoji/pack?set=${encodeURIComponent(name)}`, {
+      method:"GET",
       headers:{
         "X-Telegram-Init-Data":initData,
-        "Content-Type":"application/json",
       },
-      body:JSON.stringify({set:name}),
       cache:"no-store",
       credentials:"same-origin",
     });
@@ -1248,6 +1247,17 @@
     if (!initData) return;
     accessPackSyncRunning = true;
     try {
+      const accessResponse = await fetch("/miniapp/api/custom-emoji/packs", {
+        method:"GET",
+        headers:{"X-Telegram-Init-Data":initData},
+        cache:"no-store",
+        credentials:"same-origin",
+      });
+      const accessData = await accessResponse.json().catch(() => null);
+      if (!accessResponse.ok || !accessData?.ok || !accessData?.access) {
+        throw new Error(accessData?.error?.message || accessData?.error || "pack_access_load_failed");
+      }
+      applyPackAccess(accessData.access);
       const serverNames = serverPackNames();
       const localNames = customPacks.map(pack => String(pack?.name || "")).filter(Boolean);
       const targets = serverNames.length
@@ -1275,6 +1285,7 @@
       saveCustomPacks();
       syncCustomPackTabs();
     } catch (_) {
+      if (typeof toast === "function") toast(mt("emoji.pack_load_failed"));
       syncCustomPackTabs();
     } finally {
       accessPackSyncRunning = false;

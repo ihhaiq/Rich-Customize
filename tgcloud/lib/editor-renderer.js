@@ -10,6 +10,7 @@ import { richMessageDirection, validateEditorLimits, validateTableRows } from 'l
 import { brandingFooterBlock } from 'lib/branding';
 import { isDeveloper } from 'lib/developer-access';
 import { resolveEditorEntitlement, safePlanLimit } from 'lib/subscription-policy';
+import { validateStoredButton } from 'lib/button-validation';
 
 const INPUT_NATIVE_TYPE_ALIASES = Object.freeze({
   text: 'paragraph',
@@ -174,6 +175,38 @@ function generatedMediaFile(data) {
   return file && typeof file === 'object' && !Array.isArray(file) ? file : null;
 }
 
+function validateRichButton(button, index) {
+  if (!button || typeof button !== 'object' || Array.isArray(button)) {
+    throw new Error('buttons block has an invalid button at index ' + index);
+  }
+  const actions = [
+    ['url', 'url'],
+    ['callback_data', 'callback_data'],
+    ['copy_text', 'copy'],
+    ['web_app', 'web_app'],
+    ['login_url', 'login_url'],
+    ['switch_inline_query', 'switch_inline'],
+    ['switch_inline_query_current_chat', 'switch_inline_current'],
+    ['disabled', 'disabled'],
+  ].filter(([key]) => Object.hasOwn(button, key));
+  if (actions.length !== 1) {
+    throw new Error('buttons block has an invalid button action at index ' + index);
+  }
+  const [key, type] = actions[0];
+  const raw = button[key];
+  const value = type === 'copy'
+    ? raw?.text
+    : type === 'disabled'
+      ? ''
+      : type === 'web_app' || type === 'login_url'
+        ? raw?.url
+        : raw;
+  const result = validateStoredButton({ ...button, type, value });
+  if (!result.ok) {
+    throw new Error('buttons block has an invalid button at index ' + index + ': ' + result.code);
+  }
+}
+
 function renderGeneratedBlock(block) {
   const kind = String(block?.type || '');
   const data = block?.data && typeof block.data === 'object' && !Array.isArray(block.data)
@@ -205,6 +238,17 @@ function renderGeneratedBlock(block) {
     };
   }
   if (kind === 'anchor') return { type: 'anchor', name: anchorName(block) };
+
+  if (kind === 'buttons') {
+    const buttons = Array.isArray(data.buttons) ? data.buttons : [];
+    if (buttons.length !== 1) throw new Error('large button block must contain exactly one button');
+    buttons.forEach(validateRichButton);
+    return {
+      type: 'buttons',
+      buttons: buttons.map((button) => ({ ...button })),
+      align: ['left', 'center', 'right'].includes(data.align) ? data.align : 'center',
+    };
+  }
 
   if (kind === 'list') {
     const items = Array.isArray(data.items) ? data.items : [];
@@ -455,7 +499,7 @@ export function validateRenderedPayloadLimits(payloads, { userId = null, entitle
           else chars += textLength(listItem?.text);
         }
       } else {
-        chars += textLength(item.text) + textLength(item.summary) + textLength(item.caption) + textLength(item.credit);
+        chars += textLength(item.text) + textLength(item.summary) + textLength(item.caption) + textLength(item.credit) + textLength(item.buttons);
       }
       if (Array.isArray(item.blocks)) visit(item.blocks, level + 1);
       if (blocks > 500 || media > 50 || depth > 16 || chars > 32768) break;

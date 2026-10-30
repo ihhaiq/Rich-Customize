@@ -1,3 +1,204 @@
+## 2026-10-30 — استكمال ترجمة بلوكة الزر الكبير
+
+- **السبب:** طلب المالك نشر بلوكة الزر الكبير والتأكد من تزامن مفاتيح اللغات؛ المراجعة وجدت أن الروسية مستثناة من fallback وتفتقد مفتاحَي اسم ووصف البلوكة.
+- **التغيير:** إضافة الترجمات الروسية لـ`button.large` و`button.large_desc`، وإضافة اختبار يتحقق من حل مفاتيح البلوكة وإجراءاتها في اللغات العشرين المدعومة. تحديث إصدار `miniapp_i18n.js` لمنع استخدام نسخة مخزنة قديمة.
+- **الملفات:** `app/miniapp_static/miniapp_i18n.js`, `app/miniapp_static/editor.html`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجحت الاختبارات المركزة مع تغطية مفاتيح البلوكة في جميع اللغات المدعومة (`large-button-block` و`publish-validation`: 14/14)، ونجح `node --check` و`git diff --check`.
+- **GitHub/النشر:** نُشرت أصول Mini App الثابتة على Telegram Serverless (13 ملفاً، 345.5 KB؛ الحالة تؤكد 67 أصلاً متزامناً والـwebhook متزامن). فحص المخطط `--local --dry-run` أكد عدم وجود ترحيل مطلوب. نشر Cloudflare Pages ينتظر push الفرع.
+
+## 2026-10-30 — استعادة فحوص الإصدار قبل النشر
+
+- **السبب:** أثناء التحقق من طلب نشر كل التغييرات، تبيّن أن تعديل manifest حذف أوامر CI، وأن اختبار الحركة يفشل بسبب تهريب regex غير صحيح.
+- **التغيير:** استعادة نوع وحدات ESM وأوامر الاختبار والتحقق في `package.json`، وتصحيح نمط reduced-motion في الاختبار ليطابق CSS الحالي.
+- **الملفات:** `package.json`, `tests/serverless/miniapp-motion.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci`: فحص كتالوج الخطط وفحص الأصول الثابتة (57 أصلاً) والاختبارات كاملة (327/327).
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم يتم push أو نشر Telegram/Cloudflare أو ترحيل قاعدة بيانات.
+
+## 2026-10-30 — إصلاح مسارات نشر Mini App ورفع الوسائط
+
+- **السبب:** أظهر فحص ما قبل النشر أن النشر من checkout نظيف لا يبني مجلد الأصول الذي يتطلبه Serverless، وأن طلبات رفع الوسائط عبر XHR لا تتبع fallback إلى Cloudflare على أصل Telegram.
+- **التغيير:** ربط `npm run deploy` ببناء الأصول ثم `tgcloud push`؛ توجيه XHR من أصل Telegram إلى Cloudflare مع الحفاظ على ترويسة `initData`، وتحديث cache-busting للأصول المعدلة. تصحيح اختبار الحركة الذي كان يبحث عن تهريب regex حرفي بدل المسافات.
+- **الملفات:** `package.json`, `app/miniapp_static/editor.html`, `app/miniapp_static/media_upload.js`, `app/miniapp_static/miniapp_serverless_api.js`, `tests/serverless/miniapp-motion.test.mjs`, `md_files/docs/cloudflare-pages-miniapp.md`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (328/328)، وبناء أصول Serverless، وفحص `git diff --check`. فحص مخطط الإنتاج التجريبي أكد أن قاعدة البيانات متزامنة؛ لم يُنفذ ترحيل.
+- **GitHub/النشر:** دفع `tgcloud` الأصول الثابتة (13 ملفاً، 345.5 KB؛ 67 ملفاً متزامناً). لم يتغير كود runtime في ذلك الدفع. نشر Cloudflare Pages ينتظر push الفرع؛ اختبار Telegram WebView الحي لم يُنفذ.
+
+## 2026-10-28 — إضافة بلوكة زر كبير لمحرر Mini App
+
+- **السبب:** طلب المالك بلوكة زر كبيرة مستقلة في المحرر، مختلفة عن الأزرار الصغيرة المضمّنة داخل النص.
+- **التغيير:** إضافة نوع بلوك `buttons` إلى قائمة Mini App؛ تتيح البلوكة إضافة زر واحد كبير أو تعديله أو حذفه، وتعيد استخدام حوار أنواع الأزرار الحالي. تُحفظ الأزرار الكبيرة كبلوك Rich Message مستقل ومحاذى للوسط، ويُحوَّل رابط الصفحة إلى Callback صالح عند النشر. أُبقيت الأزرار الأصلية متعددة العناصر قابلة للعرض دون فرض تعديل مدعوم عليها. أُضيف تحقق قبل النشر والخادم، واحتساب نص الزر في حدود النص وقصّه عند تطبيق الحصة، مع تسميات عربية وإنجليزية وتغطية fallback لباقي اللغات. تحديث إصدارات الأصول في `editor.html`.
+- **الملفات:** `app/miniapp_static/app.js`, `app/miniapp_static/editor_features.js`, `app/miniapp_static/media_upload.js`, `app/miniapp_static/media_upload.css`, `app/miniapp_static/miniapp_i18n.js`, `app/miniapp_static/miniapp_i18n_coverage.js`, `app/miniapp_static/publish_validation.js`, `app/miniapp_static/editor.html`, `tgcloud/lib/editor-renderer.js`, `tgcloud/lib/editor-blocks.js`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجحت الاختبارات المركزة (`large-button-block` و`publish-validation`: 13/13)، وفحوص `node --check` للملفات المعدلة و`git diff --check`. مجموعة Serverless الكاملة: 325/326؛ الفشل الوحيد اختبار `miniapp-motion.test.mjs` الذي لا يطابق تعبيره النمطي تنسيق `@media` في `interactions.css`؛ هذا الملف غير معدّل لهذه الميزة.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare أو ترحيل بيانات.
+
+## 2026-10-28 — نقل إدارة الإيموجي المخصص إلى Serverless محلياً
+
+- **السبب:** طلب المالك نقل تفاصيل الإيموجي المخصص من Cloudflare إلى Telegram Serverless كجزء من تشغيل التطبيق المصغّر على Serverless.
+- **التغيير:** توجيه استيراد الحزم وقراءتها وترتيبها وتثبيتها وحذفها ومعايناتها إلى endpoint Serverless موثق بهوية Telegram. حفظ أسماء الحزم وترتيبها والحزمة المثبتة في `legacy_states` مع CAS وحصة موثوقة، وجلب صور المعاينة من Telegram وإرجاعها بحد 512 KiB. عند أول استخدام، يستورد العميل أسماء وترتيب/تثبيت الحزم القديمة من D1 إلى Serverless؛ لا تُحذف بيانات D1.
+- **الملفات:** `AGENTS.md`, `tgcloud/lib/miniapp-custom-emoji.js`, `tgcloud/lib/miniapp-bridge.js`, `tgcloud/lib/request-guard.js`, `app/miniapp_static/miniapp_serverless_api.js`, `app/miniapp_static/apple_emoji_picker.js`, `app/miniapp_static/editor.html`, `app/miniapp_static/index.html`, `functions/_lib/custom-emoji-packs.js`, `functions/miniapp/api/custom-emoji/packs.js`, `tests/serverless/harness.mjs`, `tests/serverless/miniapp-custom-emoji.test.mjs`, `tests/serverless/miniapp-serverless-client.test.mjs`, `md_files/docs/miniapp-serverless-cloudflare-dependencies.md`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجحت الاختبارات المركزة 14/14، ونجحت بقية مجموعة Serverless 319/319 عند استثناء `miniapp-motion.test.mjs`. المجموعة كاملة سجلت 322/323؛ الاختبار الوحيد الفاشل اختبار حركة غير متعلق يرفض صياغة `prefers-reduced-motion` الموجودة في CSS، والـCSS لم يتغير بهذه المهمة. نجحت فحوص `node --check` لكل ملفات JavaScript المعدلة و`git diff --check`. الاختبارات غطت ملكية البيانات، الاستيراد لمرة واحدة، عدم استبدال السجل بعد الاستيراد، التثبيت/الترتيب/الحذف، metadata، معاينة الصورة، وتوجيه العميل.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare أو تغيير BotFather أو ترحيل/حذف بيانات D1. استيراد D1 الفعلي يحتاج CORS المقيّد منشوراً؛ لم يُختبر Mini App داخل Telegram WebView.
+
+## 2026-10-28 — تثبيت نطاق نقل Mini App إلى Serverless
+
+- **السبب:** أكد المالك أن الهدف هو تشغيل التطبيق المصغّر على Telegram Serverless، وأن الجدولة والتذكيرات والخدمات المرتبطة بها لا يلزم نقلها.
+- **التغيير:** توضيح أن الجدولة والتذكيرات والبنية المرتبطة بها استثناء مقصود وتبقى على Cloudflare، وأن نطاق النقل هو واجهة Mini App وعمليات المحرر.
+- **الملفات:** `md_files/docs/miniapp-serverless-migration.md`, `md_files/docs/miniapp-serverless-cloudflare-dependencies.md`, `md_files/log.md`.
+- **التحقق الفعلي:** مراجعة نطاق النقل الحالي في الوثيقتين؛ لم تُجرَ اختبارات لأن التغيير توثيقي فقط.
+- **GitHub/النشر:** تغييرات توثيق محلية فقط؛ لا commit أو push أو نشر Cloudflare/Telegram أو تغيير BotFather.
+
+## 2026-10-28 — إصلاح إضافة البلوكات والوسائط في محرر Mini App
+
+- **السبب:** كانت مزامنة مواضع عناصر «التفاصيل» تعيد فرز العنصر الجديد ذي الموضع الافتراضي صفر إلى بداية القائمة، كما أن اختيار ملفات الوسائط نفسها ثانية لا يطلق حدث تغيير قبل إعادة ضبط منتقي الملفات. وعند فشل رفع جزء من الدفعة، بقيت الوسائط التي نجح رفعها في الحالة دون تعليم الصفحة كمتغيرة أو إضافتها إلى سجل التراجع.
+- **التغيير:** مزامنة مواضع التفاصيل وفق ترتيب القائمة الحالي بعد الإضافة والاستبدال والتحريك؛ إعادة ضبط منتقي الوسائط بعد أخذ نسخة من الملفات لتمكين الإضافة المتكررة؛ وحفظ الوسائط الناجحة من الدفعات الجزئية كتغييرات قابلة للحفظ والتراجع. تحديث إصدارات ملفات JavaScript في `editor.html` لكسر التخزين المؤقت.
+- **الملفات:** `app/miniapp_static/details_nested_editor.js`, `app/miniapp_static/media_upload.js`, `app/miniapp_static/editor.html`, `tests/serverless/miniapp-composite-blocks.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجحت `node --experimental-vm-modules --test tests/serverless/*.test.mjs` (314/314)؛ نجحت `node --check` لملفات JavaScript المعدلة و`git diff --check`. لم يُشغّل بناء الأصول لأن مجلد `.tgcloud-miniapp-static` موجود مسبقاً، وسكربت البناء يحذفه تكرارياً قبل إنشائه.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو `tgcloud push` أو نشر Telegram/Cloudflare أو ترحيل بيانات.
+
+## 2026-10-27 — توثيق نواقص Mini App المعتمدة على Cloudflare
+
+- **السبب:** طلب المالك ملف Markdown يشرح الوظائف التي لم تنتقل بعد من Cloudflare إلى Telegram Serverless.
+- **التغيير:** توثيق مسارات رفع/عرض الوسائط، إدارة ومعاينة الإيموجي المخصص، وقياس الأداء التي يوجهها العميل إلى Cloudflare، مع آثار تعطلها وخطوات القبول وحدود ما لم يُختبر. توضيح أن CORS المعدّل محلياً غير مثبت النشر، وأن الاشتراكات والتذكيرات والجدولة تبقى خارج نطاق نقل المحرر.
+- **الملفات:** `md_files/docs/miniapp-serverless-cloudflare-dependencies.md`, `md_files/docs/miniapp-serverless-migration.md`, `docs/README.md`, `md_files/log.md`.
+- **التحقق الفعلي:** مراجعة طبقة توجيه Serverless وواجهات Cloudflare الخاصة بالرفع والملفات والإيموجي والقياس؛ نجح `git diff --check`.
+- **GitHub/النشر:** تغييرات توثيق محلية فقط؛ لا commit أو push، ولا نشر Cloudflare/Telegram أو تغيير BotFather أو تعديل بيانات.
+
+## 2026-10-27 — بدء خطة نقل التطبيق المصغر إلى Telegram Serverless
+
+- **السبب:** كان التطبيق يعرض «افتح التطبيق من تيليجرام» لكل من غياب `initData` وفشل طلب `/miniapp/api/session`، لذلك لا تثبت الرسالة أن المستخدم فتحه خارج Telegram. وبالتزامن، أضاف Telegram Serverless استضافة Mini App وواجهات endpoints بتاريخ ٦ أكتوبر ٢٠٢٦، بينما ظل المستودع موثقاً ومهيأً على مسار Cloudflare القديم.
+- **التغيير:** توثيق مساري إعادة التوجيه المؤكدين دون ادعاء معرفة سبب جلسة الإنتاج، ووضع خطة مراحل لنقل الواجهة وواجهات API والمصادقة والبيانات المرحلية. أكد المالك إبقاء التذكيرات والاشتراكات والجدولة وكل ما يتطلب تذكيراً على Cloudflare؛ عُدلت حدود النقل لتجنب تعطيلها أو إيقاف Cloudflare بالكامل. تحديث ملاحظات Serverless وفهرس الوثائق و`soon.md`.
+- **الملفات:** `md_files/docs/miniapp-serverless-migration.md`, `md_files/docs/serverless.md`, `docs/README.md`, `md_files/soon.md`, `md_files/log.md`.
+- **التحقق الفعلي:** مراجعة `app/miniapp_static/index.html`, `functions/miniapp/api/session.js`, `functions/_lib/telegram-auth.js`, `tgcloud.jsonc`, وحصر مسارات `functions/`. مطابقة إمكانات الاستضافة و`Telegram.WebApp.Serverless.call` مع توثيق Telegram Serverless الحالي. شغّل `npx.cmd tgcloud status` وأظهر اتصال التطبيق `app8416656269` على revision 111 وWebhook متزامناً؛ أظهر `npx.cmd tgcloud diff` عدم وجود تغييرات قابلة للنشر، كما لا يحدد `tgcloud.jsonc` حالياً أي ملفات static. لا اختبارات مطلوبة لتغيير توثيقي فقط.
+- **GitHub/النشر:** تغييرات توثيق محلية فقط؛ لا commit أو push، ولا `tgcloud push` أو `migrate` أو تغيير BotFather أو تعطيل Cloudflare. النشر ليس جاهزاً لأن واجهة Mini App لم تُنقل بعد إلى static hosting وServerless endpoints.
+
+## 2026-10-27 — ربط عمليات المحرر الأولية باستضافة Serverless
+
+- **السبب:** بعد موافقة المالك على إبقاء الاشتراكات والتذكيرات والجدولة وكل ما يتطلب تذكيراً على Cloudflare، بقيت نقطة الدخول وعمليات المحرر غير موصولة باستضافة Telegram Serverless.
+- **التغيير:** إضافة عميل fetch يوجّه هوية المحرر وقراءة الصفحات والوجهات والإنشاء والحفظ والحذف والنشر ومنتقي المستخدم وبلاغات الأخطاء إلى endpoint الموثق بهوية `ctx.initData` عند تشغيل الواجهة على `tgcloud.ai`. تحفظ الواجهة معرّف الإنشاء محلياً لإعادة استخدامه عند غموض نتيجة الشبكة. تبقى المسارات غير المنقولة على Cloudflare عبر CORS يسمح لأصل الاستضافة المحدد فقط. ضبط static source وإضافة script يبني أصول الواجهة مع مسارات جذر متوافقة ويحذف ملف Cloudflare `_redirects` من البناء، وتمييز فشل الاتصال بالخدمة عن فتح التطبيق خارج Telegram. نقل صور الدليل التعليمي إلى أصول الاستضافة الجديدة. لا تغيير في جداول أو عامل الجدولة أو منطق الاشتراكات والتذكيرات.
+- **الملفات:** `app/miniapp_static/miniapp_serverless_api.js`, `app/miniapp_static/index.html`, `app/miniapp_static/editor.html`, `app/miniapp_static/app.js`, `app/miniapp_static/open-in-telegram.html`, `app/miniapp_static/tutorial-assets/manifest.json`, `scripts/build-miniapp-serverless.mjs`, `tgcloud.jsonc`, `.gitignore`, `functions/_middleware.js`, `tgcloud/endpoints/miniapp.js`, `tgcloud/lib/miniapp-bridge.js`, `tgcloud/lib/request-guard.js`, `tgcloud/lib/editor-import.js`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/docs/serverless.md`, `md_files/soon.md`, `md_files/log.md`, `tests/serverless/miniapp-serverless-client.test.mjs`, `tests/serverless/miniapp-serverless-endpoint.test.mjs`, `tests/serverless/harness.mjs`.
+- **التحقق الفعلي:** نجح `node --check` للعميل والبناء و`functions/_middleware.js` و`app.js` و`editor-import.js`. نجح بناء `node scripts/build-miniapp-serverless.mjs` وفحص 67 ملفاً ثابتاً وأربع صفحات HTML دون مراجع محلية مفقودة، كما لم يُنسخ `_redirects` الخاص بـCloudflare. نجحت مجموعة Serverless الحالية 310/310، ونجحت اختبارات العميل وCORS والـendpoint الموثق بالهوية 5/5. نجح `git diff --check`. أظهر `npx.cmd tgcloud status` اتصال `app8416656269` على revision 111 وWebhook متزامناً، وأظهر كل ملفات static الجديدة وendpoint بوضوح على أنها غير منشورة. لا يزال اختبار الواجهة داخل Telegram وCORS الحي ورفع الوسائط غير منفذ.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو `tgcloud push` أو `migrate` أو تغيير BotFather. لم يُنشر إصدار تجريبي أو يُجرَ قبول حي.
+
+## 2026-10-27 — تجهيز تجربة Mini App على Serverless
+
+- **السبب:** طلب المالك تجربة التطبيق المصغر على Telegram Serverless، وأكد أن مشروع البوتات المُدارة ملغى ويجب حذف ذكره من وثائق النقل.
+- **التغيير:** حذف الإشارات إلى البوتات المُدارة من وثائق Serverless والهجرة. نقل قراءة معلومات المستخدم الأساسية `/me` إلى endpoint Serverless باستخدام هوية Telegram والاستحقاق الموثوق، كي لا يتوقف فتح المحرر على جلسة Cloudflare. عمليات الوسائط والإيموجي المخصص ما زالت غير منقولة؛ تجربة المحرر محدودة حتى يتم ذلك.
+- **الملفات:** `tgcloud/lib/miniapp-bridge.js`, `app/miniapp_static/miniapp_serverless_api.js`, `tests/serverless/miniapp-serverless-client.test.mjs`, `tests/serverless/miniapp-serverless-endpoint.test.mjs`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجحت الاختبارات المركزة 6/6 و`git diff --check`. ظهر Telegram Cloud على revision 112 قبل نشر الواجهة، مع endpoint وملفات Serverless مطابقة؛ أظهر `tgcloud status` أن ملف العميل الثابت وحده ما زال مختلفاً. نُشر `.tgcloud-miniapp-static/` وحده، ثم أكد `tgcloud status` revision 113 و67 ملفاً ثابتاً محدثاً، وأعاد طلب الملف `miniapp_serverless_api.js` HTTP 200 وتضمن تحويل `/miniapp/api/me` إلى Serverless. لا يثبت ذلك تشغيل WebView أو قبول المستخدم.
+- **GitHub/النشر:** نُشرت الملفات الثابتة فقط إلى Telegram Serverless revision 113؛ لم يتغير رابط BotFather أو Webhook أو المخطط، ولم يُنفذ `migrate` أو push لباقي الشيفرة أو commit/push إلى GitHub. يتطلب اختبار التطبيق داخل Telegram ربط زر/رابط Mini App بعنوان Serverless؛ لم يُنفذ تغيير BotFather.
+
+## 2026-10-25 — إصلاح عرض معلومات مرسل الأمر في المجموعة والضيف
+
+- **السبب:** صيغة `@RichCustomizebot /info` في وضع الضيف لم تكن تُصنّف كطلب معلومات؛ كانت تسقط لمسار البحث عن الصفحات ولا تعرض معلومات المرسل. كما كان مسار `/info` بلا هدف يقرأ سجل `usage_users` قبل عرض المرسل، ويشترط الاسم الأول/الأخير لبناء النتيجة.
+- **التغيير:** توجيه `@RichCustomizebot /info` و`/id` إلى معلومات المرسل، واستخدام هوية `from` التي يرفقها Telegram مباشرة عند عدم وجود هدف بدلاً من اشتراط سجل استخدام سابق. إذا لم يتوفر اسم عرض، يُستخدم اسم المستخدم أو ID بدلاً من اعتبار الحساب مجهولاً. وعند الرد على رسالة لا تحمل هوية مستخدم، يعود الأمر إلى مرسل `/info`.
+- **الحد المعروف:** هذا يصلح عرض معلومات الحساب الذي أرسل الأمر من أي username وصل ضمن تحديث Telegram؛ لا يربط تلقائياً alias NFT غير الوارد ضمن `from.username` إلى ID، ولا يغيّر البحث عن مستخدم آخر باسم غير مخزّن.
+- **الملفات:** `tgcloud/lib/user-info.js`, `tgcloud/lib/user-info-copy.js`, `tests/serverless/user-info.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجحت اختبارات `user-info.test.mjs` (19/19)، وفحوص `node --check` للملفات المعدلة، و`git diff --check`.
+- **GitHub/النشر:** لا commit أو push إلى GitHub. نُشر `tgcloud/lib/user-info.js` و`tgcloud/lib/user-info-copy.js` إلى Telegram Cloud revision 111؛ أكد `tgcloud fetch/status` تطابق شجرة العمل مع اللقطة وWebhook in sync. أبلغ CLI عن خطأ محلي في كتابة snapshot بعد نجاح رفع الملفين؛ جرى التحقق من النشر بجلب revision 111.
+
+## 2026-10-25 — جعل معرّف المستخدم قابلاً للنسخ
+
+- **السبب:** رقم المستخدم كان يظهر كنص عادي في رسالة معلومات الحساب، ما يصعّب نسخه على الهاتف.
+- **التغيير:** إضافة زر نسخ يحمل رمز النسخ ورقم الحساب، ويضع الرقم وحده في `copy_text` حتى يُنسخ كما هو دون عنوان أو تنسيق إضافي. يظهر في كل مسارات رسالة معلومات المستخدم، ومنها Guest.
+- **الملفات:** `tgcloud/lib/user-info-copy.js`, `tests/serverless/user-info.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجحت اختبارات `user-info.test.mjs` (17/17) و`git diff --check`.
+- **GitHub/النشر:** محلي فقط؛ لا commit أو push أو Telegram deployment.
+
+## 2026-10-25 — معالجة منع إرسال صور الحساب في وضع الضيف
+
+- **السبب:** عند البحث عن مستخدم من Guest داخل مجموعة تمنع البوت من إرسال الصور، كان `answerGuestQuery` يفشل بـ`CHAT_SEND_PHOTOS_FORBIDDEN` فتُسجّل معالجة Guest استثناءً بدلاً من عرض معلومات الحساب.
+- **التغيير:** إعادة استخدام مصنف صلاحيات الصور من مسار `/info`؛ عند رفض صورة ملف الحساب يعيد Guest إرسال نتيجة المعلومات نفسها بلا صورة وبلا بلوك التفاصيل الخاص بها. الأخطاء الأخرى، أو فشل المحاولة البديلة، ما زالت تُسجّل ولا تُخفى.
+- **الملفات:** `tgcloud/lib/user-info.js`, `tgcloud/handlers/guest_message.js`, `tests/serverless/harness.mjs`, `tests/serverless/user-info.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `node --experimental-vm-modules --test tests/serverless/user-info.test.mjs` (17/17)، ونجحت فحوص `node --check` للمعالج والمكتبة والاختبار، و`git diff --check`.
+- **GitHub/النشر:** محلي فقط؛ لا commit أو push أو Telegram deployment.
+
+## 2026-10-25 — مواءمة توثيق الاشتراكات والوصول المبكر
+
+- **السبب:** كانت وثائق الاشتراك تصف الوصول المبكر بأنه بلا ميزات مسماة فقط، ولا تشرح أن Golden يتيح التجربة مجاناً قبل الإطلاق العام؛ كما لم تفصل بين وجود حدود الباقات في السياسة وبين إنفاذها الكامل في جميع مسارات المحرر.
+- **التغيير:** تحديث مواصفة الاشتراك وحالة التنفيذ و`soon.md`: توضيح أن أهلية Golden للوصول المبكر موجودة في سياسة الاستحقاق والعرض ورسالة `/sup`، لكن لا توجد ميزة تجريبية مسماة مربوطة بها بعد. تعريف أن تجربة Golden لا تكلف رسوماً إضافية أثناء الاشتراك النشط، وأن كل ميزة تتبع باقتها النهائية المعلنة عند الإطلاق العام. توثيق استمرار بعض حدود المحرر الأقدم، وإضافة أربعة مقترحات وصول مبكر مع وسمها بوضوح بأنها غير معتمدة/غير منفذة.
+- **الملفات:** `md_files/sups.md`, `md_files/docs/subscription-rollout.md`, `md_files/soon.md`, `md_files/log.md`.
+- **التحقق الفعلي:** مراجعة نصية مقابل `tgcloud/lib/subscription-policy.js`, `tgcloud/lib/editor-subscriptions.js`, `tgcloud/lib/subscription-rich.js`, `app/miniapp_static/subscription_offers.js` وتعليمات المشروع. لا اختبارات مطلوبة لتغيير التوثيق فقط.
+- **GitHub/النشر:** تحديث محلي فقط؛ لا commit أو push أو نشر أو migration.
+
+## 2026-10-25 — إصلاح انحدار نشر الجسر وتدقيق الاختبارات
+
+- **السبب:** كشف تشغيل اختبارات Serverless الكامل أن جسر النشر يستدعي `shouldIncludeBranding` بعد تغيير الاستيرادات من دون استيراد الدالة؛ كان ذلك يسبب `ReferenceError` في النشر عبر الجسر، بما يشمل النشر المباشر وفحوص الحصة والتسجيل بعد نجاح Telegram.
+- **التغيير:** إعادة استيراد دالة قرار الحقوق في `tgcloud/lib/publish.js`. أصلحت إعداد fixture لقائمة المشتركين ليحتوي جدول `usage_users` الذي يستعلمه التنفيذ، وعدّلت اختبار استجابة المشتركين ليتحقق من بيانات ترقيم الصفحات (`page` و`max_page`) بدلاً من افتراض أن هذا الجسر ينشئ `callback_data` بنفسه. كما حُفظت أولوية اسم الصفحة المملوك في البحث العام/inline مع بقاء أولوية الكود للرمز المستقل الصريح في Guest.
+- **الملفات:** `tgcloud/lib/publish.js`, `tests/serverless/subscriber-list.test.mjs`, `tests/serverless/admin-stats.test.mjs`, `tgcloud/lib/page-delivery.js`, `tgcloud/handlers/guest_message.js`, `tgcloud/lib/user-info.js`, `tests/serverless/page-name-delivery.test.mjs`, `tests/serverless/user-info.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** بعد إصلاح الاستيراد نجحت اختبارات الجسر/الإدارة المركزة (21/21)، ثم نجحت مجموعة Serverless كاملة (302/302). نجح `node --check` على `publish.js` و`page-delivery.js` و`git diff --check`.
+- **GitHub/النشر:** التعديلات محلية فقط؛ لا commit أو push ولا Telegram deployment أو migration. لا تدّعي نتائج الاختبار نجاح النشر الإنتاجي.
+
+## 2026-10-25 — فصل استدعاء صفحة الضيف عن البحث عن مستخدم
+
+- **السبب:** وضع Guest كان يعامل كلمات الاسم متعددة الكلمات كأكواد منفصلة، ويعامل منشن البوت متبوعاً بأي قيمة كطلب معلومات مستخدم؛ نتج عن ذلك تصادم أسماء الصفحات/أكوادها مع أسماء المستخدمين والمعرفات الرقمية.
+- **التغيير:** قُصر مطابقة كود الصفحة على مرجع كامل من رمز واحد، مع أولوية الكود المطابق تماماً على الاسم عند التصادم. أضيف `@RichCustomizebot /page <name>` لفرض البحث بالاسم حتى لو شابه الاسم كوداً أو يوزراً. يظل منشن البوت مع `@username` بحث مستخدم، وتُطلب هوية المستخدم الرقمية بصيغة `/info <id>`، فلا تُفسر الأرقام المجردة كـIDs. حدّث توثيق صيغ الإدخال.
+- **الملفات:** `tgcloud/lib/page-delivery.js`, `tgcloud/lib/user-info.js`, `tgcloud/handlers/guest_message.js`, `tests/serverless/page-name-delivery.test.mjs`, `tests/serverless/user-info.test.mjs`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق الفعلي:** اختبارات `page-name-delivery.test.mjs` و`user-info.test.mjs` نجحت 20/20؛ فحوص `node --check` و`git diff --check` نجحت. بعد النشر، أكد `tgcloud fetch/status` revision 109 وظهور Working directory clean، وأكد `tgcloud webhook` أن `guest_message` مسموح ولا توجد تحديثات معلقة.
+- **GitHub/النشر:** نُشرت الوحدات المحددة فقط `page-delivery.js`, `user-info.js`, `guest_message.js` إلى Telegram Cloud revision 109؛ Webhook متزامن. لا commit أو push إلى GitHub ولا migration.
+
+## 2026-10-25 — حفظ تفضيل إظهار الحقوق للحساب
+
+- **السبب:** طلب المالك أن يبدأ المستحقون والحقوق مخفية، وأن يبدّل الزر بين «إظهار الحقوق» و«إخفاء الحقوق» مع بقاء الاختيار محفوظاً للحساب، مع استمرار رابط الشراء لغير المستحقين.
+- **التغيير:** إضافة `branding_preferences` كجدول إعدادات منفصل عن سجل الدفع، وإعادة استخدام الاستحقاق الموثوق أو شراء إزالة الحقوق للتحقق من صلاحية التبديل. صار الوضع الافتراضي للمستحقين مخفياً، والأزرار تحمل الهدف صراحةً لمنع قلب الحالة عند إعادة الطلب. رُبط التفضيل بالمعاينات والنشر والجدولة القائمة عبر `shouldIncludeBranding`، وتلتقط الجدولة حالة الحقوق الحالية في نسختها. عُدّلت رسائل الدفع لتوضح أن الإخفاء افتراضي ويمكن عكسه.
+- **الملفات:** `tgcloud/schema.js`, `tgcloud/lib/branding.js`, `tgcloud/lib/editor-block-ui.js`, `tgcloud/lib/editor-block-flow.js`, `tgcloud/lib/editor-premium-emoji.js`, `tgcloud/lib/publish.js`, `tests/serverless/harness.mjs`, `tests/serverless/branding-cart-link.test.mjs`, `tests/serverless/branding-preferences.test.mjs`, `AGENTS.md`, `md_files/docs/scheduling.md`, `md_files/docs/subscription-rollout.md`, `md_files/log.md`.
+- **التحقق الفعلي:** `node --experimental-vm-modules --test tests/serverless/branding-preferences.test.mjs tests/serverless/branding-cart-link.test.mjs tests/serverless/golden-announcements.test.mjs tests/serverless/schedule-policy.test.mjs tests/serverless/scheduling-reminders.test.mjs` نجح 37/37؛ `node --check` لوحدات JavaScript الستة المعدلة وملفي الاختبار نجح؛ `git diff --check` نجح (مع تحذير line endings مسبق على `package.json` المتغير محلياً).
+- **GitHub/النشر:** محلي فقط؛ لا commit أو push أو Telegram deployment أو migration. يتطلب الجدول الجديد مراجعة وترحيلاً إنتاجياً منفصلاً قبل استخدام هذا الكود إنتاجياً.
+
+## 2026-10-25 — إضافة توجيه هندسي نقدي ومتمحور حول التوسع
+
+- **السبب:** طلب المالك أن تكون مراجعات المشروع مباشرة ونقدية، وأن تستهدف استقراراً قابلاً للقياس قبل استقبال ٢٥٠ ألف إلى مليون مستخدم.
+- **التغيير:** أضيف إلى `AGENTS.md` توجيه دائم بعدم المجاملة أو الادعاء بجاهزية بلا دليل، وفحص المخاطر ذات الصلة بكل مهمة، والتمييز بين العيوب المثبتة والمخاطر غير المتحققة. عُرّف رقم المستخدمين كطموح وليس وعد سعة أو تزامن، وربط ادعاء الجاهزية بنموذج حمل واختبارات ضغط/استدامة وحدود المنصات وSLOs وخطة استعادة ومراقبة وتكلفة.
+- **الملفات:** `AGENTS.md`, `md_files/log.md`.
+- **التحقق الفعلي:** مراجعة صياغة التعليمات مع مرجع تعليمات Copilot؛ `git diff --check`.
+- **GitHub/النشر:** تعديل محلي فقط؛ لا commit أو push أو نشر.
+
+## 2026-10-25 — تحديث زر الحقوق وتجربة جدولة المنشورات
+
+- **السبب:** طلب المالك إخفاء زر شراء إزالة الحقوق عن أصحاب الاستحقاق، وإتاحة إظهار الحقوق أو إخفائها لكل منشور، وتحسين إدخال موعد الجدولة وحدودها.
+- **التغيير:** حلّ زر «إظهار / إخفاء الحقوق» محل رابط الشراء للمشتركيْن Plus/Golden النشطين وأصحاب الشراء الدائم، مع حفظ الاختيار في النشر الفوري ولقطة المنشور المجدول. أصبح الإدخال `MM-DD hh:mm AM/PM` بتوقيت بغداد `GMT+3` مع استنتاج السنة وزر إلغاء؛ المجاني أربعة أيام، والاشتراك النشط شهران تقويميان. لا تتجاوز الاستحقاقات فحوص الخادم.
+- **الملفات:** `tgcloud/lib/branding.js`, `tgcloud/lib/editor-block-flow.js`, `tgcloud/lib/editor-block-ui.js`, `tgcloud/lib/editor-guard.js`, `tgcloud/lib/editor-premium-emoji.js`, `tgcloud/lib/publish.js`, `tgcloud/lib/request-guard.js`, `tgcloud/lib/schedule-policy.js`, `tgcloud/lib/scheduled-publish.js`, `tests/serverless/branding-cart-link.test.mjs`, `tests/serverless/schedule-policy.test.mjs`, `AGENTS.md`, `md_files/docs/scheduling.md`, `md_files/soon.md`, `md_files/sups.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `node --experimental-vm-modules --test tests/serverless/schedule-policy.test.mjs tests/serverless/branding-cart-link.test.mjs tests/serverless/premium-emoji.test.mjs tests/serverless/scheduling-reminders.test.mjs tests/serverless/subscription-schedule.test.mjs tests/serverless/golden-scheduler.test.mjs tests/serverless/static-error-guards.test.mjs` (41/41)، و`node --check` للوحدات التسع، و`git diff --check`.
+- **GitHub/النشر:** رُفعت الوحدات التسع المحددة فقط إلى Telegram Cloud، revision 107؛ أكد `tgcloud fetch` و`tgcloud status` أن اللقطة محدثة وWebhook متزامن. أبلغ `tgcloud push` عن TypeError عند كتابة اللقطة المحلية بعد نجاح رفع الوحدات؛ جرى التحقق من النشر عبر fetch/status. لم يتغير `tgcloud/schema.js` ولم تُنفذ migration. لا commit أو push إلى GitHub.
+
+## 2026-10-25 — تصحيح حالة جدولة المنشورات في الوثائق
+
+- **السبب:** أفاد المالك أن زر الجدولة ظاهر وأنه يستخدم الميزة؛ وصفها السابق بأنها غير مفعلة/مؤجلة كان قديماً ومخالفاً للحالة الفعلية المبلغ عنها.
+- **التغيير:** مزامنة وثائق الجدولة وخطة العمل ومواصفة الاشتراكات وتعليمات الوكلاء مع الكود الحالي وتأكيد الإتاحة. توثيق حد المجاني، وحدود Plus/Golden المؤقتة، والإلغاء دون إعادة جدولة، وتعليق التسجيل بلا ACK، وحد Cron، والنتائج الملتبسة دون الادعاء بضمان SLA أو exactly-once. تحديث تعليق `schedule-policy.js` الذي وصف الميزة خطأً بأنها غير فعالة.
+- **الملفات:** `md_files/docs/scheduling.md`, `md_files/docs/subscription-rollout.md`, `md_files/docs/cloudflare-pages-miniapp.md`, `md_files/ROADMAP.md`, `md_files/soon.md`, `md_files/sups.md`, `AGENTS.md`, `tgcloud/lib/schedule-policy.js`, `md_files/log.md`.
+- **التحقق الفعلي:** `node --experimental-vm-modules --test tests/serverless/schedule-policy.test.mjs tests/serverless/scheduling-reminders.test.mjs tests/serverless/subscription-schedule.test.mjs tests/serverless/golden-scheduler.test.mjs` نجح 13/13؛ نجح `node --check tgcloud/lib/schedule-policy.js` و`git diff --check`.
+- **GitHub/النشر:** توثيق وتعليق كود محليان فقط؛ لم يُنفذ commit أو push أو نشر أو migration.
+
+## 2026-10-25 — إخفاء قسم الصورة عند غيابها أو منع إرسالها
+
+- **السبب:** طلب المالك أن يظهر رد `/info` كالمعتاد دون تنبيه عند عدم وجود صورة أو منع المجموعة إرسال الصور، وأن تُفتح تفاصيل الصورة تلقائياً عند توفرها.
+- **التغيير:** عند غياب صورة الملف الشخصي، يعرض الرد معلومات المستخدم فقط دون نص أو فاصل أو بلوك صورة. إذا رفض Telegram الصورة بسبب صلاحيات المجموعة، يعيد البوت إرسال معلومات المستخدم دون الصورة وقسم التفاصيل أو رسالة خطأ للمستخدم. تُفتح بلوكة تفاصيل الصورة افتراضياً عند نجاح إرسالها. بقيت رسالة خطأ جلب الصورة الفعلية مترجمة كما كانت.
+- **الملفات:** `tgcloud/lib/user-info-copy.js`, `tgcloud/lib/user-info.js`, `tests/serverless/user-info.test.mjs`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق الفعلي:** `node --experimental-vm-modules --test tests/serverless/user-info.test.mjs` نجح 15/15؛ نجحت `node --check` لوحدات JavaScript المعدلة و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم يُنفذ commit أو push أو نشر Telegram.
+
+## 2026-10-25 — إصلاح رتبة المطور وعرض صورة `/info`
+
+- **السبب:** كان مسار `/info` يحوّل رتبة المطور الموثقة إلى «مجاني»، كما كان رفض Telegram للوسائط يستبدل الرسالة الغنية بصمت بنص عادي، فتختفي التفاصيل والفاصل.
+- **التغيير:** يعرض `/info` رتبة Developer الموثقة عبر `subscriptionSnapshot` بدل تحويلها إلى Free. لا يعود إرسال `/info` إلى `sendMessage` عند فشل الرسالة الغنية. عند رفض Telegram للصورة وحدها برمز 400 موثوق، يعيد البوت المحاولة كـRich Message دون الوسائط للمحافظة على بلوكات التفاصيل والفاصل؛ أما أخطاء الإرسال الأخرى فتمر لمسار معالجة الأخطاء. شكل كتلة الصورة يطابق توثيق `InputRichBlockPhoto`: `photo: { type: 'photo', media: file_id }`.
+- **الملفات:** `tgcloud/lib/user-info.js`, `tests/serverless/user-info.test.mjs`, `tests/serverless/harness.mjs`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق الفعلي:** `node --experimental-vm-modules --test tests/serverless/user-info.test.mjs tests/serverless/developer-limits.test.mjs` نجح 18/18؛ فحوص `node --check` للملفات المعدلة و`git diff --check` نجحت. آخر اختبار شامل قبل هذا الإصلاح سجل 279/282؛ الإخفاقات الثلاثة في اختبارات إدارة المشتركين.
+- **GitHub/النشر:** نُشرت وحدة `tgcloud/lib/user-info.js` وحدها. أظهر CLI خطأً أثناء تحديث snapshot المحلي بعد تأكيد رفع الوحدة؛ جرى `tgcloud fetch` ثم أكد `tgcloud status` revision 100 و`Webhook: in sync` و`Working directory clean`. لم يُنفذ migration أو commit/push إلى GitHub. بقيت التغييرات السابقة في `package.json` و`tgcloud/lib/admin-stats.js` دون تعديل.
+
+## 2026-10-25 — تصحيح نوع RichText في رد `/info`
+
+- **السبب:** أبلغ Telegram عن `Unsupported rich text type` أثناء إرسال معلومات المستخدم؛ اسم المستخدم كان مغلفًا بالنوع `text_link`، وهو نوع Message Entity وليس نوع RichText مقبولاً في InputRichBlock.
+- **التغيير:** استُبدل الغلاف بـRichText `url` المدعوم مع الإبقاء على رابط الحساب والاسم القابل للنقر. أضيف تأكيد اختبار يمنع رجوع `text_link` في بنية الرسالة الغنية.
+- **الملفات:** `tgcloud/lib/user-info-copy.js`, `tests/serverless/user-info.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** `node --experimental-vm-modules --test tests/serverless/user-info.test.mjs` نجح 11/11؛ `node --check` للملفين المعدلين و`git diff --check` نجحت.
+- **GitHub/النشر:** رُفعت وحدة `tgcloud/lib/user-info-copy.js` وحدها. ظهر خطأ CLI أثناء كتابة snapshot المحلي بعد تأكيد رفع الوحدة؛ أكد `tgcloud fetch` revision 101 و`Webhook: in sync` و`Working directory clean`. لم تُنفذ migrations أو تغييرات webhook أو commit/push إلى GitHub.
+
+## 2026-10-25 — تبسيط عرض معلومات `/info` ومعالجة تعذر الصورة
+
+- **السبب:** طلب المالك أن تظهر التفاصيل كقائمة نقطية عادية، ثم أوضح أن «وضع الضيف» هو Guest Mode الرسمي الذي يسمح بالرد في مجموعة دون عضوية البوت.
+- **التغيير:** صارت معلومات الحساب أربعة بلوكات فقرة عادية، وأصبحت بلوكة `details` مخصصة للصورة وحدها. عند فشل طلب صورة Telegram أو رفض إرسالها، تُرسل معلومات الحساب مع تذييل خطأ مترجم؛ وعند عدم وجود صورة يضاف تذييل يوضح ذلك. جرت مزامنة مفاتيح رسائل `/info` وأخطاء الضيف في اللغات العشرين. أضيف `/id` لعرض معلومات المرسل. رُبط `/info` و`/id` بمعالج `guest_message.js`، حيث يحول نتيجة المعلومات إلى InlineQueryResult article ويرسل الرد الوحيد عبر `answerGuestQuery`؛ استجابة تحديد المعدل تمر أيضاً عبر guest query بدلاً من `sendMessage`. فشل التحضير يسجل تحت `guest_message` ويرجع تشخيصاً آمناً متعدد اللغات مع مرجع التحديث.
+- **الملفات:** `tgcloud/handlers/message.js`, `tgcloud/handlers/guest_message.js`, `tgcloud/lib/request-guard.js`, `tgcloud/lib/user-info-copy.js`, `tgcloud/lib/user-info.js`, `tests/serverless/harness.mjs`, `tests/serverless/user-info.test.mjs`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق الفعلي:** `node --experimental-vm-modules --test tests/serverless/user-info.test.mjs` نجح 14/14، ويشمل محاكاة guest update دون عضوية البوت والتحقق من رد واحد عبر `answerGuestQuery` يحمل قائمة المعلومات والصورة، مع غياب `sendMessage`/`sendRichMessage`. نجحت فحوص `node --check` للمعالج والوحدات والاختبار و`git diff --check`. يلزم اختبار حي بعد تفعيل Guest Mode في BotFather.
+- **GitHub/النشر:** تحديث revision 104 شمل `user-info-copy.js` و`handlers/message.js` فقط. ربط Guest Mode وتغييرات `request-guard.js` ما زالت محلية ولم تُنشر. لا migrations أو commit/push.
+
 ## 2026-10-23 — إضافة أمر /info للبحث عن الحسابات
 
 - **السبب:** طلب إظهار معرّف المستخدم واسمه كرابط لحسابه واسم المستخدم، مع رد مترجم عند عدم العثور على الحساب.

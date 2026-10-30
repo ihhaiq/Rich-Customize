@@ -322,8 +322,22 @@ export function buildEditorKeyboard(session, languageCode) {
   return { inline_keyboard: rows };
 }
 
-export function buildEditorToolsKeyboard(languageCode) {
+export function buildEditorToolsKeyboard(languageCode, { canManage = false, includeBranding = false } = {}) {
   const copy = editorCopy(languageCode);
+  const locale=resolveLanguage(languageCode);
+  const brandingAction = canManage
+    ? [{
+        text: locale === 'ar'
+          ? (includeBranding ? 'إخفاء الحقوق' : 'إظهار الحقوق')
+          : (includeBranding ? tr(locale, 'Hide branding') : tr(locale, 'Show branding')),
+        callback_data: 'r:branding-toggle:' + (includeBranding ? '0' : '1'),
+      }]
+    : [{
+        text: locale === 'ar'
+          ? 'إزالة الحقوق — 99 ⭐️'
+          : tr(locale, 'Remove branding — 99 ⭐️'),
+        url: 'https://t.me/richDonateBot?start=cart_branding',
+      }];
   return {
     inline_keyboard: [
       [{ text: t(resolveLanguage(languageCode), 'emoji.title'), callback_data: 'r:emoji:open' }],
@@ -332,12 +346,7 @@ export function buildEditorToolsKeyboard(languageCode) {
         icon_custom_emoji_id: '4967657001023701985',
         callback_data: 'r:channels_soon',
       }],
-      [{
-        text: resolveLanguage(languageCode) === 'ar'
-          ? 'إزالة الحقوق — 99 ⭐️'
-          : tr(resolveLanguage(languageCode), 'Remove branding — 99 ⭐️'),
-        url: 'https://t.me/richDonateBot?start=cart_branding',
-      }],
+      brandingAction,
       [
         { text: copy.pages, callback_data: 'r:pages' },
         { text: copy.manageButtons, callback_data: 'r:buttons' },

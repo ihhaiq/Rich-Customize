@@ -1,6 +1,6 @@
 # Subscription rollout — current code versus production
 
-Updated 2026-10-11 — branch `serverless-cleanup`.
+Updated 2026-10-25 — branch `serverless-cleanup`.
 Approved product specification: [sups.md](../sups.md). This document
 describes code in GitHub, **not** production deployment or paid entitlement activation.
 
@@ -30,8 +30,11 @@ Additional runtime decisions may apply; the server performs authoritative checks
 
 ## Implemented in repository
 
-- Unified server-side policy and validation entry points in `editor-blocks.js`,
-  `editor-session.js`, page CRUD and publish guards.
+- `subscription-policy.js` contains the approved plan table and quota helpers;
+  the Mini App plan catalog is generated from that policy. This is not proof
+  that every editor/runtime path enforces every approved limit: some active
+  editor caps are still older than the approved values and must be reconciled
+  before claiming full enforcement.
 - Legacy stored pages (`quota_version=1`) remain publish-only; new pages use
   version 2. Import does not silently lift the legacy restriction.
 - The Mini App's Free table UI pre-checks against the authenticated
@@ -41,6 +44,24 @@ Additional runtime decisions may apply; the server performs authoritative checks
 - Static code, plan generation and Serverless unit tests are part of
   `npm run test:ci`, triggered on Mini App and Serverless changes by
   `.github/workflows/a1-quota-tests.yml`.
+- `planBenefit(..., 'earlyAccess')` grants the early-access entitlement to an
+  active Golden plan, including a currently active Golden gift; the plan card
+  and `/sup` display the benefit. No named experimental feature is currently
+  wired to this gate, so this entitlement does not yet expose a beta feature.
+
+## Golden Ticket early access
+
+Golden early access is an approved plan benefit, not a promise that a specific
+beta is available today. While Golden is active, eligible users may try named
+experimental features without an additional charge before general release.
+After general release, each feature follows its announced final plan, which may
+be Free or a paid tier; early access alone does not grant a permanent
+entitlement after the Golden subscription ends or if the final plan excludes
+the user.
+
+The remaining implementation work is to choose the first named beta, enforce
+its gate using the trusted Serverless entitlement, and document its scope,
+rollback path, feedback channel and final post-beta plan.
 
 ## Not yet an active subscription launch
 
@@ -59,14 +80,35 @@ Additional runtime decisions may apply; the server performs authoritative checks
    is not equivalent to a real Telegram WebView or a Cloudflare test.
 2. Review `tgcloud schema.js` migrations on a cloned database. In particular
    `rich_pages.quota_version`, `forum_topic_defaults`, and
-   `scheduled_post_destinations.failure_code` are pending production
-   reconciliation where not already applied.
+   `scheduled_post_destinations.failure_code`, and the new
+   `branding_preferences` table still need reconciliation
+   wherever they have not already been applied. The owner confirmed scheduled
+   publishing is available and in use on 2026-10-25; see
+   [scheduling.md](./scheduling.md). Do not describe that feature as
+   undeployed, but keep database reconciliation conditional on the actual
+   environment.
 3. Apply and verify migrations before deploying code that requires new columns
    or tables. Do not migrate or `tgcloud push` without owner approval.
 4. Verify Telegram Stars events, concurrent page saves, quota boundaries,
    downgrade and expiry, and RCB1 synchronization end to end.
 
 Templates and saved-page version history are intentionally excluded from scope.
+
+## Branding visibility preference — local implementation pending rollout
+
+- `branding_preferences` stores an account-level visibility choice separately
+  from the permanent payment/entitlement ledger. Trusted active Plus/Golden
+  plans, developer entitlements and permanent removal purchases may change it;
+  other accounts remain branded and retain the 99-Star cart link.
+- Eligible accounts default to hidden branding. The action button says
+  «إظهار الحقوق» while hidden and «إخفاء الحقوق» while visible. Explicit target
+  values make repeated/stale callbacks idempotent.
+- Instant publishing, previews, saved-page delivery and scheduled snapshots
+  use the effective preference. A scheduled message captures its current
+  setting and does not change when the account preference is later changed.
+- This is repository code only until the Serverless schema migration is
+  applied and the corresponding code is deployed. No migration or production
+  deployment is implied by this note.
 
 
 ## Subscription status and expiry notices (2026-10-12, GitHub only)
@@ -92,8 +134,11 @@ Templates and saved-page version history are intentionally excluded from scope.
   User delivery also depends on Telegram access. Ambiguous outcomes
   are marked uncertain rather than resent blindly. Monitor pending throughput
   and expand after load tests; this is not a production delivery guarantee.
-- **Pending production actions:** Serverless schema migration and tgcloud push,
-  D1 schedule schema migration, Cloudflare reminder Worker deployment with both Cron triggers,
-  bot-to-bot live check and actual expiration/renewal tests.
+- **Pending subscription-production actions:** live verification of trusted
+  payment activation, renewal, expiry and refund behavior; and acceptance of
+  subscription-expiry reminders through the bot-to-bot relay. These are
+  separate from scheduled publishing, which the owner confirms is already
+  available and in use. Verify any required schema migration against the
+  target environment before a deployment.
 
 - Temporary Telegram 429 rejects are retried with cooldown (up to five attempts); uncertain outcomes are not resent.
