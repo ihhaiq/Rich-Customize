@@ -374,7 +374,8 @@
       tag.classList.add("custom-inline-emoji");
       tag.setAttribute("aria-label", fallback);
 
-      if (tag.dataset.customEmojiRendered === "1" || tag.dataset.customEmojiLoading === "1") return;
+      if (tag.dataset.customEmojiRendered === "1" || tag.dataset.customEmojiLoading === "1"
+        || tag.dataset.customEmojiPreviewFailed === "1") return;
       tag.dataset.customEmojiLoading = "1";
 
       customInlineUrl(emojiId).then(url => {
@@ -383,6 +384,7 @@
         tag.dataset.customEmojiRendered = "1";
         delete tag.dataset.customEmojiLoading;
       }).catch(() => {
+        tag.dataset.customEmojiPreviewFailed = "1";
         delete tag.dataset.customEmojiLoading;
       });
     });

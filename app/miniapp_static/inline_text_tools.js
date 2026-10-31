@@ -202,6 +202,7 @@
   function syncEditor(editor, block = blockForEditor(editor)) {
     if (!editor || !block) return;
     const d = block.data || (block.data = {});
+    window.RichCustomEmojiCode?.convertEditor?.(editor);
     const serialized = serializeEditor(editor);
     delete d._rich_button;
     d.rich_text = null;

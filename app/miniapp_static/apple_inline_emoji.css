@@ -60,6 +60,16 @@
   cursor:text!important;
 }
 
+.rich-inline-editor tg-emoji.custom-inline-emoji[data-custom-emoji-preview-failed="1"],
+.details-child-text[contenteditable='true'] tg-emoji.custom-inline-emoji[data-custom-emoji-preview-failed="1"]{
+  width:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  color:inherit!important;
+  overflow:visible!important;
+  white-space:normal!important;
+}
+
 .rich-inline-editor.heading-1 tg-emoji.custom-inline-emoji,
 .rich-inline-editor.live-heading-1 tg-emoji.custom-inline-emoji,
 .rich-inline-editor.heading-2 tg-emoji.custom-inline-emoji,

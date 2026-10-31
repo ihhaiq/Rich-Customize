@@ -85,24 +85,35 @@ listEditor = function(block) {
   const values = (d.items || [{text:""}]).map(item => typeof item === "object" ? (item.text || "") : String(item));
 
   function sync() {
-    const lines = Array.from(list.querySelectorAll("[contenteditable]"), el => el.innerText.replace(/\r/g, ""));
-    d.items = lines.map((text, index) => kind === "checklist"
-      ? {text, has_checkbox:true, is_checked:false}
+    const editors = Array.from(list.querySelectorAll("[contenteditable]"));
+    editors.forEach(editor => window.RichCustomEmojiCode?.convertEditor?.(editor));
+    const entries = editors.map(editor => {
+      const clone = editor.cloneNode(true);
+      return {
+        text:String(clone.textContent || "").replace(/\r/g, ""),
+        html:String(clone.innerHTML || ""),
+      };
+    });
+    const lines = entries.map(entry => entry.text);
+    d.items = entries.map(({text, html}, index) => kind === "checklist"
+      ? {text, html, has_checkbox:true, is_checked:false}
       : kind === "numbered"
-        ? {text, value:index + 1, type:"1"}
-        : {text});
+        ? {text, html, value:index + 1, type:"1"}
+        : {text, html});
     d.text = lines.join("\n");
     const tag = kind === "numbered" ? "ol" : "ul";
-    d.html = `<${tag}>${lines.map(text => `<li>${escapeHtml(text)}</li>`).join("")}</${tag}>`;
+    d.html = `<${tag}>${entries.map(entry => `<li>${sanitizeTableCellHtml(entry.html, entry.text)}</li>`).join("")}</${tag}>`;
     markDirty();
   }
 
-  values.forEach(value => {
+  values.forEach((value, index) => {
     const li = document.createElement("li");
     const editor = document.createElement("div");
     editor.contentEditable = "true";
+    editor.className = "rich-inline-editor";
     editor.dataset.placeholder = mt("list.item");
-    editor.textContent = value;
+    const item = (d.items || [])[index];
+    editor.innerHTML = sanitizeTableCellHtml(item?.html, value);
     editor.addEventListener("focus", () => selectBlock(block.id));
     editor.addEventListener("input", sync);
     editor.addEventListener("keydown", event => {
@@ -111,6 +122,7 @@ listEditor = function(block) {
         const next = document.createElement("li");
         const nextEditor = document.createElement("div");
         nextEditor.contentEditable = "true";
+        nextEditor.className = "rich-inline-editor";
         nextEditor.addEventListener("focus", () => selectBlock(block.id));
         nextEditor.addEventListener("input", sync);
         next.appendChild(nextEditor);
@@ -184,7 +196,7 @@ function insertPlainTextAtSelection(editor, text) {
 
 function createRichTableCellEditor(cell, placeholder, {onFocus,onPointerDown,onInput} = {}) {
   const editor = document.createElement("div");
-  editor.className = "rich-table-cell-editor";
+  editor.className = "rich-table-cell-editor rich-inline-editor";
   editor.contentEditable = "true";
   editor.spellcheck = true;
   editor.dataset.placeholder = String(placeholder || "");
@@ -193,6 +205,7 @@ function createRichTableCellEditor(cell, placeholder, {onFocus,onPointerDown,onI
   editor.innerHTML = sanitizeTableCellHtml(cell?.html, cell?.text || "");
 
   const sync = () => {
+    window.RichCustomEmojiCode?.convertEditor?.(editor);
     const clone = editor.cloneNode(true);
     const text = String(clone.textContent || "").replace(/[\r\n]+/g, " ");
     const html = String(clone.innerHTML || "").replace(/(?:<br\s*\/?>)+/gi, " ");
@@ -618,6 +631,9 @@ window.RichLiveRenderer.render=renderRichBlocks;
           onInput:({text,html})=>{
             const next=cellObject(rows[ri][ci]);
             next.text=text;next.html=html;delete next.rich_text;
+            const parsed=window.RichCustomEmojiCode?.parseText?.(html);
+            const withoutEmoji=html.replace(/<tg-emoji\s+emoji-id\s*=\s*(["'])[1-9][0-9]{0,19}\1\s*>[^<]*<\/tg-emoji\s*>/gi,"");
+            if(block.data?.native&&parsed?.changed&&!withoutEmoji.includes("<"))next.rich_text=parsed.richText;
             if(!next.valign)next.valign="middle";
             rows[ri][ci]=next;
             try{rebuildTableHtml?.(block);}catch(_){}
@@ -668,4 +684,3 @@ window.RichLiveRenderer.render=renderRichBlocks;
   document.addEventListener("pointerdown",event=>{const target=event.target,insideMenu=Boolean(state.menu?.contains?.(target)),onHandle=Boolean(target.closest?.(".table-cell-handle"));if(insideMenu||onHandle)return;if(state.menu)closeMenu();if(!target.closest?.(".telegram-table")){clearSelectionVisuals();state.anchor=null;state.anchorRect=null;}},true);
   const reposition=()=>positionMenu();window.addEventListener("resize",reposition,{passive:true});window.visualViewport?.addEventListener("resize",reposition,{passive:true});window.visualViewport?.addEventListener("scroll",reposition,{passive:true});window.addEventListener("scroll",reposition,{passive:true,capture:true});
 })();
-

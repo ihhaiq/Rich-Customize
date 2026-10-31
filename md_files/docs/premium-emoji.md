@@ -1,7 +1,7 @@
 # Premium emoji in the Telegram editor
 
-Implemented on `serverless-cleanup`, using JavaScript and Telegram Serverless only.
-No Mini App changes, new database tables, runtime npm dependencies, user-Premium
+Implemented locally in the Telegram editor and Mini App static assets, using
+JavaScript. No new database tables, runtime npm dependencies, user-Premium
 checks or global Fragment-username requirements are added.
 
 ## Workflow
@@ -45,12 +45,22 @@ remains the only way this feature's edits reach a saved page.
 
 ## Text and storage
 
-Pasted complete `<tg-emoji emoji-id="ID">alternative</tg-emoji>` tags are converted
-in the real Telegram input path, including list/table cells without message
-entities. UTF-16 offsets of existing Telegram entities are remapped. Other
-pasted HTML stays literal; existing Telegram text formatting is retained.
-Copied code entities enclosing an emoji tag do not force the resulting emoji
-into monospace. Malformed tags stay text. No arbitrary HTML execution is added.
+The Telegram editor accepts both
+`<tg-emoji emoji-id="ID">alternative</tg-emoji>` and
+`![alternative](tg://emoji?id=ID)`. Complete codes are converted in the real
+Telegram input path, including list/table cells without message entities.
+UTF-16 offsets of existing Telegram entities are remapped. Other pasted HTML
+stays literal; existing Telegram text formatting is retained. Copied code
+entities enclosing an emoji code do not force the resulting emoji into
+monospace. Malformed codes stay text, and preformatted/code blocks remain
+literal. No arbitrary HTML execution is added.
+
+The Mini App's rich-text, list and table-cell editors convert either code as
+soon as it is complete. The saved value retains the custom-emoji ID and
+alternative text; the editor requests the Telegram emoji preview using the
+authenticated custom-emoji preview endpoint. If that preview is unavailable,
+the alternative text remains visible. Publishing still uses the stored
+custom-emoji ID and Telegram's destination-specific permissions.
 
 Insertion updates the existing block storage fields. Imported native blocks
 retain their native structure; editable derived fields are refreshed as well,
@@ -78,8 +88,8 @@ npm run test:emoji
 The dependency-free V8 harness runs the real feature, text conversion, rendering,
 localization, session TTL and undo/redo modules; Telegram API and DB I/O are mocked.
 Tests cover valid/invalid/unavailable packs, 300-emoji pagination, exact table
-shape and callback lengths, copied HTML and Telegram entity offsets, Arabic and
-English movement, combining marks/ZWJ/flags, native imported tables and Details,
+shape and callback lengths, HTML/Markdown codes and Telegram entity offsets,
+Arabic and English movement, combining marks/ZWJ/flags, native imported tables and Details,
 media captions, multi-selection, independent emoji positions, word movement, active-emoji switching,
 field selection, cancellation, confirmation,
 JSON storage/reopen rendering, undo/redo, limits, expired/foreign/stale callbacks,

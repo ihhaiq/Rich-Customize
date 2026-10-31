@@ -168,20 +168,21 @@ export function messageRichText(message) {
   return richRange(text, entities, 0, text.length);
 }
 
-// Interpret only complete custom-emoji tags, never arbitrary pasted HTML.
+// Interpret only complete custom-emoji HTML/Markdown codes, never arbitrary pasted HTML.
 // Remap Telegram's UTF-16 entity offsets before building the RichText tree.
 export function customEmojiHtmlInput(message) {
   const source = String(message?.text || '');
-  const pattern = /<tg-emoji\s+emoji-id\s*=\s*(["'])([1-9][0-9]{0,19})\1\s*>([^<>\r\n]+)<\/tg-emoji\s*>/gi;
+  const pattern = /<tg-emoji\s+emoji-id\s*=\s*(["'])([1-9][0-9]{0,19})\1\s*>([^<>\r\n]+)<\/tg-emoji\s*>|!\[([^\]\r\n<>]+)\]\(tg:\/\/emoji\?id=([1-9][0-9]{0,19})\)/gi;
   const replacements = [];
   let text = '';
   let cursor = 0;
   for (const match of source.matchAll(pattern)) {
-    const alt = decodeHtml(match[3]);
+    const emojiId = match[2] || match[5];
+    const alt = decodeHtml(match[3] || match[4] || '');
     if (!alt || alt.length > 64) continue;
     text += source.slice(cursor, match.index);
     replacements.push({ start: match.index, end: match.index + match[0].length,
-      offset: text.length, length: alt.length, id: match[2] });
+      offset: text.length, length: alt.length, id: emojiId });
     text += alt;
     cursor = match.index + match[0].length;
   }

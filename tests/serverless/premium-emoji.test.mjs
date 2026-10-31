@@ -51,6 +51,27 @@ test('pasted emoji HTML preserves UTF-16 entities, Arabic, links and native emoj
   assert.doesNotThrow(() => text.messageRichText({ text: '<tg-emoji emoji-id="123">&#99999999999;</tg-emoji>' }));
 });
 
+test('Markdown custom emoji codes become Telegram entities and preserve surrounding formatting', async () => {
+  const { text } = await harness();
+  const markdown = 'قبل ![🔥](tg://emoji?id=5368324170671202286) رابط بعد';
+  const message = {
+    text: markdown,
+    entities: [
+      { type: 'bold', offset: 0, length: markdown.length },
+      { type: 'text_link', offset: markdown.indexOf('رابط'), length: 4, url: 'https://example.com' },
+    ],
+  };
+  const rich = text.messageRichText(message);
+  assert.equal(text.plainRichText(rich), 'قبل 🔥 رابط بعد');
+  assert.match(text.richTextToHtml(rich), /<tg-emoji emoji-id="5368324170671202286">🔥<\/tg-emoji>/);
+  assert.match(text.richTextToHtml(rich), /<a href="https:\/\/example.com">رابط<\/a>/);
+  assert.match(text.richTextToHtml(rich), /^<b>قبل <tg-emoji/);
+  assert.equal(
+    text.plainRichText(text.messageRichText({ text: '![bad](tg://other?id=123)' })),
+    '![bad](tg://other?id=123)',
+  );
+});
+
 test('copied code entity becomes emoji; list and table text paths interpret HTML without entities', async () => {
   const { text, blocks, renderer } = await harness();
   const rich = text.messageRichText({ text: html, entities: [{ type: 'code', offset: 0, length: html.length }] });
@@ -64,6 +85,10 @@ test('copied code entity becomes emoji; list and table text paths interpret HTML
   }
   const code = blocks.textData({ text: html }, 'preformatted', 2, text.messageRichText({ text: html }), text.messageHtmlText({ text: html }));
   assert.equal(code.text, html); // A code block must stay literal.
+  const markdown = '![👍](tg://emoji?id=5368324170671202286)';
+  const markdownCode = blocks.textData({ text: markdown }, 'preformatted', 2,
+    text.messageRichText({ text: markdown }), text.messageHtmlText({ text: markdown }));
+  assert.equal(markdownCode.text, markdown);
 });
 
 test('grapheme-safe movement preserves RichText, links, Arabic marks and Enter lines', async () => {
