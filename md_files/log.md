@@ -12,7 +12,7 @@
 - **التغيير:** إضافة مزامنة/استيراد قائمة الحزم قبل الإضافة ومعالجة أخطاء الاستجابة، وتحويل وحفظ أكواد HTML/Markdown في نصوص وقوائم بلوكات التفاصيل، وإضافة تحويل أولي للمحتوى الموجود. توثيق حد النقل: Cloudflare مطلوب للاستيراد الأول لقوائم D1؛ تغيير رابط BotFather والقبول الحي ما زالا معلقين.
 - **الملفات:** `app/miniapp_static/apple_emoji_picker.js`, `app/miniapp_static/custom_emoji_code.js`, `app/miniapp_static/details_nested_editor.js`, `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/editor.html`, `tgcloud/lib/miniapp-bridge.js`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/docs/miniapp-serverless-cloudflare-dependencies.md`, `md_files/docs/serverless.md`, `md_files/log.md`.
 - **التحقق الفعلي:** نجح `npm run test:ci` (340/340) والاختبارات المركزة (12/12) و`git diff --check`. نُشرت الأصول إلى Telegram Serverless revision 123 وتحققت استجابة الملفات الثابتة 200 وCORS `OPTIONS` 204. لم يُختبر استيراد حقيقي أو إضافة حزمة داخل Telegram WebView.
-- **GitHub/النشر:** نُشرت الأصول إلى Serverless؛ لم تُدفع تغييرات هذه الدفعة إلى GitHub بعد. BotFather ما زال يفتح Cloudflare؛ لا ترحيل مخطط أو حذف بيانات D1.
+- **GitHub/النشر:** نُشرت أصول Mini App إلى Telegram Serverless revision 123، ودُفع commit `219f869` إلى `serverless-cleanup` وتحققت أصول Cloudflare Pages بعد النشر. BotFather ما زال يفتح Cloudflare؛ لا ترحيل مخطط أو حذف بيانات D1، ولم يُختبر الإضافة المصادق عليها في Telegram WebView.
 
 ## 2026-10-31 — دعم أكواد الإيموجي بريميوم في البوت والتطبيق المصغر
 
