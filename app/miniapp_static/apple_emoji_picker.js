@@ -1284,8 +1284,8 @@
       if(Number.isFinite(limit))customPacks=customPacks.slice(0,limit);
       saveCustomPacks();
       syncCustomPackTabs();
-    } catch (_) {
-      if (typeof toast === "function") toast(mt("emoji.pack_load_failed"));
+    } catch (error) {
+      window.RichMiniAppErrors?.report?.(error, {source:"custom_emoji.pack_sync"});
       syncCustomPackTabs();
     } finally {
       accessPackSyncRunning = false;

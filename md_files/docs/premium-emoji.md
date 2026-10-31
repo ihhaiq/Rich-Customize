@@ -56,11 +56,18 @@ monospace. Malformed codes stay text, and preformatted/code blocks remain
 literal. No arbitrary HTML execution is added.
 
 The Mini App's rich-text, list and table-cell editors convert either code as
-soon as it is complete. The saved value retains the custom-emoji ID and
-alternative text; the editor requests the Telegram emoji preview using the
-authenticated custom-emoji preview endpoint. If that preview is unavailable,
-the alternative text remains visible. Publishing still uses the stored
-custom-emoji ID and Telegram's destination-specific permissions.
+soon as it is complete. When a pasted code is present in plain clipboard text,
+the editor inserts it as text before converting it, so the browser cannot
+interpret the markup as HTML. Copied `tg-emoji` elements in rich clipboard HTML
+are converted back to code before insertion. The saved value retains the
+custom-emoji ID and alternative text; the editor requests the Telegram emoji
+preview using the authenticated custom-emoji preview endpoint. If that preview
+is unavailable, the alternative text remains visible. Publishing still uses
+the stored custom-emoji ID and Telegram's destination-specific permissions.
+
+Failure to synchronize the saved-pack list is reported as a pack-sync error;
+it does not display the pack-load toast during unrelated editor actions such
+as pasting an individual emoji code.
 
 Insertion updates the existing block storage fields. Imported native blocks
 retain their native structure; editable derived fields are refreshed as well,

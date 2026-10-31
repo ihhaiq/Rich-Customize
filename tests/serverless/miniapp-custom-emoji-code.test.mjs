@@ -50,3 +50,16 @@ test('Mini App rich text and table editors convert typed codes before serializat
   assert.match(emojiStyles, /data-custom-emoji-preview-failed="1"/);
   assert.match(fs.readFileSync(new URL('editor.html', root), 'utf8'), /custom_emoji_code\.js/);
 });
+
+test('Mini App intercepts code paste as plain text and converts before editor sync', () => {
+  const helper = fs.readFileSync(new URL('custom_emoji_code.js', root), 'utf8');
+  const picker = fs.readFileSync(new URL('apple_emoji_picker.js', root), 'utf8');
+  assert.match(helper, /clipboardCodeText/);
+  assert.match(helper, /clipboardData\?\.getData\?\.\('text\/plain'\)/);
+  assert.match(helper, /clipboardData\?\.getData\?\.\('text\/html'\)/);
+  assert.match(helper, /event\.preventDefault\(\)/);
+  assert.match(helper, /convertEditor\(editor\)/);
+  assert.match(helper, /document\.addEventListener\('paste', handlePaste\)/);
+  assert.match(picker, /custom_emoji\.pack_sync/);
+  assert.doesNotMatch(picker, /catch \(error\) \{\s*if \(typeof toast === "function"\) toast\(mt\("emoji\.pack_load_failed"\)\)/);
+});

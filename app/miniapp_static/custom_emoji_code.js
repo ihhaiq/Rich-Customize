@@ -86,6 +86,70 @@
     return {node:last.node, offset:last.length};
   }
 
+  function clipboardCodeText(clipboardData) {
+    const plain = String(clipboardData?.getData?.('text/plain') || '');
+    if (parseText(plain).changed) return plain;
+    const html = String(clipboardData?.getData?.('text/html') || '');
+    if (!html || !/<tg-emoji\b/i.test(html)) return '';
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    template.content.querySelectorAll('tg-emoji[emoji-id]').forEach(tag => {
+      const emojiId = String(tag.getAttribute('emoji-id') || '');
+      const alternativeText = String(tag.textContent || '');
+      if (!/^[1-9][0-9]{0,19}$/.test(emojiId) || !alternativeText || alternativeText.length > 64) return;
+      tag.replaceWith(document.createTextNode(
+        '<tg-emoji emoji-id="' + emojiId + '">' + alternativeText + '</tg-emoji>',
+      ));
+    });
+    const text = String(template.content.textContent || '');
+    return parseText(text).changed ? text : '';
+  }
+
+  function handlePaste(event) {
+    const editor = event.target?.closest?.('.rich-inline-editor');
+    if (!editor || event.defaultPrevented) return false;
+    const text = clipboardCodeText(event.clipboardData);
+    if (!text) return false;
+    event.preventDefault();
+    const selection = window.getSelection?.();
+    let range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    if (!range || !editor.contains(range.commonAncestorContainer)) {
+      range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+    }
+    range.deleteContents();
+    const fragment = document.createDocumentFragment();
+    const lines = text.replace(/\r\n?/g, '\n').split('\n');
+    let lastNode = null;
+    lines.forEach((line, index) => {
+      if (line) {
+        lastNode = document.createTextNode(line);
+        fragment.appendChild(lastNode);
+      }
+      if (index < lines.length - 1) {
+        lastNode = document.createElement('br');
+        fragment.appendChild(lastNode);
+      }
+    });
+    if (!lastNode) {
+      lastNode = document.createTextNode('');
+      fragment.appendChild(lastNode);
+    }
+    range.insertNode(fragment);
+    range.setStartAfter(lastNode);
+    range.collapse(true);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    convertEditor(editor);
+    editor.dispatchEvent(new InputEvent('input', {
+      bubbles:true,
+      inputType:'insertFromPaste',
+      data:text,
+    }));
+    return true;
+  }
+
   function convertEditor(editor) {
     if (!editor?.isConnected) return false;
     const selection = window.getSelection?.();
@@ -142,5 +206,6 @@
     return changed;
   }
 
-  window.RichCustomEmojiCode = Object.freeze({parseText, convertEditor});
+  if (typeof document !== 'undefined') document.addEventListener('paste', handlePaste);
+  window.RichCustomEmojiCode = Object.freeze({parseText, convertEditor, handlePaste});
 })();
