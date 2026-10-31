@@ -4,7 +4,7 @@
 - **التغيير:** التقاط لصق أكواد الإيموجي المكتملة كنص عادي قبل أن يحللها المتصفح كـHTML، وتحويلها إلى معاينة `tg-emoji` مع حفظ موضع المؤشر. فصل أخطاء مزامنة الحزم وتسجيلها في قناة أخطاء Mini App بدلاً من Toast تحميل الحزمة.
 - **الملفات:** `app/miniapp_static/custom_emoji_code.js`, `app/miniapp_static/apple_emoji_picker.js`, `app/miniapp_static/editor.html`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/docs/premium-emoji.md`, `md_files/log.md`.
 - **التحقق الفعلي:** نجح `npm run test:ci` (فحوص الخطة والأصول، والاختبارات 340/340) و`npm run test:emoji` (20/20)، و`git diff --check`.
-- **GitHub/النشر:** لم تُدفع هذه الإصلاحات بعد؛ لم يُختبر إدخال حي داخل Telegram WebView.
+- **GitHub/النشر:** دُفع commit `fb639e7` إلى `serverless-cleanup`، وتأكد نشر Cloudflare Pages بجلب ملفات المحول ومعالجة مزامنة الحزم بعد التحديث. `npx tgcloud push` أكد «لا تغييرات للنشر»؛ Telegram Serverless على revision 121 و67 ملف Mini App ثابت متزامنة. لم يُختبر الإدخال حياً داخل Telegram WebView؛ لا ترحيل مخطط.
 
 ## 2026-10-31 — دعم أكواد الإيموجي بريميوم في البوت والتطبيق المصغر
 
