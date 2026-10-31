@@ -15,7 +15,7 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
     records[name] = [];
     tables[name] = new Proxy({ _name: name }, { get: (target, prop) => prop === '_name' ? target._name : { table: name, key: prop } });
   }
-  const keys = { goldenBroadcasts:'month', goldenAnnouncements:'key', goldenCampaigns:'month', goldenClaims:'key', legacyStates:'namespace', miniappBridgeRequests:'requestId', editorSessions: 'userId', maintenanceLocks: 'name', processedUpdates: 'updateId', requestWindows: 'key', richPages: 'pageId', usageUsers: 'userId', editorSubscriptions: 'userId', managedBotOrders: 'orderId', managedBotPayments: 'chargeId', managedBotLicenses: 'licenseId', brandingEntitlements: 'userId', brandingPreferences: 'userId', forumTopicDefaults: 'chatId' };
+  const keys = { goldenBroadcasts:'month', goldenAnnouncements:'key', goldenCampaigns:'month', goldenClaims:'key', legacyStates:'namespace', miniappBridgeRequests:'requestId', editorSessions: 'userId', editorAlbumItems: 'key', maintenanceLocks: 'name', processedUpdates: 'updateId', requestWindows: 'key', richPages: 'pageId', usageUsers: 'userId', editorSubscriptions: 'userId', managedBotOrders: 'orderId', managedBotPayments: 'chargeId', managedBotLicenses: 'licenseId', brandingEntitlements: 'userId', brandingPreferences: 'userId', forumTopicDefaults: 'chatId' };
   const clone = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
   class BotApiError extends Error {
     constructor(code, description) {

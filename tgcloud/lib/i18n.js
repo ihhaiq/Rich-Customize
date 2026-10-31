@@ -2,7 +2,7 @@ import { db } from 'sdk';
 import { eq } from 'sdk/db';
 import { usageUsers } from 'schema';
 import { MESSAGE_KEYS, SUPPORTED_LOCALES } from 'lib/i18n-keys';
-import { SOURCE_TRANSLATIONS, UI_TERMS } from 'lib/i18n-source';
+import { EDITOR_COPY, SOURCE_TRANSLATIONS, UI_TERMS } from 'lib/i18n-source';
 import { BOT_PROFILES } from 'lib/bot-profiles';
 import { MAIN_AR_BY_EN } from 'lib/main-ar-source';
 import enValues from 'lib/lang/en';
@@ -712,6 +712,7 @@ export function tr(locale, source, values = null) {
     text = original;
   } else {
     const exact = mainArabic(language, original)
+      ?? EDITOR_COPY[language]?.[original]
       ?? SOURCE_TRANSLATIONS[language]?.[original];
     const semanticKey = ENGLISH_KEY_BY_TEXT.get(original);
     text = exact

@@ -6,6 +6,7 @@
 | Repository orientation and invariants | [AGENTS.md](../AGENTS.md) |
 | Runtime and storage map | [ARCHITECTURE.md](../md_files/ARCHITECTURE.md) |
 | Serverless workflow | [serverless.md](../md_files/docs/serverless.md) |
+| Agent guide: building a Telegram Serverless feature | [telegram-serverless-feature-agent-guide.md](../md_files/docs/telegram-serverless-feature-agent-guide.md) |
 | Mini App / Cloudflare | [cloudflare-pages-miniapp.md](../md_files/docs/cloudflare-pages-miniapp.md) |
 | خطة نقل Mini App إلى Serverless | [miniapp-serverless-migration.md](../md_files/docs/miniapp-serverless-migration.md) |
 | نواقص Mini App المعتمدة على Cloudflare | [miniapp-serverless-cloudflare-dependencies.md](../md_files/docs/miniapp-serverless-cloudflare-dependencies.md) |

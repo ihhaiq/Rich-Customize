@@ -2184,3 +2184,123 @@ export const UI_TERMS = Object.freeze({
     "block": "區塊"
   }
 });
+
+export const EDITOR_COPY = Object.freeze({
+  ar: {
+    Media: "الوسائط",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "الرابط ممكن يكون URL أو @username أو t.me/username. وتكدر تضيف لون اختياري: #r أحمر، #b أزرق، #g أخضر.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "أرسل سطراً واحداً بهذا التنسيق:\nاسم الزر - الرابط\nأو\nاسم الزر - cbd:كود_الصفحة",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "تكدر ترسل صورة، ملف، بصمة صوتية، فيديو، ملف صوتي، صورة متحركة (GIF)، أو ألبوم صور (كولاج). كل وسيط ينحفظ بنوعه الأصلي.",
+  },
+  en: {
+    Media: "Media",
+  },
+  es: {
+    Media: "Multimedia",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "El enlace puede ser una URL, @username o t.me/username. Colores opcionales: #r rojo, #b azul, #g verde.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Envía una sola línea con este formato:\nNombre del botón - URL\no\nNombre del botón - cbd:código_de_página",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Envía una foto, archivo, nota de voz, vídeo, archivo de audio, animación (GIF) o álbum de fotos (collage). Cada elemento se guarda con su tipo de medio original.",
+  },
+  de: {
+    Media: "Medien",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "Der Link kann eine URL, @username oder t.me/username sein. Optionale Farben: #r Rot, #b Blau, #g Grün.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Sende eine einzelne Zeile in diesem Format:\nButtonname - URL\noder\nButtonname - cbd:Seitencode",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Sende ein Foto, eine Datei, Sprachnachricht, ein Video, eine Audiodatei, Animation (GIF) oder Fotoalbum (Collage). Jedes Element wird als ursprünglicher Medientyp gespeichert.",
+  },
+  it: {
+    Media: "Contenuti multimediali",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "Il link può essere un URL, @username o t.me/username. Colori facoltativi: #r rosso, #b blu, #g verde.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Invia una sola riga in questo formato:\nNome pulsante - URL\noppure\nNome pulsante - cbd:codice_pagina",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Invia una foto, un file, un messaggio vocale, un video, un file audio, un'animazione (GIF) o un album di foto (collage). Ogni elemento viene salvato con il suo tipo di media originale.",
+  },
+  pt: {
+    Media: "Mídia",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "O link pode ser uma URL, @username ou t.me/username. Cores opcionais: #r vermelho, #b azul, #g verde.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Envie uma única linha neste formato:\nNome do botão - URL\nou\nNome do botão - cbd:código_da_página",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Envie uma foto, arquivo, mensagem de voz, vídeo, arquivo de áudio, animação (GIF) ou álbum de fotos (colagem). Cada item é salvo com seu tipo de mídia original.",
+  },
+  nl: {
+    Media: "Media",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "De link kan een URL, @username of t.me/username zijn. Optionele kleuren: #r rood, #b blauw, #g groen.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Stuur één regel in dit formaat:\nKnopnaam - URL\nof\nKnopnaam - cbd:pagina_code",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Stuur een foto, bestand, spraakbericht, video, audiobestand, animatie (GIF) of fotoalbum (collage). Elk item wordt opgeslagen als het oorspronkelijke mediatype.",
+  },
+  pl: {
+    Media: "Media",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "Link może być adresem URL, @username lub t.me/username. Opcjonalne kolory: #r czerwony, #b niebieski, #g zielony.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Wyślij jeden wiersz w tym formacie:\nNazwa przycisku - URL\nlub\nNazwa przycisku - cbd:kod_strony",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Wyślij zdjęcie, plik, wiadomość głosową, film, plik audio, animację (GIF) lub album zdjęć (kolaż). Każdy element zostanie zapisany jako jego oryginalny typ mediów.",
+  },
+  uk: {
+    Media: "Медіа",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "Посиланням може бути URL, @username або t.me/username. Необов’язкові кольори: #r червоний, #b синій, #g зелений.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Надішліть один рядок у такому форматі:\nНазва кнопки - URL\nабо\nНазва кнопки - cbd:код_сторінки",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Надішліть фото, файл, голосове повідомлення, відео, аудіофайл, анімацію (GIF) або фотоальбом (колаж). Кожен елемент буде збережено у своєму початковому типі медіа.",
+  },
+  ru: {
+    Media: "Медиа",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "Ссылка может быть URL, @username или t.me/username. Необязательные цвета: #r красный, #b синий, #g зелёный.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Отправьте одну строку в таком формате:\nНазвание кнопки - URL\nили\nНазвание кнопки - cbd:код_страницы",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Отправьте фото, файл, голосовое сообщение, видео, аудиофайл, анимацию (GIF) или фотоальбом (коллаж). Каждый элемент сохранится в исходном типе медиа.",
+  },
+  tr: {
+    Media: "Medya",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "Bağlantı URL, @username veya t.me/username olabilir. İsteğe bağlı renkler: #r kırmızı, #b mavi, #g yeşil.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Bu biçimde tek satır gönderin:\nDüğme adı - URL\nveya\nDüğme adı - cbd:sayfa_kodu",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Fotoğraf, dosya, sesli mesaj, video, ses dosyası, animasyon (GIF) veya fotoğraf albümü (kolaj) gönderin. Her öğe özgün medya blok türünde kaydedilir.",
+  },
+  ur: {
+    Media: "میڈیا",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "لنک URL، @username یا t.me/username ہو سکتا ہے۔ اختیاری رنگ: #r سرخ، #b نیلا، #g سبز۔",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "اس فارمیٹ میں ایک سطر بھیجیں:\nبٹن کا نام - URL\nیا\nبٹن کا نام - cbd:صفحہ_کوڈ",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "تصویر، فائل، وائس نوٹ، ویڈیو، آڈیو فائل، اینیمیشن (GIF)، یا تصاویر کا البم (کولاج) بھیجیں۔ ہر چیز اپنی اصل میڈیا بلاک قسم میں محفوظ ہوگی۔",
+  },
+  hi: {
+    Media: "मीडिया",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "लिंक URL, @username या t.me/username हो सकता है। वैकल्पिक रंग: #r लाल, #b नीला, #g हरा।",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "इस प्रारूप में एक पंक्ति भेजें:\nबटन का नाम - URL\nया\nबटन का नाम - cbd:पेज_कोड",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "फ़ोटो, फ़ाइल, वॉइस नोट, वीडियो, ऑडियो फ़ाइल, एनिमेशन (GIF), या फ़ोटो एल्बम (कोलाज) भेजें। हर आइटम अपने मूल मीडिया ब्लॉक प्रकार में सहेजा जाएगा।",
+  },
+  id: {
+    Media: "Media",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "Tautan dapat berupa URL, @username, atau t.me/username. Warna opsional: #r merah, #b biru, #g hijau.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Kirim satu baris dengan format ini:\nNama tombol - URL\natau\nNama tombol - cbd:kode_halaman",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Kirim foto, file, pesan suara, video, file audio, animasi (GIF), atau album foto (kolase). Setiap item disimpan dengan jenis blok media aslinya.",
+  },
+  ja: {
+    Media: "メディア",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "リンクにはURL、@username、またはt.me/usernameを指定できます。色は任意です: #r 赤、#b 青、#g 緑。",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "次の形式で1行送信してください:\nボタン名 - URL\nまたは\nボタン名 - cbd:ページコード",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "写真、ファイル、ボイスメッセージ、動画、音声ファイル、アニメーション (GIF)、または写真アルバム (コラージュ) を送信してください。各アイテムは元のメディアブロック種類で保存されます。",
+  },
+  ko: {
+    Media: "미디어",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "링크는 URL, @username 또는 t.me/username일 수 있습니다. 선택 색상: #r 빨강, #b 파랑, #g 초록.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "다음 형식으로 한 줄을 보내세요:\n버튼 이름 - URL\n또는\n버튼 이름 - cbd:페이지_코드",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "사진, 파일, 음성 메시지, 동영상, 오디오 파일, 애니메이션 (GIF) 또는 사진 앨범 (콜라주)을 보내세요. 각 항목은 원래 미디어 블록 유형으로 저장됩니다.",
+  },
+  vi: {
+    Media: "Phương tiện",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "Liên kết có thể là URL, @username hoặc t.me/username. Màu tùy chọn: #r đỏ, #b xanh dương, #g xanh lá.",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "Gửi một dòng theo định dạng này:\nTên nút - URL\nhoặc\nTên nút - cbd:mã_trang",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "Gửi ảnh, tệp, tin nhắn thoại, video, tệp âm thanh, ảnh động (GIF) hoặc album ảnh (ảnh ghép). Mỗi mục được lưu theo loại khối phương tiện ban đầu.",
+  },
+  th: {
+    Media: "สื่อ",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "ลิงก์เป็น URL, @username หรือ t.me/username ได้ สีที่เลือกได้: #r แดง #b น้ำเงิน #g เขียว",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "ส่งหนึ่งบรรทัดตามรูปแบบนี้:\nชื่อปุ่ม - URL\nหรือ\nชื่อปุ่ม - cbd:รหัสหน้า",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "ส่งรูปภาพ ไฟล์ ข้อความเสียง วิดีโอ ไฟล์เสียง ภาพเคลื่อนไหว (GIF) หรืออัลบั้มรูป (คอลลาจ) แต่ละรายการจะบันทึกเป็นบล็อกสื่อชนิดเดิม",
+  },
+  "zh-hans": {
+    Media: "媒体",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "链接可以是 URL、@username 或 t.me/username。可选颜色：#r 红色、#b 蓝色、#g 绿色。",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "请按此格式发送一行：\n按钮名称 - URL\n或\n按钮名称 - cbd:页面代码",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "发送照片、文件、语音消息、视频、音频文件、动画 (GIF) 或照片相册（拼贴）。每项都会按原始媒体块类型保存。",
+  },
+  "zh-hant": {
+    Media: "媒體",
+    "The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.": "連結可以是 URL、@username 或 t.me/username。可選顏色：#r 紅色、#b 藍色、#g 綠色。",
+    "Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code": "請依此格式傳送一行：\n按鈕名稱 - URL\n或\n按鈕名稱 - cbd:頁面代碼",
+    "Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.": "傳送照片、檔案、語音訊息、影片、音訊檔、動畫 (GIF) 或照片相簿（拼貼）。每個項目都會以原本的媒體區塊類型儲存。",
+  },
+});

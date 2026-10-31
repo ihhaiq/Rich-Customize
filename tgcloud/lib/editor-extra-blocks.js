@@ -1,6 +1,9 @@
 import { isDeveloper } from 'lib/developer-access';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
-import { api } from 'sdk';
+import { validateStoredButton } from 'lib/button-validation';
+import { api, db } from 'sdk';
+import { eq } from 'sdk/db';
+import { richPages } from 'schema';
 import {
   DETAILS_CHILD_TYPES,
   FINAL_RICH_BLOCK_TYPES,
@@ -411,6 +414,99 @@ function promptForEdit(type, languageCode) {
   return prompts[type] || tr(locale, 'Send new content of the same type.');
 }
 
+const LARGE_BUTTON_FORMAT = 'Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code';
+const BUTTON_LINK_AND_COLOR_GUIDE = 'The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.';
+const MEDIA_INPUT_GUIDE = 'Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.';
+const BUTTON_STYLES_BY_COLOR = Object.freeze({
+  r: 'danger',
+  b: 'primary',
+  g: 'success',
+});
+
+function largeButtonInputPrompt(languageCode) {
+  const locale = localeOf(languageCode);
+  return tr(locale, LARGE_BUTTON_FORMAT)
+    + '\n'
+    + tr(locale, BUTTON_LINK_AND_COLOR_GUIDE);
+}
+
+function mediaInputPrompt(languageCode) {
+  return tr(localeOf(languageCode), MEDIA_INPUT_GUIDE);
+}
+
+async function parseLargeButtonInput(input, userId) {
+  const raw = String(input || '').trim();
+  const separator = /\s+[-–—]\s+/u.exec(raw);
+  if (!separator) return { error: 'format' };
+  const text = raw.slice(0, separator.index).trim();
+  let target = raw.slice(separator.index + separator[0].length).trim();
+  if (!text || !target) return { error: 'format' };
+  if (text.length > 64) return { error: 'title' };
+  const colorMatch = /\s+#([rbg])$/i.exec(target);
+  const style = colorMatch
+    ? BUTTON_STYLES_BY_COLOR[colorMatch[1].toLowerCase()]
+    : null;
+  if (colorMatch) target = target.slice(0, colorMatch.index).trim();
+  if (!target) return { error: 'format' };
+
+  const pageMatch = /^cbd(?::|\s+)([A-Za-z0-9_-]{1,64})$/i.exec(target);
+  if (pageMatch) {
+    const pageId = pageMatch[1];
+    const page = await db.select()
+      .from(richPages)
+      .where(eq(richPages.pageId, pageId))
+      .get();
+    if (!page || Number(page.ownerId) !== Number(userId)) {
+      return { error: 'page' };
+    }
+    const button = {
+      text,
+      callback_data: 'r:cbd:' + pageId,
+      ...(style ? { style } : {}),
+    };
+    return validateStoredButton({
+      text,
+      type: 'callback_data',
+      value: button.callback_data,
+    }).ok
+      ? { button }
+      : { error: 'format' };
+  }
+
+  const url = /^@[A-Za-z0-9_]{5,32}$/.test(target)
+    ? 'https://t.me/' + target.slice(1)
+    : /^t\.me\/[^\s]+$/i.test(target)
+      ? 'https://' + target
+      : target;
+  const button = {
+    text,
+    url,
+    ...(style ? { style } : {}),
+  };
+  return validateStoredButton({ ...button, type: 'url' }).ok
+    ? { button }
+    : { error: 'format' };
+}
+
+async function replyLargeButtonInputError(message, error, languageCode) {
+  if (error === 'title') {
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      text: tr(localeOf(languageCode), 'The button title is too long; the maximum is 64 characters.'),
+    });
+  } else if (error === 'page') {
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      text: tr(localeOf(languageCode), 'The page code does not exist or does not belong to you.'),
+    });
+  } else {
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      text: largeButtonInputPrompt(languageCode),
+    });
+  }
+}
+
 function readyRichBlock(message, type) {
   if (!message?.rich_message) return null;
   const wanted = String(type || '');
@@ -789,6 +885,28 @@ async function handleAddCallback(query, session, data, languageCode) {
   const chatId = query.message?.chat?.id;
   const messageId = query.message?.message_id;
   if (!chatId || !messageId) return false;
+
+  if (data === 'r:add:buttons') {
+    await setEditorState(userId, 'adding_block', {
+      pendingAddType: 'buttons',
+      addStep: 'large_button_entry',
+      addPayload: {},
+    });
+    await sendPrompt(userId, chatId, largeButtonInputPrompt(languageCode));
+    await answer(query);
+    return true;
+  }
+
+  if (data === 'r:add:media') {
+    await setEditorState(userId, 'adding_block', {
+      pendingAddType: 'media',
+      addStep: 'content',
+      addPayload: {},
+    });
+    await sendPrompt(userId, chatId, mediaInputPrompt(languageCode));
+    await answer(query);
+    return true;
+  }
 
   if (data === 'r:add:listmenu') {
     await editMessage(
@@ -1346,10 +1464,17 @@ async function handleEditCallback(query, session, data, languageCode) {
   await setEditorState(query.from.id, 'editing_block', {
     currentBlockId: id,
     expectedType: type,
-    editField: null,
+    editField: type === 'buttons' ? 'large_button_entry' : null,
     headingSize: null,
+    addPayload: {},
   });
-  await sendPrompt(query.from.id, query.message.chat.id, promptForEdit(type, languageCode));
+  await sendPrompt(
+    query.from.id,
+    query.message.chat.id,
+    type === 'buttons'
+      ? largeButtonInputPrompt(languageCode)
+      : promptForEdit(type, languageCode),
+  );
   await answer(query);
   return true;
 }
@@ -2130,7 +2255,9 @@ async function handleDetailsManagerCallback(query, session, data, languageCode) 
 export function isExtraBlockCallback(data) {
   const value = String(data || '');
   return (
-    value === 'r:add:listmenu'
+    value === 'r:add:buttons'
+    || value === 'r:add:media'
+    || value === 'r:add:listmenu'
     || value === 'r:details:add'
     || value === 'r:details:content'
     || value === 'r:details:cancel'
@@ -2246,11 +2373,92 @@ async function handleSlideshowMessage(message, session, languageCode, nested = f
   return true;
 }
 
+async function handleCollageAddMessage(message, session, languageCode) {
+  if (message?.media_group_id) {
+    const collected = await rememberMediaGroup(message, 'collage');
+    if (!collected) return true;
+    const children = mediaChildrenFromBlocks(collected.blocks);
+    const nextPayload = clone(session.addPayload || {});
+    nextPayload.collage_upload = {
+      group_id: collected.groupId,
+      token: collected.token,
+    };
+    await updateEditorSession(message.from.id, { addPayload: nextPayload });
+    await clearInputMessages(session, message);
+    await sendPrompt(
+      message.from.id,
+      message.chat.id,
+      t(localeOf(languageCode), 'media.received', {
+        count: children.length,
+        type: t(localeOf(languageCode), 'block.collage'),
+      }),
+      collageConfirmationKeyboard(collected.token, languageCode),
+    );
+    return true;
+  }
+  const children = mediaChildren(message);
+  if (!children.length) {
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      text: t(localeOf(languageCode), 'media.send_collage'),
+    });
+    return true;
+  }
+  await finishAdd(
+    message.from.id,
+    session,
+    message,
+    makeBlock('collage', { children, caption_html: null, credit_html: null }),
+    languageCode,
+  );
+  return true;
+}
+
 async function handleAddMessage(message, session, languageCode) {
   const userId = message.from.id;
   const type = String(session.pendingAddType || '');
   const step = String(session.addStep || 'content');
   const payload = clone(session.addPayload || {});
+
+  if (type === 'buttons') {
+    if (step !== 'large_button_entry' || !message?.text) {
+      await api.sendMessage({
+        chat_id: message.chat.id,
+        text: largeButtonInputPrompt(languageCode),
+      });
+      return true;
+    }
+    const parsed = await parseLargeButtonInput(message.text, userId);
+    if (!parsed.button) {
+      await replyLargeButtonInputError(message, parsed.error, languageCode);
+      return true;
+    }
+    await finishAdd(
+      userId,
+      session,
+      message,
+      makeBlock('buttons', { buttons: [parsed.button] }),
+      languageCode,
+    );
+    return true;
+  }
+
+  if (type === 'media') {
+    if (message?.media_group_id) {
+      return handleCollageAddMessage(message, session, languageCode);
+    }
+    const media = messageToBlocks(message).find((block) => MEDIA_TYPES.has(String(block?.type || '')));
+    const block = media ? mediaBlock(message, media.type) : null;
+    if (!block) {
+      await api.sendMessage({
+        chat_id: message.chat.id,
+        text: mediaInputPrompt(languageCode),
+      });
+      return true;
+    }
+    await finishAdd(userId, session, message, block, languageCode);
+    return true;
+  }
 
   if (type === 'details') return handleDetailsAddMessage(message, session, languageCode);
 
@@ -2377,37 +2585,7 @@ async function handleAddMessage(message, session, languageCode) {
 
   if (type === 'slideshow') return handleSlideshowMessage(message, session, languageCode, false);
 
-  if (type === 'collage') {
-    if (message?.media_group_id) {
-      const collected = await rememberMediaGroup(message, 'collage');
-      if (!collected) return true;
-      const children = mediaChildrenFromBlocks(collected.blocks);
-      const nextPayload = clone(session.addPayload || {});
-      nextPayload.collage_upload = {
-        group_id: collected.groupId,
-        token: collected.token,
-      };
-      await updateEditorSession(userId, { addPayload: nextPayload });
-      await clearInputMessages(session, message);
-      await sendPrompt(
-        userId,
-        message.chat.id,
-        t(localeOf(languageCode), 'media.received', {
-          count: children.length,
-          type: t(localeOf(languageCode), 'block.collage'),
-        }),
-        collageConfirmationKeyboard(collected.token, languageCode),
-      );
-      return true;
-    }
-    const children = mediaChildren(message);
-    if (!children.length) {
-      await api.sendMessage({ chat_id: message.chat.id, text: t(localeOf(languageCode), 'media.send_collage') });
-      return true;
-    }
-    await finishAdd(userId, session, message, makeBlock('collage', { children, caption_html: null, credit_html: null }), languageCode);
-    return true;
-  }
+  if (type === 'collage') return handleCollageAddMessage(message, session, languageCode);
 
   if (type === 'map') {
     if (!message?.location) {
@@ -2790,6 +2968,21 @@ async function handleEditMessage(message, session, languageCode) {
   const block = getBlockById(session.blocks, session.currentBlockId);
   const type = String(session.expectedType || '');
   if (!block || block.type !== type) return false;
+
+  if (type === 'buttons' && session.editField === 'large_button_entry') {
+    const parsed = await parseLargeButtonInput(message?.text, message.from.id);
+    if (!parsed.button) {
+      await replyLargeButtonInputError(message, parsed.error, languageCode);
+      return true;
+    }
+    const current = Array.isArray(block.data?.buttons) ? block.data.buttons[0] : null;
+    const replacement = stripNative(block.data || {});
+    replacement.buttons = [{
+      ...parsed.button,
+      ...(!parsed.button.style && current?.style ? { style: current.style } : {}),
+    }];
+    return replaceTopBlock(message.from.id, session, message, block, replacement, languageCode);
+  }
 
   if (session.editField === 'summary' && type === 'details') {
     if (!message?.text) {

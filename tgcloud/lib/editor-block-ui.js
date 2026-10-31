@@ -367,6 +367,8 @@ export function buildAddBlockKeyboard(languageCode) {
     ['paragraph', 'r:add:paragraph'],
     ['heading', 'r:add:heading'],
     ['preformatted', 'r:add:preformatted'],
+    ['buttons', 'r:add:buttons'],
+    ['media', 'r:add:media'],
     ['footer', 'r:add:footer'],
     ['divider', 'r:add:divider'],
     ['mathematical_expression', 'r:add:mathematical_expression'],
@@ -374,22 +376,17 @@ export function buildAddBlockKeyboard(languageCode) {
     ['list', 'r:add:listmenu'],
     ['blockquote', 'r:add:blockquote'],
     ['pullquote', 'r:add:pullquote'],
-    ['collage', 'r:add:collage'],
     ['slideshow', 'r:add:slideshow'],
     ['table', 'r:add:table'],
     ['details', 'r:add:details'],
     ['map', 'r:add:map'],
-    ['animation', 'r:add:animation'],
-    ['audio', 'r:add:audio'],
-    ['photo', 'r:add:photo'],
-    ['document', 'r:add:document'],
-    ['video', 'r:add:video'],
-    ['voice', 'r:add:voice'],
   ];
   const rows = [];
   for (let index = 0; index < choices.length; index += 2) {
     rows.push(choices.slice(index, index + 2).map(([kind, callbackData]) => ({
-      text: blockLabel(kind, languageCode),
+      text: kind === 'media'
+        ? '📎 ' + tr(languageCode, 'Media')
+        : blockLabel(kind, languageCode),
       callback_data: callbackData,
     })));
   }

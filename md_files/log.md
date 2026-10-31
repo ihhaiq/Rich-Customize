@@ -1,3 +1,51 @@
+## 2026-10-31 — دعم أكواد الإيموجي بريميوم في البوت والتطبيق المصغر
+
+- **السبب:** طلب المالك إدخال كود الإيموجي المخصص بصيغتي HTML وMarkdown مباشرة أثناء تعديل محتوى البلوكات، بما في ذلك Mini App.
+- **التغيير:** تحويل `<tg-emoji emoji-id="…">بديل</tg-emoji>` و`![بديل](tg://emoji?id=…)` إلى كيانات Telegram مخصصة مع إبقاء بديل النص، وإعادة تعيين إزاحات كيانات Telegram الموجودة. في Mini App تتحول الأكواد المكتملة أثناء التحرير إلى عناصر معاينة مخصصة، وتُحفظ المعرفات في النصوص والقوائم والخلايا؛ وتبقى بلوكات الكود حرفية. توثيق السلوك وحدود المعاينة.
+- **الملفات:** `tgcloud/lib/rich-text.js`, `app/miniapp_static/custom_emoji_code.js`, `app/miniapp_static/editor.html`, `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/live_preview.js`, `app/miniapp_static/apple_inline_emoji.js`, `app/miniapp_static/apple_inline_emoji.css`, `tests/serverless/premium-emoji.test.mjs`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/docs/premium-emoji.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (339/339؛ فحوص الخطط وأصول Mini App نجحت)، و`npm run test:emoji` (20/20)، واختبار تحويل Mini App (3/3)، وفحص صياغة الملفات المعدلة و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم تُدفع إلى GitHub ولم تُنشر إلى Telegram Serverless أو Mini App. لا تغيير مخطط أو ترحيل.
+
+## 2026-10-31 — دليل الوكيل لبناء ميزة Telegram Serverless
+
+- **السبب:** طلب إعداد دليل Markdown يوضح للوكيل طريقة بدء وتنفيذ ميزة جديدة بما يلائم بيئة Telegram Serverless ومعمارية المستودع.
+- **التغيير:** إضافة دليل عربي يغطي فهم المتطلبات، اختيار موضع التنفيذ، حدود التشغيل والبيانات، الصلاحيات والتوافق، الاختبارات، التوثيق وبوابة النشر؛ وربطه بفهرس الوثائق.
+- **الملفات:** `md_files/docs/telegram-serverless-feature-agent-guide.md`, `docs/README.md`, `md_files/log.md`.
+- **التحقق الفعلي:** تغيير توثيقي فقط؛ لم تُشغّل اختبارات التطبيق. فُحص وجود ملف الدليل وهدف رابطه وعدم وجود مسافات زائدة، ونجح `git diff --check` للملفات المتتبعة.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم تُدفع إلى GitHub ولم تُنشر إلى Telegram Serverless أو Cloudflare.
+
+## 2026-10-30 — قبول يوزرات تليكرام وألوان الزر الكبير
+
+- **السبب:** طلب المالك استخدام أسماء Telegram المختصرة وأكواد الألوان ضمن سطر إعداد الزر.
+- **التغيير:** قبول `@username` وتحويله إلى `https://t.me/username`، وقبول `t.me/...` دون مخطط HTTPS وإضافة المخطط عند الحفظ. دعم `#r` أحمر و`#b` أزرق و`#g` أخضر للروابط وأزرار CBD، وإضافة شرح مترجم لصيغة الإدخال.
+- **الملفات:** `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/i18n-source.js`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm.cmd run test:ci`؛ فحوص الخطط والأصول نجحت، والاختبارات **335/335**. الاختبار المركّز نجح (11/11)، بما فيه تغيير اللون أثناء تعديل الزر والتحقق من الترجمات، ونجح `git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم تُدفع إلى GitHub ولم تُنشر إلى Telegram Serverless.
+
+## 2026-10-30 — إضافة رمز لزر الوسائط
+
+- **السبب:** طلب المالك تمييز زر الوسائط برمز مناسب.
+- **التغيير:** إضافة رمز المرفقات 📎 قبل الاسم المترجم للوسائط.
+- **الملفات:** `tgcloud/lib/editor-block-ui.js`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح اختبار `large-button-block.test.mjs` بالكامل (10/10)، ونجح `git diff --check`.
+- **GitHub/النشر:** تغيير محلي فقط؛ لم يُدفع إلى GitHub ولم يُنشر إلى Telegram Serverless.
+
+## 2026-10-30 — تبسيط إدخال الزر وتجميع بلوكات الوسائط
+
+- **السبب:** طلب المالك إدخال عنوان الزر ورابطه برسالة واحدة، وتقليل خيارات الوسائط مع الحفاظ على النوع الفعلي لكل مرفق.
+- **التغيير:** تغيير طلب الزر إلى `اسم الزر - الرابط` أو `اسم الزر - cbd:كود_الصفحة` في رسالة واحدة؛ التحقق من الرابط ومن ملكية صفحة CBD. تجميع photo/document/voice/video/audio/animation/collage تحت خيار «الوسائط» مع إرشاد يذكر الأنواع المخفية، مع إبقاء كل مرفق منفرداً في نوعه الأصلي وتجميع الألبوم ككولاج. إضافة ترجمات للغة المدعومة.
+- **الملفات:** `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/editor-block-flow.js`, `tgcloud/lib/editor-block-ui.js`, `tgcloud/lib/i18n.js`, `tgcloud/lib/i18n-source.js`, `tests/serverless/large-button-block.test.mjs`, `tests/serverless/harness.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm.cmd run test:ci`؛ فحوص الخطط والأصول نجحت، والاختبارات **334/334**. الاختبارات المركزة (10/10) تغطي أنواع الوسائط المنفردة والألبوم، إدخال URL وCBD والتحقق من ملكية الصفحة، وتغطية اللغات العشرين. نجح `git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم تُدفع إلى GitHub ولم تُنشر إلى Telegram Serverless. لا تغيير مخطط أو ترحيل.
+
+## 2026-10-30 — إضافة الزر الكبير إلى محرر البوت
+
+- **السبب:** التنفيذ السابق أضاف البلوك إلى Mini App فقط، بينما قائمة المستخدم المطلوبة هي قائمة البلوكات داخل محرر Telegram.
+- **التغيير:** إضافة خيار الأزرار إلى قائمة محرر البوت وربطه بإنشاء بلوك مستقل بزر واحد كبير عبر إدخال العنوان والرابط، مع التحقق من الرابط وإتاحة تعديل البلوك. إعادة استخدام مفاتيح الترجمة الموجودة واختبار ظهورها في اللغات العشرين المدعومة.
+- **الملفات:** `tgcloud/lib/editor-blocks.js`, `tgcloud/lib/editor-block-ui.js`, `tgcloud/lib/editor-block-flow.js`, `tgcloud/lib/editor-extra-blocks.js`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm.cmd run test:ci`؛ فحوص الخطط والأصول نجحت، والاختبارات **331/331**.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم تُدفع إلى GitHub ولم تُنشر إلى Telegram Serverless. لا تغيير مخطط أو ترحيل.
+
 ## 2026-10-30 — استكمال ترجمة بلوكة الزر الكبير
 
 - **السبب:** طلب المالك نشر بلوكة الزر الكبير والتأكد من تزامن مفاتيح اللغات؛ المراجعة وجدت أن الروسية مستثناة من fallback وتفتقد مفتاحَي اسم ووصف البلوكة.

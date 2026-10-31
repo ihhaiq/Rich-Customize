@@ -11,6 +11,7 @@ export const FIRST_BLOCK_TYPES = Object.freeze([
   'preformatted',
   'footer',
   'divider',
+  'buttons',
 ]);
 
 export const FINAL_RICH_BLOCK_TYPES = Object.freeze([

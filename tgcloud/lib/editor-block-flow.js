@@ -1158,6 +1158,21 @@ export async function handleEditorBlockCallback(query) {
       return true;
     }
 
+    if (type === 'buttons') {
+      await setEditorState(query.from.id, 'adding_block', {
+        pendingAddType: type,
+        addStep: 'large_button_entry',
+        addPayload: {},
+      });
+      await sendPrompt(
+        query.from.id,
+        chatId,
+        tr(resolveLanguage(code), 'Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code'),
+      );
+      await api.answerCallbackQuery({ callback_query_id: query.id });
+      return true;
+    }
+
     if (type === 'heading') {
       await api.sendMessage({
         chat_id: chatId,
