@@ -142,11 +142,15 @@
     selection?.removeAllRanges();
     selection?.addRange(range);
     convertEditor(editor);
-    editor.dispatchEvent(new InputEvent('input', {
-      bubbles:true,
-      inputType:'insertFromPaste',
-      data:text,
-    }));
+    try {
+      editor.dispatchEvent(new InputEvent('input', {
+        bubbles:true,
+        inputType:'insertFromPaste',
+        data:text,
+      }));
+    } catch (_) {
+      editor.dispatchEvent(new Event('input', {bubbles:true}));
+    }
     return true;
   }
 

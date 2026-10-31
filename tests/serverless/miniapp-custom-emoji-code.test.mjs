@@ -54,6 +54,9 @@ test('Mini App rich text and table editors convert typed codes before serializat
 test('Mini App intercepts code paste as plain text and converts before editor sync', () => {
   const helper = fs.readFileSync(new URL('custom_emoji_code.js', root), 'utf8');
   const picker = fs.readFileSync(new URL('apple_emoji_picker.js', root), 'utf8');
+  const nestedEditor = fs.readFileSync(new URL('details_nested_editor.js', root), 'utf8');
+  const inlineTools = fs.readFileSync(new URL('inline_text_tools.js', root), 'utf8');
+  const bridge = fs.readFileSync(new URL('../../tgcloud/lib/miniapp-bridge.js', import.meta.url), 'utf8');
   assert.match(helper, /clipboardCodeText/);
   assert.match(helper, /clipboardData\?\.getData\?\.\('text\/plain'\)/);
   assert.match(helper, /clipboardData\?\.getData\?\.\('text\/html'\)/);
@@ -61,5 +64,18 @@ test('Mini App intercepts code paste as plain text and converts before editor sy
   assert.match(helper, /convertEditor\(editor\)/);
   assert.match(helper, /document\.addEventListener\('paste', handlePaste\)/);
   assert.match(picker, /custom_emoji\.pack_sync/);
+  assert.match(picker, /await loadPackAccessFromServer\(\)/);
+  assert.match(picker, /CUSTOM_EMOJI_PACK_LIMIT/);
+  assert.ok(
+    picker.indexOf('await loadPackAccessFromServer()')
+      < picker.indexOf('fetch("/miniapp/api/custom-emoji/pack"'),
+    'legacy packs must synchronize before a new pack is claimed',
+  );
+  assert.match(nestedEditor, /details-child-text live-editor rich-inline-editor/);
+  assert.match(nestedEditor, /RichCustomEmojiCode\?\.convertEditor\?\.\(editor\)/);
+  assert.match(nestedEditor, /details-child-list-item/);
+  assert.match(nestedEditor, /RichCustomEmojiCode\?\.convertEditor\?\.\(editor\)/);
+  assert.match(inlineTools, /window\.RichInlineTextTools = Object\.freeze\(\{sanitizeInlineHtml\}\)/);
+  assert.match(bridge, /CUSTOM_EMOJI_STATE_CONFLICT/);
   assert.doesNotMatch(picker, /catch \(error\) \{\s*if \(typeof toast === "function"\) toast\(mt\("emoji\.pack_load_failed"\)\)/);
 });

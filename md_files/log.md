@@ -6,13 +6,13 @@
 - **التحقق الفعلي:** نجح `npm run test:ci` (فحوص الخطة والأصول، والاختبارات 340/340) و`npm run test:emoji` (20/20)، و`git diff --check`.
 - **GitHub/النشر:** دُفع commit `fb639e7` إلى `serverless-cleanup`، وتأكد نشر Cloudflare Pages بجلب ملفات المحول ومعالجة مزامنة الحزم بعد التحديث. `npx tgcloud push` أكد «لا تغييرات للنشر»؛ Telegram Serverless على revision 121 و67 ملف Mini App ثابت متزامنة. لم يُختبر الإدخال حياً داخل Telegram WebView؛ لا ترحيل مخطط.
 
-## 2026-10-31 — دعم أكواد الإيموجي بريميوم في البوت والتطبيق المصغر
+## 2026-10-31 — نقل إضافة ومعاينة الإيموجي إلى Serverless
 
-- **السبب:** طلب المالك إدخال كود الإيموجي المخصص بصيغتي HTML وMarkdown مباشرة أثناء تعديل محتوى البلوكات، بما في ذلك Mini App.
-- **التغيير:** تحويل `<tg-emoji emoji-id="…">بديل</tg-emoji>` و`![بديل](tg://emoji?id=…)` إلى كيانات Telegram مخصصة مع إبقاء بديل النص، وإعادة تعيين إزاحات كيانات Telegram الموجودة. في Mini App تتحول الأكواد المكتملة أثناء التحرير إلى عناصر معاينة مخصصة، وتُحفظ المعرفات في النصوص والقوائم والخلايا؛ وتبقى بلوكات الكود حرفية. توثيق السلوك وحدود المعاينة.
-- **الملفات:** `tgcloud/lib/rich-text.js`, `app/miniapp_static/custom_emoji_code.js`, `app/miniapp_static/editor.html`, `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/live_preview.js`, `app/miniapp_static/apple_inline_emoji.js`, `app/miniapp_static/apple_inline_emoji.css`, `tests/serverless/premium-emoji.test.mjs`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/docs/premium-emoji.md`, `md_files/log.md`.
-- **التحقق الفعلي:** نجح `npm run test:ci` (339/339؛ فحوص الخطط وأصول Mini App نجحت)، و`npm run test:emoji` (20/20)، واختبار تحويل Mini App (3/3)، وفحص صياغة الملفات المعدلة و`git diff --check`.
-- **GitHub/النشر:** دُفع commit `9104112` إلى فرع `serverless-cleanup`. تحقق نشر Cloudflare Pages بجلب `https://rich-customize.pages.dev/miniapp/static/custom_emoji_code.js?v=0.1.0` وظهور محوّل HTML/Markdown الحالي. صفحة المحرر تعيد التوجيه للتحقق من جلسة Telegram خارج WebView، لذلك لم يُختبر إدخال حي. تعديل `tgcloud/lib/rich-text.js` موجود على GitHub ولم يُنفّذ له `tgcloud push`. لا تغيير مخطط أو ترحيل.
+- **السبب:** طلب المالك إكمال نقل إضافة حزم الإيموجي إلى Telegram Serverless وإصلاح بقاء كود الإيموجي ظاهراً في محررات التطبيق المصغر.
+- **التغيير:** إضافة مزامنة/استيراد قائمة الحزم قبل الإضافة ومعالجة أخطاء الاستجابة، وتحويل وحفظ أكواد HTML/Markdown في نصوص وقوائم بلوكات التفاصيل، وإضافة تحويل أولي للمحتوى الموجود. توثيق حد النقل: Cloudflare مطلوب للاستيراد الأول لقوائم D1؛ تغيير رابط BotFather والقبول الحي ما زالا معلقين.
+- **الملفات:** `app/miniapp_static/apple_emoji_picker.js`, `app/miniapp_static/custom_emoji_code.js`, `app/miniapp_static/details_nested_editor.js`, `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/editor.html`, `tgcloud/lib/miniapp-bridge.js`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/docs/miniapp-serverless-cloudflare-dependencies.md`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (340/340) والاختبارات المركزة (12/12) و`git diff --check`. نُشرت الأصول إلى Telegram Serverless revision 123 وتحققت استجابة الملفات الثابتة 200 وCORS `OPTIONS` 204. لم يُختبر استيراد حقيقي أو إضافة حزمة داخل Telegram WebView.
+- **GitHub/النشر:** نُشرت الأصول إلى Serverless؛ لم تُدفع تغييرات هذه الدفعة إلى GitHub بعد. BotFather ما زال يفتح Cloudflare؛ لا ترحيل مخطط أو حذف بيانات D1.
 
 ## 2026-10-31 — دعم أكواد الإيموجي بريميوم في البوت والتطبيق المصغر
 

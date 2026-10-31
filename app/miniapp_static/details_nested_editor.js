@@ -182,7 +182,7 @@
     const editor = document.createElement("div");
     editor.contentEditable = "true";
     editor.spellcheck = true;
-    editor.className = "details-child-text live-editor";
+    editor.className = "details-child-text live-editor rich-inline-editor";
     if (child.type === "heading") {
       const level = Math.max(1, Math.min(6, Number(d.size || 2)));
       editor.classList.add(`live-heading-${level}`);
@@ -194,7 +194,51 @@
     } else editor.classList.add("live-paragraph");
 
     editor.dataset.placeholder = child.type === "paragraph" ? mt("details.write_inside") : info(child.type).label;
-    editor.textContent = blockText(child);
+    const rawHtml = String(
+      child.type === "blockquote" || child.type === "pullquote"
+        ? d.quote_html || ""
+        : d.html || "",
+    );
+    if (rawHtml && window.RichInlineTextTools?.sanitizeInlineHtml) {
+      const template = document.createElement("template");
+      template.innerHTML = window.RichInlineTextTools.sanitizeInlineHtml(rawHtml);
+      const wrapperTag = child.type === "heading"
+        ? `H${Math.max(1, Math.min(6, Number(d.size || 2)))}`
+        : child.type === "footer" ? "FOOTER"
+          : child.type === "preformatted" ? "PRE"
+            : ["paragraph", "text", "caption"].includes(child.type) ? "P" : "";
+      const first = template.content.firstElementChild;
+      editor.innerHTML = wrapperTag && template.content.childElementCount === 1 && first?.tagName === wrapperTag
+        ? first.innerHTML
+        : template.innerHTML;
+    } else {
+      editor.textContent = blockText(child);
+    }
+    const convertsCustomEmoji = !["preformatted", "anchor", "mathematical_expression"].includes(child.type);
+
+    function syncText() {
+      if (convertsCustomEmoji) window.RichCustomEmojiCode?.convertEditor?.(editor);
+      const value = editor.innerText.replace(/\r/g, "");
+      const html = window.RichInlineTextTools?.sanitizeInlineHtml?.(editor.innerHTML) || escapeHtml(value);
+      const hasCustomEmoji = convertsCustomEmoji && /<tg-emoji\b[^>]*\bemoji-id=/i.test(html);
+      if (!hasCustomEmoji) {
+        applyText(child, value);
+        return value;
+      }
+      if (child.type === "blockquote" || child.type === "pullquote") {
+        d.quote_text = value;
+        d.quote_html = html;
+      } else {
+        d.text = value;
+        d.rich_text = null;
+        if (child.type === "heading") {
+          const level = Math.max(1, Math.min(6, Number(d.size || 2)));
+          d.html = `<h${level}>${html}</h${level}>`;
+        } else if (child.type === "footer") d.html = `<footer>${html}</footer>`;
+        else d.html = `<p>${html}</p>`;
+      }
+      return value;
+    }
 
     let commandMenu = null;
     const closeCommandMenu = () => {
@@ -209,8 +253,7 @@
 
     editor.addEventListener("focus", () => selectBlock(detailsBlock.id));
     editor.addEventListener("input", () => {
-      const value = editor.innerText.replace(/\r/g, "");
-      applyText(child, value);
+      const value = syncText();
       markDirty();
       refreshCommandMenu(value.trim());
     });
@@ -238,6 +281,9 @@
       }
     });
     editor.addEventListener("blur", () => setTimeout(closeCommandMenu, 160));
+    requestAnimationFrame(() => {
+      if (convertsCustomEmoji && window.RichCustomEmojiCode?.convertEditor?.(editor)) syncText();
+    });
     return editor;
   }
 
@@ -248,25 +294,34 @@
     list.className = `telegram-list details-inner-list${kind === "checklist" ? " telegram-checklist" : ""}`;
     const values = (d.items || [{text:""}]).map(item => typeof item === "object" ? String(item.text || "") : String(item || ""));
 
-    function sync() {
-      const lines = Array.from(list.querySelectorAll('[contenteditable="true"]'), el => el.innerText.replace(/\r/g, ""));
-      d.items = lines.map((text, index) => kind === "checklist"
-        ? {text, has_checkbox:true, is_checked:false}
+    function sync(mark = true) {
+      const entries = Array.from(list.querySelectorAll('[contenteditable="true"]'), editor => {
+        window.RichCustomEmojiCode?.convertEditor?.(editor);
+        const text = editor.innerText.replace(/\r/g, "");
+        const html = window.RichInlineTextTools?.sanitizeInlineHtml?.(editor.innerHTML) || escapeHtml(text);
+        return {text, html};
+      });
+      d.items = entries.map(({text, html}, index) => kind === "checklist"
+        ? {text, html, has_checkbox:true, is_checked:false}
         : kind === "numbered"
-          ? {text, value:index + 1, type:"1"}
-          : {text});
+          ? {text, html, value:index + 1, type:"1"}
+          : {text, html});
+      const lines = entries.map(entry => entry.text);
       d.text = lines.join("\n");
       const tag = kind === "numbered" ? "ol" : "ul";
-      d.html = `<${tag}>${lines.map(text => `<li>${escapeHtml(text)}</li>`).join("")}</${tag}>`;
-      markDirty();
+      d.html = `<${tag}>${entries.map(entry => `<li>${entry.html}</li>`).join("")}</${tag}>`;
+      if (mark) markDirty();
     }
 
-    values.forEach(value => {
+    values.forEach((value, index) => {
       const li = document.createElement("li");
       const input = document.createElement("div");
       input.contentEditable = "true";
       input.spellcheck = true;
-      input.textContent = value;
+      input.className = "rich-inline-editor details-child-list-item";
+      const item = (d.items || [])[index];
+      input.innerHTML = window.RichInlineTextTools?.sanitizeInlineHtml?.(item?.html)
+        || escapeHtml(value);
       input.addEventListener("focus", () => selectBlock(detailsBlock.id));
       input.addEventListener("input", sync);
       input.addEventListener("keydown", event => {
@@ -275,6 +330,7 @@
         const next = document.createElement("li");
         const nextInput = document.createElement("div");
         nextInput.contentEditable = "true";
+        nextInput.className = "rich-inline-editor details-child-list-item";
         nextInput.addEventListener("focus", () => selectBlock(detailsBlock.id));
         nextInput.addEventListener("input", sync);
         next.appendChild(nextInput);
@@ -284,6 +340,9 @@
       });
       li.appendChild(input);
       list.appendChild(li);
+      requestAnimationFrame(() => {
+        if (window.RichCustomEmojiCode?.convertEditor?.(input)) sync(false);
+      });
     });
     return list;
   }

@@ -116,6 +116,8 @@
     return out.innerHTML;
   }
 
+  window.RichInlineTextTools = Object.freeze({sanitizeInlineHtml});
+
   function tokenClass(info) {
     if (info.type === "disabled") return "is-disabled";
     return ({r:"is-danger",g:"is-success",b:"is-primary",p:"is-primary"})[info.color] || "is-default";

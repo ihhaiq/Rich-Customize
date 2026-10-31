@@ -1108,12 +1108,6 @@
 
     card.addEventListener("submit", async event => {
       event.preventDefault();
-      if (!hasCustomPackCapacity()) {
-        status.textContent = mt("emoji.pack_limit_reached");
-        showPackLimitOffer();
-        syncCustomPackTabs();
-        return;
-      }
       const value = String(input.value || "").trim();
       if (!value) {
         status.textContent = mt("emoji.pack_link_required");
@@ -1131,6 +1125,12 @@
       status.textContent = "";
 
       try {
+        await loadPackAccessFromServer();
+        if (!hasCustomPackCapacity()) {
+          const error = new Error("custom_emoji_pack_limit");
+          error.code = "CUSTOM_EMOJI_PACK_LIMIT";
+          throw error;
+        }
         const response = await fetch("/miniapp/api/custom-emoji/pack", {
           method:"POST",
           headers:{
@@ -1143,8 +1143,17 @@
         });
         const data = await response.json().catch(() => null);
         if (!response.ok || !data?.ok || !data?.pack) {
-          const error = new Error(data?.error || data?.message || "pack_load_failed");
-          error.code = String(data?.error || "");
+          const responseError = data?.error;
+          const error = new Error(
+            typeof responseError === "object"
+              ? String(responseError.message || responseError.code || "pack_load_failed")
+              : String(responseError || data?.message || "pack_load_failed"),
+          );
+          error.code = String(
+            typeof responseError === "object"
+              ? responseError.code || ""
+              : responseError || "",
+          );
           throw error;
         }
         if (data?.access) applyPackAccess(data.access);
@@ -1167,12 +1176,14 @@
         renderCustomPack(pack.name);
         try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("success"); } catch (_) {}
       } catch (error) {
-        if (String(error?.code || error?.message || "") === "custom_emoji_pack_limit") {
+        const errorCode = String(error?.code || error?.message || "").toLowerCase();
+        if (errorCode === "custom_emoji_pack_limit") {
           status.textContent = mt("emoji.pack_limit_reached");
           showPackLimitOffer();
           syncCustomPackTabs();
         } else {
           status.textContent = mt("emoji.pack_load_failed");
+          window.RichMiniAppErrors?.report?.(error, {source:"custom_emoji.pack_add"});
         }
         input.disabled = false;
         submit.disabled = false;
@@ -1183,6 +1194,34 @@
   }
 
   let accessPackSyncRunning = false;
+
+  async function loadPackAccessFromServer() {
+    const initData = String(window.Telegram?.WebApp?.initData || "");
+    if (!initData) throw new Error("missing_init_data");
+    const response = await fetch("/miniapp/api/custom-emoji/packs", {
+      method:"GET",
+      headers:{"X-Telegram-Init-Data":initData},
+      cache:"no-store",
+      credentials:"same-origin",
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.ok || !data?.access) {
+      const responseError = data?.error;
+      const error = new Error(
+        typeof responseError === "object"
+          ? String(responseError.message || responseError.code || "pack_access_load_failed")
+          : String(responseError || "pack_access_load_failed"),
+      );
+      error.code = String(
+        typeof responseError === "object"
+          ? responseError.code || ""
+          : responseError || "",
+      );
+      throw error;
+    }
+    applyPackAccess(data.access);
+    return data.access;
+  }
 
   function applyPackAccess(access) {
     if (!access) return;
@@ -1247,17 +1286,7 @@
     if (!initData) return;
     accessPackSyncRunning = true;
     try {
-      const accessResponse = await fetch("/miniapp/api/custom-emoji/packs", {
-        method:"GET",
-        headers:{"X-Telegram-Init-Data":initData},
-        cache:"no-store",
-        credentials:"same-origin",
-      });
-      const accessData = await accessResponse.json().catch(() => null);
-      if (!accessResponse.ok || !accessData?.ok || !accessData?.access) {
-        throw new Error(accessData?.error?.message || accessData?.error || "pack_access_load_failed");
-      }
-      applyPackAccess(accessData.access);
+      await loadPackAccessFromServer();
       const serverNames = serverPackNames();
       const localNames = customPacks.map(pack => String(pack?.name || "")).filter(Boolean);
       const targets = serverNames.length
