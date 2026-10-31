@@ -4,6 +4,14 @@
 - **التغيير:** تحويل `<tg-emoji emoji-id="…">بديل</tg-emoji>` و`![بديل](tg://emoji?id=…)` إلى كيانات Telegram مخصصة مع إبقاء بديل النص، وإعادة تعيين إزاحات كيانات Telegram الموجودة. في Mini App تتحول الأكواد المكتملة أثناء التحرير إلى عناصر معاينة مخصصة، وتُحفظ المعرفات في النصوص والقوائم والخلايا؛ وتبقى بلوكات الكود حرفية. توثيق السلوك وحدود المعاينة.
 - **الملفات:** `tgcloud/lib/rich-text.js`, `app/miniapp_static/custom_emoji_code.js`, `app/miniapp_static/editor.html`, `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/live_preview.js`, `app/miniapp_static/apple_inline_emoji.js`, `app/miniapp_static/apple_inline_emoji.css`, `tests/serverless/premium-emoji.test.mjs`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/docs/premium-emoji.md`, `md_files/log.md`.
 - **التحقق الفعلي:** نجح `npm run test:ci` (339/339؛ فحوص الخطط وأصول Mini App نجحت)، و`npm run test:emoji` (20/20)، واختبار تحويل Mini App (3/3)، وفحص صياغة الملفات المعدلة و`git diff --check`.
+- **GitHub/النشر:** دُفع commit `9104112` إلى فرع `serverless-cleanup`. تحقق نشر Cloudflare Pages بجلب `https://rich-customize.pages.dev/miniapp/static/custom_emoji_code.js?v=0.1.0` وظهور محوّل HTML/Markdown الحالي. صفحة المحرر تعيد التوجيه للتحقق من جلسة Telegram خارج WebView، لذلك لم يُختبر إدخال حي. تعديل `tgcloud/lib/rich-text.js` موجود على GitHub ولم يُنفّذ له `tgcloud push`. لا تغيير مخطط أو ترحيل.
+
+## 2026-10-31 — دعم أكواد الإيموجي بريميوم في البوت والتطبيق المصغر
+
+- **السبب:** طلب المالك إدخال كود الإيموجي المخصص بصيغتي HTML وMarkdown مباشرة أثناء تعديل محتوى البلوكات، بما في ذلك Mini App.
+- **التغيير:** تحويل `<tg-emoji emoji-id="…">بديل</tg-emoji>` و`![بديل](tg://emoji?id=…)` إلى كيانات Telegram مخصصة مع إبقاء بديل النص، وإعادة تعيين إزاحات كيانات Telegram الموجودة. في Mini App تتحول الأكواد المكتملة أثناء التحرير إلى عناصر معاينة مخصصة، وتُحفظ المعرفات في النصوص والقوائم والخلايا؛ وتبقى بلوكات الكود حرفية. توثيق السلوك وحدود المعاينة.
+- **الملفات:** `tgcloud/lib/rich-text.js`, `app/miniapp_static/custom_emoji_code.js`, `app/miniapp_static/editor.html`, `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/live_preview.js`, `app/miniapp_static/apple_inline_emoji.js`, `app/miniapp_static/apple_inline_emoji.css`, `tests/serverless/premium-emoji.test.mjs`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/docs/premium-emoji.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (339/339؛ فحوص الخطط وأصول Mini App نجحت)، و`npm run test:emoji` (20/20)، واختبار تحويل Mini App (3/3)، وفحص صياغة الملفات المعدلة و`git diff --check`.
 - **GitHub/النشر:** تغييرات محلية فقط؛ لم تُدفع إلى GitHub ولم تُنشر إلى Telegram Serverless أو Mini App. لا تغيير مخطط أو ترحيل.
 
 ## 2026-10-31 — دليل الوكيل لبناء ميزة Telegram Serverless
