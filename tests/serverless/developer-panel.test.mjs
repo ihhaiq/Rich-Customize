@@ -69,6 +69,31 @@ test('developer panel command in a group does not open or expose admin actions',
   assert.equal(h.calls.some(call => call.method === 'sendRichMessage'), false);
 });
 
+test('developer import prompt keeps confirmation controls inline and returns to the compact home menu', async () => {
+  const h = await developerHarness();
+  const query = data => ({
+    id: 'import-menu-' + data,
+    from: { id: developerId },
+    data,
+    message: { chat: { id: developerId, type: 'private' }, message_id: 50 },
+  });
+
+  await h.developer.handleDeveloperCallback(query('dev:import'));
+  const prompt = h.calls.find(call => call.method === 'editMessageText');
+  assert.deepEqual(prompt.args.reply_markup.inline_keyboard.map(row =>
+    row.map(button => button.callback_data)), [['dev:import:cancel']]);
+  assert.doesNotMatch(JSON.stringify(prompt.args.rich_message), /callback_data|type":"button/);
+
+  const cancelStart = h.calls.length;
+  await h.developer.handleDeveloperCallback(query('dev:import:cancel'));
+  const home = h.calls.slice(cancelStart).find(call => call.method === 'editMessageText');
+  assert.deepEqual(home.args.reply_markup.inline_keyboard.map(row =>
+    row.map(button => button.callback_data)), [
+    ['dev:stats', 'dev:broadcast:menu'],
+    ['dev:backup:menu', 'dev:tools:menu'],
+  ]);
+});
+
 test('callbacks from a group cannot run developer actions', async () => {
   const h = await developerHarness();
 
@@ -101,7 +126,7 @@ test('plain-text panel fallback retains report content and actions', async () =>
   assert.match(fallback.args.text, /المستخدمون:/);
   const buttons = fallback.args.reply_markup.inline_keyboard.flat();
   assert.ok(buttons.some(button => button.callback_data === 'dev:stats'));
-  assert.ok(buttons.some(button => button.callback_data === 'dev:export'));
+  assert.ok(buttons.some(button => button.callback_data === 'dev:home'));
 });
 
 test('developer pending input never sends a legacy panel response back to a group', async () => {
@@ -253,7 +278,58 @@ test('developer broadcast status reports live progress privately with a refresh 
     message_id: 50,
   });
   const panel = h.calls.find(call => call.method === 'sendRichMessage');
-  assert.match(JSON.stringify(panel.args.rich_message), /dev:broadcast:check/);
+  const homeButtons = panel.args.reply_markup.inline_keyboard;
+  assert.equal(homeButtons.length, 2);
+  assert.deepEqual(homeButtons.map(row => row.map(button => button.callback_data)), [
+    ['dev:stats', 'dev:broadcast:menu'],
+    ['dev:backup:menu', 'dev:tools:menu'],
+  ]);
+  assert.ok(homeButtons.flat().every(button => button.style === 'primary'));
+  assert.doesNotMatch(JSON.stringify(panel.args.rich_message), /callback_data|type":"button/);
+
+  const broadcastMenuStart = h.calls.length;
+  await h.developer.handleDeveloperCallback(query('dev:broadcast:menu'));
+  const broadcastMenu = h.calls.slice(broadcastMenuStart)
+    .find(call => call.method === 'editMessageText');
+  const broadcastButtons = broadcastMenu.args.reply_markup.inline_keyboard;
+  assert.deepEqual(broadcastButtons.map(row => row.map(button => button.callback_data)), [
+    ['dev:broadcast:check', 'dev:broadcast'],
+    ['dev:home'],
+  ]);
+  assert.equal(broadcastButtons[0][1].style, 'success');
+  assert.doesNotMatch(JSON.stringify(broadcastMenu.args.rich_message), /callback_data|type":"button/);
+
+  const backupMenuStart = h.calls.length;
+  await h.developer.handleDeveloperCallback(query('dev:backup:menu'));
+  const backupMenu = h.calls.slice(backupMenuStart)
+    .find(call => call.method === 'editMessageText');
+  const backupButtons = backupMenu.args.reply_markup.inline_keyboard;
+  assert.deepEqual(backupButtons.map(row => row.map(button => button.callback_data)), [
+    ['dev:import', 'dev:export'],
+    ['dev:snapshot', 'dev:home'],
+  ]);
+  assert.equal(backupButtons[1][0].style, 'success');
+
+  const toolsMenuStart = h.calls.length;
+  await h.developer.handleDeveloperCallback(query('dev:tools:menu'));
+  const toolsMenu = h.calls.slice(toolsMenuStart)
+    .find(call => call.method === 'editMessageText');
+  assert.deepEqual(toolsMenu.args.reply_markup.inline_keyboard
+    .map(row => row.map(button => button.callback_data)), [
+    ['dev:database:check', 'dev:showcase:refresh'],
+    ['dev:languages:sync', 'dev:errorlog'],
+    ['dev:home'],
+  ]);
+
+  const returnHomeStart = h.calls.length;
+  await h.developer.handleDeveloperCallback(query('dev:home'));
+  const returnedHome = h.calls.slice(returnHomeStart)
+    .find(call => call.method === 'editMessageText');
+  assert.deepEqual(returnedHome.args.reply_markup.inline_keyboard
+    .map(row => row.map(button => button.callback_data)), [
+    ['dev:stats', 'dev:broadcast:menu'],
+    ['dev:backup:menu', 'dev:tools:menu'],
+  ]);
 
   await h.developer.handleDeveloperCallback(query('dev:broadcast'));
   await h.developer.handleDeveloperPendingMessage({
@@ -280,7 +356,8 @@ test('developer broadcast status reports live progress privately with a refresh 
   const report = JSON.stringify(statusMessage.args.rich_message);
   assert.match(report, /المعالجة: .+ من .+ \(50%\)/);
   assert.match(report, /قبلها Telegram/);
-  assert.match(report, /dev:broadcast:check/);
+  assert.ok(statusMessage.args.reply_markup.inline_keyboard.flat()
+    .some(button => button.callback_data === 'dev:broadcast:check'));
 });
 
 test('developer broadcasts send a private completion report with failed user IDs and reasons', async () => {

@@ -30,17 +30,20 @@ const BROADCAST_BATCH_SIZE = 20;
 const BROADCAST_RESULT_CHUNK_SIZE = 2500;
 const BROADCAST_REPORT_PAGE_SIZE = 10000;
 const BROADCAST_ACTIVE_NAMESPACE = 'developer_broadcast:v1:active';
+const PANEL_HOME_TEXT = 'اختر القسم المطلوب. الاشتراكات وإهداء Golden في @richDonateBot.';
 
-const PANEL_ACTIONS = [
-  { text: 'فحص قاعدة البيانات', callback_data: 'dev:database:check', style: 'primary' },
-  { text: 'تحديث قناة المعاينة', callback_data: 'dev:showcase:refresh', style: 'primary' },
-  { text: 'بيانات / إحصائيات', callback_data: 'dev:stats', style: 'primary' },
-  { text: '📡 حالة الإذاعة', callback_data: 'dev:broadcast:check', style: 'primary' },
-  { text: '📢 بث رسالة', callback_data: 'dev:broadcast', style: 'success' },
-  { text: 'إنشاء Snapshot الآن', callback_data: 'dev:snapshot', style: 'primary' },
-  { text: 'مزامنة لغات البوت', callback_data: 'dev:languages:sync', style: 'success' },
-  { text: 'قناة سجل الأخطاء', callback_data: 'dev:errorlog', style: 'danger' },
+const PANEL_HOME_ACTIONS = [
+  { text: '📊 الإحصائيات', callback_data: 'dev:stats', style: 'primary' },
+  { text: '📢 الإذاعة', callback_data: 'dev:broadcast:menu', style: 'primary' },
+  { text: '💾 النسخ الاحتياطي', callback_data: 'dev:backup:menu', style: 'primary' },
+  { text: '🛠 الأدوات', callback_data: 'dev:tools:menu', style: 'primary' },
 ];
+
+const PANEL_HOME_BUTTON = {
+  text: '🏠 القائمة الرئيسية',
+  callback_data: 'dev:home',
+  style: 'primary',
+};
 
 function now() {
   return Math.floor(Date.now() / 1000);
@@ -105,21 +108,11 @@ async function releaseLock(lock) {
     .run();
 }
 
-function panelKeyboard(extraButtons = [], includePanelActions = false) {
-  const buttons = [
-    { text: '📤 رفع واستيراد', callback_data: 'dev:import', style: 'success' },
-    { text: '📥 تنزيل وتصدير', callback_data: 'dev:export', style: 'primary' },
-    ...(includePanelActions ? PANEL_ACTIONS : []),
-    ...(includePanelActions ? [{
-      text: 'اختبار مراقب الأخطاء',
-      callback_data: 'dev:errorlog:template-test',
-      style: 'danger',
-    }] : []),
-    ...(Array.isArray(extraButtons) ? extraButtons.filter(Boolean) : []),
-  ];
+function panelKeyboard(buttons = []) {
+  const actions = Array.isArray(buttons) ? buttons.filter(Boolean) : [];
   const rows = [];
-  for (let offset = 0; offset < buttons.length; offset += 2) {
-    rows.push(buttons.slice(offset, offset + 2));
+  for (let offset = 0; offset < actions.length; offset += 2) {
+    rows.push(actions.slice(offset, offset + 2));
   }
   return {
     inline_keyboard: rows,
@@ -133,26 +126,6 @@ function tableTextCell(text, { header = false, align = 'right' } = {}) {
     valign: 'middle',
     ...(header ? { is_header: true } : {}),
   };
-}
-
-function tableButtonCell(button) {
-  return {
-    text: { type: 'button', button },
-    align: 'center',
-    valign: 'middle',
-  };
-}
-
-function buttonTableBlock(buttons, columns = 2) {
-  const source = Array.isArray(buttons) ? buttons.filter(Boolean) : [];
-  const width = Math.max(1, Math.min(4, Number(columns) || 2));
-  const cells = [];
-  for (let offset = 0; offset < source.length; offset += width) {
-    cells.push(source.slice(offset, offset + width).map(tableButtonCell));
-  }
-  return cells.length
-    ? { type: 'table', cells, is_bordered: true, is_compact: false }
-    : null;
 }
 
 function statTable(title, items) {
@@ -169,33 +142,15 @@ function statTable(title, items) {
   return { type: 'table', cells, is_bordered: true, is_compact: false };
 }
 
-function panelRichMessage(content, extraButtons = []) {
-  const blocks = [{ type: 'heading', text: '🛠 لوحة المطور', size: 2 }];
+function panelRichMessage(content) {
+  const blocks = Array.isArray(content)
+    ? [...content]
+    : [{ type: 'heading', text: '🛠 لوحة المطور', size: 2 }];
   if (Array.isArray(content)) {
-    blocks.push(...content);
+    return { blocks, is_rtl: true };
   } else if (content != null && String(content)) {
     blocks.push({ type: 'paragraph', text: String(content) });
   }
-
-  const mainActions = buttonTableBlock(PANEL_ACTIONS, 2);
-  if (mainActions) blocks.push(mainActions);
-
-  const extraActions = buttonTableBlock(extraButtons, 3);
-  if (extraActions) blocks.push(extraActions);
-
-  blocks.push({
-    type: 'footer',
-    text: [
-      {
-        type: 'button',
-        button: {
-          text: 'اختبار مراقب الأخطاء',
-          callback_data: 'dev:errorlog:template-test',
-          style: 'danger',
-        },
-      },
-    ],
-  });
   return { blocks, is_rtl: true };
 }
 
@@ -226,10 +181,13 @@ function messageNotModified(error) {
     .includes('message is not modified');
 }
 
-async function sendPanel(chatId, content = 'لوحة المطور', extraButtons = [], messageId = null) {
-  const replyMarkup = panelKeyboard();
-  const fallbackMarkup = panelKeyboard(extraButtons, true);
-  const richMessage = panelRichMessage(content, extraButtons);
+async function sendPanel(chatId, content = 'لوحة المطور', extraButtons = [], messageId = null, includeHome = true) {
+  const buttons = Array.isArray(extraButtons) ? extraButtons.filter(Boolean) : [];
+  if (includeHome && !buttons.some(button => button.callback_data === PANEL_HOME_BUTTON.callback_data)) {
+    buttons.push(PANEL_HOME_BUTTON);
+  }
+  const replyMarkup = panelKeyboard(buttons);
+  const richMessage = panelRichMessage(content);
 
   if (messageId) {
     try {
@@ -248,7 +206,7 @@ async function sendPanel(chatId, content = 'لوحة المطور', extraButtons
           chat_id: chatId,
           message_id: messageId,
           text: panelFallbackText(content),
-          reply_markup: fallbackMarkup,
+          reply_markup: replyMarkup,
         });
       } catch (fallbackError) {
         if (messageNotModified(fallbackError)) return;
@@ -270,9 +228,50 @@ async function sendPanel(chatId, content = 'لوحة المطور', extraButtons
     await api.sendMessage({
       chat_id: chatId,
       text: panelFallbackText(content),
-      reply_markup: fallbackMarkup,
+      reply_markup: replyMarkup,
     });
   }
+}
+
+async function showDeveloperHome(query, chatId) {
+  await api.answerCallbackQuery({ callback_query_id: query.id });
+  await sendPanel(
+    chatId,
+    PANEL_HOME_TEXT,
+    PANEL_HOME_ACTIONS,
+    query.message?.message_id || null,
+    false,
+  );
+}
+
+async function showBroadcastMenu(query, chatId) {
+  await api.answerCallbackQuery({ callback_query_id: query.id });
+  await sendPanel(chatId, '📢 الإذاعة\nافحص الإذاعة الحالية أو ابدأ إعداد رسالة جديدة.', [
+    { text: '📊 فحص الحالة', callback_data: 'dev:broadcast:check', style: 'primary' },
+    { text: '✉️ بدء إذاعة', callback_data: 'dev:broadcast', style: 'success' },
+    PANEL_HOME_BUTTON,
+  ], query.message?.message_id || null);
+}
+
+async function showBackupMenu(query, chatId) {
+  await api.answerCallbackQuery({ callback_query_id: query.id });
+  await sendPanel(chatId, '💾 النسخ الاحتياطي\nاختر إجراءً. الاستيراد يعرض ملخصاً ويطلب تأكيدك.', [
+    { text: '📤 استيراد نسخة', callback_data: 'dev:import', style: 'primary' },
+    { text: '📥 تصدير نسخة', callback_data: 'dev:export', style: 'primary' },
+    { text: '📸 إنشاء Snapshot', callback_data: 'dev:snapshot', style: 'success' },
+    PANEL_HOME_BUTTON,
+  ], query.message?.message_id || null);
+}
+
+async function showToolsMenu(query, chatId) {
+  await api.answerCallbackQuery({ callback_query_id: query.id });
+  await sendPanel(chatId, '🛠 أدوات الإدارة\nاختر الفحص أو الإعداد المطلوب.', [
+    { text: 'فحص قاعدة البيانات', callback_data: 'dev:database:check', style: 'primary' },
+    { text: 'تحديث قناة المعاينة', callback_data: 'dev:showcase:refresh', style: 'success' },
+    { text: 'مزامنة اللغات', callback_data: 'dev:languages:sync', style: 'success' },
+    { text: 'قناة سجل الأخطاء', callback_data: 'dev:errorlog', style: 'primary' },
+    PANEL_HOME_BUTTON,
+  ], query.message?.message_id || null);
 }
 
 async function editImportConfirmation(chatId, messageId, text) {
@@ -934,14 +933,30 @@ export async function openDeveloperPanel(message) {
   await clearState(userId);
   await sendPanel(
     chatId,
-    'لوحة أدوات المحرر التشغيلية: النسخ الاحتياطي، قاعدة البيانات، النشاط، قناة المعاينة وسجل الأخطاء.\n\nلإدارة الاشتراكات وإهداء Golden Ticket افتح /dev في @richDonateBot.\n\nالاستيراد يُفحص ويطلب تأكيدًا قبل الكتابة.'
+    PANEL_HOME_TEXT,
+    PANEL_HOME_ACTIONS,
+    null,
+    false,
   );
   return true;
 }
 
-async function sendPendingNotice(chatId, panelChatId, panelMessageId, text) {
+async function sendPendingNotice(chatId, panelChatId, panelMessageId, text, state) {
   if (panelChatId && panelMessageId) {
-    await sendPanel(panelChatId, text, [], panelMessageId);
+    const cancelCallback = {
+      waiting_error_log_channel: 'dev:errorlog:cancel',
+      waiting_broadcast_message: 'dev:broadcast:cancel-input',
+      waiting_import: 'dev:import:cancel',
+    }[state];
+    await sendPanel(
+      panelChatId,
+      text,
+      cancelCallback
+        ? [{ text: '❌ إلغاء الإدخال', callback_data: cancelCallback, style: 'danger' }]
+        : [],
+      panelMessageId,
+      false,
+    );
     return;
   }
   await api.sendMessage({ chat_id: chatId, text });
@@ -968,7 +983,7 @@ export async function handleDeveloperPendingMessage(message) {
     const target = String(message.text || '').trim();
     if (!target) {
       const text = 'أرسل ID القناة مثل -1001234567890 أو @username لقناة عامة.';
-      await sendPendingNotice(chatId, waitingPanelChatId, waitingPanelMessageId, text);
+      await sendPendingNotice(chatId, waitingPanelChatId, waitingPanelMessageId, text, state.state);
       return true;
     }
     try {
@@ -988,8 +1003,12 @@ export async function handleDeveloperPendingMessage(message) {
       await sendPanel(
         waitingPanelChatId || chatId,
         '❌ تعذر ربط القناة.\n\n' + String(error?.message || error),
-        [{ text: 'إعادة المحاولة', callback_data: 'dev:errorlog:set', style: 'primary' }],
+        [
+          { text: 'إعادة المحاولة', callback_data: 'dev:errorlog:set', style: 'primary' },
+          { text: 'إلغاء', callback_data: 'dev:errorlog:cancel', style: 'danger' },
+        ],
         waitingPanelMessageId,
+        false,
       );
     }
     return true;
@@ -998,7 +1017,7 @@ export async function handleDeveloperPendingMessage(message) {
   if (state.state === 'waiting_broadcast_message') {
     if (Number(chatId) !== Number(userId)) {
       await sendPendingNotice(chatId, waitingPanelChatId, waitingPanelMessageId,
-        'أرسل رسالة الإذاعة في محادثتك الخاصة مع البوت.');
+        'أرسل رسالة الإذاعة في محادثتك الخاصة مع البوت.', state.state);
       return true;
     }
     const sourceMessageId = Number(message.message_id);
@@ -1015,7 +1034,8 @@ export async function handleDeveloperPendingMessage(message) {
         },
       );
       await sendPendingNotice(chatId, waitingPanelChatId, waitingPanelMessageId,
-        'أرسل نصاً منسقاً أو حوّل رسالة نصية/وسائط قابلة للنسخ؛ لا تقبل رسائل الخدمة.');
+        'أرسل نصاً منسقاً أو حوّل رسالة نصية/وسائط قابلة للنسخ؛ لا تقبل رسائل الخدمة.',
+        state.state);
       return true;
     }
 
@@ -1036,7 +1056,8 @@ export async function handleDeveloperPendingMessage(message) {
           + '; forward_origin=' + String(message?.forward_origin?.type || 'none'),
       });
       await sendPendingNotice(chatId, waitingPanelChatId, waitingPanelMessageId,
-        'تعذر نسخ هذه الرسالة المحوّلة. أرسلها من جديد أو اختر نصاً أو وسائط قابلة للنسخ.');
+        'تعذر نسخ هذه الرسالة المحوّلة. أرسلها من جديد أو اختر نصاً أو وسائط قابلة للنسخ.',
+        state.state);
       return true;
     }
     if (Number.isSafeInteger(Number(copied?.message_id))
@@ -1059,7 +1080,7 @@ export async function handleDeveloperPendingMessage(message) {
     if (!audience.total) {
       await clearState(userId);
       await sendPendingNotice(chatId, waitingPanelChatId, waitingPanelMessageId,
-        'لا توجد حسابات مستخدمين مسجلة للإذاعة.');
+        'لا توجد حسابات مستخدمين مسجلة للإذاعة.', state.state);
       return true;
     }
     await setState(userId, 'confirm_broadcast', {
@@ -1085,6 +1106,7 @@ export async function handleDeveloperPendingMessage(message) {
         { text: '❌ إلغاء', callback_data: 'dev:broadcast:cancel-input' },
       ],
       waitingPanelMessageId,
+      false,
     );
     return true;
   }
@@ -1097,6 +1119,7 @@ export async function handleDeveloperPendingMessage(message) {
       waitingPanelChatId,
       waitingPanelMessageId,
       'أرسل ملف ZIP أو JSON كمستند.',
+      state.state,
     );
     return true;
   }
@@ -1108,6 +1131,7 @@ export async function handleDeveloperPendingMessage(message) {
       waitingPanelChatId,
       waitingPanelMessageId,
       'حجم الملف أكبر من الحد المسموح وهو 20MB.',
+      state.state,
     );
     return true;
   }
@@ -1164,7 +1188,7 @@ export async function handleDeveloperPendingMessage(message) {
   } catch (error) {
     console.error('Developer import validation failed', error);
     const text = '❌ تعذر قبول الملف:\n' + (error?.message || 'خطأ غير معروف');
-    await sendPendingNotice(chatId, waitingPanelChatId, waitingPanelMessageId, text);
+    await sendPendingNotice(chatId, waitingPanelChatId, waitingPanelMessageId, text, state.state);
   }
   return true;
 }
@@ -1401,6 +1425,7 @@ async function showStats(query, chatId) {
     { text: '📡 حالة الإذاعة', callback_data: 'dev:broadcast:check', style: 'primary' },
     { text: '👥 إحصائيات المستخدمين', callback_data: 'dev:stats:users:0', style: 'primary' },
     { text: '🔄 تحديث', callback_data: 'dev:stats', style: 'primary' },
+    PANEL_HOME_BUTTON,
   ], query.message?.message_id || null);
 }
 
@@ -1475,6 +1500,7 @@ async function showUsers(query, chatId, requestedPage) {
   if (result.page < result.maxPage) {
     buttons.push({ text: 'التالي ➡️', callback_data: 'dev:stats:users:' + (result.page + 1), style: 'primary' });
   }
+  buttons.push(PANEL_HOME_BUTTON);
   await api.answerCallbackQuery({ callback_query_id: query.id });
   await sendPanel(chatId, blocks, buttons, query.message?.message_id || null);
 }
@@ -1723,6 +1749,7 @@ async function beginBroadcast(query, chatId) {
         { text: 'إيقاف الإذاعة', callback_data: 'dev:broadcast:cancel:' + jobId, style: 'danger' },
         { text: '🔄 تحديث حالة الإذاعة', callback_data: 'dev:broadcast:check', style: 'primary' },
         { text: '📊 الإحصائيات', callback_data: 'dev:stats', style: 'primary' },
+        PANEL_HOME_BUTTON,
       ],
       query.message?.message_id || null,
     );
@@ -1763,6 +1790,7 @@ async function cancelBroadcast(query, chatId, jobId) {
     await api.answerCallbackQuery({ callback_query_id: query.id, text: 'تم إيقاف الدفعات التالية.' });
     await sendPanel(chatId, broadcastReport(current.job), [
       { text: '📊 الإحصائيات', callback_data: 'dev:stats', style: 'primary' },
+      PANEL_HOME_BUTTON,
     ], query.message?.message_id || null);
     await tryCompleteBroadcastReport(current.job, broadcastJobNamespace(jobId));
   } finally {
@@ -1789,6 +1817,7 @@ async function showBroadcastStatus(query, chatId, jobId) {
       ? [{ text: '🔄 تحديث حالة الإذاعة', callback_data: 'dev:broadcast:check', style: 'primary' }]
       : []),
     { text: '📊 الإحصائيات', callback_data: 'dev:stats', style: 'primary' },
+    PANEL_HOME_BUTTON,
   ], query.message?.message_id || null);
 }
 
@@ -1799,6 +1828,7 @@ async function showCurrentBroadcastStatus(query, chatId) {
     await sendPanel(chatId, '📢 لا توجد إذاعة مسجلة حالياً.', [
       { text: '🔄 فحص مجدداً', callback_data: 'dev:broadcast:check', style: 'primary' },
       { text: 'بدء إذاعة', callback_data: 'dev:broadcast', style: 'success' },
+      PANEL_HOME_BUTTON,
     ], query.message?.message_id || null);
     return;
   }
@@ -1812,6 +1842,7 @@ async function showCurrentBroadcastStatus(query, chatId) {
       ? [{ text: '🔄 تحديث حالة الإذاعة', callback_data: 'dev:broadcast:check', style: 'primary' }]
       : []),
     { text: '📊 الإحصائيات', callback_data: 'dev:stats', style: 'primary' },
+    PANEL_HOME_BUTTON,
   ], query.message?.message_id || null);
 }
 
@@ -1824,6 +1855,7 @@ async function showErrorLogSettings(query, chatId) {
   const title = config.title || '—';
   const buttons = [
     { text: config.enabled ? 'تغيير القناة' : 'تعيين القناة', callback_data: 'dev:errorlog:set', style: 'primary' },
+    { text: 'اختبار قالب الأخطاء', callback_data: 'dev:errorlog:template-test', style: 'primary' },
   ];
   if (config.enabled && config.chatId != null) {
     buttons.push(
@@ -1831,6 +1863,7 @@ async function showErrorLogSettings(query, chatId) {
       { text: 'تعطيل', callback_data: 'dev:errorlog:disable', style: 'danger' },
     );
   }
+  buttons.push(PANEL_HOME_BUTTON);
   await api.answerCallbackQuery({ callback_query_id: query.id });
   await sendPanel(
     chatId,
@@ -1873,6 +1906,22 @@ export async function handleDeveloperCallback(query) {
       text:'تم نقل إدارة الاشتراكات والإهداء إلى @richDonateBot. افتح /dev هناك.'});
     return true;
   }
+  if (data === 'dev:home') {
+    await showDeveloperHome(query, chatId);
+    return true;
+  }
+  if (data === 'dev:broadcast:menu') {
+    await showBroadcastMenu(query, chatId);
+    return true;
+  }
+  if (data === 'dev:backup:menu') {
+    await showBackupMenu(query, chatId);
+    return true;
+  }
+  if (data === 'dev:tools:menu') {
+    await showToolsMenu(query, chatId);
+    return true;
+  }
   if (data === 'dev:errorlog') {
     await showErrorLogSettings(query, chatId);
     return true;
@@ -1907,9 +1956,16 @@ export async function handleDeveloperCallback(query) {
     await sendPanel(
       chatId,
       'أرسل ID قناة سجل الأخطاء مثل -1001234567890.\n\nإذا القناة عامة تقدر ترسل @username. لازم البوت يقدر يرسل رسائل داخلها.',
-      [],
+      [{ text: '❌ إلغاء الإدخال', callback_data: 'dev:errorlog:cancel', style: 'danger' }],
       query.message?.message_id || null,
+      false,
     );
+    return true;
+  }
+  if (data === 'dev:errorlog:cancel') {
+    await clearState(query.from.id);
+    await api.answerCallbackQuery({ callback_query_id: query.id, text: 'تم إلغاء الإعداد.' });
+    await sendPanel(chatId, PANEL_HOME_TEXT, PANEL_HOME_ACTIONS, query.message?.message_id || null, false);
     return true;
   }
   if (data === 'dev:errorlog:test') {
@@ -1944,7 +2000,10 @@ export async function handleDeveloperCallback(query) {
     await sendPanel(
       chatId,
       'تم تعطيل إرسال الأخطاء إلى القناة.',
-      [{ text: 'تعيين قناة', callback_data: 'dev:errorlog:set', style: 'primary' }],
+      [
+        { text: 'تعيين قناة', callback_data: 'dev:errorlog:set', style: 'primary' },
+        PANEL_HOME_BUTTON,
+      ],
       query.message?.message_id || null,
     );
     return true;
@@ -1962,6 +2021,7 @@ export async function handleDeveloperCallback(query) {
           ? [{ text: '🔄 تحديث حالة الإذاعة', callback_data: 'dev:broadcast:check', style: 'primary' }]
           : []),
         { text: '📊 الإحصائيات', callback_data: 'dev:stats', style: 'primary' },
+        PANEL_HOME_BUTTON,
       ], query.message?.message_id || null);
       return true;
     }
@@ -1981,14 +2041,20 @@ export async function handleDeveloperCallback(query) {
       + 'ويمكن إيقاف الدفعات من اللوحة.',
       [{ text: 'إلغاء', callback_data: 'dev:broadcast:cancel-input' }],
       query.message?.message_id || null,
+      false,
     );
     return true;
   }
   if (data === 'dev:broadcast:cancel-input') {
     await clearState(query.from.id);
     await api.answerCallbackQuery({ callback_query_id: query.id, text: 'تم إلغاء الإذاعة.' });
-    await sendPanel(chatId, 'تم إلغاء إعداد الإذاعة؛ لم تُرسل أي رسالة.',
-      [], query.message?.message_id || null);
+    await sendPanel(
+      chatId,
+      'تم إلغاء إعداد الإذاعة؛ لم تُرسل أي رسالة.',
+      PANEL_HOME_ACTIONS,
+      query.message?.message_id || null,
+      false,
+    );
     return true;
   }
   if (data === 'dev:broadcast:confirm') {
@@ -2019,8 +2085,9 @@ export async function handleDeveloperCallback(query) {
     await sendPanel(
       chatId,
       '📤 أرسل الآن ملف النسخة بصيغة ZIP، أو ملف JSON معروف مثل rich_pages.json.\n\nالحد الأقصى: 20MB.',
-      [],
+      [{ text: '❌ إلغاء الإدخال', callback_data: 'dev:import:cancel', style: 'danger' }],
       query.message?.message_id || null,
+      false,
     );
     return true;
   }
@@ -2031,8 +2098,9 @@ export async function handleDeveloperCallback(query) {
     await sendPanel(
       chatId,
       'تم إلغاء الاستيراد.',
-      [],
+      PANEL_HOME_ACTIONS,
       query.message?.message_id || null,
+      false,
     );
     return true;
   }
