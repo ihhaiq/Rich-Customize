@@ -58,14 +58,24 @@ export function buildUserInfoMessage(user, languageCode, {
     .join(' ');
   if (!Number.isSafeInteger(id) || id <= 0) return null;
 
-  const username = typeof user?.username === 'string'
-    ? user.username.trim().replace(/^@/, '')
-    : '';
+  const usernames = [];
+  const seenUsernames = new Set();
+  for (const candidate of [
+    user?.username,
+    ...(Array.isArray(user?.active_usernames) ? user.active_usernames : []),
+  ]) {
+    if (typeof candidate !== 'string') continue;
+    const username = candidate.trim().replace(/^@/, '');
+    const key = username.toLowerCase();
+    if (!/^[A-Za-z0-9_]{5,32}$/.test(username) || seenUsernames.has(key)) continue;
+    seenUsernames.add(key);
+    usernames.push(username);
+  }
+  const username = usernames[0] || '';
   const displayName = name || (username ? '@' + username : String(id));
   const nameLine = '• 👤 ' + userInfoText(languageCode, 'name') + ': ' + displayName;
   const usernameLine = '• 🔗 ' + userInfoText(languageCode, 'username') + ': '
-    + (username ? '@' + username : userInfoText(languageCode, 'noUsername'));
-  const idLine = '• 🆔 ' + userInfoText(languageCode, 'id') + ': ' + id;
+    + (usernames.length ? usernames.map((value) => '@' + value).join(', ') : userInfoText(languageCode, 'noUsername'));
   const subscriptionLine = '• 🎖 ' + userInfoText(languageCode, 'subscription') + ': ' + subscription;
   const photoBlock = photoFileId
     ? {
@@ -82,7 +92,6 @@ export function buildUserInfoMessage(user, languageCode, {
       : null;
   const locale = normalizeLocale(languageCode);
   const blocks = [
-    { type: 'paragraph', text: idLine },
     {
       type: 'paragraph',
       text: {
@@ -102,7 +111,6 @@ export function buildUserInfoMessage(user, languageCode, {
   ];
   if (photoBlock) blocks.push({ type: 'divider' }, photoBlock);
   const text = [
-    idLine,
     nameLine,
     usernameLine,
     subscriptionLine,

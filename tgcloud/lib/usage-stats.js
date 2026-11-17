@@ -1,9 +1,10 @@
-import { db } from 'sdk';
+import { api, db } from 'sdk';
 import { asc, desc, eq, gte, lt, sql } from 'sdk/db';
-import { usageMinutes, usageRuntime, usageUsers } from 'schema';
+import { usageMinutes, usageRuntime, usageUsers, userAliases, userAliasSyncs } from 'schema';
 
 const RUNTIME_ID = 1;
 const MINUTE_RETENTION_SECONDS = 24 * 60 * 60;
+const USER_ALIAS_REFRESH_SECONDS = 24 * 60 * 60;
 
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
@@ -17,6 +18,69 @@ function cleanText(value, limit) {
 
 function minuteKey(stamp) {
   return Math.floor(stamp / 60) * 60;
+}
+
+function normalizeUsername(value) {
+  if (typeof value !== 'string') return '';
+  const username = value.trim().replace(/^@/, '');
+  return /^[A-Za-z0-9_]{5,32}$/.test(username) ? username.toLowerCase() : '';
+}
+
+async function syncUserAliases(user, userId, stamp) {
+  if (user?.is_bot) return;
+  const previous = await db.select({ checkedAt: userAliasSyncs.checkedAt })
+    .from(userAliasSyncs)
+    .where(eq(userAliasSyncs.userId, userId))
+    .get();
+  if (Number(previous?.checkedAt) > stamp - USER_ALIAS_REFRESH_SECONDS) return;
+
+  let chat = null;
+  try {
+    chat = await api.getChat({ chat_id: userId });
+    if (Number(chat?.id) !== userId || chat?.type !== 'private') chat = null;
+  } catch (error) {
+    console.warn('Could not refresh Telegram user aliases', error?.code || error?.name || 'Error');
+  }
+
+  const aliases = new Set([normalizeUsername(user?.username)]);
+  if (chat) {
+    aliases.add(normalizeUsername(chat.username));
+    if (Array.isArray(chat.active_usernames)) {
+      for (const username of chat.active_usernames) aliases.add(normalizeUsername(username));
+    }
+  }
+
+  for (const username of aliases) {
+    if (!username) continue;
+    await db.insert(userAliases).values({
+      username,
+      userId,
+      checkedAt: stamp,
+    }).onConflictDoUpdate({
+      target: userAliases.username,
+      set: { userId, checkedAt: stamp },
+    }).run();
+  }
+  if (chat) {
+    const previousAliases = await db.select({ username: userAliases.username })
+      .from(userAliases)
+      .where(eq(userAliases.userId, userId))
+      .all();
+    for (const previousAlias of previousAliases) {
+      if (!aliases.has(previousAlias.username)) {
+        await db.delete(userAliases)
+          .where(eq(userAliases.username, previousAlias.username))
+          .run();
+      }
+    }
+  }
+  await db.insert(userAliasSyncs).values({
+    userId,
+    checkedAt: stamp,
+  }).onConflictDoUpdate({
+    target: userAliasSyncs.userId,
+    set: { checkedAt: stamp },
+  }).run();
 }
 
 async function ensureRuntime(stamp) {
@@ -35,16 +99,23 @@ async function ensureRuntime(stamp) {
   }).onConflictDoNothing({ target: usageRuntime.id }).run();
 }
 
-export async function observeRequest(user, durationMs, failed = false, stamp = nowSeconds()) {
+export async function observeRequest(
+  user,
+  durationMs,
+  failed = false,
+  stamp = nowSeconds(),
+  privateChat = false,
+) {
   const safeDuration = Math.max(0, Number(durationMs) || 0);
   await ensureRuntime(stamp);
 
   const userId = Number(user?.id);
-  if (Number.isSafeInteger(userId)) {
+  if (Number.isSafeInteger(userId) && userId > 0 && !user?.is_bot) {
     const userSet = {
       lastSeen: stamp,
       events: sql`${usageUsers.events} + 1`,
     };
+    if (privateChat) userSet.privateSeenAt = stamp;
     const username = cleanText(user?.username, 64);
     const firstName = cleanText(user?.first_name, 128);
     const lastName = cleanText(user?.last_name, 128);
@@ -62,11 +133,13 @@ export async function observeRequest(user, durationMs, failed = false, stamp = n
       languageCode,
       firstSeen: stamp,
       lastSeen: stamp,
+      privateSeenAt: privateChat ? stamp : null,
       events: 1,
     }).onConflictDoUpdate({
       target: usageUsers.userId,
       set: userSet,
     }).run();
+    await syncUserAliases(user, userId, stamp);
   }
 
   await db.insert(usageMinutes).values({
@@ -127,6 +200,9 @@ function windowStats(rows, cutoff) {
 
 export async function usageSummary(stamp = nowSeconds()) {
   const trackedUsers = await db.$count(usageUsers);
+  const privateUsersRow = await db.get(sql.raw(
+    'SELECT COUNT(*) AS count FROM usage_users WHERE private_seen_at IS NOT NULL',
+  ));
   const profiledUsersRow = await db.get(sql.raw('SELECT COUNT(*) AS count FROM usage_users WHERE username IS NOT NULL OR first_name IS NOT NULL'));
   const usernamesRow = await db.get(sql.raw('SELECT COUNT(*) AS count FROM usage_users WHERE username IS NOT NULL'));
   const eventsRow = await db.get(sql.raw('SELECT COALESCE(SUM(events), 0) AS events FROM usage_users'));
@@ -160,6 +236,8 @@ export async function usageSummary(stamp = nowSeconds()) {
 
   return {
     trackedUsers,
+    privateUsers: Number(privateUsersRow?.count || 0),
+    unverifiedPrivateUsers: Math.max(0, trackedUsers - Number(privateUsersRow?.count || 0)),
     profiledUsers: Number(profiledUsersRow?.count || 0),
     usersWithUsername: Number(usernamesRow?.count || 0),
     events: Number(eventsRow?.events || 0),
@@ -224,6 +302,7 @@ export async function exportUsageStats(stamp = nowSeconds()) {
       first_seen: Number(user.firstSeen),
       last_seen: Number(user.lastSeen),
       events: Number(user.events || 0),
+      private_seen_at: user.privateSeenAt == null ? null : Number(user.privateSeenAt),
       username: user.username ?? null,
       first_name: user.firstName ?? null,
       last_name: user.lastName ?? null,
@@ -278,6 +357,10 @@ export async function importUsageStats(payload) {
     const lastName = cleanText(raw.last_name, 128);
     const languageCode = cleanText(raw.language_code, 16);
     const profileUpdates = {};
+    const privateSeenAt = Number(raw.private_seen_at);
+    if (Number.isSafeInteger(privateSeenAt) && privateSeenAt > 0) {
+      profileUpdates.privateSeenAt = privateSeenAt;
+    }
     if (username !== null) profileUpdates.username = username;
     if (firstName !== null) profileUpdates.firstName = firstName;
     if (lastName !== null) profileUpdates.lastName = lastName;
@@ -291,6 +374,7 @@ export async function importUsageStats(payload) {
       languageCode,
       firstSeen,
       lastSeen,
+      privateSeenAt: profileUpdates.privateSeenAt ?? null,
       events,
     }).onConflictDoUpdate({
       target: usageUsers.userId,
@@ -299,6 +383,9 @@ export async function importUsageStats(payload) {
         lastSeen: sql`max(${usageUsers.lastSeen}, ${lastSeen})`,
         events: sql`max(${usageUsers.events}, ${events})`,
         ...profileUpdates,
+        ...(profileUpdates.privateSeenAt == null
+          ? {}
+          : { privateSeenAt: sql`max(COALESCE(${usageUsers.privateSeenAt}, 0), ${profileUpdates.privateSeenAt})` }),
       },
     }).run();
     importedUsers += 1;

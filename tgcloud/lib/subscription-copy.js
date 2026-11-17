@@ -3,7 +3,7 @@
 export const SUBSCRIPTION_LOCALES = Object.freeze([
   'ar','en','es','de','it','pt','nl','pl','uk','ru','tr','ur','hi','id','ja','ko','vi','th','zh-hans','zh-hant',
 ]);
-const KEYS = ['free','gift','developer','benefits','text','blocks','depth','media','columns','pages','packs','branding','early','remaining','noExpiry','days','hours','until','warning'];
+const KEYS = ['free','gift','developer','benefits','text','blocks','depth','media','columns','pages','packs','branding','early','remaining','noExpiry','days','hours','until','warning','expired','renew'];
 const VALUES = {
   ar:['المجانية','هدية','المطور','مميزات اشتراكك','حرف','بلوك','مستوى تداخل','وسائط','عمود جدول','صفحة محفوظة','حزمة إيموجي','إزالة الحقوق','الوصول المبكر','المدة المتبقية','بدون انتهاء','يوم','ساعة','ينتهي في','اقترب انتهاء اشتراكك'],
   en:['Free','Gift','Developer','Your subscription benefits','characters','blocks','nesting levels','media items','table columns','saved pages','emoji packs','Branding removed','Early access','Time remaining','No expiry','days','hours','Expires at','Your subscription is ending soon'],
@@ -26,8 +26,31 @@ const VALUES = {
   'zh-hans':['免费','礼物','开发者','订阅权益','字符','区块','嵌套层级','媒体','表格列','已保存页面','表情包','移除品牌标识','抢先体验','剩余时间','永不过期','天','小时','到期时间','你的订阅即将到期'],
   'zh-hant':['免費','禮物','開發者','訂閱權益','字元','區塊','巢狀層級','媒體','表格欄','已儲存頁面','表情包','移除品牌標誌','搶先體驗','剩餘時間','永不過期','天','小時','到期時間','你的訂閱即將到期'],
 };
+const EXTRA_VALUES = {
+  ar:{expired:'انتهى اشتراكك',renew:'إعادة الاشتراك'},
+  en:{expired:'Your subscription has expired',renew:'Renew subscription'},
+  es:{expired:'Tu suscripción ha vencido',renew:'Renovar suscripción'},
+  de:{expired:'Dein Abo ist abgelaufen',renew:'Abo erneuern'},
+  it:{expired:'Il tuo abbonamento è scaduto',renew:'Rinnova abbonamento'},
+  pt:{expired:'Sua assinatura expirou',renew:'Renovar assinatura'},
+  nl:{expired:'Je abonnement is verlopen',renew:'Abonnement verlengen'},
+  pl:{expired:'Twoja subskrypcja wygasła',renew:'Odnów subskrypcję'},
+  uk:{expired:'Термін підписки завершився',renew:'Поновити підписку'},
+  ru:{expired:'Срок подписки истёк',renew:'Продлить подписку'},
+  tr:{expired:'Aboneliğin sona erdi',renew:'Aboneliği yenile'},
+  ur:{expired:'آپ کی رکنیت ختم ہو گئی ہے',renew:'رکنیت دوبارہ شروع کریں'},
+  hi:{expired:'आपकी सदस्यता समाप्त हो गई है',renew:'सदस्यता नवीनीकृत करें'},
+  id:{expired:'Langgananmu telah berakhir',renew:'Perpanjang langganan'},
+  ja:{expired:'サブスクリプションの期限が切れました',renew:'サブスクリプションを更新'},
+  ko:{expired:'구독이 만료되었습니다',renew:'구독 갱신'},
+  vi:{expired:'Gói đăng ký đã hết hạn',renew:'Gia hạn đăng ký'},
+  th:{expired:'การสมัครของคุณหมดอายุแล้ว',renew:'ต่ออายุการสมัคร'},
+  'zh-hans':{expired:'你的订阅已过期',renew:'续订'},
+  'zh-hant':{expired:'你的訂閱已過期',renew:'續訂'},
+};
 for (const locale of SUBSCRIPTION_LOCALES) {
-  if (!Array.isArray(VALUES[locale]) || VALUES[locale].length !== KEYS.length)
+  if (!Array.isArray(VALUES[locale]) || VALUES[locale].length !== KEYS.length - 2
+    || !EXTRA_VALUES[locale]?.expired || !EXTRA_VALUES[locale]?.renew)
     throw new Error('Incomplete subscription translation: ' + locale);
 }
 export function subscriptionLocale(languageCode) {
@@ -39,6 +62,7 @@ export function subscriptionLocale(languageCode) {
 export function subscriptionText(locale,key) {
   const index=KEYS.indexOf(key);
   if(index<0) throw new Error('Unknown subscription copy: '+key);
-  return VALUES[subscriptionLocale(locale)][index];
+  const language=subscriptionLocale(locale);
+  return index<VALUES[language].length?VALUES[language][index]:EXTRA_VALUES[language][key];
 }
 export function subscriptionRtl(locale) {return ['ar','ur'].includes(subscriptionLocale(locale));}

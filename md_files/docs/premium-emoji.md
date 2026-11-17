@@ -55,6 +55,12 @@ entities enclosing an emoji code do not force the resulting emoji into
 monospace. Malformed codes stay text, and preformatted/code blocks remain
 literal. No arbitrary HTML execution is added.
 
+The Serverless publish renderer also converts complete codes found in stored
+rich-text strings, HTML text nodes, or plain-text fallbacks into Telegram
+`custom_emoji` RichText nodes. This server-side conversion is required for
+publishing older or directly submitted page data that did not pass through the
+Mini App's visual editor conversion.
+
 The Mini App's rich-text, list and table-cell editors convert either code as
 soon as it is complete. When a pasted code is present in plain clipboard text,
 the editor inserts it as text before converting it, so the browser cannot
@@ -68,6 +74,12 @@ the stored custom-emoji ID and Telegram's destination-specific permissions.
 Failure to synchronize the saved-pack list is reported as a pack-sync error;
 it does not display the pack-load toast during unrelated editor actions such
 as pasting an individual emoji code.
+
+If the legacy pack list cannot be imported yet, adding a new pack remains
+available. The Serverless record stays marked for migration, and a later
+successful import merges the legacy names with the packs already added there;
+it does not discard the legacy list or overwrite the new packs. The configured
+pack limit still controls which packs are visible.
 
 Insertion updates the existing block storage fields. Imported native blocks
 retain their native structure; editable derived fields are refreshed as well,

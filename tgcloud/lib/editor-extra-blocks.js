@@ -54,6 +54,7 @@ import {
   quoteMediaPayload,
   replacementData,
 } from 'lib/editor-import';
+import { buildEditorGuideRichMessage, editorGuideFallback } from 'lib/editor-guide';
 import {
   alignLinkedAnchors,
   anchorName,
@@ -63,8 +64,11 @@ import {
 import {
   messageHtmlText,
   messageRichText,
+  inlineButtonRichText,
+  parseInlineButtonMarker,
   plainRichText,
 } from 'lib/rich-text';
+import { normalizePageTitle } from 'lib/page-delivery';
 import { buildSingleBlockRichMessage } from 'lib/editor-renderer';
 import {
   albumToken,
@@ -73,7 +77,13 @@ import {
   readAlbumBlocks,
   rememberAlbumPart,
 } from 'lib/editor-albums';
-import { resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
+import {
+  checklistPrompt,
+  resolveLanguage,
+  resolveUserLanguage,
+  t,
+  tr,
+} from 'lib/i18n';
 import { requestEditorLimitConfirmation } from 'lib/editor-limit-confirmation';
 
 const SIMPLE_TEXT_TYPES = new Set([
@@ -190,12 +200,75 @@ async function editManagement(session, text, replyMarkup) {
   return true;
 }
 
-async function sendPrompt(userId, chatId, text, replyMarkup = undefined) {
-  const sent = await api.sendMessage({
-    chat_id: chatId,
-    text,
-    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+function isMissingMessageTarget(error) {
+  const reason = String(error?.description || error?.message || error).toLowerCase();
+  return reason.includes('message to edit not found')
+    || reason.includes('message_id_invalid');
+}
+
+async function editOrRepostManagement(userId, session, fallbackChatId, fallbackMessageId, content, replyMarkup) {
+  const chatId = fallbackChatId || session?.managementChatId || session?.chatId;
+  const messageId = fallbackMessageId || session?.managementMessageId;
+  if (!chatId || !messageId) return false;
+  try {
+    await editMessage(chatId, messageId, content, replyMarkup);
+    await updateEditorSession(userId, {
+      managementChatId: chatId,
+      managementMessageId: messageId,
+    });
+    return { chatId, messageId };
+  } catch (error) {
+    if (!isMissingMessageTarget(error)) throw error;
+  }
+  const rich = content && typeof content === 'object' && Array.isArray(content.blocks);
+  const sent = rich
+    ? await api.sendRichMessage({
+      chat_id: chatId,
+      rich_message: content,
+      reply_markup: replyMarkup,
+    })
+    : await api.sendMessage({
+      chat_id: chatId,
+      text: content,
+      reply_markup: replyMarkup,
+    });
+  await updateEditorSession(userId, {
+    managementChatId: sent.chat?.id || chatId,
+    managementMessageId: sent.message_id,
   });
+  return {
+    chatId: sent.chat?.id || chatId,
+    messageId: sent.message_id,
+  };
+}
+
+async function sendPrompt(userId, chatId, text, replyMarkup = undefined) {
+  const isRich = text && typeof text === 'object' && Array.isArray(text.blocks);
+  let sent;
+  if (isRich) {
+    const { fallbackText, ...richMessage } = text;
+    try {
+      sent = await api.sendRichMessage({
+        chat_id: chatId,
+        rich_message: richMessage,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      });
+    } catch (error) {
+      if (typeof fallbackText !== 'string') throw error;
+      console.warn('Could not send rich editor prompt; using plain fallback', error);
+      sent = await api.sendMessage({
+        chat_id: chatId,
+        text: fallbackText,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      });
+    }
+  } else {
+    sent = await api.sendMessage({
+      chat_id: chatId,
+      text,
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
+  }
   await updateEditorSession(userId, {
     addPromptChatId: sent.chat?.id || chatId,
     addPromptMessageId: sent.message_id,
@@ -369,12 +442,17 @@ function stripNative(data) {
   return result;
 }
 
-function promptForAdd(type, languageCode) {
+function listInputPrompt(listKind, locale) {
+  if (listKind === 'checklist') return checklistPrompt(locale);
+  return t(locale, listKind === 'numbered' ? 'list.numbered_prompt' : 'list.bullet_prompt');
+}
+
+function promptForAdd(type, languageCode, listKind = 'bullet') {
   const locale = localeOf(languageCode);
   const prompts = {
     mathematical_expression: t(locale, 'math.add_prompt'),
     anchor: t(locale, 'anchor.name_required'),
-    list: t(locale, 'list.bullet_prompt'),
+    list: listInputPrompt(listKind, locale),
     table: tr(locale, 'Send table rows, one per line, separating columns with |.'),
     blockquote: t(locale, 'details.send_quote'),
     pullquote: t(locale, 'details.send_pullquote'),
@@ -391,12 +469,12 @@ function promptForAdd(type, languageCode) {
   return prompts[type] || tr(locale, 'Send the content.');
 }
 
-function promptForEdit(type, languageCode) {
+function promptForEdit(type, languageCode, listKind = 'bullet') {
   const locale = localeOf(languageCode);
   const prompts = {
     mathematical_expression: t(locale, 'math.edit_prompt'),
     anchor: tr(locale, 'Send the new anchor name.'),
-    list: tr(locale, 'Send list items, one per line.'),
+    list: listInputPrompt(listKind, locale),
     table: tr(locale, 'Send table rows; separate columns with |.'),
     blockquote: tr(locale, 'Send new quote text or new media/file.'),
     pullquote: tr(locale, 'Send new pull quote text or new media/file.'),
@@ -414,20 +492,13 @@ function promptForEdit(type, languageCode) {
   return prompts[type] || tr(locale, 'Send new content of the same type.');
 }
 
-const LARGE_BUTTON_FORMAT = 'Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code';
-const BUTTON_LINK_AND_COLOR_GUIDE = 'The link may be a URL, @username, or t.me/username. Optional colors: #r red, #b blue, #g green.';
 const MEDIA_INPUT_GUIDE = 'Send a photo, file, voice note, video, audio file, animation (GIF), or photo album (collage). Each item is saved as its original media block type.';
-const BUTTON_STYLES_BY_COLOR = Object.freeze({
-  r: 'danger',
-  b: 'primary',
-  g: 'success',
-});
 
 function largeButtonInputPrompt(languageCode) {
-  const locale = localeOf(languageCode);
-  return tr(locale, LARGE_BUTTON_FORMAT)
-    + '\n'
-    + tr(locale, BUTTON_LINK_AND_COLOR_GUIDE);
+  return {
+    ...buildEditorGuideRichMessage('', languageCode, { largeButton: true }),
+    fallbackText: editorGuideFallback('', languageCode, { largeButton: true }),
+  };
 }
 
 function mediaInputPrompt(languageCode) {
@@ -436,56 +507,74 @@ function mediaInputPrompt(languageCode) {
 
 async function parseLargeButtonInput(input, userId) {
   const raw = String(input || '').trim();
-  const separator = /\s+[-–—]\s+/u.exec(raw);
-  if (!separator) return { error: 'format' };
-  const text = raw.slice(0, separator.index).trim();
-  let target = raw.slice(separator.index + separator[0].length).trim();
-  if (!text || !target) return { error: 'format' };
-  if (text.length > 64) return { error: 'title' };
-  const colorMatch = /\s+#([rbg])$/i.exec(target);
-  const style = colorMatch
-    ? BUTTON_STYLES_BY_COLOR[colorMatch[1].toLowerCase()]
-    : null;
-  if (colorMatch) target = target.slice(0, colorMatch.index).trim();
-  if (!target) return { error: 'format' };
-
-  const pageMatch = /^cbd(?::|\s+)([A-Za-z0-9_-]{1,64})$/i.exec(target);
-  if (pageMatch) {
-    const pageId = pageMatch[1];
-    const page = await db.select()
+  if (!raw) return { error: 'format' };
+  let source = raw.includes('{') || raw.includes('}')
+    ? raw
+    : '{' + raw + '}';
+  const pageMarkers = [...source.matchAll(/\{[^{}\n]+\}/g)]
+    .map(match => ({ marker: match[0], parts: parseInlineButtonMarker(match[0]) }))
+    .filter(({ parts }) => parts?.[1] === 'page_callback');
+  if (pageMarkers.length) {
+    const pages = await db.select()
       .from(richPages)
-      .where(eq(richPages.pageId, pageId))
-      .get();
-    if (!page || Number(page.ownerId) !== Number(userId)) {
-      return { error: 'page' };
+      .where(eq(richPages.ownerId, Number(userId)))
+      .all();
+    for (const { marker, parts } of pageMarkers) {
+      const [title, , reference, color, audience] = parts;
+      const page = pages.find(item => String(item.pageId) === reference)
+        || (() => {
+          const matches = pages.filter(item => normalizePageTitle(item.title) === normalizePageTitle(reference));
+          return matches.length === 1 ? matches[0] : null;
+        })();
+      if (!page) return { error: 'page' };
+      const colorOption = color ? ' #' + color : '';
+      const audienceOption = audience === 'subscribers' ? ' sub' : '';
+      const replacement = '{' + title + ' - CBD:' + page.pageId + colorOption + audienceOption + '}';
+      source = source.replace(marker, replacement);
     }
-    const button = {
-      text,
-      callback_data: 'r:cbd:' + pageId,
-      ...(style ? { style } : {}),
-    };
-    return validateStoredButton({
-      text,
-      type: 'callback_data',
-      value: button.callback_data,
-    }).ok
-      ? { button }
-      : { error: 'format' };
   }
+  const parsed = inlineButtonRichText(source);
+  const parts = Array.isArray(parsed) ? parsed : [parsed];
+  const buttons = [];
 
-  const url = /^@[A-Za-z0-9_]{5,32}$/.test(target)
-    ? 'https://t.me/' + target.slice(1)
-    : /^t\.me\/[^\s]+$/i.test(target)
-      ? 'https://' + target
-      : target;
-  const button = {
-    text,
-    url,
-    ...(style ? { style } : {}),
-  };
-  return validateStoredButton({ ...button, type: 'url' }).ok
-    ? { button }
-    : { error: 'format' };
+  for (const part of parts) {
+    if (typeof part === 'string' && !part.trim()) continue;
+    if (!part || typeof part !== 'object' || Array.isArray(part) || part.type !== 'button') {
+      return { error: 'format' };
+    }
+    const button = part.button;
+    if (!button || typeof button !== 'object' || Array.isArray(button)) return { error: 'format' };
+    if (String(button.text || '').length > 64) return { error: 'title' };
+
+    const actions = [
+      ['url', 'url', button.url],
+      ['callback_data', 'callback_data', button.callback_data],
+      ['copy_text', 'copy', button.copy_text?.text],
+      ['web_app', 'web_app', button.web_app?.url],
+      ['login_url', 'login_url', button.login_url?.url],
+      ['switch_inline_query', 'switch_inline', button.switch_inline_query],
+      ['switch_inline_query_current_chat', 'switch_inline_current', button.switch_inline_query_current_chat],
+      ['disabled', 'disabled', ''],
+    ].filter(([key]) => Object.hasOwn(button, key));
+    if (actions.length !== 1) return { error: 'format' };
+    const [, type, value] = actions[0];
+    if (type === 'url' && /^tg:(?:\/\/)?user(?:[/?#]|$)/i.test(String(value || ''))) {
+      return { error: 'user' };
+    }
+    if (!validateStoredButton({ ...button, type, value }).ok) return { error: 'format' };
+
+    const pageMatch = String(button.callback_data || '').match(/^r:cbd(?:s?):([A-Za-z0-9_-]{1,64})$/);
+    if (pageMatch) {
+      const page = await db.select()
+        .from(richPages)
+        .where(eq(richPages.pageId, pageMatch[1]))
+        .get();
+      if (!page || Number(page.ownerId) !== Number(userId)) return { error: 'page' };
+    }
+    buttons.push(button);
+  }
+  if (!buttons.length || buttons.length > 100) return { error: 'format' };
+  return { buttons };
 }
 
 async function replyLargeButtonInputError(message, error, languageCode) {
@@ -495,15 +584,31 @@ async function replyLargeButtonInputError(message, error, languageCode) {
       text: tr(localeOf(languageCode), 'The button title is too long; the maximum is 64 characters.'),
     });
   } else if (error === 'page') {
+    await api.sendRichMessage({
+      chat_id: message.chat.id,
+      rich_message: {
+        blocks: [
+          { type: 'paragraph', text: tr(localeOf(languageCode), 'The button format is invalid.') },
+          {
+            type: 'blockquote',
+            blocks: [{
+              type: 'paragraph',
+              text: tr(localeOf(languageCode), 'For CBD, use the exact name of one of your saved pages or its code. If names match more than one page, use the code.'),
+            }],
+          },
+        ],
+      },
+    });
+  } else if (error === 'user') {
     await api.sendMessage({
       chat_id: message.chat.id,
-      text: tr(localeOf(languageCode), 'The page code does not exist or does not belong to you.'),
+      text: localeOf(languageCode) === 'ar'
+        ? 'رابط الحساب يحتاج اسم مستخدم عام (@username). استخدم صيغة USER واختار حساباً عنده اسم مستخدم.'
+        : tr(localeOf(languageCode), 'Account links require a public @username. Use USER and select an account with one.'),
     });
+    await sendPrompt(message.from.id, message.chat.id, largeButtonInputPrompt(languageCode));
   } else {
-    await api.sendMessage({
-      chat_id: message.chat.id,
-      text: largeButtonInputPrompt(languageCode),
-    });
+    await sendPrompt(message.from.id, message.chat.id, largeButtonInputPrompt(languageCode));
   }
 }
 
@@ -539,6 +644,23 @@ function mediaChildrenFromBlocks(blocks) {
   return (Array.isArray(blocks) ? blocks : [])
     .filter((item) => ['photo', 'video'].includes(String(item?.type || '')))
     .map((item, index) => ({ ...item, position: index }));
+}
+function allMediaBlocksFromBlocks(blocks) {
+  return (Array.isArray(blocks) ? blocks : [])
+    .filter((item) => MEDIA_TYPES.has(String(item?.type || '')))
+    .map((item, index) => ({ ...item, position: index }));
+}
+
+function fieldActionKeyboard(action, languageCode) {
+  const locale = localeOf(languageCode);
+  return {
+    inline_keyboard: [[{
+      text: action === 'skip'
+        ? (locale === 'ar' ? 'إلغاء / تخطي' : 'Cancel / Skip')
+        : tr(locale, 'Remove'),
+      callback_data: 'r:field:' + action,
+    }]],
+  };
 }
 
 async function rememberMediaGroup(message, purpose) {
@@ -927,7 +1049,7 @@ async function handleAddCallback(query, session, data, languageCode) {
       addStep: 'content',
       addPayload: { list_kind: kind },
     });
-    await sendPrompt(userId, chatId, promptForAdd('list', languageCode));
+    await sendPrompt(userId, chatId, promptForAdd('list', languageCode, kind));
     await answer(query);
     return true;
   }
@@ -1010,7 +1132,12 @@ async function mergeSlideshowActiveGroup(userId, upload) {
   const current = clone(upload || {});
   const groupId = String(current.active_group || '');
   if (!groupId) return { upload: current, ready: true };
-  const batch = await readAlbumBatch(userId, groupId);
+  const deadline = Date.now() + 2500;
+  let batch = await readAlbumBatch(userId, groupId);
+  while (!batch.quiet && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    batch = await readAlbumBatch(userId, groupId);
+  }
   if (!batch.quiet) return { upload: current, ready: false };
   const grouped = mediaChildrenFromBlocks(batch.blocks);
   const remaining = Math.max(0, (isDeveloper(userId) ? Infinity : SLIDESHOW_LIMIT) - current.children.length);
@@ -1021,6 +1148,401 @@ async function mergeSlideshowActiveGroup(userId, upload) {
   delete current.active_group;
   delete current.active_group_token;
   return { upload: current, ready: true };
+}
+
+function mediaAppendKeyboard(token, languageCode) {
+  return {
+    inline_keyboard: [
+      [{
+        text: t(localeOf(languageCode), 'media.done'),
+        callback_data: 'r:media:append:done:' + token,
+        style: 'success',
+      }],
+      [{
+        text: editorCopy(languageCode).cancel,
+        callback_data: 'r:media:append:cancel:' + token,
+      }],
+    ],
+  };
+}
+
+function mediaAppendText(current, added, languageCode) {
+  return tr(localeOf(languageCode), 'Current media: {current}\nNew media: {added}\nSend supported media, then tap Done.', {
+    current,
+    added,
+  });
+}
+
+function mediaAppendKind(type) {
+  if (CONTAINER_TYPES.has(String(type || ''))) return 'container';
+  if (QUOTE_TYPES.includes(String(type || ''))) return 'quote';
+  if (MEDIA_TYPES.has(String(type || ''))) return 'sibling';
+  return null;
+}
+
+function mediaAppendTarget(session, append) {
+  const details = append?.detailsId
+    ? getBlockById(session?.blocks, append.detailsId)
+    : null;
+  const block = append?.detailsId
+    ? details && findDetailsChild(details, append.targetId || append.slideshowId)
+    : getBlockById(session?.blocks, append?.targetId || append?.slideshowId);
+  if (
+    !block
+    || mediaAppendKind(block.type) !== (append?.kind || 'container')
+    || (append?.detailsId && details?.type !== 'details')
+  ) return null;
+  return { details, block };
+}
+
+function mediaAppendItems(blocks, kind) {
+  return kind === 'container'
+    ? mediaChildrenFromBlocks(blocks)
+    : allMediaBlocksFromBlocks(blocks);
+}
+
+function mediaAppendItemsFromMessage(message, kind) {
+  const parsed = messageToBlocks(message);
+  const items = mediaAppendItems(parsed, kind);
+  if (kind === 'container') return items;
+  const caption = parsed.find((item) => item?.type === 'caption');
+  const media = items.find((item) => MEDIA_CAPTION_TYPES.includes(String(item?.type || '')));
+  if (caption && media) {
+    media.data.caption_html = caption.data?.html || null;
+    media.data.caption_text = caption.data?.text || null;
+    media.data.caption_rich_text = caption.data?.rich_text ?? null;
+  }
+  return items;
+}
+
+function mediaAppendCurrentCount(target, kind) {
+  if (kind === 'container') {
+    return Array.isArray(target?.block?.data?.children) ? target.block.data.children.length : 0;
+  }
+  if (kind === 'quote') {
+    return Array.isArray(target?.block?.data?.media_children) ? target.block.data.media_children.length : 0;
+  }
+  return 1;
+}
+
+async function updateMediaAppendPrompt(userId, session, append, languageCode) {
+  const target = mediaAppendTarget(session, append);
+  if (!target) return false;
+  const kind = append.kind || 'container';
+  let pending = mediaAppendItems(append.items, kind).length;
+  if (append.activeGroupId) {
+    const batch = await readAlbumBatch(userId, append.activeGroupId);
+    pending += mediaAppendItems(batch.blocks, kind).length;
+  }
+  const current = mediaAppendCurrentCount(target, kind);
+  const maximum = kind === 'container' && !isDeveloper(userId) ? SLIDESHOW_LIMIT : Infinity;
+  const added = Math.min(pending, Math.max(0, maximum - current));
+  await editMessage(
+    session.addPromptChatId || session.managementChatId || session.chatId,
+    session.addPromptMessageId,
+    mediaAppendText(current, added, languageCode),
+    mediaAppendKeyboard(append.token, languageCode),
+  );
+  return true;
+}
+
+async function startMediaAppend(query, session, targetId, detailsId, languageCode) {
+  if (session?.state !== 'managing') {
+    await answer(query, tr(localeOf(languageCode), 'This flow has expired.'), true);
+    return true;
+  }
+  const targetBlock = detailsId
+    ? findDetailsChild(getBlockById(session?.blocks, detailsId), targetId)
+    : getBlockById(session?.blocks, targetId);
+  const kind = mediaAppendKind(targetBlock?.type);
+  if (!kind) {
+    await answer(query, tr(localeOf(languageCode), 'This block does not contain media.'), true);
+    return true;
+  }
+  const append = {
+    token: (globalThis.crypto?.randomUUID?.() || Math.random().toString(16).slice(2)).replaceAll('-', '').slice(0, 12),
+    targetId: String(targetId),
+    detailsId: detailsId ? String(detailsId) : null,
+    kind,
+    items: [],
+    activeGroupId: null,
+  };
+  const target = mediaAppendTarget(session, append);
+  if (!target) {
+    await answer(query, tr(localeOf(languageCode), 'This media block no longer exists.'), true);
+    return true;
+  }
+  const currentCount = mediaAppendCurrentCount(target, kind);
+  if (kind === 'container' && !isDeveloper(query.from.id) && currentCount >= SLIDESHOW_LIMIT) {
+    await answer(query, tr(localeOf(languageCode), 'The media block reached its item limit.'), true);
+    return true;
+  }
+  await setEditorState(query.from.id, 'editing_block', {
+    currentBlockId: detailsId ? null : String(targetId),
+    expectedType: String(targetBlock.type),
+    editField: 'media_append',
+    nestedDetailsId: detailsId ? String(detailsId) : null,
+    nestedChildId: detailsId ? String(targetId) : null,
+    nestedAction: detailsId ? 'media_append' : null,
+    addPayload: { mediaAppend: append },
+  });
+  await sendPrompt(
+    query.from.id,
+    query.message.chat.id,
+    mediaAppendText(currentCount, 0, languageCode),
+    mediaAppendKeyboard(append.token, languageCode),
+  );
+  await answer(query);
+  return true;
+}
+
+async function handleMediaAppendCallback(query, session, data, languageCode) {
+  const parts = data.split(':');
+  if (parts[1] === 'slides' && parts[2] === 'edit' && parts[3] === 'add') {
+    if (parts.length === 5) return startMediaAppend(query, session, parts[4], null, languageCode);
+  } else if (parts[1] === 'dslides' && parts[2] === 'edit' && parts[3] === 'add' && parts.length === 6) {
+    return startMediaAppend(query, session, parts[5], parts[4], languageCode);
+  } else if (parts[1] === 'media' && parts[2] === 'edit' && parts[3] === 'add' && parts.length === 5) {
+    return startMediaAppend(query, session, parts[4], null, languageCode);
+  } else if (parts[1] === 'dmedia' && parts[2] === 'edit' && parts[3] === 'add' && parts.length === 6) {
+    return startMediaAppend(query, session, parts[5], parts[4], languageCode);
+  }
+  if (
+    parts.length !== 5
+    || parts[0] !== 'r'
+    || !['slides', 'media'].includes(parts[1])
+    || parts[2] !== 'append'
+    || !['done', 'cancel'].includes(parts[3])
+  ) return false;
+
+  const append = session?.addPayload?.mediaAppend || session?.addPayload?.slideshowAppend;
+  if (
+    session?.state !== 'editing_block'
+    || !['media_append', 'slideshow_append'].includes(String(session.editField || ''))
+    || !append?.token
+    || String(append.token) !== parts[4]
+  ) {
+    await answer(query, tr(localeOf(languageCode), 'This flow has expired.'), true);
+    return true;
+  }
+  const normalizedAppend = {
+    ...append,
+    targetId: append.targetId || append.slideshowId,
+    kind: append.kind || 'container',
+  };
+  const target = mediaAppendTarget(session, normalizedAppend);
+  if (!target) {
+    await answer(query, tr(localeOf(languageCode), 'This media block no longer exists.'), true);
+    return true;
+  }
+  if (parts[3] === 'cancel') {
+    if (append.activeGroupId) await clearAlbum(query.from.id, append.activeGroupId);
+    await deleteQuietly(session.addPromptChatId, session.addPromptMessageId);
+    await updateEditorSession(query.from.id, {
+      state: 'managing',
+      currentBlockId: null,
+      expectedType: null,
+      editField: null,
+      nestedDetailsId: null,
+      nestedChildId: null,
+      nestedAction: null,
+      addPayload: {},
+      addPromptChatId: null,
+      addPromptMessageId: null,
+    });
+    await answer(query);
+    return true;
+  }
+
+  const additions = mediaAppendItems(
+    Array.isArray(append.items) ? append.items : [],
+    normalizedAppend.kind,
+  );
+  if (append.activeGroupId) {
+    const batch = await readAlbumBatch(query.from.id, append.activeGroupId);
+    if (!batch.quiet) {
+      await answer(query, tr(localeOf(languageCode), 'The album is still receiving items. Try again in a moment.'), true);
+      return true;
+    }
+    additions.push(...mediaAppendItems(batch.blocks, normalizedAppend.kind));
+    await clearAlbum(query.from.id, append.activeGroupId);
+  }
+  if (!additions.length) {
+    await answer(query, tr(localeOf(languageCode), 'Send at least one media item.'), true);
+    return true;
+  }
+  const blocks = clone(session.blocks || []);
+  let selectedBlock = null;
+  if (normalizedAppend.kind === 'container') {
+    const children = clone(Array.isArray(target.block.data?.children) ? target.block.data.children : []);
+    const room = Math.max(0, (isDeveloper(query.from.id) ? Infinity : SLIDESHOW_LIMIT) - children.length);
+    for (const addition of additions.slice(0, room)) {
+      children.push({ ...addition, position: children.length });
+    }
+    if (children.length === (Array.isArray(target.block.data?.children) ? target.block.data.children.length : 0)) {
+      await answer(query, tr(localeOf(languageCode), 'The media block reached its item limit.'), true);
+      return true;
+    }
+    const replacement = { ...clone(target.block.data || {}), children };
+    selectedBlock = append.detailsId
+      ? replaceDetailsChild(
+        getBlockById(blocks, append.detailsId),
+        normalizedAppend.targetId,
+        makeBlock(target.block.type, replacement, target.block.position, 'generated', normalizedAppend.targetId),
+      )
+      : replaceBlockData(blocks, normalizedAppend.targetId, replacement, 'generated');
+  } else if (normalizedAppend.kind === 'quote') {
+    const current = clone(Array.isArray(target.block.data?.media_children) ? target.block.data.media_children : []);
+    const children = current.concat(additions.map((item, index) => ({
+      ...item,
+      position: current.length + index,
+    })));
+    const replacement = { ...clone(target.block.data || {}), media_children: children };
+    selectedBlock = append.detailsId
+      ? replaceDetailsChild(
+        getBlockById(blocks, append.detailsId),
+        normalizedAppend.targetId,
+        makeBlock(target.block.type, replacement, target.block.position, 'generated', normalizedAppend.targetId),
+      )
+      : replaceBlockData(blocks, normalizedAppend.targetId, replacement, 'generated');
+  } else if (append.detailsId) {
+    const details = getBlockById(blocks, append.detailsId);
+    const children = details ? detailsChildren(details) : [];
+    const targetIndex = children.findIndex((item) => String(item.id) === normalizedAppend.targetId);
+    if (targetIndex < 0) {
+      await answer(query, tr(localeOf(languageCode), 'This media block no longer exists.'), true);
+      return true;
+    }
+    let index = targetIndex + 1;
+    for (const addition of additions) {
+      addBlock(children, makeBlock(addition.type, addition.data || {}, index, addition.source), index);
+      index += 1;
+    }
+    detachDetails(details);
+    details.data.children = children;
+    selectedBlock = children[targetIndex + 1] || null;
+  } else {
+    const targetIndex = blocks.findIndex((item) => String(item.id) === normalizedAppend.targetId);
+    if (targetIndex < 0) {
+      await answer(query, tr(localeOf(languageCode), 'This media block no longer exists.'), true);
+      return true;
+    }
+    let index = targetIndex + 1;
+    for (const addition of additions) {
+      addBlock(blocks, makeBlock(addition.type, addition.data || {}, index, addition.source), index);
+      index += 1;
+    }
+    selectedBlock = blocks[targetIndex + 1] || null;
+  }
+  if (!selectedBlock) {
+    await answer(query, tr(localeOf(languageCode), 'This media block no longer exists.'), true);
+    return true;
+  }
+  const saved = await saveMutatedBlocks(query.from.id, session, blocks, {
+    state: 'managing',
+    currentBlockId: null,
+    expectedType: null,
+    editField: null,
+    nestedDetailsId: null,
+    nestedChildId: null,
+    nestedAction: null,
+    addPayload: {},
+    addPromptChatId: null,
+    addPromptMessageId: null,
+  });
+  if (!saved.ok) {
+    await answer(query, limitText(saved.limit, languageCode), true);
+    return true;
+  }
+  let page;
+  let keyboard;
+  if (append.detailsId) {
+    const updatedDetails = getBlockById(saved.updated.blocks, append.detailsId);
+    selectedBlock = findDetailsChild(updatedDetails, selectedBlock.id);
+    page = detailsInnerPage(updatedDetails, selectedBlock, languageCode);
+    keyboard = buildDetailsInnerBlockKeyboard(updatedDetails, selectedBlock, languageCode);
+  } else {
+    selectedBlock = getBlockById(saved.updated.blocks, selectedBlock.id);
+    page = blockPage(selectedBlock, saved.updated.blocks, languageCode);
+    keyboard = buildBlockEditorKeyboard(selectedBlock, saved.updated.blocks, languageCode);
+  }
+  const managementTarget = await editOrRepostManagement(
+    query.from.id,
+    saved.updated,
+    saved.updated.managementChatId || query.message.chat.id,
+    saved.updated.managementMessageId || query.message.message_id,
+    page,
+    keyboard,
+  );
+  if (
+    managementTarget
+    && session.addPromptMessageId
+    && Number(session.addPromptMessageId) !== Number(managementTarget.messageId)
+  ) {
+    await deleteQuietly(session.addPromptChatId || query.message.chat.id, session.addPromptMessageId);
+  }
+  await answer(query, tr(localeOf(languageCode), 'Media added.'));
+  return true;
+}
+
+async function handleMediaAppendMessage(message, session, languageCode) {
+  const append = session?.addPayload?.mediaAppend || session?.addPayload?.slideshowAppend;
+  if (
+    session?.state !== 'editing_block'
+    || !['media_append', 'slideshow_append'].includes(String(session.editField || ''))
+    || !append?.token
+  ) return false;
+  const normalizedAppend = {
+    ...append,
+    targetId: append.targetId || append.slideshowId,
+    kind: append.kind || 'container',
+  };
+  const target = mediaAppendTarget(session, normalizedAppend);
+  if (!target) {
+    await resetEditorTransientState(message.from.id);
+    await api.sendMessage({ chat_id: message.chat.id, text: tr(localeOf(languageCode), 'This media block no longer exists.') });
+    return true;
+  }
+  if (normalizedAppend.kind === 'container' && !validateSlideshowMessage(message)) {
+    await api.sendMessage({ chat_id: message.chat.id, text: tr(localeOf(languageCode), 'This media exceeds the slideshow safety limits.') });
+    return true;
+  }
+  const incoming = mediaAppendItemsFromMessage(message, normalizedAppend.kind);
+  if (!incoming.length) {
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      text: tr(localeOf(languageCode), normalizedAppend.kind === 'container'
+        ? 'Send photos or videos for this type.'
+        : 'Send supported media for this type.'),
+    });
+    return true;
+  }
+
+  const upload = clone(normalizedAppend);
+  if (message?.media_group_id) {
+    if (upload.activeGroupId && String(upload.activeGroupId) !== String(message.media_group_id)) {
+      const previous = await readAlbumBatch(message.from.id, upload.activeGroupId);
+      if (!previous.quiet) {
+        await updateSlideshowAppendPrompt(message.from.id, session, upload, languageCode);
+        return true;
+      }
+      upload.items.push(...mediaChildrenFromBlocks(previous.blocks));
+      await clearAlbum(message.from.id, upload.activeGroupId);
+    }
+    const collected = await rememberMediaGroup(message, 'media-append');
+    if (!collected) return true;
+    upload.activeGroupId = collected.groupId;
+  } else {
+    upload.items.push(...incoming);
+  }
+
+  const live = await updateEditorSession(message.from.id, {
+    addPayload: { ...(session.addPayload || {}), mediaAppend: upload },
+  });
+  if (!live) throw new Error('Editor session expired while adding media.');
+  await updateMediaAppendPrompt(message.from.id, live, upload, languageCode);
+  await deleteQuietly(message.chat.id, message.message_id);
+  return true;
 }
 
 async function handleSlideshowCallback(query, session, data, languageCode) {
@@ -1197,8 +1719,9 @@ async function handleAlbumFlowCallback(query, session, data, languageCode) {
       query.from.id,
       query.message.chat.id,
       hasCaption
-        ? (tr(localeOf(languageCode), 'Media caption used as quote text. Send author or /skip.'))
-        : (tr(localeOf(languageCode), 'Now send the quote text.')),
+        ? tr(localeOf(languageCode), 'Media caption used as quote text.')
+        : tr(localeOf(languageCode), 'Now send the quote text.'),
+      fieldActionKeyboard('skip', languageCode),
     );
     await answer(query);
     return true;
@@ -1239,8 +1762,9 @@ async function handleAlbumFlowCallback(query, session, data, languageCode) {
       query.from.id,
       query.message.chat.id,
       hasCaption
-        ? (tr(localeOf(languageCode), 'Send the author as text, or /skip.'))
-        : (tr(localeOf(languageCode), 'Send quote text.')),
+        ? tr(localeOf(languageCode), 'Send the author as text.')
+        : tr(localeOf(languageCode), 'Send quote text.'),
+      fieldActionKeyboard('skip', languageCode),
     );
     await answer(query);
     return true;
@@ -1473,7 +1997,7 @@ async function handleEditCallback(query, session, data, languageCode) {
     query.message.chat.id,
     type === 'buttons'
       ? largeButtonInputPrompt(languageCode)
-      : promptForEdit(type, languageCode),
+      : promptForEdit(type, languageCode, listKind(block)),
   );
   await answer(query);
   return true;
@@ -1517,8 +2041,9 @@ async function handleFieldCallback(query, session, data, languageCode) {
     query.from.id,
     query.message.chat.id,
     field === 'caption'
-      ? (tr(localeOf(languageCode), 'Send the new media caption, or /remove to delete it.'))
-      : (tr(localeOf(languageCode), 'Send the new author/source, or /remove to delete it.')),
+      ? tr(localeOf(languageCode), 'Send the new media caption.')
+      : tr(localeOf(languageCode), 'Send the new author/source.'),
+    fieldActionKeyboard('remove', languageCode),
   );
   await answer(query);
   return true;
@@ -1999,9 +2524,14 @@ async function handleDetailsBuilderCallback(query, session, data, languageCode) 
       pendingChildType: 'list',
       addPayload: payload,
     });
-    await editMessage(chatId, messageId, promptForAdd('list', languageCode), {
+    await editMessage(
+      chatId,
+      messageId,
+      promptForAdd('list', languageCode, kind),
+      {
       inline_keyboard: [[{ text: editorCopy(languageCode).back, callback_data: 'r:details:add' }]],
-    });
+      },
+    );
     await answer(query);
     return true;
   }
@@ -2142,7 +2672,11 @@ async function handleDetailsManagerCallback(query, session, data, languageCode) 
       expectedType: String(child.type),
       editField: null,
     });
-    await sendPrompt(userId, chatId, promptForEdit(String(child.type), languageCode));
+    await sendPrompt(
+      userId,
+      chatId,
+      promptForEdit(String(child.type), languageCode, listKind(child)),
+    );
     await answer(query);
     return true;
   }
@@ -2185,11 +2719,16 @@ async function handleDetailsManagerCallback(query, session, data, languageCode) 
       editField: null,
     });
     const prompt = action === 'caption'
-      ? (tr(localeOf(languageCode), 'Send the caption or /remove.'))
+      ? tr(localeOf(languageCode), 'Send the caption.')
       : action === 'credit'
-        ? (tr(localeOf(languageCode), 'Send the source/author or /remove.'))
+        ? tr(localeOf(languageCode), 'Send the source/author.')
         : (tr(localeOf(languageCode), 'Send the footer text.'));
-    await sendPrompt(userId, chatId, prompt);
+    await sendPrompt(
+      userId,
+      chatId,
+      prompt,
+      action === 'add_footer' ? undefined : fieldActionKeyboard('remove', languageCode),
+    );
     await answer(query);
     return true;
   }
@@ -2266,8 +2805,12 @@ export function isExtraBlockCallback(data) {
     || value.startsWith('r:add:details')
     || value.startsWith('r:at:')
     || value.startsWith('r:slides:')
+    || value.startsWith('r:dslides:')
+    || value.startsWith('r:media:')
+    || value.startsWith('r:dmedia:')
     || value.startsWith('r:collage:done:')
     || value.startsWith('r:album:done:')
+    || value.startsWith('r:field:')
     || value.startsWith('r:f:')
     || value.startsWith('r:ct:')
     || value.startsWith('r:tm:')
@@ -2291,6 +2834,72 @@ export function isExtraBlockCallback(data) {
   );
 }
 
+async function handleFieldActionCallback(query, session, data, languageCode) {
+  if (!['r:field:skip', 'r:field:remove'].includes(data)) return false;
+  const action = data.endsWith(':skip') ? 'skip' : 'remove';
+  const message = {
+    ...query.message,
+    from: query.from,
+    text: action === 'skip' ? '/skip' : '/remove',
+  };
+  let handled = false;
+  if (action === 'skip' && session?.state === 'adding_block') {
+    const payload = session.addPayload || {};
+    if (session.addStep === 'quote_media_text' && payload.media_children?.length) {
+      await clearInputMessages(session, message);
+      await updateEditorSession(query.from.id, {
+        addStep: 'quote_credit',
+        addPayload: {
+          ...payload,
+          quote_text: '',
+          quote_html: '',
+          quote_rich_text: null,
+        },
+      });
+      await sendPrompt(
+        query.from.id,
+        query.message.chat.id,
+        tr(localeOf(languageCode), 'Send the author as text.'),
+        fieldActionKeyboard('skip', languageCode),
+      );
+      handled = true;
+    } else if (
+      session.addStep === 'details_child_pullquote_text'
+      && payload.child_media_children?.length
+    ) {
+      await clearInputMessages(session, message);
+      await updateEditorSession(query.from.id, {
+        addStep: 'details_child_quote_credit',
+        addPayload: {
+          ...payload,
+          child_quote_text: '',
+          child_quote_html: '',
+          child_quote_rich_text: null,
+        },
+      });
+      await sendPrompt(
+        query.from.id,
+        query.message.chat.id,
+        tr(localeOf(languageCode), 'Send author.'),
+        fieldActionKeyboard('skip', languageCode),
+      );
+      handled = true;
+    } else {
+      handled = await handleAddMessage(message, session, languageCode);
+    }
+  } else if (action === 'remove' && session?.state === 'editing_block') {
+    handled = session.nestedDetailsId
+      ? await handleNestedEditMessage(message, session, languageCode)
+      : await handleEditMessage(message, session, languageCode);
+  }
+  if (!handled) {
+    await answer(query, tr(localeOf(languageCode), 'This field can no longer be changed.'), true);
+    return true;
+  }
+  await answer(query);
+  return true;
+}
+
 export async function handleExtraBlockCallback(query, session) {
   if (query?.from && !query.from.language_code) {
     query.from.language_code = await resolveUserLanguage(query.from);
@@ -2298,8 +2907,10 @@ export async function handleExtraBlockCallback(query, session) {
   const data = String(query?.data || '');
   const languageCode = code(query);
 
+  if (await handleFieldActionCallback(query, session, data, languageCode)) return true;
   if (await handleAddCallback(query, session, data, languageCode)) return true;
   if (await handleAnchorTargetCallback(query, session, data, languageCode)) return true;
+  if (await handleMediaAppendCallback(query, session, data, languageCode)) return true;
   if (await handleSlideshowCallback(query, session, data, languageCode)) return true;
   if (await handleCollageCallback(query, session, data, languageCode)) return true;
   if (await handleAlbumFlowCallback(query, session, data, languageCode)) return true;
@@ -2360,16 +2971,34 @@ async function handleSlideshowMessage(message, session, languageCode, nested = f
 
   payload.slideshow = upload;
   await updateEditorSession(message.from.id, { addPayload: payload });
-  await clearInputMessages(session, message);
-  await sendPrompt(
+  const prompt = t(localeOf(languageCode), 'media.received', {
+    count: visibleCount + (isDeveloper(message.from.id) ? '' : '/' + SLIDESHOW_LIMIT),
+    type: t(localeOf(languageCode), 'block.slideshow'),
+  });
+  const keyboard = slideshowKeyboard(
+    upload.token,
+    visibleCount,
+    nested,
+    languageCode,
     message.from.id,
-    message.chat.id,
-    t(localeOf(languageCode), 'media.received', {
-      count: visibleCount + (isDeveloper(message.from.id) ? '' : '/' + SLIDESHOW_LIMIT),
-      type: t(localeOf(languageCode), 'block.slideshow'),
-    }),
-    slideshowKeyboard(upload.token, visibleCount, nested, languageCode, message.from.id),
   );
+  if (message?.media_group_id && session.addPromptMessageId) {
+    await deleteQuietly(message.chat.id, message.message_id);
+    try {
+      await editMessage(
+        session.addPromptChatId || message.chat.id,
+        session.addPromptMessageId,
+        prompt,
+        keyboard,
+      );
+    } catch (error) {
+      if (!isMissingMessageTarget(error)) throw error;
+      await sendPrompt(message.from.id, message.chat.id, prompt, keyboard);
+    }
+  } else {
+    await clearInputMessages(session, message);
+    await sendPrompt(message.from.id, message.chat.id, prompt, keyboard);
+  }
   return true;
 }
 
@@ -2422,14 +3051,11 @@ async function handleAddMessage(message, session, languageCode) {
 
   if (type === 'buttons') {
     if (step !== 'large_button_entry' || !message?.text) {
-      await api.sendMessage({
-        chat_id: message.chat.id,
-        text: largeButtonInputPrompt(languageCode),
-      });
+      await sendPrompt(message.from.id, message.chat.id, largeButtonInputPrompt(languageCode));
       return true;
     }
     const parsed = await parseLargeButtonInput(message.text, userId);
-    if (!parsed.button) {
+    if (!parsed.buttons) {
       await replyLargeButtonInputError(message, parsed.error, languageCode);
       return true;
     }
@@ -2437,7 +3063,7 @@ async function handleAddMessage(message, session, languageCode) {
       userId,
       session,
       message,
-      makeBlock('buttons', { buttons: [parsed.button] }),
+      makeBlock('buttons', { buttons: parsed.buttons }),
       languageCode,
     );
     return true;
@@ -2517,7 +3143,12 @@ async function handleAddMessage(message, session, languageCode) {
             quote_rich_text: messageRichText(message),
           },
         });
-        await sendPrompt(userId, message.chat.id, tr(localeOf(languageCode), 'Send the author as text, or /skip.'));
+        await sendPrompt(
+          userId,
+          message.chat.id,
+          tr(localeOf(languageCode), 'Send the author as text.'),
+          fieldActionKeyboard('skip', languageCode),
+        );
         return true;
       }
       if (message?.media_group_id) {
@@ -2551,8 +3182,9 @@ async function handleAddMessage(message, session, languageCode) {
         userId,
         message.chat.id,
         caption
-          ? (tr(localeOf(languageCode), 'Media caption used as quote text. Send author or /skip.'))
-          : (tr(localeOf(languageCode), 'Now send the quote text.')),
+          ? tr(localeOf(languageCode), 'Media caption used as quote text.')
+          : tr(localeOf(languageCode), 'Now send the quote text.'),
+        fieldActionKeyboard('skip', languageCode),
       );
       return true;
     }
@@ -2569,12 +3201,22 @@ async function handleAddMessage(message, session, languageCode) {
       };
       await clearInputMessages(session, message);
       await updateEditorSession(userId, { addStep: 'quote_credit', addPayload: next });
-      await sendPrompt(userId, message.chat.id, tr(localeOf(languageCode), 'Send the author as text, or /skip.'));
+      await sendPrompt(
+        userId,
+        message.chat.id,
+        tr(localeOf(languageCode), 'Send the author as text.'),
+        fieldActionKeyboard('skip', languageCode),
+      );
       return true;
     }
     if (step === 'quote_credit') {
       if (!message?.text) {
-        await api.sendMessage({ chat_id: message.chat.id, text: tr(localeOf(languageCode), 'Send the author as text, or /skip.') });
+        await sendPrompt(
+          userId,
+          message.chat.id,
+          tr(localeOf(languageCode), 'Send the author as text.'),
+          fieldActionKeyboard('skip', languageCode),
+        );
         return true;
       }
       const credit = message.text.trim().toLowerCase() === '/skip' ? null : messageHtmlText(message);
@@ -2653,7 +3295,12 @@ async function handleDetailsAddMessage(message, session, languageCode) {
       };
       await clearInputMessages(session, message);
       await updateEditorSession(userId, { addStep: 'details_child_quote_credit', addPayload: next });
-      await sendPrompt(userId, message.chat.id, tr(localeOf(languageCode), 'Send the author as text, or /skip.'));
+      await sendPrompt(
+        userId,
+        message.chat.id,
+        tr(localeOf(languageCode), 'Send the author as text.'),
+        fieldActionKeyboard('skip', languageCode),
+      );
       return true;
     }
     if (message?.media_group_id) {
@@ -2686,8 +3333,9 @@ async function handleDetailsAddMessage(message, session, languageCode) {
       userId,
       message.chat.id,
       caption
-        ? (tr(localeOf(languageCode), 'Send the author as text, or /skip.'))
-        : (tr(localeOf(languageCode), 'Send quote text.')),
+        ? tr(localeOf(languageCode), 'Send the author as text.')
+        : tr(localeOf(languageCode), 'Send quote text.'),
+      fieldActionKeyboard('skip', languageCode),
     );
     return true;
   }
@@ -2704,13 +3352,23 @@ async function handleDetailsAddMessage(message, session, languageCode) {
       child_quote_rich_text: messageRichText(message),
     };
     await updateEditorSession(userId, { addStep: 'details_child_quote_credit', addPayload: next });
-    await sendPrompt(userId, message.chat.id, tr(localeOf(languageCode), 'Send author or /skip.'));
+    await sendPrompt(
+      userId,
+      message.chat.id,
+      tr(localeOf(languageCode), 'Send author.'),
+      fieldActionKeyboard('skip', languageCode),
+    );
     return true;
   }
 
   if (step === 'details_child_quote_credit') {
     if (!message?.text) {
-      await api.sendMessage({ chat_id: message.chat.id, text: tr(localeOf(languageCode), 'Send author or /skip.') });
+      await sendPrompt(
+        userId,
+        message.chat.id,
+        tr(localeOf(languageCode), 'Send author.'),
+        fieldActionKeyboard('skip', languageCode),
+      );
       return true;
     }
     const childType = String(session.pendingChildType || '');
@@ -2834,6 +3492,10 @@ async function handleNestedEditMessage(message, session, languageCode) {
     return true;
   }
 
+  if (action === 'media_append' || action === 'slideshow_append') {
+    return handleMediaAppendMessage(message, session, languageCode);
+  }
+
   if (
     action === 'content'
     && message?.media_group_id
@@ -2887,7 +3549,12 @@ async function handleNestedEditMessage(message, session, languageCode) {
     selected = footer;
   } else if (action === 'caption' || action === 'credit') {
     if (!message?.text) {
-      await api.sendMessage({ chat_id: message.chat.id, text: tr(localeOf(languageCode), 'Send text.') });
+      await sendPrompt(
+        message.from.id,
+        message.chat.id,
+        tr(localeOf(languageCode), 'Send text.'),
+        fieldActionKeyboard('remove', languageCode),
+      );
       return true;
     }
     const replacement = stripNative(child.data || {});
@@ -2969,18 +3636,22 @@ async function handleEditMessage(message, session, languageCode) {
   const type = String(session.expectedType || '');
   if (!block || block.type !== type) return false;
 
+  if (['media_append', 'slideshow_append'].includes(String(session.editField || ''))) {
+    return handleMediaAppendMessage(message, session, languageCode);
+  }
+
   if (type === 'buttons' && session.editField === 'large_button_entry') {
     const parsed = await parseLargeButtonInput(message?.text, message.from.id);
-    if (!parsed.button) {
+    if (!parsed.buttons) {
       await replyLargeButtonInputError(message, parsed.error, languageCode);
       return true;
     }
-    const current = Array.isArray(block.data?.buttons) ? block.data.buttons[0] : null;
+    const current = Array.isArray(block.data?.buttons) ? block.data.buttons : [];
     const replacement = stripNative(block.data || {});
-    replacement.buttons = [{
-      ...parsed.button,
-      ...(!parsed.button.style && current?.style ? { style: current.style } : {}),
-    }];
+    replacement.buttons = parsed.buttons.map((button, index) => ({
+      ...button,
+      ...(!button.style && current[index]?.style ? { style: current[index].style } : {}),
+    }));
     return replaceTopBlock(message.from.id, session, message, block, replacement, languageCode);
   }
 
@@ -3055,7 +3726,12 @@ async function handleEditMessage(message, session, languageCode) {
 
   if (session.editField === 'caption' || session.editField === 'credit') {
     if (!message?.text) {
-      await api.sendMessage({ chat_id: message.chat.id, text: tr(localeOf(languageCode), 'Send text.') });
+      await sendPrompt(
+        message.from.id,
+        message.chat.id,
+        tr(localeOf(languageCode), 'Send text.'),
+        fieldActionKeyboard('remove', languageCode),
+      );
       return true;
     }
     const replacement = stripNative(block.data || {});

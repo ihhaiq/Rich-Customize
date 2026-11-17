@@ -26,24 +26,40 @@ export function subscriptionRemaining(expiresAt,now,locale) {
   const days=Math.floor(seconds/86400),hours=Math.floor(seconds%86400/3600);
   return days+' '+tx(locale,'days')+' · '+hours+' '+tx(locale,'hours');
 }
-export function buildSubscriptionRich({plan='free',gift=false,expiresAt=0,now=Math.floor(Date.now()/1000),locale='en',reminder=false}={}) {
+export function buildSubscriptionRich({plan='free',gift=false,expiresAt=0,now=Math.floor(Date.now()/1000),locale='en',reminder=false,expired=false,queuedGift=null}={}) {
   const language=subscriptionLocale(locale);
   const title=subscriptionPlanTitle(plan,language,gift);
   const remaining=subscriptionRemaining(expiresAt,now,language);
   const blocks=[{type:'heading',size:1,text:title}];
-  if(reminder)blocks.push({type:'paragraph',text:tx(language,'warning')});
+  if(expired)blocks.push({type:'paragraph',text:tx(language,'expired')});
+  else if(reminder)blocks.push({type:'paragraph',text:tx(language,'warning')});
   blocks.push({
     type:'details',summary:tx(language,'benefits'),
     blocks:subscriptionFeatureLines(plan,language).map(line=>({type:'paragraph',text:line})),
   });
+  if(queuedGift&&['plus','golden'].includes(queuedGift.plan)
+      &&Number.isSafeInteger(queuedGift.expiresAt)&&queuedGift.expiresAt>now) {
+    blocks.push({type:'paragraph',text:subscriptionPlanTitle(queuedGift.plan,language,true)+
+      ' · '+tx(language,'remaining')+': '+
+      subscriptionRemaining(queuedGift.expiresAt,now,language)+' · '+
+      tx(language,'until')+': '+expiryText(queuedGift.expiresAt)});
+  }
   blocks.push({type:'footer',text:tx(language,'remaining')+': '+remaining+
     (expiresAt>0?' · '+tx(language,'until')+': '+expiryText(expiresAt):'')});
   return {blocks,...(subscriptionRtl(language)?{is_rtl:true}:{})};
 }
 export function buildSubscriptionPlain(input) {
   const locale=input.locale||'en';
-  return [subscriptionPlanTitle(input.plan,locale,input.gift),tx(locale,'benefits')+':',
+  const now=input.now||Math.floor(Date.now()/1000);
+  const lines=[subscriptionPlanTitle(input.plan,locale,input.gift),tx(locale,'benefits')+':',
     ...subscriptionFeatureLines(input.plan,locale),tx(locale,'remaining')+': '+
-      subscriptionRemaining(input.expiresAt||0,input.now||Math.floor(Date.now()/1000),locale)
-      +(input.expiresAt?' · '+tx(locale,'until')+': '+expiryText(input.expiresAt):'')].join('\n');
+      subscriptionRemaining(input.expiresAt||0,now,locale)
+      +(input.expiresAt?' · '+tx(locale,'until')+': '+expiryText(input.expiresAt):'')];
+  if(input.queuedGift&&['plus','golden'].includes(input.queuedGift.plan)
+      &&Number.isSafeInteger(input.queuedGift.expiresAt)&&input.queuedGift.expiresAt>now) {
+    lines.push(subscriptionPlanTitle(input.queuedGift.plan,locale,true)+' · '+
+      tx(locale,'remaining')+': '+subscriptionRemaining(input.queuedGift.expiresAt,now,locale)+
+      ' · '+tx(locale,'until')+': '+expiryText(input.queuedGift.expiresAt));
+  }
+  return lines.join('\n');
 }

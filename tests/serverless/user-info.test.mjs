@@ -67,25 +67,26 @@ test('user info uses ordinary bullet blocks and puts only the photo in details',
   assert.deepEqual(topLevel.slice(0, 4).map((block) => block.type), [
     'paragraph', 'paragraph', 'paragraph', 'paragraph',
   ]);
-  assert.deepEqual(topLevel[5], { type: 'divider' });
-  assert.equal(topLevel[6].type, 'details');
-  assert.equal(topLevel[6].summary, 'Account photo');
-  assert.equal(topLevel[6].is_open, true);
-  assert.deepEqual(topLevel[6].blocks[0], {
+  assert.deepEqual(topLevel[4], { type: 'divider' });
+  assert.equal(topLevel[5].type, 'details');
+  assert.equal(topLevel[5].summary, 'Account photo');
+  assert.equal(topLevel[5].is_open, true);
+  assert.deepEqual(topLevel[5].blocks[0], {
     type: 'photo',
     photo: { type: 'photo', media: 'photo-file-id' },
   });
-  assert.match(topLevel[0].text, /• 🆔 Account ID: 123456/);
-  assert.deepEqual(topLevel[1].text, {
+  assert.doesNotMatch(message.text, /Account ID: 123456/);
+  assert.doesNotMatch(JSON.stringify(message.rich_message), /Account ID: 123456/);
+  assert.deepEqual(topLevel[0].text, {
     type: 'button',
     button: { text: '📋 123456', copy_text: { text: '123456' } },
   });
-  assert.equal(topLevel[2].text[1].type, 'url');
-  assert.equal(topLevel[2].text[1].text, '🌟 Noor Ali');
-  assert.equal(topLevel[2].text[1].url, 'tg://user?id=123456');
+  assert.equal(topLevel[1].text[1].type, 'url');
+  assert.equal(topLevel[1].text[1].text, '🌟 Noor Ali');
+  assert.equal(topLevel[1].text[1].url, 'tg://user?id=123456');
   assert.doesNotMatch(JSON.stringify(message.rich_message), /"type":"text_link"/);
-  assert.match(topLevel[3].text, /• 🔗 Username: @noor_ali/);
-  assert.match(topLevel[4].text, /• 🎖 Subscription tier: Plus/);
+  assert.match(topLevel[2].text, /• 🔗 Username: @noor_ali/);
+  assert.match(topLevel[3].text, /• 🎖 Subscription tier: Plus/);
 });
 
 test('profile without a public username remains identifiable and invalid IDs are rejected', () => {
@@ -99,7 +100,7 @@ test('profile without a public username remains identifiable and invalid IDs are
   assert.deepEqual(message.rich_message.blocks.slice(0, 4).map((block) => block.type), [
     'paragraph', 'paragraph', 'paragraph', 'paragraph',
   ]);
-  assert.equal(message.rich_message.blocks.length, 5);
+  assert.equal(message.rich_message.blocks.length, 4);
   assert.doesNotMatch(message.text, /لا توجد صورة ملف شخصي/);
   const usernameOnly = buildUserInfoMessage({ id: 10, username: 'sara_name' }, 'ar');
   assert.match(JSON.stringify(usernameOnly.rich_message), /@sara_name/);
@@ -123,10 +124,181 @@ test('/info shows the Telegram sender ID without requiring a usage profile', asy
 
   const sent = h.calls.find((call) => call.method === 'sendRichMessage');
   assert.equal(sent.args.chat_id, message.chat.id);
-  assert.match(JSON.stringify(sent.args.rich_message), /Account ID: 765432/);
+  assert.doesNotMatch(JSON.stringify(sent.args.rich_message), /Account ID: 765432/);
+  assert.deepEqual(sent.args.rich_message.blocks[0].text.button.copy_text, { text: '765432' });
   assert.match(JSON.stringify(sent.args.rich_message), /@hxh_aot/);
   assert.equal(h.calls.some((call) => call.method === 'sendMessage'), false);
   assert.equal(buildUserInfoMessage({ id: 0, first_name: 'Sara' }, 'ar'), null);
+});
+
+test('/info loads only the target private chat usernames and removes duplicates', async () => {
+  const h = await harness({ extraModules: { info: 'lib/user-info' } });
+  h.records.usageUsers.push({
+    userId: 123456,
+    username: 'noor_ali',
+    firstName: 'Noor',
+  });
+  h.apiState.chats = {
+    '123456': {
+      id: 123456,
+      type: 'private',
+      username: 'noor_primary',
+      active_usernames: ['noor_ali', '@noor_alt', 'Noor_Alt', 'bad-name'],
+    },
+  };
+
+  await h.info.handleInfoCommand({
+    chat: { id: -100123, type: 'supergroup' },
+    from: { id: 765432, username: 'requester_alias', language_code: 'en' },
+  }, '123456', 'en');
+
+  const lookup = h.calls.find((call) => call.method === 'getChat');
+  assert.deepEqual(lookup.args, { chat_id: 123456 });
+  const sent = h.calls.find((call) => call.method === 'sendRichMessage');
+  const rendered = JSON.stringify(sent.args.rich_message);
+  assert.match(rendered, /@noor_ali, @noor_alt, @noor_primary/);
+  assert.doesNotMatch(rendered, /requester_alias|bad-name|Noor_Alt/);
+  assert.equal((rendered.match(/@noor_alt/g) || []).length, 1);
+});
+
+test('/info resolves an active username alias indexed from the target user update', async () => {
+  const h = await harness({
+    extraModules: {
+      info: 'lib/user-info',
+      usage: 'lib/usage-stats',
+    },
+  });
+  h.apiState.chats = {
+    '123456': {
+      id: 123456,
+      type: 'private',
+      username: 'noor_main',
+      active_usernames: ['noor_alt', 'noor_second'],
+    },
+  };
+  const target = {
+    id: 123456,
+    username: 'noor_main',
+    first_name: 'Noor',
+    language_code: 'en',
+  };
+  const stamp = Math.floor(Date.now() / 1000);
+
+  await h.usage.observeRequest(target, 10, false, stamp);
+  await h.usage.observeRequest(target, 10, false, stamp + 1);
+
+  assert.deepEqual(
+    h.records.userAliases.map((row) => row.username).sort(),
+    ['noor_alt', 'noor_main', 'noor_second'],
+  );
+  assert.equal(h.calls.filter((call) => call.method === 'getChat').length, 1);
+
+  await h.info.handleInfoCommand({
+    chat: { id: -100123, type: 'supergroup' },
+    from: { id: 765432, username: 'requester_alias', language_code: 'en' },
+  }, '@noor_alt', 'en');
+
+  const sent = h.calls.find((call) => call.method === 'sendRichMessage');
+  const rendered = JSON.stringify(sent.args.rich_message);
+  assert.match(rendered, /copy_text.*123456/);
+  assert.match(rendered, /@noor_main, @noor_alt, @noor_second/);
+  assert.doesNotMatch(rendered, /requester_alias/);
+
+  h.apiState.chats['123456'].active_usernames = ['noor_second'];
+  await h.usage.observeRequest(target, 10, false, stamp + 24 * 60 * 60 + 1);
+  assert.deepEqual(
+    h.records.userAliases.map((row) => row.username).sort(),
+    ['noor_main', 'noor_second'],
+  );
+});
+
+test('/info rejects an indexed alias that Telegram no longer reports as active', async () => {
+  const h = await harness({ extraModules: { info: 'lib/user-info' } });
+  h.records.usageUsers.push({
+    userId: 123456,
+    username: 'noor_main',
+    firstName: 'Noor',
+  });
+  h.records.userAliases.push({
+    username: 'noor_old',
+    userId: 123456,
+    checkedAt: Math.floor(Date.now() / 1000),
+  });
+  h.apiState.chats = {
+    '123456': {
+      id: 123456,
+      type: 'private',
+      username: 'noor_main',
+      active_usernames: ['noor_new'],
+    },
+  };
+
+  await h.info.handleInfoCommand({
+    chat: { id: -100123, type: 'supergroup' },
+    from: { id: 765432, language_code: 'en' },
+  }, '@noor_old', 'en');
+
+  assert.equal(h.calls.some((call) => call.method === 'sendRichMessage'), false);
+  assert.equal(h.calls.some((call) => call.method === 'sendMessage'), true);
+});
+
+test('/info uses a cached secondary username during Telegram outages only while fresh', async () => {
+  const recent = await harness({ extraModules: { info: 'lib/user-info' } });
+  recent.records.usageUsers.push({
+    userId: 123456,
+    username: 'noor_main',
+    firstName: 'Noor',
+  });
+  recent.records.userAliases.push({
+    username: 'noor_alt',
+    userId: 123456,
+    checkedAt: Math.floor(Date.now() / 1000),
+  });
+  recent.apiState.chatError = 'Telegram chat lookup failed';
+  await recent.info.handleInfoCommand({
+    chat: { id: -100123, type: 'supergroup' },
+    from: { id: 765432, language_code: 'en' },
+  }, '@noor_alt', 'en');
+  assert.equal(recent.calls.some((call) => call.method === 'sendRichMessage'), true);
+
+  const stale = await harness({ extraModules: { info: 'lib/user-info' } });
+  stale.records.usageUsers.push({
+    userId: 123456,
+    username: 'noor_main',
+    firstName: 'Noor',
+  });
+  stale.records.userAliases.push({
+    username: 'noor_alt',
+    userId: 123456,
+    checkedAt: Math.floor(Date.now() / 1000) - 8 * 24 * 60 * 60,
+  });
+  stale.apiState.chatError = 'Telegram chat lookup failed';
+  await stale.info.handleInfoCommand({
+    chat: { id: -100123, type: 'supergroup' },
+    from: { id: 765432, language_code: 'en' },
+  }, '@noor_alt', 'en');
+  assert.equal(stale.calls.some((call) => call.method === 'sendRichMessage'), false);
+  assert.equal(stale.calls.some((call) => call.method === 'sendMessage'), true);
+});
+
+test('/info keeps the primary username when getChat fails', async () => {
+  const h = await harness({ extraModules: { info: 'lib/user-info' } });
+  h.records.usageUsers.push({
+    userId: 123456,
+    username: 'noor_ali',
+    firstName: 'Noor',
+  });
+  h.apiState.chatError = 'Telegram chat lookup failed';
+
+  await h.info.handleInfoCommand({
+    chat: { id: 765432, type: 'private' },
+    from: { id: 765432, language_code: 'en' },
+  }, '123456', 'en');
+
+  const sent = h.calls.find((call) => call.method === 'sendRichMessage');
+  const rendered = JSON.stringify(sent.args.rich_message);
+  assert.match(rendered, /@noor_ali/);
+  assert.doesNotMatch(rendered, /requester_alias|chat lookup failed/);
 });
 
 test('a user without a profile photo is shown as ordinary user info with no photo section', async () => {
@@ -144,7 +316,7 @@ test('a user without a profile photo is shown as ordinary user info with no phot
   }, '123456', 'en');
 
   const sent = h.calls.find((call) => call.method === 'sendRichMessage');
-  assert.equal(sent.args.rich_message.blocks.length, 5);
+  assert.equal(sent.args.rich_message.blocks.length, 4);
   assert.doesNotMatch(JSON.stringify(sent.args.rich_message), /photo|details|No profile photo/);
 });
 
@@ -168,11 +340,11 @@ test('photo retrieval failure keeps the user list and adds an error footer', asy
     'paragraph', 'paragraph', 'paragraph', 'paragraph',
   ]);
   assert.match(JSON.stringify(blocks), /Noor/);
-  assert.deepEqual(blocks[5], { type: 'divider' });
-  assert.deepEqual(blocks[6], {
+  assert.deepEqual(blocks[5], {
     type: 'footer',
     text: userInfoText('en', 'photoError'),
   });
+  assert.deepEqual(blocks[4], { type: 'divider' });
 });
 
 test('/info and the bot-mention guest syntax are routed before the private editor path', () => {
@@ -249,7 +421,8 @@ test('/id shows the sender profile through the same rich info message', async ()
 
   const sent = h.calls.find((call) => call.method === 'sendRichMessage');
   assert.equal(sent.args.chat_id, message.chat.id);
-  assert.match(JSON.stringify(sent.args.rich_message), /Account ID: 765432/);
+  assert.doesNotMatch(JSON.stringify(sent.args.rich_message), /Account ID: 765432/);
+  assert.deepEqual(sent.args.rich_message.blocks[0].text.button.copy_text, { text: '765432' });
   assert.match(JSON.stringify(sent.args.rich_message), /@noor_ali/);
   assert.match(JSON.stringify(sent.args.rich_message), /Noor Ali/);
 });
@@ -262,6 +435,19 @@ test('guest_message answers /info mention with one rich guest reply outside bot 
     firstName: 'Noor',
     lastName: 'Ali',
   });
+  h.records.userAliases.push({
+    username: 'noor_alt',
+    userId: 123456,
+    checkedAt: Math.floor(Date.now() / 1000),
+  });
+  h.apiState.chats = {
+    '123456': {
+      id: 123456,
+      type: 'private',
+      username: 'noor_primary',
+      active_usernames: ['noor_ali', 'noor_alt'],
+    },
+  };
   h.apiState.profilePhotos['123456'] = {
     total_count: 1,
     photos: [[{ file_id: 'guest-profile-photo' }]],
@@ -270,7 +456,7 @@ test('guest_message answers /info mention with one rich guest reply outside bot 
     guest_query_id: 'guest-query-1',
     chat: { id: -100123, type: 'supergroup' },
     from: { id: 765432, language_code: 'en' },
-    text: '@RichCustomizebot @noor_ali',
+    text: '@RichCustomizebot @noor_alt',
   };
 
   await h.guest.default(guestUpdate, { update: { update_id: 9001 } });
@@ -282,6 +468,10 @@ test('guest_message answers /info mention with one rich guest reply outside bot 
   assert.match(
     JSON.stringify(replies[0].args.result.input_message_content.rich_message),
     /Noor/,
+  );
+  assert.match(
+    JSON.stringify(replies[0].args.result.input_message_content.rich_message),
+    /@noor_ali, @noor_alt, @noor_primary/,
   );
   assert.match(
     JSON.stringify(replies[0].args.result.input_message_content.rich_message),
@@ -311,7 +501,7 @@ test('guest /info without a target uses the Telegram sender ID even when not sto
   assert.equal(reply.args.result.type, 'article');
   assert.match(
     JSON.stringify(reply.args.result.input_message_content.rich_message),
-    /Account ID: 765432/,
+    /copy_text/,
   );
   assert.match(
     JSON.stringify(reply.args.result.input_message_content.rich_message),
@@ -381,7 +571,7 @@ test('guest requests distinguish username lookup from an explicitly named page a
   }, { update: { update_id: 9010 } });
   const userResult = h.calls.filter((call) => call.method === 'answerGuestQuery').at(-1).args.result;
   assert.equal(userResult.type, 'article');
-  assert.match(JSON.stringify(userResult.input_message_content.rich_message), /Account ID: 123456/);
+  assert.doesNotMatch(JSON.stringify(userResult.input_message_content.rich_message), /Account ID: 123456/);
 
   await h.guest.default({
     guest_query_id: 'guest-page-name',
@@ -410,7 +600,7 @@ test('guest requests distinguish username lookup from an explicitly named page a
   }, { update: { update_id: 9013 } });
   const idResult = h.calls.filter((call) => call.method === 'answerGuestQuery').at(-1).args.result;
   assert.equal(idResult.id, 'guest-user-info');
-  assert.match(JSON.stringify(idResult.input_message_content.rich_message), /Account ID: 123456/);
+  assert.doesNotMatch(JSON.stringify(idResult.input_message_content.rich_message), /Account ID: 123456/);
 });
 
 test('@RichCustomizebot @username uses the same stored profile lookup as /info', async () => {
@@ -465,9 +655,9 @@ test('/info in a group returns the target profile photo and trusted subscription
   const sent = h.calls.find((call) => call.method === 'sendRichMessage');
   assert.equal(sent.args.chat_id, -100123);
   assert.equal(sent.args.rich_message.blocks[0].type, 'paragraph');
-  assert.equal(sent.args.rich_message.blocks[5].type, 'divider');
-  assert.equal(sent.args.rich_message.blocks[6].summary, 'Account photo');
-  assert.equal(sent.args.rich_message.blocks[6].blocks[0].photo.media, 'profile-large');
+  assert.equal(sent.args.rich_message.blocks[4].type, 'divider');
+  assert.equal(sent.args.rich_message.blocks[5].summary, 'Account photo');
+  assert.equal(sent.args.rich_message.blocks[5].blocks[0].photo.media, 'profile-large');
   assert.match(JSON.stringify(sent.args.rich_message), /Plus/);
 });
 
@@ -479,6 +669,14 @@ test('/info shows the configured developer tier instead of downgrading it to Fre
     username: 'developer',
     firstName: 'Developer',
   });
+  h.apiState.chats = {
+    [String(developerId)]: {
+      id: developerId,
+      type: 'private',
+      username: 'developer',
+      active_usernames: ['dev_alt'],
+    },
+  };
 
   await h.info.handleInfoCommand({
     chat: { id: developerId, type: 'private' },
@@ -487,6 +685,7 @@ test('/info shows the configured developer tier instead of downgrading it to Fre
 
   const sent = h.calls.find((call) => call.method === 'sendRichMessage');
   assert.match(JSON.stringify(sent.args.rich_message), /Subscription tier: Developer/);
+  assert.match(JSON.stringify(sent.args.rich_message), /@developer, @dev_alt/);
   assert.doesNotMatch(JSON.stringify(sent.args.rich_message), /Subscription tier: Free/);
 });
 
@@ -513,9 +712,9 @@ test('/info omits the photo section without an error if the group forbids sendin
   const sends = h.calls.filter((call) => call.method === 'sendRichMessage');
   assert.equal(sends.length, 2);
   assert.equal(sends[0].args.rich_message.blocks[0].type, 'paragraph');
-  assert.equal(sends[0].args.rich_message.blocks[5].type, 'divider');
-  assert.equal(sends[0].args.rich_message.blocks[6].blocks[0].photo.media, 'profile-large');
-  assert.equal(sends[1].args.rich_message.blocks.length, 5);
+  assert.equal(sends[0].args.rich_message.blocks[4].type, 'divider');
+  assert.equal(sends[0].args.rich_message.blocks[5].blocks[0].photo.media, 'profile-large');
+  assert.equal(sends[1].args.rich_message.blocks.length, 4);
   assert.doesNotMatch(JSON.stringify(sends[1].args.rich_message), /photo|details|error/i);
   assert.match(JSON.stringify(sends[1].args.rich_message), /Noor/);
   assert.equal(h.calls.some((call) => call.method === 'sendMessage'), false);

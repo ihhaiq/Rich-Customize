@@ -18,8 +18,7 @@ import jaValues, { tutorialCatalog as jaTutorial } from 'lib/lang/ja';
 import koValues, { tutorialCatalog as koTutorial } from 'lib/lang/ko';
 import viValues, { tutorialCatalog as viTutorial } from 'lib/lang/vi';
 import thValues, { tutorialCatalog as thTutorial } from 'lib/lang/th';
-import zhHansValues, { tutorialCatalog as zhHansTutorial } from 'lib/lang/zh-hans';
-import zhHantValues, { tutorialCatalog as zhHantTutorial } from 'lib/lang/zh-hant';
+import { localeValues as chineseValues, tutorialCatalogs as chineseTutorials } from 'lib/lang/chinese';
 
 const LANGUAGE_VALUES = Object.freeze({
   en: enValues,
@@ -40,8 +39,31 @@ const LANGUAGE_VALUES = Object.freeze({
   ko: koValues,
   vi: viValues,
   th: thValues,
-  'zh-hans': zhHansValues,
-  'zh-hant': zhHantValues,
+  'zh-hans': chineseValues['zh-hans'],
+  'zh-hant': chineseValues['zh-hant'],
+});
+
+const CHANNEL_POST_LABELS = Object.freeze({
+  ar:'فتح في التطبيق المصغر',
+  de:'In der Mini App öffnen',
+  en:'Open in Mini App',
+  es:'Abrir en la Mini App',
+  hi:'मिनी ऐप में खोलें',
+  id:'Buka di Mini App',
+  it:'Apri nella Mini App',
+  ja:'ミニアプリで開く',
+  ko:'미니 앱에서 열기',
+  nl:'Openen in de mini-app',
+  pl:'Otwórz w Mini App',
+  pt:'Abrir no Mini App',
+  ru:'Открыть в мини-приложении',
+  th:'เปิดในมินิแอป',
+  tr:"Mini Uygulama'da aç",
+  uk:'Відкрити в міні-застосунку',
+  ur:'منی ایپ میں کھولیں',
+  vi:'Mở trong Mini App',
+  'zh-hans':'在迷你应用中打开',
+  'zh-hant':'在迷你應用程式中開啟',
 });
 
 export const TUTORIAL_TRANSLATIONS = Object.freeze({
@@ -61,8 +83,8 @@ export const TUTORIAL_TRANSLATIONS = Object.freeze({
   "uk": slavicTutorials.uk,
   "ur": urTutorial,
   "vi": viTutorial,
-  "zh-hans": zhHansTutorial,
-  "zh-hant": zhHantTutorial,
+  "zh-hans": chineseTutorials['zh-hans'],
+  "zh-hant": chineseTutorials['zh-hant'],
 });
 
 function placeholders(value) {
@@ -143,6 +165,128 @@ const MESSAGES = Object.freeze(Object.fromEntries(
 
 const SUPPORTED = new Set(SUPPORTED_LOCALES);
 const RTL = new Set(['ar', 'ur']);
+const CHECKLIST_COPY = Object.freeze({
+  ar: {
+    prompt: 'أرسل كل مهمة في سطر. السطر العادي غير منجز؛ لجعلها منجزة اكتب قبلها [x] أو ✅ أو ☑️.',
+    settings: 'لتغيير حالة مهمة اضغط زرها أدناه: ☑️ منجزة أو ☐ غير منجزة.',
+    done: 'منجزة',
+    pending: 'غير منجزة',
+  },
+  de: {
+    prompt: 'Eine Aufgabe pro Zeile. Ohne Markierung = offen; erledigte Aufgaben mit [x], ✅ oder ☑️ beginnen.',
+    settings: 'Tippe unten auf eine Aufgabe, um zwischen erledigt und offen umzuschalten.',
+    done: 'Erledigt',
+    pending: 'Offen',
+  },
+  en: {
+    prompt: 'Send one task per line. Normal lines are not done; prefix completed tasks with [x], ✅, or ☑️.',
+    settings: 'Tap a task button below to switch it between done and not done.',
+    done: 'Done',
+    pending: 'Not done',
+  },
+  es: {
+    prompt: 'Escribe una tarea por línea. Sin marca = pendiente; inicia las completadas con [x], ✅ o ☑️.',
+    settings: 'Pulsa una tarea abajo para cambiar entre completada y pendiente.',
+    done: 'Completada',
+    pending: 'Pendiente',
+  },
+  hi: {
+    prompt: 'हर काम अलग पंक्ति में लिखें। बिना निशान वाला काम अधूरा है; पूरे काम से पहले [x], ✅ या ☑️ लिखें।',
+    settings: 'काम की स्थिति बदलने के लिए नीचे उसके बटन को दबाएँ।',
+    done: 'पूरा',
+    pending: 'अधूरा',
+  },
+  id: {
+    prompt: 'Tulis satu tugas per baris. Tanpa tanda berarti belum selesai; awali tugas selesai dengan [x], ✅, atau ☑️.',
+    settings: 'Ketuk tombol tugas di bawah untuk mengubah statusnya.',
+    done: 'Selesai',
+    pending: 'Belum selesai',
+  },
+  it: {
+    prompt: 'Scrivi un’attività per riga. Senza simbolo è da completare; anteponi [x], ✅ o ☑️ a quelle completate.',
+    settings: 'Tocca un’attività qui sotto per alternare tra completata e da completare.',
+    done: 'Completata',
+    pending: 'Da completare',
+  },
+  ja: {
+    prompt: 'タスクを1行に1つ入力してください。記号なしは未完了です。完了済みには先頭に [x]、✅ または ☑️ を付けてください。',
+    settings: '下のタスクボタンを押すと、完了・未完了を切り替えられます。',
+    done: '完了',
+    pending: '未完了',
+  },
+  ko: {
+    prompt: '한 줄에 작업 하나를 입력하세요. 표시가 없으면 미완료입니다. 완료된 작업 앞에 [x], ✅ 또는 ☑️를 붙이세요.',
+    settings: '아래 작업 버튼을 눌러 완료 상태를 바꾸세요.',
+    done: '완료',
+    pending: '미완료',
+  },
+  nl: {
+    prompt: 'Zet één taak per regel. Zonder markering is de taak niet voltooid; begin voltooide taken met [x], ✅ of ☑️.',
+    settings: 'Tik hieronder op een taak om de status te wijzigen.',
+    done: 'Voltooid',
+    pending: 'Niet voltooid',
+  },
+  pl: {
+    prompt: 'Wpisz jedno zadanie w każdym wierszu. Bez oznaczenia jest niewykonane; wykonane poprzedź przez [x], ✅ lub ☑️.',
+    settings: 'Naciśnij zadanie poniżej, aby zmienić jego stan.',
+    done: 'Wykonane',
+    pending: 'Niewykonane',
+  },
+  pt: {
+    prompt: 'Escreva uma tarefa por linha. Sem marcação = pendente; inicie as concluídas com [x], ✅ ou ☑️.',
+    settings: 'Toque numa tarefa abaixo para alternar o estado.',
+    done: 'Concluída',
+    pending: 'Pendente',
+  },
+  ru: {
+    prompt: 'Пишите по одной задаче в строке. Без отметки — не выполнена; выполненные начните с [x], ✅ или ☑️.',
+    settings: 'Нажмите задачу ниже, чтобы изменить её статус.',
+    done: 'Выполнена',
+    pending: 'Не выполнена',
+  },
+  th: {
+    prompt: 'เขียนงานหนึ่งรายการต่อบรรทัด งานที่ไม่มีเครื่องหมายยังไม่เสร็จ; งานที่เสร็จแล้วให้ขึ้นต้นด้วย [x], ✅ หรือ ☑️',
+    settings: 'แตะปุ่มงานด้านล่างเพื่อเปลี่ยนสถานะ',
+    done: 'เสร็จแล้ว',
+    pending: 'ยังไม่เสร็จ',
+  },
+  tr: {
+    prompt: 'Her satıra bir görev yazın. İşaretsiz görev tamamlanmamıştır; tamamlananların başına [x], ✅ veya ☑️ ekleyin.',
+    settings: 'Durumunu değiştirmek için aşağıdaki görev düğmesine dokunun.',
+    done: 'Tamamlandı',
+    pending: 'Yapılmadı',
+  },
+  uk: {
+    prompt: 'Пишіть одне завдання в рядку. Без позначки — не виконане; виконані починайте з [x], ✅ або ☑️.',
+    settings: 'Натисніть завдання нижче, щоб змінити його стан.',
+    done: 'Виконано',
+    pending: 'Не виконано',
+  },
+  ur: {
+    prompt: 'ہر کام الگ سطر میں لکھیں۔ بغیر نشان والا کام نامکمل ہے؛ مکمل کام سے پہلے [x]، ✅ یا ☑️ لکھیں۔',
+    settings: 'کام کی حالت بدلنے کے لیے نیچے اس کے بٹن کو دبائیں۔',
+    done: 'مکمل',
+    pending: 'نامکمل',
+  },
+  vi: {
+    prompt: 'Viết mỗi nhiệm vụ trên một dòng. Không có dấu là chưa hoàn thành; thêm [x], ✅ hoặc ☑️ trước nhiệm vụ đã xong.',
+    settings: 'Nhấn nút nhiệm vụ bên dưới để đổi trạng thái.',
+    done: 'Hoàn thành',
+    pending: 'Chưa hoàn thành',
+  },
+  'zh-hans': {
+    prompt: '每行填写一项任务。没有标记表示未完成；已完成的任务请在前面加 [x]、✅ 或 ☑️。',
+    settings: '点击下方任务按钮即可切换完成状态。',
+    done: '已完成',
+    pending: '未完成',
+  },
+  'zh-hant': {
+    prompt: '每行填寫一項任務。沒有標記表示未完成；已完成的任務請在前面加 [x]、✅ 或 ☑️。',
+    settings: '點擊下方任務按鈕即可切換完成狀態。',
+    done: '已完成',
+    pending: '未完成',
+  },
+});
 
 const ENGLISH_KEY_BY_TEXT = new Map(
   Object.entries(MESSAGES.en || {})
@@ -163,6 +307,19 @@ export function resolveLanguage(languageCode) {
   }
   const primary = code.split('-', 1)[0];
   return SUPPORTED.has(primary) ? primary : 'en';
+}
+
+export function checklistPrompt(languageCode) {
+  return CHECKLIST_COPY[resolveLanguage(languageCode)].prompt;
+}
+
+export function checklistSettingsHint(languageCode) {
+  return CHECKLIST_COPY[resolveLanguage(languageCode)].settings;
+}
+
+export function checklistTaskStateLabel(languageCode, isChecked) {
+  const copy = CHECKLIST_COPY[resolveLanguage(languageCode)];
+  return isChecked ? copy.done : copy.pending;
 }
 
 export async function resolveUserLanguage(user) {
@@ -658,6 +815,10 @@ export function t(locale, key, values = null) {
   return text.replace(/\{([A-Za-z0-9_]+)\}/g, (match, name) => (
     Object.hasOwn(values, name) ? String(values[name]) : match
   ));
+}
+
+export function channelPostMiniAppLabel(locale) {
+  return CHANNEL_POST_LABELS[resolveLanguage(locale)] || CHANNEL_POST_LABELS.en;
 }
 
 function legacyNativeFallback(language, english) {

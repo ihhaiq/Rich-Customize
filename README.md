@@ -218,4 +218,4 @@ Obsolete Python/Aiogram files under `app/**/*.py` were removed in the cleanup pa
 
 Start with [docs/README.md](docs/README.md), [ROADMAP.md](md_files/ROADMAP.md) and [sups.md](md_files/sups.md). Changes go in [log.md](md_files/log.md).
 Active tests are [tests/serverless/](tests/serverless/) and run with `npm test`. The 58 Python-era tests are preserved as `.py.txt` in `docs/archive/python-tests/`; they are historical references, not runnable tests for this branch.
-The payment bot is maintained in [ihhaiq/richDonate](https://github.com/ihhaiq/richDonate). The former `subscription-bot/` scaffold is archived.
+The payment bot is maintained in [ihhaiq/richDonate](https://github.com/ihhaiq/richDonate). The former `subscription-bot/` scaffold is archived. For any subscription, purchase or billing feature, explicitly report whether Rich Donate needs a coordinated change; see the [subscription rollout](md_files/docs/subscription-rollout.md).

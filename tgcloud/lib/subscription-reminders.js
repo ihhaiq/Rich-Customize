@@ -3,30 +3,74 @@
 // rather than empty per-minute subscription heartbeats.
 // Only Serverless reads subscriber identities and entitlements.
 import { api, db } from 'sdk';
-import { and, asc, eq, gt, lte } from 'sdk/db';
-import { editorSubscriptions, goldenClaims, usageUsers,
+import { and, asc, eq, gt, gte, lte } from 'sdk/db';
+import { editorGiftEntitlements, editorSubscriptions, goldenClaims, usageUsers,
   subscriptionReminderScans, subscriptionReminderDeliveries } from 'schema';
-import { verifiedSubscriptionRow } from 'lib/editor-subscriptions';
+import { getEditorSubscriptionState, verifiedSubscriptionRow } from 'lib/editor-subscriptions';
 import { buildSubscriptionRich } from 'lib/subscription-rich';
 import { isDefinitePublishRejection, normalizePublishError } from 'lib/publish-errors';
-const WINDOW=5*86400;
+import { isDeveloper } from 'lib/developer-access';
+import { subscriptionLocale, subscriptionText } from 'lib/subscription-copy';
+import { isBrandingRemoved } from 'lib/branding';
+const DAY=86400;
+const WINDOW=5*DAY;
+const EXPIRED_WINDOW=7*DAY;
 const BATCH=10;
 const stamp=()=>Math.floor(Date.now()/1000);
 const today=(now)=>Math.floor(now/86400);
-export const subscriptionReminderWindow=(expiresAt,now)=>Number(expiresAt)>now&&Number(expiresAt)<=now+WINDOW;
-export const subscriptionReminderKey=(source,userId,expiresAt,now)=>
-  [source,userId,expiresAt,today(now)].join(':');
+const RENEWAL_CART_URLS=Object.freeze({
+  plus:'https://t.me/RichDonateBot?start=buyPlus',
+  golden:'https://t.me/RichDonateBot?start=buyGT',
+  goldenWithoutBranding:'https://t.me/RichDonateBot',
+});
+const trustedPaidRow=row=>row?.status==='active'
+  &&row?.source==='richdonate:verified'
+  &&['plus','golden'].includes(String(row?.plan||''));
+export function subscriptionReminderStage(expiresAt,now) {
+  const end=Number(expiresAt);
+  if(end>=now+4*DAY&&end<=now+WINDOW)return 'before';
+  if(end<=now&&end>now-EXPIRED_WINDOW)return 'expired';
+  return '';
+}
+export const subscriptionReminderWindow=(expiresAt,now)=>
+  subscriptionReminderStage(expiresAt,now)==='before';
+export const subscriptionReminderKey=(_source,userId,expiresAt,stage)=>
+  [userId,expiresAt,stage].join(':');
+const renewalMarkup=(locale,plan,brandingRemoved=false)=>({
+  inline_keyboard:[[{text:subscriptionText(locale,'renew'),url:
+    plan==='plus'?RENEWAL_CART_URLS.plus
+      :brandingRemoved?RENEWAL_CART_URLS.goldenWithoutBranding:RENEWAL_CART_URLS.golden}]],
+});
 
-async function showReminder(source,row,now) {
+async function entitlementExtendsBeyond(userId,expiresAt) {
+  const claims=await db.select().from(goldenClaims)
+    .where(eq(goldenClaims.userId,userId)).all();
+  if(Math.max(0,...claims.map(item=>Number(item.expiresAt)||0))>expiresAt)return true;
+  const state=await getEditorSubscriptionState(userId,{now:expiresAt});
+  return state.active&&Number(state.expiresAt)>expiresAt;
+}
+
+async function showReminder(source,row,now,stage) {
   const id=Number(row.userId),end=Number(row.expiresAt);
-  if(!subscriptionReminderWindow(end,now))return;
-  if(source==='paid' && !verifiedSubscriptionRow(row,now))return;
+  if(subscriptionReminderStage(end,now)!==stage)return;
+  if(source==='paid' && (stage==='before'
+      ? !verifiedSubscriptionRow(row,now)
+      : !trustedPaidRow(row)))return;
+  if(source==='manual_gift'&&(!['plus','golden'].includes(String(row.plan||''))
+    ||Number(row.startedAt)>now))return;
   if(source==='gift') {
     // A newer overlapping gift supersedes an older expiry notice.
     const claims=await db.select().from(goldenClaims).where(eq(goldenClaims.userId,id)).all();
     if(Math.max(0,...claims.map(c=>Number(c.expiresAt)||0))!==end)return;
+  } else {
+    const claims=await db.select().from(goldenClaims).where(eq(goldenClaims.userId,id)).all();
+    if(claims.some(c=>Number(c.expiresAt)===end))return;
+    const effective=await getEditorSubscriptionState(id,{now:end-1});
+    if(!effective.active||Number(effective.expiresAt)!==end
+      ||effective.plan!==row.plan)return;
   }
-  const key=subscriptionReminderKey(source,id,end,now);
+  if(await entitlementExtendsBeyond(id,end))return;
+  const key=subscriptionReminderKey(source,id,end,stage);
   const inserted=await db.insert(subscriptionReminderDeliveries).values({
     key,userId:id,source,expiresAt:end,day:today(now),status:'sending',
     attempts:1,nextAttemptAt:0,updatedAt:now,
@@ -37,12 +81,23 @@ async function showReminder(source,row,now) {
 async function deliverReminder(delivery,row,now) {
   const user=await db.select().from(usageUsers)
     .where(eq(usageUsers.userId,delivery.userId)).get();
+  const expired=delivery.key.endsWith(':expired');
+  const locale=user?.languageCode||'en';
+  const plan=delivery.source==='gift'?'golden':row.plan;
+  const brandingRemoved=expired&&plan==='golden'
+    ?await isBrandingRemoved(delivery.userId):false;
   let state='sent',nextAttemptAt=0;
   try {
-    await api.sendRichMessage({chat_id:delivery.userId,rich_message:buildSubscriptionRich({
-      plan:delivery.source==='gift'?'golden':row.plan,gift:delivery.source==='gift',
-      expiresAt:delivery.expiresAt,now,locale:user?.languageCode||'en',reminder:true,
-    })});
+    await api.sendRichMessage({
+      chat_id:delivery.userId,
+      rich_message:buildSubscriptionRich({
+        plan,
+        gift:delivery.source!=='paid',
+        expiresAt:delivery.expiresAt,now,locale,
+        reminder:!expired,expired,
+      }),
+      ...(expired?{reply_markup:renewalMarkup(locale,row.plan,brandingRemoved)}:{}),
+    });
   } catch(error) {
     const normalized=normalizePublishError(error);
     if(normalized.code==='PUBLISH_RATE_LIMITED'&&delivery.attempts<5){
@@ -56,24 +111,51 @@ async function deliverReminder(delivery,row,now) {
   }).where(and(eq(subscriptionReminderDeliveries.key,delivery.key),
     eq(subscriptionReminderDeliveries.status,'sending'))).run();
 }
+export async function sendSubscriptionExpiryTest(message,locale='en') {
+  if(message?.chat?.type!=='private'||!isDeveloper(message?.from?.id))return false;
+  const now=stamp(),language=subscriptionLocale(locale||message?.from?.language_code);
+  const brandingRemoved=await isBrandingRemoved(message.from.id);
+  await api.sendRichMessage({
+    chat_id:message.chat.id,
+    rich_message:buildSubscriptionRich({
+      plan:'golden',expiresAt:now-1,now,locale:language,expired:true,
+    }),
+    reply_markup:renewalMarkup(language,'golden',brandingRemoved),
+  });
+  return true;
+}
 async function retryDue(now) {
   const pending=await db.select().from(subscriptionReminderDeliveries)
     .where(and(eq(subscriptionReminderDeliveries.status,'retry'),
       lte(subscriptionReminderDeliveries.nextAttemptAt,now))).limit(2).all();
   for(const item of pending) {
     let row=null;
-    if(item.day===today(now)&&subscriptionReminderWindow(item.expiresAt,now)){
+    const stage=item.key.endsWith(':expired')?'expired':'before';
+    const eligible=subscriptionReminderStage(item.expiresAt,now);
+    if(item.day===today(now)&&eligible===stage){
       if(item.source==='paid'){
         row=await db.select().from(editorSubscriptions)
           .where(eq(editorSubscriptions.userId,item.userId)).get();
-        if(!verifiedSubscriptionRow(row,now)||Number(row.expiresAt)!==item.expiresAt)row=null;
+        if((stage==='before'?!verifiedSubscriptionRow(row,now):!trustedPaidRow(row))
+          ||Number(row.expiresAt)!==item.expiresAt)row=null;
       }else if(item.source==='gift'){
         const claims=await db.select().from(goldenClaims)
           .where(eq(goldenClaims.userId,item.userId)).all();
         const newest=Math.max(0,...claims.map(c=>Number(c.expiresAt)||0));
         if(newest===item.expiresAt)row=claims.find(c=>Number(c.expiresAt)===newest);
+      }else if(item.source==='manual_gift'){
+        const gifts=await db.select().from(editorGiftEntitlements)
+          .where(eq(editorGiftEntitlements.userId,item.userId)).all();
+        row=gifts.find(gift=>Number(gift.expiresAt)===item.expiresAt
+          &&Number(gift.startedAt)<=now);
       }
     }
+    if(row&&item.source!=='gift') {
+      const effective=await getEditorSubscriptionState(item.userId,{now:item.expiresAt-1});
+      if(!effective.active||Number(effective.expiresAt)!==item.expiresAt
+        ||effective.plan!==row.plan)row=null;
+    }
+    if(row&&await entitlementExtendsBeyond(item.userId,item.expiresAt))row=null;
     if(!row){
       await db.update(subscriptionReminderDeliveries).set({status:'canceled',updatedAt:now})
         .where(and(eq(subscriptionReminderDeliveries.key,item.key),
@@ -88,44 +170,52 @@ async function retryDue(now) {
   }
 }
 
-async function scan(source,now) {
+async function scan(source,now,stage) {
+  const scanId=source+':'+stage;
   const day=today(now);
   await db.insert(subscriptionReminderScans).values({
-    id:source,day,cursor:'0',leaseUntil:0,
+    id:scanId,day,cursor:'0',leaseUntil:0,
   }).onConflictDoNothing({target:subscriptionReminderScans.id}).run();
   let old=await db.select().from(subscriptionReminderScans)
-    .where(eq(subscriptionReminderScans.id,source)).get();
+    .where(eq(subscriptionReminderScans.id,scanId)).get();
   if(old.day!==day){
     await db.update(subscriptionReminderScans).set({day,cursor:'0',leaseUntil:0})
-      .where(and(eq(subscriptionReminderScans.id,source),
+      .where(and(eq(subscriptionReminderScans.id,scanId),
         eq(subscriptionReminderScans.day,old.day))).run();
     old=await db.select().from(subscriptionReminderScans)
-      .where(eq(subscriptionReminderScans.id,source)).get();
+      .where(eq(subscriptionReminderScans.id,scanId)).get();
   }
   if(old.day!==day||old.cursor==='DONE'||old.leaseUntil>now)return;
   const lease=now+100;
   const claimed=await db.update(subscriptionReminderScans).set({leaseUntil:lease})
-    .where(and(eq(subscriptionReminderScans.id,source),eq(subscriptionReminderScans.day,day),
+    .where(and(eq(subscriptionReminderScans.id,scanId),eq(subscriptionReminderScans.day,day),
       eq(subscriptionReminderScans.cursor,old.cursor),lte(subscriptionReminderScans.leaseUntil,now)))
     .returning().run();
   if(!claimed?.length)return;
   let cursor=old.cursor;
   try{
-    const table=source==='paid'?editorSubscriptions:goldenClaims;
-    const field=source==='paid'?table.userId:table.key;
+    const table=source==='paid'?editorSubscriptions
+      :source==='gift'?goldenClaims:editorGiftEntitlements;
+    const field=source==='paid'?table.userId
+      :source==='gift'?table.key:table.requestId;
+    const expiryWhere=stage==='before'
+      ?and(gte(table.expiresAt,now+4*DAY),lte(table.expiresAt,now+WINDOW))
+      :and(gt(table.expiresAt,now-EXPIRED_WINDOW),lte(table.expiresAt,now));
     const where=source==='paid'
-      ?and(gt(table.userId,Number(cursor)),eq(table.status,'active'),
-        gt(table.expiresAt,now),lte(table.expiresAt,now+WINDOW))
-      :and(gt(table.key,cursor),gt(table.expiresAt,now),lte(table.expiresAt,now+WINDOW));
+      ?and(gt(table.userId,Number(cursor)),eq(table.status,'active'),expiryWhere)
+      :source==='gift'
+        ?and(gt(table.key,cursor),expiryWhere)
+        :and(gt(table.requestId,cursor),lte(table.startedAt,now),expiryWhere);
     const results=await db.select().from(table).where(where).orderBy(asc(field)).limit(BATCH).all();
     for(const row of results){
-      await showReminder(source,row,now);
-      cursor=String(source==='paid'?row.userId:row.key);
+      await showReminder(source,row,now,stage);
+      cursor=String(source==='paid'?row.userId
+        :source==='gift'?row.key:row.requestId);
     }
     if(results.length<BATCH)cursor='DONE';
   }finally{
     await db.update(subscriptionReminderScans).set({cursor,leaseUntil:0})
-      .where(and(eq(subscriptionReminderScans.id,source),eq(subscriptionReminderScans.day,day),
+      .where(and(eq(subscriptionReminderScans.id,scanId),eq(subscriptionReminderScans.day,day),
         eq(subscriptionReminderScans.leaseUntil,lease))).run();
   }
 }
@@ -164,9 +254,9 @@ async function readCycle(now) {
   }
   return row;
 }
-async function unfinishedScan(source,day) {
+async function unfinishedScan(source,stage,day) {
   const row=await db.select().from(subscriptionReminderScans)
-    .where(eq(subscriptionReminderScans.id,source)).get();
+    .where(eq(subscriptionReminderScans.id,source+':'+stage)).get();
   return !row || row.day!==day || row.cursor!=='DONE';
 }
 async function nextRetry(day) {
@@ -228,9 +318,15 @@ export async function runSubscriptionReminderTick(now=stamp(),options={}) {
   if(!claimed?.length)return false;
   try {
     await retryDue(now);
-    await scan('paid',now);
-    await scan('gift',now);
-    const needsScan=(await unfinishedScan('paid',day))||(await unfinishedScan('gift',day));
+    await scan('paid',now,'before');
+    await scan('gift',now,'before');
+    await scan('paid',now,'expired');
+    await scan('gift',now,'expired');
+    await scan('manual_gift',now,'before');
+    await scan('manual_gift',now,'expired');
+    const needsScan=(await Promise.all([
+      ['paid','before'],['gift','before'],['paid','expired'],['gift','expired'],
+    ].map(([source,stage])=>unfinishedScan(source,stage,day)))).some(Boolean);
     const retryAt=await nextRetry(day);
     const unfinished=needsScan||Boolean(retryAt);
     const earliest=now+NEXT_BATCH_DELAY;

@@ -49,6 +49,7 @@
 }
 .telegram-details-v036.is-expanded .details-toggle-btn svg{transform:rotate(180deg)}
 .telegram-details-v036 .details-title-input{
+  display:block;
   width:100%;
   min-width:0;
   min-height:34px;
@@ -61,6 +62,17 @@
   font-size:17px!important;
   font-weight:500!important;
   direction:auto;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  cursor:text;
+}
+.telegram-details-v036 .details-title-input:empty::before{
+  content:attr(data-placeholder);
+  color:var(--tg-rich-muted);
+  pointer-events:none;
+}
+.telegram-details-v036 .details-title-input tg-emoji.custom-inline-emoji{
+  vertical-align:-.12em;
 }
 .telegram-details-v036 .details-expand-state{
   flex:0 0 auto;
@@ -172,6 +184,23 @@
   backdrop-filter:blur(18px) saturate(155%)!important;
   -webkit-backdrop-filter:blur(18px) saturate(155%)!important;
 }
+.details-command-menu .menu-head{
+  align-items:center;
+  justify-content:flex-start;
+  gap:10px;
+}
+.nested-menu-back{
+  flex:0 0 auto;
+  min-width:32px;
+  min-height:30px;
+  padding:2px 7px;
+  border:0;
+  border-radius:9px;
+  background:rgba(255,255,255,.05);
+  color:var(--text);
+  font-size:12px;
+}
+.nested-menu-back:active{background:rgba(255,255,255,.1)}
 .details-command-menu .menu-list{display:grid;gap:2px}
 .details-command-menu .menu-item{min-height:48px!important;padding:8px 10px!important;border-radius:13px!important}
 .details-command-menu .menu-icon{width:34px!important;font-size:20px!important}

@@ -87,9 +87,17 @@
     return raw;
   }
 
+  function preserveBlockBoundaries(raw) {
+    return String(raw || "")
+      .replace(/<\/(?:p|div|h[1-6]|pre|footer|blockquote|details|summary|ul|ol|li)\s*>/gi, "<br>")
+      .replace(/<(?:p|div|h[1-6]|pre|footer|blockquote|details|summary|ul|ol|li)(?:\s[^>]*)?>/gi, "")
+      .replace(/(?:<br\s*\/?\s*>\s*){2,}/gi, "<br>")
+      .replace(/^(?:<br\s*\/?\s*>\s*)+|(?:<br\s*\/?\s*>\s*)+$/gi, "");
+  }
+
   function sanitizeInlineHtml(raw) {
     const template = document.createElement("template");
-    template.innerHTML = String(raw || "");
+    template.innerHTML = preserveBlockBoundaries(raw);
     const allowed = new Set(["B","STRONG","I","EM","U","INS","S","STRIKE","DEL","TG-SPOILER","CODE","MARK","SUB","SUP","BR","A","TG-EMOJI"]);
     const cleanNode = node => {
       if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.nodeValue || "");
@@ -116,7 +124,27 @@
     return out.innerHTML;
   }
 
-  window.RichInlineTextTools = Object.freeze({sanitizeInlineHtml});
+  function richTextToHtml(value) {
+    if (value == null) return "";
+    if (typeof value === "string" || typeof value === "number") return escapeHtml(String(value));
+    if (Array.isArray(value)) return value.map(richTextToHtml).join("");
+    if (typeof value !== "object") return "";
+    const type = String(value.type || "plain");
+    const inner = richTextToHtml(value.text ?? value.children ?? value.content ?? "");
+    const wrappers = {
+      bold:"b", italic:"i", underline:"u", strikethrough:"s",
+      spoiler:"tg-spoiler", code:"code", marked:"mark",
+      subscript:"sub", superscript:"sup",
+    };
+    if (type === "custom_emoji" && /^[1-9][0-9]{0,19}$/.test(String(value.custom_emoji_id || ""))) {
+      return `<tg-emoji emoji-id="${escapeHtml(value.custom_emoji_id)}">${escapeHtml(value.alternative_text || "🙂")}</tg-emoji>`;
+    }
+    if (wrappers[type]) return `<${wrappers[type]}>${inner}</${wrappers[type]}>`;
+    if (type === "url" && /^(https?:|tg:|mailto:|tel:|#)/i.test(String(value.url || ""))) {
+      return `<a href="${escapeHtml(value.url)}">${inner}</a>`;
+    }
+    return inner || escapeHtml(value.alternative_text || value.button?.text || "");
+  }
 
   function tokenClass(info) {
     if (info.type === "disabled") return "is-disabled";
@@ -173,6 +201,8 @@
     clone.querySelectorAll("[contenteditable]").forEach(el => el.removeAttribute("contenteditable"));
     return {html:clone.innerHTML, text:clone.textContent || ""};
   }
+
+  window.RichInlineTextTools = Object.freeze({sanitizeInlineHtml,richTextToHtml,serializeEditor});
 
   function findBlockRecursive(blocks, id) {
     for (const block of blocks || []) {
@@ -231,6 +261,9 @@
     editor.innerHTML = sanitizeInlineHtml(innerHtmlForBlock(block));
     decorateMarkers(editor);
     editor.querySelectorAll("tg-spoiler").forEach(el => el.classList.add("inline-spoiler"));
+    requestAnimationFrame(() => {
+      if (editor.isConnected) window.RichCustomEmojiCode?.convertEditor?.(editor);
+    });
   }
 
   function makeTopLevelEditor(block) {
@@ -727,9 +760,10 @@
     return range;
   }
 
-  function insertTokenAtRange(editor, range, info) {
+  function insertTokenAtRange(editor, range, info, preserveSelectedText = false) {
     const token = makeToken(markerFor(info));
-    range.deleteContents();
+    if (preserveSelectedText) range.collapse(false);
+    else range.deleteContents();
     range.insertNode(token);
     const spacer = document.createTextNode("\u200B");
     token.after(spacer);
@@ -747,6 +781,19 @@
   }
 
   function ensureEditorForInlineButton(callback) {
+    const composerText = String(slashInput?.value || "");
+    if (composerText.trim() && !composerText.trimStart().startsWith("/")) {
+      if (commitPendingComposerText()) {
+        requestAnimationFrame(() => {
+          const editor = blocksEl.querySelector(`.block[data-id="${selectedBlockId}"] .rich-inline-editor`);
+          if (editor) {
+            activeEditor = editor;
+            callback(editor);
+          }
+        });
+        return;
+      }
+    }
     if (activeEditor?.isConnected && activeEditor.isContentEditable) {
       callback(activeEditor);
       return;
@@ -767,7 +814,7 @@
     ensureEditorForInlineButton(editor => {
       let range = fromSelection && savedRange ? savedRange.cloneRange() : null;
       if (!range || !editor.contains(range.commonAncestorContainer)) range = caretRangeAtEnd(editor);
-      created = insertTokenAtRange(editor, range, {title:cleanTitle(title),type,value:"",color:null});
+      created = insertTokenAtRange(editor, range, {title:cleanTitle(title),type,value:"",color:null}, fromSelection);
     });
     return created;
   }

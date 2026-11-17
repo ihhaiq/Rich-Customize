@@ -1,9 +1,11 @@
 import { api, BotApiError, db } from 'sdk';
 import { eq, sql } from 'sdk/db';
-import { usageUsers } from 'schema';
+import { usageUsers, userAliases } from 'schema';
 import { buildUserInfoMessage, userInfoText } from 'lib/user-info-copy';
 import { subscriptionSnapshot } from 'lib/subscription-status';
 import { subscriptionPlanTitle } from 'lib/subscription-rich';
+
+const USER_ALIAS_CACHE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
 export function infoCommandArgument(text) {
   if (typeof text !== 'string') return null;
@@ -40,6 +42,12 @@ function profileFromStored(row) {
   };
 }
 
+function normalizedUsername(value) {
+  return typeof value === 'string'
+    ? value.trim().replace(/^@/, '').toLowerCase()
+    : '';
+}
+
 async function findStoredUserById(userId) {
   const row = await db.select({
     userId: usageUsers.userId,
@@ -51,15 +59,26 @@ async function findStoredUserById(userId) {
 }
 
 async function findStoredUserByUsername(username) {
+  const normalized = normalizedUsername(username);
   const row = await db.select({
     userId: usageUsers.userId,
     username: usageUsers.username,
     firstName: usageUsers.firstName,
     lastName: usageUsers.lastName,
   }).from(usageUsers)
-    .where(sql`lower(${usageUsers.username}) = ${username.toLowerCase()}`)
+    .where(sql`lower(${usageUsers.username}) = ${normalized}`)
     .get();
-  return profileFromStored(row);
+  if (row) return { ...profileFromStored(row), matchedUsername: normalized };
+
+  const alias = await db.select({
+    userId: userAliases.userId,
+    checkedAt: userAliases.checkedAt,
+  }).from(userAliases)
+    .where(eq(userAliases.username, normalized))
+    .get();
+  if (!alias) return null;
+  const user = await findStoredUserById(alias.userId);
+  return user ? { ...user, matchedUsername: normalized, aliasCheckedAt: alias.checkedAt } : null;
 }
 
 async function profilePhotoFileId(userId) {
@@ -78,7 +97,15 @@ export function isProfilePhotoSendingForbidden(error) {
 export async function findUserInfoTarget(argument) {
   const target=commandTarget({},String(argument||''));
   if(target.kind==='id')return findStoredUserById(target.id);
-  if(target.kind==='username')return findStoredUserByUsername(target.username);
+  if(target.kind==='username') {
+    const user = await findStoredUserByUsername(target.username);
+    if (!user) return null;
+    const enriched = await addActiveUsernames(user);
+    const confirmed = enriched.activeUsernamesLoaded
+      ? usernameMatches(enriched, target.username)
+      : storedUsernameMatchesWhenUnavailable(enriched, target.username);
+    return confirmed ? enriched : null;
+  }
   return null;
 }
 
@@ -111,6 +138,52 @@ function commandTarget(message, argument) {
   return { kind: 'invalid' };
 }
 
+async function addActiveUsernames(user) {
+  const userId = validUserId(user?.id);
+  if (!userId) return user;
+
+  try {
+    const chat = await api.getChat({ chat_id: userId });
+    if (Number(chat?.id) !== userId || chat?.type !== 'private') {
+      if (chat?.id != null && Number(chat.id) !== userId) {
+        console.warn('Telegram returned a different chat while loading user info usernames');
+      }
+      return user;
+    }
+
+    return {
+      ...user,
+      activeUsernamesLoaded: true,
+      active_usernames: [
+        ...(Array.isArray(user.active_usernames) ? user.active_usernames : []),
+        ...(Array.isArray(chat.active_usernames) ? chat.active_usernames : []),
+        ...(typeof chat.username === 'string' ? [chat.username] : []),
+      ],
+    };
+  } catch (error) {
+    console.warn('Could not load Telegram user usernames', error?.code || error?.name || 'Error');
+    return user;
+  }
+}
+
+function usernameMatches(user, username) {
+  const wanted = normalizedUsername(username);
+  const names = [
+    user?.username,
+    ...(Array.isArray(user?.active_usernames) ? user.active_usernames : []),
+  ];
+  return names.some((name) => normalizedUsername(name) === wanted);
+}
+
+function storedUsernameMatchesWhenUnavailable(user, username) {
+  const wanted = normalizedUsername(username);
+  if (normalizedUsername(user?.username) === wanted) return true;
+  const checkedAt = Number(user?.aliasCheckedAt);
+  return normalizedUsername(user?.matchedUsername) === wanted
+    && Number.isSafeInteger(checkedAt)
+    && Math.floor(Date.now() / 1000) - checkedAt <= USER_ALIAS_CACHE_MAX_AGE_SECONDS;
+}
+
 export async function prepareUserInfoMessage(message, argument, languageCode) {
   const target = commandTarget(message, argument);
   let user = null;
@@ -136,6 +209,13 @@ export async function prepareUserInfoMessage(message, argument, languageCode) {
   }
 
   if (!user) return null;
+  user = await addActiveUsernames(user);
+  if (target.kind === 'username'
+    && ((user.activeUsernamesLoaded && !usernameMatches(user, target.username))
+      || (!user.activeUsernamesLoaded
+        && !storedUsernameMatchesWhenUnavailable(user, target.username)))) {
+    return null;
+  }
 
   let photoFileId = '';
   let photoError = false;

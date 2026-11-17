@@ -1,4 +1,6 @@
 import { runSubscriptionReminderTick, receiveSubscriptionReminderSchedule } from 'lib/subscription-reminders';
+import { runRichDonateB2BTick } from 'lib/editor-subscriptions';
+import { runDeveloperBroadcastTick } from 'lib/developer';
 import { receiveBirthdayReminder } from 'lib/golden-announcements';
 import { goldenGiftStatus, receiveGiftReminder } from 'lib/golden-gifts';
 import { assertUniquePageTitle, acquireOwnerPageLock as acquireCreateLock, releaseOwnerPageLock as releaseCreateLock } from 'lib/page-names';
@@ -21,6 +23,7 @@ import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { safePlanLimit } from 'lib/subscription-policy';
 import { isLegacySavedPage } from 'lib/saved-page-policy';
+import { loadEditorSession } from 'lib/editor-session';
 import { allowBridgeRequest, allowMiniAppEndpointRequest } from 'lib/request-guard';
 import { validateStoredButtons } from 'lib/button-validation';
 import {
@@ -31,15 +34,7 @@ import {
 import { prepareMiniAppUserPicker } from 'lib/miniapp-user-picker';
 import {
   acknowledgeMiniAppSync,
-  buildPageDeleteSync,
-  buildPageUpsertSync,
-  enqueuePageDeleteSync,
-  enqueuePageUpsertSync,
-  flushMiniAppSyncOutbox,
-  nextPageSyncVersion,
-  reactMiniAppSyncSuccess,
   retryMiniAppSync,
-  sendMiniAppFullSnapshot,
 } from 'lib/miniapp-sync';
 import { DEVELOPER_IDS } from 'lib/developer-access';
 import { receiveScheduleRelayControl } from 'lib/scheduled-publish';
@@ -51,7 +46,6 @@ import {
   importMiniAppCustomEmojiPacks,
   manageMiniAppCustomEmojiPacks,
 } from 'lib/miniapp-custom-emoji';
-
 export const MINIAPP_BRIDGE_CHAT_ID = -1003993506865;
 export const MINIAPP_BRIDGE_BOT_USERNAME = 'richminiappsbot';
 export const MINIAPP_BRIDGE_TARGET_USERNAME = 'richcustomizebot';
@@ -256,9 +250,6 @@ async function handleSyncControl(message) {
   } else {
     await retryMiniAppSync(id);
   }
-  try {
-    await flushMiniAppSyncOutbox({ limit: 1 });
-  } catch {}
   return true;
 }
 
@@ -759,7 +750,6 @@ async function handleCreate(message, id, envelope, directPayload = null) {
 
     await assertUniquePageTitle(input.ownerId, input.title);
     const stamp = now();
-    const version = await nextPageSyncVersion(0);
     await db.insert(richPages).values({
       pageId: idValue,
       ownerId: Number(input.ownerId),
@@ -771,8 +761,8 @@ async function handleCreate(message, id, envelope, directPayload = null) {
       createdAt: stamp,
       updatedAt: stamp,
       quotaVersion:2,
-      revision: version.revision,
-      syncSeq: version.syncSeq,
+      revision:1,
+      syncSeq:0,
     }).run();
     const created = await getOwnedPage(input.ownerId, idValue);
     return {
@@ -780,9 +770,8 @@ async function handleCreate(message, id, envelope, directPayload = null) {
       user_id: input.ownerId,
       page_id: idValue,
       updated_at: stamp,
-      revision: version.revision,
-      sync_seq: version.syncSeq,
-      sync_event: buildPageUpsertSync(created, id),
+      revision: 1,
+      sync_seq: 0,
     };
   } finally {
     await releaseCreateLock(lock);
@@ -817,7 +806,6 @@ async function handleSave(message, id, envelope, directPayload = null) {
         updated_at: Number(existing.updatedAt),
         revision: Number(existing.revision || 1),
         sync_seq: Number(existing.syncSeq || 0),
-        sync_event: buildPageUpsertSync(existing, id),
       };
     }
     throw new BridgeError('PAGE_CONFLICT', 'Page was changed after the Mini App loaded it. Reload the latest version.');
@@ -836,7 +824,7 @@ async function handleSave(message, id, envelope, directPayload = null) {
   }
   await validatePageInput(documentPayload);
   const stamp = Math.max(now(), Number(existing.updatedAt || 0) + 1);
-  const version = await nextPageSyncVersion(existing.revision || 1);
+  const revision = Math.max(1, Number(existing.revision || 1)) + 1;
   const updated = await db.update(richPages).set({
     title: input.title,
     blocks: input.blocks,
@@ -844,8 +832,8 @@ async function handleSave(message, id, envelope, directPayload = null) {
     buttonsPerRow: input.buttonsPerRow,
     buttonsAlign: input.buttonsAlign,
     updatedAt: stamp,
-    revision: version.revision,
-    syncSeq: version.syncSeq,
+    revision,
+    syncSeq: Number(existing.syncSeq || 0),
   }).where(and(
     eq(richPages.pageId, input.pageId),
     eq(richPages.ownerId, Number(input.ownerId)),
@@ -863,9 +851,8 @@ async function handleSave(message, id, envelope, directPayload = null) {
     user_id: input.ownerId,
     page_id: input.pageId,
     updated_at: stamp,
-    revision: version.revision,
-    sync_seq: version.syncSeq,
-    sync_event: buildPageUpsertSync(saved, id),
+    revision,
+    sync_seq: Number(existing.syncSeq || 0),
   };
   } finally { await releaseCreateLock(lock); }
 }
@@ -1046,7 +1033,6 @@ async function handleDelete(message, id, ownerId, idValue, envelope, retry = fal
     throw new BridgeError('PAGE_CONFLICT', 'Page changed after the Mini App loaded it. Reload before deleting.');
   }
 
-  const version = await nextPageSyncVersion(existing.revision || 1);
   const removed = await db.delete(richPages).where(and(
     eq(richPages.pageId, idValue),
     eq(richPages.ownerId, Number(ownerId)),
@@ -1063,40 +1049,13 @@ async function handleDelete(message, id, ownerId, idValue, envelope, retry = fal
     status: 'deleted',
     user_id: ownerId,
     page_id: idValue,
-    revision: version.revision,
-    sync_seq: version.syncSeq,
-    sync_event: buildPageDeleteSync({
-      ownerId,
-      pageId: idValue,
-      revision: version.revision,
-      syncSeq: version.syncSeq,
-      updatedAt: now(),
-      requestId: id,
-    }),
+    revision: Math.max(1, Number(existing.revision || 1)) + 1,
+    sync_seq: Number(existing.syncSeq || 0),
   };
 }
 
 async function sendMutationAck(message, id, action, result, replay = false) {
   if (!result || typeof result !== 'object' || Array.isArray(result)) return false;
-  if (['create', 'save', 'delete'].includes(action) && result.sync_event) {
-    const event = {
-      ...clone(result.sync_event),
-      request_id: id,
-    };
-    await sendJson(
-      message,
-      'page_sync_' + String(result.page_id || 'deleted') + '_' + id + '.json',
-      '✅ ' + BRIDGE_PROTOCOL + ' PAGE_SYNC_OK' + (replay ? ' (REPLAY)' : '') + '\n'
-        + 'request_id: ' + id + '\n'
-        + 'sync_id: ' + String(event.sync_id || '—') + '\n'
-        + 'sync_seq: ' + String(event.sync_seq || 0) + '\n'
-        + 'user_id: ' + String(result.user_id || '—') + '\n'
-        + 'page_id: ' + String(result.page_id || '—'),
-      event,
-    );
-    await reactMiniAppSyncSuccess(message);
-    return true;
-  }
   const label = {
     create: 'CREATE_PAGE_OK',
     save: 'SAVE_PAGE_OK',
@@ -1129,30 +1088,6 @@ function miniAppEndpointRequestId(value) {
   return requestId(value || generated);
 }
 
-async function enqueueDirectPageSync(action, result, requestIdValue) {
-  try {
-    if (action === 'delete') {
-      await enqueuePageDeleteSync({
-        ownerId: result.user_id,
-        pageId: result.page_id,
-        revision: result.revision,
-        syncSeq: result.sync_seq,
-        updatedAt: result.sync_event?.deleted_at,
-        requestId: requestIdValue,
-      });
-    } else {
-      const page = await getOwnedPage(result.user_id, result.page_id);
-      if (page) await enqueuePageUpsertSync(page);
-    }
-    await flushMiniAppSyncOutbox({ limit: 1 });
-  } catch (error) {
-    await logError('miniapp_sync.serverless_endpoint', error, {
-      userId: result.user_id,
-      extra: 'action=' + action + '; request=' + requestIdValue,
-    });
-  }
-}
-
 async function handleMiniAppEmojiAction(operation) {
   try {
     return await operation();
@@ -1179,7 +1114,7 @@ export async function handleMiniAppServerlessEndpoint(input, context) {
   const action = String(input.action || '').trim();
   const supportedActions = new Set([
     'me', 'pages', 'page', 'destinations', 'create', 'save', 'delete',
-    'publish', 'user_picker', 'client_error', 'custom_emoji_packs',
+    'publish', 'user_picker', 'client_error', 'draft', 'custom_emoji_packs',
     'custom_emoji_pack', 'custom_emoji_manage', 'custom_emoji_import',
     'custom_emoji_pack_read', 'custom_emoji_preview',
   ]);
@@ -1205,8 +1140,15 @@ export async function handleMiniAppServerlessEndpoint(input, context) {
       user: { id: ownerId },
       beta: '0.3',
       is_developer: developer,
+      plan: entitlement.plan,
       limits: {
+        text: safePlanLimit(entitlement, 'text'),
+        emoji_packs: safePlanLimit(entitlement, 'emojiPacks'),
         custom_emoji_packs: safePlanLimit(entitlement, 'emojiPacks'),
+        saved_pages: safePlanLimit(entitlement, 'pages'),
+        blocks: safePlanLimit(entitlement, 'blocks'),
+        nesting_depth: safePlanLimit(entitlement, 'nestingDepth'),
+        media_attachments: safePlanLimit(entitlement, 'mediaAttachments'),
         table_columns: developer ? 20 : safePlanLimit(entitlement, 'tableColumns'),
         table_rows: 26,
       },
@@ -1218,6 +1160,40 @@ export async function handleMiniAppServerlessEndpoint(input, context) {
       ok: true,
       ...result,
       Golden_ticket: result.golden_gift?.Golden_ticket === true,
+    };
+  }
+  if (action === 'draft') {
+    const token = String(input.token || '');
+    if (!/^[a-f0-9]{32}$/.test(token)) {
+      throw new BridgeError('DRAFT_NOT_FOUND', 'Draft is unavailable or expired.');
+    }
+    const session = await loadEditorSession(ownerId, { touch:false });
+    const pending = session?.pendingUserState;
+    if (
+      pending?.kind !== 'channel_post_choice'
+      || pending.miniAppToken !== token
+      || Number(pending.miniAppExpiresAt || 0) <= now()
+      || !Array.isArray(pending.importDraft?.blocks)
+      || !pending.importDraft.blocks.length
+    ) {
+      throw new BridgeError('DRAFT_NOT_FOUND', 'Draft is unavailable or expired.');
+    }
+    const entitlement = await getEditorEntitlement(ownerId);
+    const limits = validateEditorLimits(pending.importDraft.blocks, ownerId, { entitlement });
+    if (!limits.ok) {
+      throw new BridgeError(
+        'EDITOR_LIMIT_' + String(limits.code || 'UNKNOWN').toUpperCase(),
+        'Draft content exceeds the current editor limits.',
+      );
+    }
+    return {
+      ok:true,
+      draft:{
+        blocks:clone(pending.importDraft.blocks),
+        buttons:clone(pending.importDraft.messageButtons || []),
+        buttons_per_row:Number(pending.importDraft.buttonsPerRow || 1),
+        buttons_align:String(pending.importDraft.buttonsAlign || 'center'),
+      },
     };
   }
   if (action === 'page') {
@@ -1259,13 +1235,10 @@ export async function handleMiniAppServerlessEndpoint(input, context) {
     let result;
     if (action === 'create') {
       result = await handleCreate(null, id, envelope, envelope);
-      await enqueueDirectPageSync(action, result, id);
     } else if (action === 'save') {
       result = await handleSave(null, id, envelope, envelope);
-      await enqueueDirectPageSync(action, result, id);
     } else if (action === 'delete') {
       result = await handleDelete(null, id, ownerId, pageIdValue, envelope, Boolean(claim.retry), envelope);
-      await enqueueDirectPageSync(action, result, id);
     } else if (action === 'publish') {
       result = await handlePublish(null, id, ownerId, pageIdValue, envelope, envelope);
     } else if (action === 'user_picker') {
@@ -1288,7 +1261,6 @@ export async function handleMiniAppServerlessEndpoint(input, context) {
 
     await finishRequest(id, 'completed', result);
     const response = { ...result };
-    delete response.sync_event;
     return { ok: true, ...response };
   } catch (error) {
     try {
@@ -1305,6 +1277,36 @@ export async function handleMiniAppServerlessEndpoint(input, context) {
 
 export async function handleMiniAppBridgeMessage(message, context = {}) {
   const scheduleSource=commandSource(message);
+  if (/^\/rcb_broadcast_tick@richcustomizebot\b/i.test(scheduleSource)) {
+    if (!isBridgeOrigin(message)) return false;
+    if (message?.forward_origin || message?.forward_from || message?.forward_from_chat
+        || message?.forward_sender_name || message?.forward_date || message?.via_bot
+        || message?.sender_chat || message?.external_reply) return true;
+    await authorizeBridgeMessage(message, 'broadcast_tick');
+    const payload=scheduleSource.match(/^\/rcb_broadcast_tick@richcustomizebot\s+([^\n]+)$/i);
+    let data=null;try{data=JSON.parse(payload?.[1]||'');}catch{return true;}
+    const minute=Math.floor(Date.now()/60000);
+    if(data?.protocol!=='RCB1'||data.kind!=='broadcast'||!Number.isSafeInteger(data.minute)
+       ||Math.abs(data.minute-minute)>5)return true;
+    await runDeveloperBroadcastTick(data.minute);
+    return true;
+  }
+
+  if (/^\/rcb_rdb_tick@richcustomizebot\b/i.test(scheduleSource)) {
+    if (!isBridgeOrigin(message)) return false;
+    if (message?.forward_origin || message?.forward_from || message?.forward_from_chat
+        || message?.forward_sender_name || message?.forward_date || message?.via_bot
+        || message?.sender_chat || message?.external_reply) return true;
+    await authorizeBridgeMessage(message,'richdonate_sync');
+    const payload=scheduleSource.match(/^\/rcb_rdb_tick@richcustomizebot\s+([^\n]+)$/i);
+    let data=null;try{data=JSON.parse(payload?.[1]||'');}catch{return true;}
+    const minute=Math.floor(Date.now()/60000);
+    if(data?.protocol!=='RCB1'||data.kind!=='richdonate_sync'||!Number.isSafeInteger(data.minute)
+       ||Math.abs(data.minute-minute)>15)return true;
+    await runRichDonateB2BTick();
+    return true;
+  }
+
   if (/^\/rcb_subscription_tick@richcustomizebot\b/i.test(scheduleSource)) {
     if (!isBridgeOrigin(message)) return false;
     await authorizeBridgeMessage(message,'schedule_due');
@@ -1382,11 +1384,12 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
 
     let result;
     if (action === 'ping') result = await handlePing(message, id, senderBotId);
-    else if (action === 'full_sync') result = await sendMiniAppFullSnapshot({
-      requestId: id,
-      replyToMessage: message,
-      reason: 'bootstrap',
-    });
+    else if (action === 'full_sync') {
+      throw new BridgeError(
+        'PAGE_SYNC_DISABLED',
+        'Saved-page mirroring to Cloudflare is disabled.',
+      );
+    }
     else if (action === 'pages') result = await handlePages(message, id, ownerId);
     else if (action === 'licenses') {
       const licenses = await listManagedBotLicensesForBridge(ownerId);

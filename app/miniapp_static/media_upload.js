@@ -175,6 +175,29 @@ function appendStoredPreview(box, block, config, options = {}) {
   return true;
 }
 
+function storedQuoteMediaPreview(block) {
+  const config = mediaConfig(block?.type);
+  if (!config) return null;
+  const box = document.createElement("div");
+  box.className = "media-placeholder media-picker-card quote-media-card";
+  appendStoredPreview(box, block, config);
+
+  const header = document.createElement("div");
+  header.className = "media-picker-head";
+  const icon = createMediaIcon(block.type);
+  const copy = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = config.label;
+  const status = document.createElement("small");
+  status.textContent = mt("media.ready", {file:""});
+  copy.append(title, status);
+  header.append(icon, copy);
+  box.prepend(header);
+  return box;
+}
+
+window.RichMiniAppStoredMediaPreview = storedQuoteMediaPreview;
+
 function appendContainerPreviews(box, block) {
   const children = Array.isArray(block?.data?.children) ? block.data.children : [];
   if (!children.length) return;

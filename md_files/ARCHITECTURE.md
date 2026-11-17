@@ -29,13 +29,19 @@ Telegram users
       @RichCustomizebot / Telegram Serverless
 ```
 
+When the Mini App is opened from its Telegram Serverless origin, page reads
+and saved-page mutations use the direct `miniapp` endpoint instead of the
+Cloudflare relay. Cloudflare-origin routes and the RCB1 bridge remain for
+legacy routes and other supported operations; they are not the storage path
+for direct Serverless page CRUD.
+
 ## Ownership boundaries
 | Component | Paths | Responsibility |
 | --- | --- | --- |
 | Telegram Serverless | `tgcloud/schema.js`, `tgcloud/handlers/*.js`, `tgcloud/lib/**/*.js` | Authoritative page and editor data, permissions, publication, compatibility and operational state |
-| Mini App | `app/miniapp_static/**` | Browser UI and local unsaved edits; explicitly saved changes go through the bridge |
-| Cloudflare Functions | `functions/**` | Authentication validation, relay transport, webhook and upload handling |
-| Cloudflare D1 | `cloudflare/d1/schema.sql` | Request correlation, identity, page mirrors used for prechecks, and transitional emoji-pack storage; binding `DB`. Saved page truth remains Serverless |
+| Mini App | `app/miniapp_static/**` | Browser UI and local unsaved edits; direct Serverless page operations use authenticated `initData` and the `miniapp` endpoint |
+| Cloudflare Functions | `functions/**` | Cloudflare-origin authentication, legacy relay transport, webhook and upload handling |
+| Cloudflare D1 | `cloudflare/d1/schema.sql` | Request correlation, identity, and transitional emoji-pack storage; older page mirrors may remain but Serverless no longer refreshes them. Binding `DB`; saved page truth remains Serverless |
 | Documentation | `docs/**`, root Markdown | Architecture and planning; not an executable source of truth |
 
 ## Data invariants

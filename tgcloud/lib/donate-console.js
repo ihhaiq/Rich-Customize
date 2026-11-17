@@ -2,8 +2,9 @@
 // owner of gift claims, subscriber entitlements and recipient delivery.
 import { api, db, InputFile } from 'sdk';
 import { eq } from 'sdk/db';
-import { legacyStates } from 'schema';
+import { editorGiftEntitlements, legacyStates } from 'schema';
 import { isDeveloper } from 'lib/developer-access';
+import { acquireEditorMutationLock, releaseEditorMutationLock } from 'lib/editor-session';
 import { issueGoldenGift } from 'lib/golden-gifts';
 import { birthdayCampaignStatus, birthdayReportText, birthdayFailureBreakdown, birthdayFailureText } from 'lib/golden-announcements';
 import { audienceAndSubscriptionStats, activeSubscribersPage } from 'lib/admin-stats';
@@ -19,6 +20,9 @@ const DONATE_BOT_USERNAME='richdonatebot';
 const RE=/^rdm_[a-f0-9]{32}$/;
 const MAX_PAYLOAD=1024;
 const MAX_RESPONSE_BYTES=1024*1024;
+const GIFT_DURATION_SECONDS=30*86400;
+const GIFT_NOTIFICATION_LEASE_SECONDS=60;
+const ACTIONS=['sup','issue','status','failures','stats','subscribers','info','gift_subscription'];
 const validId=n=>Number.isSafeInteger(Number(n))&&Number(n)>0;
 const validChatId=n=>Number.isSafeInteger(Number(n))&&Number(n)!==0;
 const now=()=>Math.floor(Date.now()/1000);
@@ -109,6 +113,125 @@ function subscriberRichMessage(result) {
     subscriberTable(result),
   ]};
 }
+function validGiftTarget(value) {
+  return typeof value==='string'
+    && (/^\d{1,20}$/.test(value.trim())
+      || /^@[A-Za-z0-9_]{5,32}$/.test(value.trim()));
+}
+function giftRequestFieldsValid(p) {
+  return validGiftTarget(p.target)
+    && ['plus','golden'].includes(p.plan)
+    && Number.isSafeInteger(p.months)&&p.months>=1&&p.months<=120
+    && p.entitlement_status==='paid'
+    && typeof p.recipient_message==='string'
+    && p.recipient_message.length<=512;
+}
+function giftResponseFields(p,fields={}) {
+  return {
+    target:typeof p.target==='string'?p.target:'',
+    plan:['plus','golden'].includes(p.plan)?p.plan:'plus',
+    months:Number.isSafeInteger(p.months)?p.months:0,
+    entitlement_status:'paid',
+    entitlement_applied:false,
+    notification_sent:false,
+    ...fields,
+  };
+}
+function giftRequestMatches(row,p,targetUserId) {
+  return Number(row.actorId)===Number(p.user_id)
+    &&Number(row.userId)===Number(targetUserId)
+    &&row.plan===p.plan
+    &&Number(row.months)===Number(p.months);
+}
+async function giftSubscriptionResponse(p) {
+  const actor=Number(p.user_id);
+  const target=await findUserInfoTarget(p.target);
+  if(!target||!validId(target.id)) {
+    return giftResponseFields(p,{ok:false,
+      text:'لم أجد هذا المستخدم ضمن الحسابات التي سبق أن تفاعلت مع المحرر.'});
+  }
+  const userId=Number(target.id);
+  const lock=await acquireEditorMutationLock(userId);
+  if(!lock) {
+    return giftResponseFields(p,{ok:false,
+      text:'حساب المستلم قيد التحديث الآن. أعد المحاولة من لوحة الإهداء.'});
+  }
+  try {
+    const stamp=now();
+    let gift=await db.select().from(editorGiftEntitlements)
+      .where(eq(editorGiftEntitlements.requestId,p.request_id)).get();
+    if(gift&&!giftRequestMatches(gift,p,userId)) {
+      return giftResponseFields(p,{ok:false,
+        text:'معرّف طلب الهدية مستخدم لطلب مختلف.'});
+    }
+    if(!gift) {
+      const current=await subscriptionSnapshot(userId,stamp);
+      const startsAt=Math.max(stamp,Number(current.expiresAt)||0,
+        Number(current.underlyingExpiresAt)||0);
+      const row={
+        requestId:p.request_id,
+        actorId:actor,
+        userId,
+        plan:p.plan,
+        months:p.months,
+        startedAt:startsAt,
+        expiresAt:startsAt+p.months*GIFT_DURATION_SECONDS,
+        createdAt:stamp,
+        notificationStatus:'pending',
+        notificationLeaseUntil:0,
+        notificationAttempts:0,
+      };
+      const inserted=await db.insert(editorGiftEntitlements).values(row)
+        .onConflictDoNothing({target:editorGiftEntitlements.requestId})
+        .returning({requestId:editorGiftEntitlements.requestId}).run();
+      gift=inserted?.length?row:await db.select().from(editorGiftEntitlements)
+        .where(eq(editorGiftEntitlements.requestId,p.request_id)).get();
+      if(!gift||!giftRequestMatches(gift,p,userId)) {
+        return giftResponseFields(p,{ok:false,
+          text:'تعذر تثبيت سجل الهدية. لم يتم تأكيد منحها.'});
+      }
+    }
+    if(gift.notificationStatus==='sent') {
+      return giftResponseFields(p,{ok:true,entitlement_applied:true,
+        notification_sent:true,
+        text:'تم تفعيل هدية '+(p.plan==='golden'?'Golden Ticket':'Plus')+
+          ' لمدة '+p.months+' شهر وإشعار المستلم.'});
+    }
+    if(gift.notificationStatus==='sending'
+        &&Number(gift.notificationLeaseUntil)>stamp) {
+      return giftResponseFields(p,{ok:false,entitlement_applied:true,
+        text:'تم حفظ الاستحقاق، وإشعار المستلم قيد الإرسال. أعد المحاولة بعد قليل.'});
+    }
+    const leaseUntil=stamp+GIFT_NOTIFICATION_LEASE_SECONDS;
+    await db.update(editorGiftEntitlements).set({
+      notificationStatus:'sending',
+      notificationLeaseUntil:leaseUntil,
+      notificationAttempts:Number(gift.notificationAttempts||0)+1,
+    }).where(eq(editorGiftEntitlements.requestId,p.request_id)).run();
+    const planName=p.plan==='golden'?'Golden Ticket':'Plus';
+    try {
+      await api.sendMessage({chat_id:userId,
+        text:'مبروك وصلت لك هدية الاشتراك 🎁\nالباقة: '+planName+
+          '\nالمدة: '+p.months+' شهر'});
+    } catch(error) {
+      await db.update(editorGiftEntitlements).set({
+        notificationStatus:'pending',notificationLeaseUntil:0,
+      }).where(eq(editorGiftEntitlements.requestId,p.request_id)).run();
+      console.warn('Donation console gift notification failed',
+        error?.code||error?.name||'Error');
+      return giftResponseFields(p,{ok:false,entitlement_applied:true,
+        text:'حُفظ الاستحقاق، لكن تعذر إرسال إشعار المستلم. أعد المحاولة من لوحة الإهداء.'});
+    }
+    await db.update(editorGiftEntitlements).set({
+      notificationStatus:'sent',notificationLeaseUntil:0,
+    }).where(eq(editorGiftEntitlements.requestId,p.request_id)).run();
+    return giftResponseFields(p,{ok:true,entitlement_applied:true,
+      notification_sent:true,
+      text:'تم تفعيل هدية '+planName+' لمدة '+p.months+' شهر وإشعار المستلم.'});
+  } finally {
+    await releaseEditorMutationLock(lock);
+  }
+}
 async function actionResponse(p) {
   const actor=Number(p.user_id);
   if(p.action==='sup') {
@@ -116,6 +239,7 @@ async function actionResponse(p) {
     return {rich_message:buildSubscriptionRich({...snap,locale:p.locale==='en'?'en':'ar'})};
   }
   if(p.action!=='info'&&!isDeveloper(actor))throw new Error('DEVELOPER_ONLY');
+  if(p.action==='gift_subscription')return giftSubscriptionResponse(p);
   if(p.action==='issue') {
     const result=await issueGoldenGift(actor);
     return {text:result.announcementQueued
@@ -149,6 +273,58 @@ async function actionResponse(p) {
   }
   throw new Error('INVALID_OPERATION');
 }
+function invalidRequestFields(p) {
+  const fields=[];
+  if(!p||typeof p!=='object'||Array.isArray(p))return ['payload'];
+  if(!RE.test(String(p.request_id||'')))fields.push('request_id');
+  if(!(p.action==='info'?validChatId(p.user_id):validId(p.user_id)))fields.push('user_id');
+  if(!ACTIONS.includes(p.action))fields.push('action');
+  if(!Number.isSafeInteger(Number(p.page||0))
+    ||Number(p.page||0)<0||Number(p.page||0)>10000)fields.push('page');
+  if(p.action==='gift_subscription'&&!giftRequestFieldsValid(p)) {
+    if(!validGiftTarget(p.target))fields.push('target');
+    if(!['plus','golden'].includes(p.plan))fields.push('plan');
+    if(!Number.isSafeInteger(p.months)||p.months<1||p.months>120)fields.push('months');
+    if(p.entitlement_status!=='paid')fields.push('entitlement_status');
+    if(typeof p.recipient_message!=='string'||p.recipient_message.length>512) {
+      fields.push('recipient_message');
+    }
+  }
+  return fields;
+}
+async function executeAndRespond(message,p,namespace) {
+  let response={request_id:p.request_id,action:p.action,user_id:Number(p.user_id),ok:true};
+  try {
+    response={...response,...await actionResponse(p)};
+  } catch(error) {
+    console.warn('Donation console operation failed',p.action,error);
+    await logBridgeIssue('ACTION_FAILED_'+p.action,message,error);
+    if(p.action==='gift_subscription') {
+      const gift=await db.select().from(editorGiftEntitlements)
+        .where(eq(editorGiftEntitlements.requestId,p.request_id)).get();
+      response={...response,...giftResponseFields(p,{
+        ok:gift?.notificationStatus==='sent',
+        entitlement_applied:Boolean(gift),
+        notification_sent:gift?.notificationStatus==='sent',
+        text:'تعذر إكمال طلب الهدية. أعد المحاولة من لوحة الإهداء بالمعرّف نفسه.',
+      })};
+    } else {
+      response={...response,ok:false,text:'تعذر تنفيذ الطلب. افحص سجل اتصال البوتين وقاعدة المحرر.'};
+    }
+  }
+  await db.update(legacyStates).set({payload:{
+    status:'done',user_id:Number(p.user_id),action:p.action,response},updatedAt:now()})
+    .where(eq(legacyStates.namespace,namespace)).run();
+  try {
+    await sendResult(message,response);
+  } catch(error) {
+    console.error('Donation console response document could not be sent',{
+      request_id:p.request_id,action:p.action,chat_id:message?.chat?.id,
+    },error);
+    await logBridgeIssue('RESPONSE_FILE_SEND_FAILED_'+p.action,message,error);
+    throw error;
+  }
+}
 export async function handleDonateConsoleMessage(message) {
   const source=String(message?.text||'').trim();
   if(!/^\/rdm_request_v1(?:@|\s|$)/i.test(source))return false;
@@ -173,17 +349,34 @@ export async function handleDonateConsoleMessage(message) {
     await logBridgeIssue('REQUEST_JSON_INVALID',message,error);
     return true;
   }
-  if(!p||!RE.test(String(p.request_id||''))||
-    !(p.action==='info'?validChatId(p.user_id):validId(p.user_id))
-    ||!['sup','issue','status','failures','stats','subscribers','info'].includes(p.action)
-    ||!Number.isSafeInteger(Number(p.page||0))||Number(p.page||0)<0||Number(p.page||0)>10000) {
-    await logBridgeIssue('REQUEST_FIELDS_INVALID',message,new Error('REQUEST_FIELDS_INVALID'));
+  const invalidFields=invalidRequestFields(p);
+  if(invalidFields.length) {
+    await logBridgeIssue('REQUEST_FIELDS_INVALID:'+invalidFields.join(','),
+      message,new Error('REQUEST_FIELDS_INVALID'));
+    if(RE.test(String(p?.request_id||''))
+        &&ACTIONS.includes(p?.action)
+        &&(p.action==='info'?validChatId(p.user_id):validId(p.user_id))) {
+      const response={request_id:p.request_id,action:p.action,
+        user_id:Number(p.user_id),ok:false,
+        text:'حقول الطلب غير صالحة: '+invalidFields.join(', ')};
+      if(p.action==='gift_subscription') {
+        Object.assign(response,giftResponseFields(p,{ok:false,
+          text:'حقول طلب الهدية غير صالحة. أعد المحاولة من لوحة الإهداء.'}));
+      }
+      await sendResult(message,response);
+    }
     return true;
   }
   if(p.action!=='sup'&&p.action!=='info'&&!isDeveloper(p.user_id)) {
     await logBridgeIssue('REQUEST_NOT_AUTHORIZED',message,new Error('DEVELOPER_ONLY'));
-    await sendResult(message,{request_id:p.request_id,action:p.action,
-      user_id:Number(p.user_id),ok:false,text:'هذا الإجراء متاح للمطوّر فقط.'});
+    const response={request_id:p.request_id,action:p.action,
+      user_id:Number(p.user_id),ok:false,text:'هذا الإجراء متاح للمطوّر فقط.'};
+    if(p.action==='gift_subscription') {
+      Object.assign(response,giftResponseFields(p,{
+        ok:false,text:'هذا الإجراء متاح للمطوّر فقط.',
+      }));
+    }
+    await sendResult(message,response);
     return true;
   }
   const namespace='donate_console:'+p.request_id;
@@ -194,11 +387,18 @@ export async function handleDonateConsoleMessage(message) {
     const old=await db.select().from(legacyStates).where(eq(legacyStates.namespace,namespace)).get();
     if(Number(old?.payload?.user_id)!==Number(p.user_id)||old?.payload?.action!==p.action)return true;
     if(old.payload.status==='done'&&old.payload.response) {
-      try { await sendResult(message,old.payload.response); }
-      catch(error) {
-        await logBridgeIssue('RESPONSE_FILE_RESEND_FAILED',message,error);
-        throw error;
+      if(p.action==='gift_subscription'
+          &&old.payload.response.notification_sent!==true) {
+        await executeAndRespond(message,p,namespace);
+      } else {
+        try { await sendResult(message,old.payload.response); }
+        catch(error) {
+          await logBridgeIssue('RESPONSE_FILE_RESEND_FAILED',message,error);
+          throw error;
+        }
       }
+    } else if(p.action==='gift_subscription') {
+      await executeAndRespond(message,p,namespace);
     } else {
       // Never reexecute side effects after an uncertain processing crash. Make the
       // stuck state observable instead of silently leaving the caller waiting.
@@ -210,24 +410,6 @@ export async function handleDonateConsoleMessage(message) {
     }
     return true;
   }
-  let response={request_id:p.request_id,action:p.action,user_id:Number(p.user_id),ok:true};
-  try{response={...response,...await actionResponse(p)};}
-  catch(error){
-    console.warn('Donation console operation failed',p.action,error);
-    await logBridgeIssue('ACTION_FAILED_'+p.action,message,error);
-    response={...response,ok:false,text:'تعذر تنفيذ الطلب. افحص سجل اتصال البوتين وقاعدة المحرر.'};
-  }
-  await db.update(legacyStates).set({payload:{
-    status:'done',user_id:Number(p.user_id),action:p.action,response},updatedAt:now()})
-    .where(eq(legacyStates.namespace,namespace)).run();
-  try {
-    await sendResult(message,response);
-  } catch(error) {
-    console.error('Donation console response document could not be sent',{
-      request_id:p.request_id,action:p.action,chat_id:message?.chat?.id,
-    },error);
-    await logBridgeIssue('RESPONSE_FILE_SEND_FAILED_'+p.action,message,error);
-    throw error;
-  }
+  await executeAndRespond(message,p,namespace);
   return true;
 }

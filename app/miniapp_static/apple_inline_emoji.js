@@ -22,6 +22,7 @@
   let allFrame = 0;
   const editorFrames = new WeakMap();
   const failedTextNodes = new WeakSet();
+  const composingEditors = new WeakSet();
   const segmenter = typeof Intl?.Segmenter === "function"
     ? new Intl.Segmenter(undefined, {granularity:"grapheme"})
     : null;
@@ -391,13 +392,14 @@
   }
 
   function decorateEditor(editor) {
-    if (!editor?.isConnected || !editor.matches?.(EDITOR_SELECTOR)) return;
-    const snapshot = selectionSnapshot(editor);
+    if (
+      !editor?.isConnected
+      || !editor.matches?.(EDITOR_SELECTOR)
+      || composingEditors.has(editor)
+    ) return;
     decorateCustomEmoji(editor);
-    if (!emojiMap) {
-      restoreSelection(editor, snapshot);
-      return;
-    }
+    if (!emojiMap) return;
+    const snapshot = selectionSnapshot(editor);
     const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) {
@@ -421,9 +423,11 @@
   }
 
   function scheduleEditor(editor) {
-    if (!editor?.isConnected || editorFrames.has(editor)) return;
+    if (!editor?.isConnected || composingEditors.has(editor) || editorFrames.has(editor)) return;
     const frame = requestAnimationFrame(async () => {
       editorFrames.delete(editor);
+      if (composingEditors.has(editor)) return;
+      decorateEditor(editor);
       try {
         await loadCatalog();
         decorateEditor(editor);
@@ -432,10 +436,30 @@
     editorFrames.set(editor, frame);
   }
 
+  function editorForEventTarget(target) {
+    const editor = target?.matches?.(EDITOR_SELECTOR)
+      ? target
+      : target?.closest?.(EDITOR_SELECTOR);
+    return editor?.isContentEditable ? editor : null;
+  }
+
+  document.addEventListener("compositionstart", event => {
+    const editor = editorForEventTarget(event.target);
+    if (editor) composingEditors.add(editor);
+  });
+
+  document.addEventListener("compositionend", event => {
+    const editor = editorForEventTarget(event.target);
+    if (!editor) return;
+    composingEditors.delete(editor);
+    scheduleEditor(editor);
+  });
+
   function scheduleAll() {
     if (allFrame) return;
     allFrame = requestAnimationFrame(async () => {
       allFrame = 0;
+      document.querySelectorAll(EDITOR_SELECTOR).forEach(decorateEditor);
       try {
         await loadCatalog();
         document.querySelectorAll(EDITOR_SELECTOR).forEach(decorateEditor);

@@ -4,7 +4,12 @@ import vm from 'node:vm';
 
 // Dependency-free isolated V8 harness. Only Telegram API and DB I/O are mocked;
 // editor, rendering, localization, session TTL and undo/redo run real modules.
-export async function harness({ intl = Intl, extraModules = {} } = {}) {
+export async function harness({
+  intl = Intl,
+  extraModules = {},
+  moduleMocks = {},
+  queryHandler = null,
+} = {}) {
   const root = path.resolve(import.meta.dirname, '../../tgcloud');
   const context = vm.createContext({ console, Intl: intl, Date, Math, JSON, TextEncoder, setTimeout, clearTimeout, crypto: globalThis.crypto });
   const records = {};
@@ -15,7 +20,7 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
     records[name] = [];
     tables[name] = new Proxy({ _name: name }, { get: (target, prop) => prop === '_name' ? target._name : { table: name, key: prop } });
   }
-  const keys = { goldenBroadcasts:'month', goldenAnnouncements:'key', goldenCampaigns:'month', goldenClaims:'key', legacyStates:'namespace', miniappBridgeRequests:'requestId', editorSessions: 'userId', editorAlbumItems: 'key', maintenanceLocks: 'name', processedUpdates: 'updateId', requestWindows: 'key', richPages: 'pageId', usageUsers: 'userId', editorSubscriptions: 'userId', managedBotOrders: 'orderId', managedBotPayments: 'chargeId', managedBotLicenses: 'licenseId', brandingEntitlements: 'userId', brandingPreferences: 'userId', forumTopicDefaults: 'chatId' };
+  const keys = { goldenBroadcasts:'month', goldenAnnouncements:'key', goldenCampaigns:'month', goldenClaims:'key', legacyStates:'namespace', miniappBridgeRequests:'requestId', editorSessions: 'userId', editorAlbumItems: 'key', maintenanceLocks: 'name', processedUpdates: 'updateId', requestWindows: 'key', richPages: 'pageId', usageUsers: 'userId', userAliases: 'username', userAliasSyncs: 'userId', editorSubscriptions: 'userId', editorEntitlementEvents:'eventId', editorGiftEntitlements:'requestId', richDonateBridge:'key', managedBotOrders:'orderId', managedBotPayments:'chargeId', managedBotLicenses:'licenseId', brandingEntitlements:'userId', brandingPreferences:'userId', forumTopicDefaults:'chatId', subscriptionReminderScans:'id', subscriptionReminderDeliveries:'key' };
   const clone = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
   class BotApiError extends Error {
     constructor(code, description) {
@@ -25,6 +30,10 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
     }
   }
   const db = {
+    async all(query) {
+      if (!queryHandler) return [];
+      return clone(await queryHandler(query, { records }));
+    },
     async $count(table, predicate = () => true) {
       return records[table._name].filter(predicate).length;
     },
@@ -58,7 +67,11 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
         async run() {
           const list = records[table._name]; const key = keys[table._name];
           const existing = list.find(row => row[key] === values[key]);
-          if (existing) { if (conflict) Object.assign(existing, clone(conflict)); return []; }
+          const uniqueExisting = table._name === 'editorEntitlementEvents' && list.find(row =>
+            (values.purchaseOrderId && row.purchaseOrderId === values.purchaseOrderId)
+            || (values.purchaseChargeId && row.purchaseChargeId === values.purchaseChargeId)
+            || (values.refundOrderId && row.refundOrderId === values.refundOrderId));
+          if (existing || uniqueExisting) { if (existing && conflict) Object.assign(existing, clone(conflict)); return []; }
           list.push(clone(values)); return [clone(values)];
         } };
       return q;
@@ -73,13 +86,25 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
       if (apiState.profilePhotoError) throw new Error(apiState.profilePhotoError);
       return clone(apiState.profilePhotos?.[String(args?.user_id)] || { total_count: 0, photos: [] });
     }
+    if (method === 'getChat' && apiState.chatError) throw new Error(apiState.chatError);
     if (method === 'getChat' && apiState.chats?.[String(args?.chat_id)]) {
       return clone(apiState.chats[String(args.chat_id)]);
+    }
+    if (method === 'getChatMember' && apiState.memberErrors?.[String(args?.user_id)]) {
+      throw apiState.memberErrors[String(args.user_id)];
     }
     if (method === 'getChatMember' && apiState.members?.[String(args?.user_id)]) {
       return clone(apiState.members[String(args.user_id)]);
     }
     if (method === 'sendMessage' && apiState.messageSendErrors?.[String(args.chat_id)]) throw apiState.messageSendErrors[String(args.chat_id)];
+    if (method === 'sendDocument' && apiState.documentSendErrors) {
+      const errors = apiState.documentSendErrors;
+      if (Array.isArray(errors)) {
+        if (errors.length) throw errors.shift();
+      } else {
+        throw errors;
+      }
+    }
     if (method === 'getMe' && apiState.me) return clone(apiState.me);
     if (method === 'sendRichMessage' && apiState.richSendErrors?.[String(args.chat_id)]) {
       const errors = apiState.richSendErrors[String(args.chat_id)];
@@ -96,6 +121,14 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
     }
     if (method === 'getCustomEmojiStickers') return clone(apiState.customEmojiStickers || []);
     if (method === 'getFileContent') return apiState.fileContent || new Uint8Array();
+    if (method === 'copyMessage' && apiState.copyMessageErrors?.[String(args?.chat_id)]) {
+      const errors = apiState.copyMessageErrors[String(args.chat_id)];
+      if (Array.isArray(errors)) {
+        if (errors.length) throw errors.shift();
+      } else {
+        throw errors;
+      }
+    }
     if (method === 'editMessageText' && apiState.editError) throw new Error(apiState.editError);
     return { message_id: 100, chat: { id: 1 } };
   } });
@@ -110,7 +143,8 @@ export async function harness({ intl = Intl, extraModules = {} } = {}) {
     }
     return () => false;
   };
-  const mocks = { sdk: { api, BotApiError, db, InputFile: class InputFile {} }, 'sdk/db': { eq, lt, lte: (column,value) => row => row[column.key]<=value, asc: column => column, desc: column => column, gt: (column, value) => row => row[column.key] > value, gte: (column, value) => row => row[column.key] >= value, sql, and: (...parts) => row => parts.every(p => p(row)) }, schema: tables };
+  sql.raw = query => ({ query: String(query) });
+  const mocks = { ...moduleMocks, sdk: { api, BotApiError, db, InputFile: class InputFile { constructor(data,filename,options={}) { this.data=data;this.filename=filename;this.options=options; } } }, 'sdk/db': { eq, inArray: (column, values) => row => values.includes(row[column.key]), lt, lte: (column,value) => row => row[column.key]<=value, asc: column => column, desc: column => column, gt: (column, value) => row => row[column.key] > value, gte: (column, value) => row => row[column.key] >= value, sql, and: (...parts) => row => parts.every(p => p(row)) }, schema: tables };
   const modules = new Map();
   const load = (name) => {
     if (modules.has(name)) return modules.get(name);

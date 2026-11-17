@@ -13,7 +13,13 @@ import {
   normalizeBlockScrollOffset,
   richMessageDirection,
 } from 'lib/editor-blocks';
-import { resolveLanguage, t, tr } from 'lib/i18n';
+import {
+  checklistSettingsHint,
+  checklistTaskStateLabel,
+  resolveLanguage,
+  t,
+  tr,
+} from 'lib/i18n';
 import { buildSingleBlockRichMessage } from 'lib/editor-renderer';
 
 export function editorLanguage(languageCode) {
@@ -31,6 +37,7 @@ export function editorCopy(languageCode) {
     addBlock: t(locale, 'add_block'),
     pages: t(locale, 'pages'),
     preview: t(locale, 'ux.editor.preview'),
+    emptyRecovery: tr(locale, 'The previous editor panel stopped working. I opened a fresh editor panel and kept any existing blocks. You can continue editing or add blocks.'),
     undo: t(locale, 'editor.undo_button'),
     redo: t(locale, 'editor.redo_button'),
     tools: t(locale, 'editor.tools_button'),
@@ -231,7 +238,21 @@ export function blockEditorRichMessage(block, blocks, languageCode, userId = nul
   ].join('\n');
 
   try {
-    const preview = buildSingleBlockRichMessage(block, { userId });
+    const accountButton = block?.type === 'buttons'
+      ? (Array.isArray(block.data?.buttons) ? block.data.buttons : [])
+        .find((button) => /^tg:(?:\/\/)?user(?:[/?#]|$)/i.test(String(button?.url || '')))
+      : null;
+    const preview = accountButton
+      ? {
+          blocks: [{
+            type: 'paragraph',
+            text: tr(
+              locale,
+              'This account button uses a user-ID link that Telegram rejected. Edit it and select an account with a public @username.',
+            ),
+          }],
+        }
+      : buildSingleBlockRichMessage(block, { userId });
     return {
       ...preview,
       is_rtl: typeof preview?.is_rtl === 'boolean'
@@ -277,9 +298,10 @@ export function buildEditorKeyboard(session, languageCode) {
       inline_keyboard: [
         [{ text:copy.pages, callback_data:'r:pages' }],
         [
-          { text:copy.tools, callback_data:'r:tools', style:'success' },
+          { text:copy.tools, callback_data:'r:tools', style:'danger' },
           { text:copy.addBlock, callback_data:'r:addmenu', style:'primary' },
         ],
+        [{ text:copy.publish, callback_data:'r:post', style:'success' }],
       ],
     };
   }
@@ -316,9 +338,10 @@ export function buildEditorKeyboard(session, languageCode) {
     ]);
   }
   rows.push([
-    { text:copy.tools, callback_data:'r:tools', style:'success' },
+    { text:copy.tools, callback_data:'r:tools', style:'danger' },
     { text:copy.addBlock, callback_data:'r:addmenu', style:'primary' },
   ]);
+  rows.push([{ text:copy.publish, callback_data:'r:post', style:'success' }]);
   return { inline_keyboard: rows };
 }
 
@@ -351,11 +374,6 @@ export function buildEditorToolsKeyboard(languageCode, { canManage = false, incl
         { text: copy.pages, callback_data: 'r:pages' },
         { text: copy.manageButtons, callback_data: 'r:buttons' },
       ],
-      [{
-        text: copy.publish,
-        callback_data: 'r:post',
-        style: 'success',
-      }],
       [{ text: copy.back, callback_data: 'r:back' }],
     ],
   };
@@ -449,6 +467,9 @@ export function blockPage(block, blocks, languageCode) {
     const marker = String(item?.id) === String(block?.id) ? '◀️ ' : '';
     lines.push(marker + (position + 1) + '. ' + blockLabel(item?.type, languageCode));
   }
+  if (block.type === 'list' && String(block?.data?.kind || '') === 'checklist') {
+    lines.push('', checklistSettingsHint(languageCode));
+  }
   lines.push('', copy.chooseAction);
   return lines.join('\n');
 }
@@ -461,6 +482,24 @@ export function buildBlockEditorKeyboard(block, blocks, languageCode) {
   const linkedAnchor = block.type === 'anchor' && Boolean(anchorTargetId(block));
   const positionLabel = (position + 1) + '/' + ordered.length;
   const rows = [];
+
+  if (block.type === 'slideshow') {
+    rows.push([{
+      text: tr(resolveLanguage(languageCode), 'Add media to slideshow'),
+      callback_data: 'r:slides:edit:add:' + id,
+      style: 'primary',
+    }]);
+  } else if (
+    block.type === 'collage'
+    || QUOTE_TYPES.includes(String(block.type))
+    || ['photo', 'video', 'animation', 'audio', 'voice', 'document'].includes(String(block.type))
+  ) {
+    rows.push([{
+      text: t(resolveLanguage(languageCode), 'media.add_more'),
+      callback_data: 'r:media:edit:add:' + id,
+      style: 'primary',
+    }]);
+  }
 
   function containsCustomEmoji(value) {
     if (Array.isArray(value)) return value.some(containsCustomEmoji);
@@ -507,9 +546,12 @@ export function buildBlockEditorKeyboard(block, blocks, languageCode) {
       if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
       const checked = Boolean(item.is_checked);
       let label = String(item.text || (t(resolveLanguage(languageCode), 'list.unnamed_task')));
-      if (label.length > 48) label = label.slice(0, 47) + '…';
+      if (label.length > 36) label = label.slice(0, 35) + '…';
       rows.push([{
-        text: (checked ? '☑️ ' : '☐ ') + label,
+        text: (checked ? '☑️ ' : '☐ ')
+          + checklistTaskStateLabel(languageCode, checked)
+          + ': '
+          + label,
         callback_data: 'r:ct:' + id + ':' + index,
         ...(checked ? { style: 'success' } : {}),
       }]);
@@ -602,6 +644,23 @@ export function buildDetailsInnerBlockKeyboard(details, child, languageCode) {
   const locale = resolveLanguage(languageCode);
   const rows = [];
   if (child?.type !== 'divider') rows.push([{ text: t(locale, 'edit'), callback_data: 'r:die:' + prefix }]);
+  if (child?.type === 'slideshow') {
+    rows.push([{
+      text: tr(locale, 'Add media to slideshow'),
+      callback_data: 'r:dslides:edit:add:' + prefix,
+      style: 'primary',
+    }]);
+  } else if (
+    child?.type === 'collage'
+    || QUOTE_TYPES.includes(String(child?.type || ''))
+    || ['photo', 'video', 'animation', 'audio', 'voice', 'document'].includes(String(child?.type || ''))
+  ) {
+    rows.push([{
+      text: t(locale, 'media.add_more'),
+      callback_data: 'r:dmedia:edit:add:' + prefix,
+      style: 'primary',
+    }]);
+  }
   if (MEDIA_CAPTION_TYPES.includes(String(child?.type || ''))) {
     rows.push([
       { text: t(locale, 'media.edit_caption_button'), callback_data: 'r:dif:' + prefix + ':caption' },

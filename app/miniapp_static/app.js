@@ -281,7 +281,7 @@ window.withMiniAppWait=withWait;
 function escapeHtml(s){return String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]))}
 function stripHtml(s){return String(s??"").replace(/<[^>]*>/g,"").trim()}
 function uid(){return (crypto?.randomUUID?.()||`${Date.now()}${Math.random()}`).replaceAll("-","").slice(0,12)}
-function info(type){return BLOCKS.find(x=>x.type===type)||{type,icon:"generic",label:type,desc:"Block"}}
+function info(type){const kind=type==="text"?"paragraph":type;return BLOCKS.find(x=>x.type===kind)||{type:kind,icon:"generic",label:kind,desc:"Block"}}
 function normalizePositions(){current?.blocks?.forEach((b,i)=>b.position=i)}
 function autoGrow(el){el.style.height="auto";el.style.height=`${Math.max(38,el.scrollHeight)}px`}
 
@@ -315,7 +315,7 @@ function offlineDraftPayload(){
 function persistOfflineDraftNow(){
   const key=offlineDraftKey();if(!key||!current)return;
   const payload=offlineDraftPayload();
-  const meaningful=Boolean(payload?.blocks?.length||payload?.composer_text?.trim()||dirty);
+  const meaningful=Boolean(hasSavablePageContent()||payload?.composer_text?.trim()||dirty);
   if(!meaningful){clearOfflineDraft();return}
   try{localStorage.setItem(key,JSON.stringify(payload))}catch(_){}
 }
@@ -435,6 +435,7 @@ function savePerfQueue(queue){
 }
 let perfQueue=loadPerfQueue();
 let perfFlushTimer=null;
+let perfFlushPromise=null;
 function recordPerf(metric,durationMs=0){
   const name=String(metric||"").replace(/[^a-z0-9_.-]/gi,"").slice(0,48);
   if(!name)return;
@@ -445,21 +446,27 @@ function recordPerf(metric,durationMs=0){
   perfFlushTimer=setTimeout(()=>flushPerf(),5000)
 }
 async function flushPerf({keepalive=false}={}){
+  if(perfFlushPromise)return perfFlushPromise;
   if(!perfQueue.length||!tg?.initData||navigator.onLine===false)return;
   const batch=perfQueue.slice(0,30);
-  try{
-    const response=await fetch("/miniapp/api/performance",{
-      method:"POST",
-      headers:{"X-Telegram-Init-Data":tg.initData,"Content-Type":"application/json"},
-      body:JSON.stringify({samples:batch}),
-      cache:"no-store",
-      credentials:"same-origin",
-      keepalive:Boolean(keepalive),
-    });
-    if(!response.ok)return;
-    perfQueue.splice(0,batch.length);savePerfQueue(perfQueue);
-    if(perfQueue.length&&!keepalive)setTimeout(()=>flushPerf(),1200)
-  }catch(_){}
+  const request=(async()=>{
+    try{
+      const response=await fetch("/miniapp/api/performance",{
+        method:"POST",
+        headers:{"X-Telegram-Init-Data":tg.initData,"Content-Type":"application/json"},
+        body:JSON.stringify({samples:batch}),
+        cache:"no-store",
+        credentials:"same-origin",
+        keepalive:Boolean(keepalive),
+      });
+      if(!response.ok)return;
+      perfQueue.splice(0,batch.length);savePerfQueue(perfQueue);
+      if(perfQueue.length&&!keepalive)setTimeout(()=>flushPerf(),1200)
+    }catch(_){}
+  })();
+  perfFlushPromise=request;
+  try{await request}
+  finally{if(perfFlushPromise===request)perfFlushPromise=null}
 }
 window.RichMiniAppPerf=Object.freeze({
   start:()=>performance.now(),
@@ -483,11 +490,46 @@ function canEditCurrent(){
 function newDraft({preserveOffline=false}={}){
   if(!preserveOffline)clearOfflineDraft();
   selectedTableCell=null;activeTablePanId=null;syncTableHeaderPan();
-  current={page_id:null,title:mt("editor.untitled"),blocks:[],buttons:[],buttons_per_row:1,buttons_align:"center"};
+  current={page_id:null,title:mt("editor.untitled"),blocks:[defaultBlock("paragraph")],buttons:[],buttons_per_row:1,buttons_align:"center"};
   pageTitle.disabled=false;slashInput.disabled=false;
   pageTitle.value=current.title;selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
   mutationVersion+=1;
   renderBlocks();updateSaveState(mt("editor.unsaved"));pushHistory();hideMenus();closeSheets();
+}
+function miniAppDraftToken(){
+  try{
+    const params=new URLSearchParams(location.search);
+    const start=String(tg?.initDataUnsafe?.start_param||params.get("tgWebAppStartParam")||"");
+    const match=start.match(/^draft_([a-f0-9]{32})$/);
+    return match?.[1]||"";
+  }catch(_){return ""}
+}
+function openImportedMiniAppDraft(draft){
+  try{
+    if(!Array.isArray(draft?.blocks)||!draft.blocks.length)throw new Error("Imported draft is empty");
+    current={
+      page_id:null,
+      title:mt("editor.untitled"),
+      blocks:copySessionValue(draft.blocks),
+      buttons:copySessionValue(draft.buttons||[]),
+      buttons_per_row:Number(draft.buttons_per_row||1),
+      buttons_align:String(draft.buttons_align||"center"),
+    };
+    normalizePositions();
+    pageTitle.disabled=false;slashInput.disabled=false;
+    pageTitle.value=current.title;slashInput.value="";
+    selectedBlockId=null;insertIndex=null;dirty=false;history=[];future=[];
+    mutationVersion+=1;
+    renderBlocks();updateSaveState(mt("save.new_draft"));pushHistory();hideMenus();closeSheets();
+  }catch(error){
+    try{
+      window.RichMiniAppErrors?.report?.(error,{
+        source:"miniapp.imported_draft.render",
+        block_count:Array.isArray(draft?.blocks)?draft.blocks.length:0,
+      });
+    }catch(_){}
+    throw error;
+  }
 }
 
 function captureBlockLayout(){
@@ -574,7 +616,12 @@ function updateSaveState(text,{saving=false,saved=false}={}){
     setTimeout(()=>saveState.classList.remove("is-saved"),500);
   }
 }
-function hasSavablePageContent(){return Array.isArray(current?.blocks)&&current.blocks.length>0}
+function hasSavablePageContent(){
+  const blocks=current?.blocks;
+  if(!Array.isArray(blocks)||!blocks.length)return false;
+  if(current.page_id||blocks.length>1)return true;
+  return blocks[0].type!=="paragraph"||Boolean(blockText(blocks[0]).trim());
+}
 function emptyPageSaveError(){
   const error=new Error(mt("send.add_content"));
   error.code="EMPTY_PAGE";
@@ -712,7 +759,7 @@ function detailsEditor(block){
 }
 
 function listEditor(block){
-  const ta=document.createElement("textarea");ta.className="block-editor";const d=block.data||(block.data={});ta.value=(d.items||[]).map(item=>typeof item==="object"?(item.text||""):String(item)).join("\n");ta.placeholder=mt("list.item_placeholder");ta.addEventListener("focus",()=>selectBlock(block.id));ta.addEventListener("input",()=>{const lines=ta.value.split("\n").filter(x=>x.length);d.items=lines.map((text,i)=>d.kind==="checklist"?{text,has_checkbox:true,is_checked:false}:d.kind==="numbered"?{text,value:i+1,type:"1"}:{text});d.text=ta.value;const tag=d.kind==="numbered"?"ol":"ul";d.html=`<${tag}>${lines.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</${tag}>`;autoGrow(ta);markDirty()});requestAnimationFrame(()=>autoGrow(ta));return ta
+  const ta=document.createElement("textarea");ta.className="block-editor";const d=block.data||(block.data={});  ta.value=(d.items||[]).map(item=>typeof item==="object"?(item.text||""):String(item)).join("\n");ta.placeholder=mt("list.item_placeholder");ta.addEventListener("focus",()=>selectBlock(block.id));ta.addEventListener("input",()=>{const lines=ta.value.split("\n").filter(x=>x.length);const previous=Array.isArray(d.items)?d.items:[];d.items=lines.map((text,i)=>d.kind==="checklist"?{text,has_checkbox:true,is_checked:Boolean(previous[i]?.is_checked)}:d.kind==="numbered"?{text,value:i+1,type:"1"}:{text});d.text=ta.value;const tag=d.kind==="numbered"?"ol":"ul";d.html=`<${tag}>${lines.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</${tag}>`;autoGrow(ta);markDirty()});requestAnimationFrame(()=>autoGrow(ta));return ta
 }
 
 function nativeTableCellForMiniApp(raw){
@@ -721,6 +768,64 @@ function nativeTableCellForMiniApp(raw){
   delete cell.rich_text;delete cell.html;delete cell._previous_align;
   return cell
 }
+function miniAppTableRows(block){
+  const data=block?.data;
+  if(!data||typeof data!=="object"||Array.isArray(data))return [];
+  const native=data.native_data;
+  const nativeRows=Array.isArray(native?.cells)?native.cells:[];
+  if(Array.isArray(data.rows)&&(data.rows.length||!nativeRows.length))return data.rows;
+  data.rows=nativeRows.map(row=>Array.isArray(row)?row.map(raw=>{
+    const cell=raw&&typeof raw==="object"&&!Array.isArray(raw)?copySessionValue(raw):{text:String(raw??"")};
+    const richText=cell.rich_text??(cell.text&&typeof cell.text==="object"?cell.text:null);
+    if(richText!==null&&richText!==undefined&&!cell.html){
+      cell.html=window.RichInlineTextTools?.richTextToHtml?.(richText)||"";
+    }
+    return cell
+  }):[]);
+  if(data.is_bordered==null&&native?.is_bordered!=null)data.is_bordered=Boolean(native.is_bordered);
+  if(data.is_striped==null&&native?.is_striped!=null)data.is_striped=Boolean(native.is_striped);
+  if(data.is_compact==null&&native?.is_compact!=null)data.is_compact=Boolean(native.is_compact);
+  return data.rows
+}
+window.RichMiniAppTableRows=miniAppTableRows;
+function miniAppQuoteMedia(block){
+  const data=block?.data;
+  if(!data||typeof data!=="object"||Array.isArray(data))return [];
+  const mediaTypes={photo:"photo",video:"video",animation:"animation",audio:"audio",voice:"voice",voice_note:"voice",document:"document"};
+  const media=[];
+  const append=(raw,path)=>{
+    if(!raw||typeof raw!=="object"||Array.isArray(raw))return;
+    const rawType=String(raw.type||"");
+    const type=mediaTypes[rawType]||"";
+    if(!type)return;
+    const field=rawType==="voice"?"voice_note":rawType;
+    let file=raw.data?.file||raw.file||raw[field]||raw[type];
+    if(Array.isArray(file))file=file.at(-1);
+    if(!file||typeof file!=="object"||Array.isArray(file)||!file.file_id)return;
+    media.push({
+      id:`${String(block.id||"quote")}:media:${path}`,
+      type,
+      data:{file:copySessionValue(file),has_spoiler:Boolean(raw.has_spoiler||raw.data?.has_spoiler)},
+    });
+  };
+  if(Array.isArray(data.media_children)){
+    data.media_children.forEach((child,index)=>append(child,index));
+    return media;
+  }
+  const visit=(children,prefix="")=>{
+    if(!Array.isArray(children))return;
+    children.forEach((child,index)=>{
+      const path=prefix?`${prefix}.${index}`:String(index);
+      append(child,path);
+      if(["collage","slideshow","details"].includes(String(child?.type||""))){
+        visit(child.blocks,path);
+      }
+    });
+  };
+  visit(data.native_data?.blocks);
+  return media;
+}
+window.RichMiniAppQuoteMedia=miniAppQuoteMedia;
 function syncNativeTableData(block){
   if(block?.type!=="table")return;
   const d=block.data;
@@ -758,7 +863,7 @@ function tableEditor(block){
   viewport.setAttribute("aria-label",ar?"جدول قابل للتمرير أفقياً وعمودياً":"Scrollable editable table");
   const table=document.createElement("table");
   table.className="table-edit-grid";
-  const rows=Array.isArray(block.data?.rows)?block.data.rows:[];
+  const rows=miniAppTableRows(block);
   const head=document.createElement("thead");
   const body=document.createElement("tbody");
   rows.forEach((row,ri)=>{
@@ -881,7 +986,7 @@ function renderBlocks(){
   (current?.blocks||[]).forEach((block,index)=>{
     const article=document.createElement("article");article.className=`block${selectedBlockId===block.id?" selected":""}`;article.dataset.id=block.id;
     const row=document.createElement("div");row.className="block-row";const main=document.createElement("div");main.className="block-main";let editor;
-    if(["paragraph","heading","footer","preformatted","blockquote","pullquote","anchor","mathematical_expression"].includes(block.type))editor=textEditor(block);
+    if(["paragraph","text","heading","footer","preformatted","blockquote","pullquote","anchor","mathematical_expression"].includes(block.type))editor=textEditor(block);
     else if(block.type==="details")editor=detailsEditor(block);
     else if(block.type==="list")editor=listEditor(block);
     else if(block.type==="table")editor=tableEditor(block);
@@ -1310,6 +1415,17 @@ async function boot(){
     window.RichMiniAppAccess={
       userId:currentUserId,
       isDeveloper:Boolean(meData?.is_developer),
+      plan:typeof meData?.plan==="string"?meData.plan:null,
+      limits:meData?.limits&&typeof meData.limits==="object"?{
+        text:meData.limits.text??null,
+        emojiPacks:meData.limits.emoji_packs??null,
+        savedPages:meData.limits.saved_pages??null,
+        blocks:meData.limits.blocks??null,
+        nestingDepth:meData.limits.nesting_depth??null,
+        mediaAttachments:meData.limits.media_attachments??null,
+        tableColumns:meData.limits.table_columns??null,
+        tableRows:meData.limits.table_rows??null,
+      }:null,
       customEmojiPackLimit:meData?.limits?.custom_emoji_packs==null?null:Math.max(0,Number(meData.limits.custom_emoji_packs)||0),
       customEmojiPacks:Array.isArray(meData?.custom_emoji_packs)?meData.custom_emoji_packs.map(name=>String(name||"")).filter(Boolean):[],
       customEmojiPackCount:Math.max(0,Number(meData?.custom_emoji_pack_count||0)),
@@ -1348,8 +1464,15 @@ async function boot(){
     setPagesSnapshot(pages);
 
     const resumeTarget=String(window.RichMiniAppResume?.initialPage||"");
-    const restored=await restoreOfflineDraft(pages);
-    if(!restored&&!resumeTarget&&!current)newDraft({preserveOffline:true});
+    const draftToken=miniAppDraftToken();
+    if(draftToken){
+      const imported=await api(`/miniapp/api/drafts/${encodeURIComponent(draftToken)}`);
+      openImportedMiniAppDraft(imported?.draft);
+      try{history.replaceState(null,"",location.pathname)}catch(_){}
+    }else{
+      const restored=await restoreOfflineDraft(pages);
+      if(!restored&&!resumeTarget&&!current)newDraft({preserveOffline:true});
+    }
     recordPerf("boot",performance.now()-APP_BOOT_STARTED);
     flushPerf();
     waitOverlay?.hide();

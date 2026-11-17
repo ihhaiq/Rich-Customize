@@ -1,11 +1,12 @@
-// Separate timer ONLY: rich editor and subscriber data stay in Telegram Serverless.
-// The per-minute trigger serves scheduled jobs. The daily trigger starts ONE
-// subscription scan cycle; unfinished batches queue targeted RCB1 due jobs.
+// Rich editor, subscriber, broadcast content and recipient data stay in Telegram Serverless.
+// Per-minute triggers carry due-job reminders and an ID/time-only broadcast tick.
+// The daily trigger starts ONE subscription scan cycle; unfinished batches queue RCB1 jobs.
 import { dispatchDueReminders } from '../../functions/_lib/scheduling-reminders.js';
 import { reserveBridgeSlot } from '../../functions/_lib/b2b-bridge.js';
 
 const BRIDGE_CHAT_ID = -1003993506865;
 const MINUTE_CRON = '* * * * *';
+const RICH_DONATE_SYNC_CRON = '*/10 * * * *';
 const SUBSCRIPTIONS_DAILY_CRON = '0 9 * * *'; // 09:00 UTC, once daily.
 
 export default {
@@ -40,9 +41,28 @@ export default {
       return;
     }
 
+    if (event.cron === RICH_DONATE_SYNC_CRON) {
+      await dispatch('/rcb_rdb_tick@RichCustomizebot\n' + JSON.stringify({
+        protocol: 'RCB1',
+        kind: 'richdonate_sync',
+        minute: Math.floor(Date.now() / 60000),
+      }));
+      console.log('Rich Donate B2B sync requested');
+      return;
+    }
+
     if (event.cron === MINUTE_CRON) {
       const outcome = await dispatchDueReminders(env.DB, dispatch, Math.floor(Date.now() / 1000), 10);
       console.log('Schedule reminders', outcome.claimed, outcome.delivered);
+      try {
+        await dispatch('/rcb_broadcast_tick@RichCustomizebot\n' + JSON.stringify({
+          protocol: 'RCB1',
+          kind: 'broadcast',
+          minute: Math.floor(Date.now() / 60000),
+        }));
+      } catch (error) {
+        console.warn('Broadcast Cron relay failure', String(error?.message || error).slice(0, 120));
+      }
       return;
     }
 

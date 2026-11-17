@@ -206,9 +206,14 @@ test('final Free message charges generated branding and navigation to the actual
     userId:999999,navigationButtons:[{text:'Open',url:'https://example.com'}],
   }),/EDITOR_LIMIT:blocks:51:50/);
   const plus=h.policy.resolveEditorEntitlement({plan:'plus',active:true});
-  assert.equal(h.renderer.buildInputRichMessage(fifty,{
+  const branded=h.renderer.buildInputRichMessage(fifty,{
     userId:999999,includeBranding:true,entitlement:plus,
-  }).blocks.length,51);
+  });
+  assert.equal(branded.blocks.length,51);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(branded.blocks.at(-1))),
+    {type:'footer',text:'@RichCustomizebot'},
+  );
   assert.equal(h.renderer.buildInputRichMessage(fifty,{
     userId:h.access.DEVELOPER_IDS[0],includeBranding:true,
   }).blocks.length,51);

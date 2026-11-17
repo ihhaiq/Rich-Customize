@@ -1,3 +1,476 @@
+## 2026-11-18 — إضافة فحص تقدم إذاعة المطور
+
+- **السبب:** لوحة المطور تعرض أعداد الإذاعة دون نسبة تقدم أو إجراء مباشر لفحص حالة الإذاعة الحالية.
+- **التغيير:** إضافة زر خاص يفحص أحدث حالة للإذاعة ويرسل للمطور تقريراً خاصاً بعدد المستهدفين، ونسبة ومعيار التقدم، والمقبول والفاشل وغير المؤكد والمتبقي، مع إمكانية تحديث التقرير. لا يتغير سلوك الإرسال أو إعادة المحاولة.
+- **الملفات:** `tgcloud/lib/developer.js`, `tests/serverless/developer-panel.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح `node --check` للملفين المعدلين، والاختبار المركز `tests/serverless/developer-panel.test.mjs` (15/15)، و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram Serverless/Cloudflare، ولا Migration أو تعديل بيانات إنتاج.
+
+## 2026-11-18 — نشر إصلاح إضافة الإيموجي إلى Telegram Cloud
+
+- **التغيير:** نُشر تحديث Mini App الذي يتحقق من قائمة الحزم المحفوظة قبل الإضافة مجدداً بعد تعذر النقل. اقتصر الرفع على ملف المحوّل وملف HTML الذي يحدّث رقم النسخة؛ لم تُرفع وحدات Telegram Serverless.
+- **الملفات المرفوعة:** `app/miniapp_static/apple_emoji_picker.js`, `app/miniapp_static/editor.html`.
+- **التحقق:** رفع Telegram Cloud ملفين (89.4 KB). أظهر `tgcloud status` المراجعة 189 و70 ملفاً ثابتاً «Up to date». جُلبت النسخة الحية من `apple_emoji_picker.js` و`editor.html` وتأكد وجود تعديل الاستعادة ورقم النسخة `0.3.87`.
+- **GitHub/النشر:** نُشر Mini App إلى Telegram Cloud فقط؛ لا commit أو push إلى GitHub، ولا نشر Cloudflare أو تغيير في وحدات Serverless.
+
+## 2026-11-17 — استعادة إضافة حزمة الإيموجي بعد فشل النقل
+
+- **السبب:** قد ينقطع رد إضافة حزمة الإيموجي بعد أن يسجلها Serverless؛ إعادة المحاولة مباشرة لا تتحقق من الحالة المحفوظة أولاً.
+- **التغيير:** قبل الإضافة، يحدّث Mini App قائمة الحزم الموثوقة؛ إذا كانت الحزمة المطلوبة مسجلة بالفعل، يستعيد بياناتها ويعرضها بدلاً من إرسال إضافة مكررة. بقي حد Free للمرفقات 10 كما هو؛ محاولة 11 مرفقاً تتجاوز الحد ولا تمثل عطلاً.
+- **الملفات:** `app/miniapp_static/apple_emoji_picker.js`, `app/miniapp_static/editor.html`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `tests/serverless/miniapp-custom-emoji.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت `npm.cmd run test:ci` (461/461 اختباراً، فحص الخطة، و60 أصل Mini App) و`git diff --check`. محاكاة محلية فقط.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push. لم يُنشر Mini App على Cloudflare أو Telegram Serverless.
+
+## 2026-11-17 — منع اضطراب الكتابة أثناء تحرير النص في Mini App
+
+- **السبب:** كان محوّل الإيموجي يعيد ضبط تحديد النص حتى عندما لم يكن كتالوج الإيموجي جاهزاً ولم يتغير محتوى المحرر. إعادة التحديد بعد كل إدخال تقطع تركيب لوحة المفاتيح على الهاتف وقد تكرر الحروف أو تفسد الكتابة والحذف.
+- **التغيير:** إلغاء أي استعادة لموضع المؤشر قبل تحميل الكتالوج، وتعطيل تحويل النص أثناء تركيب IME وإعادة جدولته بعد انتهائه. حُدّث رقم نسخة ملف المحوّل لتفادي cache قديم.
+- **الملفات:** `app/miniapp_static/apple_inline_emoji.js`, `app/miniapp_static/editor.html`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت `npm.cmd run test:ci` (فحوص الخطة و60 أصل Mini App و460/460 اختباراً)، والاختبارات المركزة (10/10)، و`node --check` و`git diff --check`. لا يغني الاختبار المحلي عن تجربة الكتابة والحذف على Android Telegram WebView.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push. لم يُنشر Mini App على Cloudflare؛ يلزم النشر وقبول الكتابة والحذف على Android Telegram WebView.
+
+## 2026-11-17 — استكمال تقرير نتائج إذاعة المطور
+
+- **السبب:** كان البث يعرض أعداداً إجمالية فقط ولا يحتفظ بمعرّف كل مستلم تعذر الوصول إليه أو نتيجة إرساله الملتبسة؛ كما لم يكن تقرير الإنهاء مضموناً عند تعذر إرسال إشعار المطور.
+- **التغيير:** توحيد جمهور العدّ والإرسال ليشمل معرّفات الاستخدام والاشتراكات والهدايا ومالكي الصفحات وجلسات المحرر. حفظ نتائج الفشل/الالتباس على دفعات قابلة للاستعادة، ثم إرسال ملخص خاص وقائمة TXT بمعرّف كل مستخدم وسبب التعذر. يعاد إرسال التقرير بعد أخطاء Telegram مع تسجيلها في قناة الأخطاء، وتنتج الإذاعة الملغاة أو المتوقفة بسبب رسالة المصدر تقريراً نهائياً أيضاً. لا يُحفظ محتوى الرسالة داخل التقرير. بقي حد الإرسال 20 مستلماً في الدقيقة؛ مليون مستلم يعني نظرياً نحو 34.7 يوماً متواصلة قبل احتساب إعادة المحاولة، وليس ذلك ادعاءً عن سعة الإنتاج.
+- **الملفات:** `tgcloud/lib/developer.js`, `tests/serverless/developer-panel.test.mjs`, `tests/serverless/harness.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت الاختبارات المركزة للبث والتقرير والإلغاء (7/7)، و`npm.cmd test` (459/459)، وفحوص `node --check` للملفات المعدلة و`git diff --check`. الاختبارات محاكاة محلية؛ لا تثبت قبول Telegram الفعلي أو أداء قاعدة الإنتاج.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push. لم يُنشر Telegram Serverless أو Worker، ولم تُنفذ Migration أو عمليات إنتاج. المالك سيتولى النشر والتحقق الحي.
+
+## 2026-11-17 — قبول الرسائل المحوّلة وإصلاح عرض اقتباسات Mini App
+
+- **السبب:** مسار بث المطور لا يعتبر `rich_message` وحده محتوى قابلاً للنسخ، فتُرفض بعض الرسائل المنسقة المحوّلة من مستخدم أو بوت أو قناة. كما أن تنظيف HTML في Mini App كان يحذف فواصل فقرات الاقتباس، وفشل فتح المسودة كان يُلتقط دون إرساله إلى قناة الأخطاء.
+- **التغيير:** قبول الرسائل الغنية المحوّلة مع نسخها من محادثة المطور الخاصة للحفاظ على تنسيق Telegram أياً كان مصدر التحويل. ربط رفض/تعذر نسخ المصدر وأخطاء تسليم البث غير المتوقعة بسجل الأخطاء مع معرفات وسياق محدودين دون محتوى الرسالة. يحافظ تنظيف HTML على فواصل الكتل كأسطر مع بقاء تنظيف الوسوم والروابط، وتُرسل أخطاء فتح/عرض المسودة إلى مرحّل أخطاء Mini App. تحديث cache-busting للملفات الثابتة.
+- **الملفات:** `tgcloud/lib/developer.js`, `app/miniapp_static/app.js`, `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/editor.html`, `tests/serverless/developer-panel.test.mjs`, `tests/serverless/channel-post-edit-import.test.mjs`, `tests/serverless/miniapp-inline-button-selection.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `md_files/log.md`.
+- **التحقق:** نجح `npm.cmd run test:ci` (فحوص الخطة و60 أصل Mini App، و456/456 اختباراً)، والاختبارات المركزة للبث واستيراد Mini App (32/32)، و`node --check` و`git diff --check`. لم تُضف وحدة runtime جديدة.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push. لم يُنشر Telegram Serverless أو Mini App، ولا يثبت الاختبار المحلي سلوك Bot API أو العرض داخل Telegram فعلياً.
+
+## 2026-11-17 — تحسين إحصاءات المستخدمين وإضافة إذاعة المطور
+
+- **السبب:** عرض أعداد المستخدمين بتمييز أوضح، وإتاحة إرسال إعلان منسق إلى الحسابات التي يعرفها البوت دون نقل محتوى الرسالة أو جمهورها إلى Cloudflare.
+- **التغيير:** إضافة تفاصيل «بدأوا الخاص» مقابل السجلات القديمة غير المؤكدة، وعدّ صفحات المستخدمين في استعلام مجمّع. لوحة المطور تقبل رسالة نصية منسقة أو وسيطاً قابلاً للنسخ وتطلب تأكيد العدد قبل الإرسال؛ تحفظ Serverless المحتوى والمؤشر والجمهور، ويعالج Worker دفعة من 20 حساباً في الدقيقة بإشارة RCB1 تحمل رقم الدقيقة فقط. أضيفت حالات إيقاف/تقرير، وتأجيل 429، وإظهار الإرسال الملتبس كغير مؤكد بدلاً من إعادة المحاولة العمياء.
+- **حدود معروفة:** الجمهور اتحاد معرّفات الاستخدام والاشتراكات والهدايا وقت التأكيد، ويشمل سجلات قديمة قد تكون تفاعلت في مجموعة فقط. `private_seen_at` لا يصنف التاريخ بأثر رجعي. قبول Telegram لا يثبت التسليم أو القراءة؛ لا توجد اختبارات حمل/تحمل أو تحقق إنتاجي.
+- **الملفات:** `tgcloud/lib/developer.js`, `tgcloud/lib/miniapp-bridge.js`, `tgcloud/lib/usage-stats.js`, `tgcloud/lib/admin-stats.js`, `tgcloud/schema.js`, `tgcloud/handlers/message.js`, `tgcloud/handlers/callback_query.js`, `workers/schedule-reminders/worker.js`, `tests/serverless/developer-panel.test.mjs`, `tests/serverless/user-stats.test.mjs`, `tests/serverless/rich-donate-b2b.test.mjs`, `tests/serverless/subscription-schedule.test.mjs`, `tests/serverless/harness.mjs`, `md_files/docs/scheduling.md`, `md_files/log.md`.
+- **التحقق:** نجح `npm.cmd run test:ci` (452/452؛ فحوص الخطط و60 أصل Mini App)، واختبارات البث والجسر المستهدفة (20/20)، وفحوص `node --check` للملفات runtime المعدلة و`git diff --check`. عدد وحدات Serverless لم يزد؛ لم تُضف وحدة جديدة.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push. لم تُطبّق Migration حقل `private_seen_at` والفهرس، ولم يُنشر Serverless أو Worker؛ لا يمكن استخدام الميزة قبل الترحيل والنشر والتحقق الحي. لا تغيير مطلوب في عقد أو مستودع `ihhaiq/richDonate`.
+
+## 2026-11-17 — الحفاظ على أزرار callback عند تعديل منشور قناة
+
+- **السبب:** عند تحويل منشور قناة، قد لا يتضمن التحديث المُحوّل لوحة الأزرار الأصلية. كان مسار تعديل المنشور يرسل لوحة فارغة فيحذف أزرار `CBD` و`callback_data` الأصلية.
+- **التغيير:** حفظ لقطة داخلية لأزرار المنشور المستوردة، وعدم إرسال `reply_markup` ما دامت الأزرار لم تتغير؛ Telegram يبقي اللوحة الحالية عند تعديل النص دون تمريرها. إذا عدّل المستخدم الأزرار، تُرسل اللوحة الجديدة بقيم callback كما أدخلها. لا تُعاد بيانات الأزرار الأصلية في طلب تعديل النص ما دامت دون تغيير، ولا تُضاف إلى رسائل أو سجلات.
+- **الملفات:** `tgcloud/lib/editor-core.js`, `tests/serverless/channel-post-edit-import.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت اختبارات مسار منشورات القنوات المستهدفة (19/19)؛ يشمل ذلك عدم حذف لوحة غير موجودة في النسخة المحوّلة، عدم إعادة إرسال callbacks دون تعديل، وتطبيق callback المعدّل كما هو. لم يُنشر التغيير.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram Serverless أو migration.
+
+## 2026-11-17 — فتح المنشور المحوّل في التطبيق المصغر كمسودة
+
+- **السبب:** كان تحويل منشور القناة يتيح فتحه في محرر البوت أو استيراده، دون خيار استخدام واجهة Mini App.
+- **التغيير:** إضافة زر «فتح في التطبيق المصغر» إلى خيارات منشور القناة. يمرر الرابط رمزاً عشوائياً قصير الصلاحية فقط؛ يتحقق Serverless من هوية Telegram والمالك والرمز قبل إعادة محتوى المسودة، ثم يفتح Mini App المحتوى بعنوان «بدون عنوان» ومن دون `page_id` أو حفظ تلقائي. يستمر التطبيق في تحميل الصفحات المحفوظة عند بدء التشغيل، وتبقى صلاحية الرمز ١٥ دقيقة. أضيفت ترجمات الزر للغات المدعومة دون تعديل مخطط البيانات أو إنشاء وحدة runtime جديدة.
+- **الملفات:** `tgcloud/lib/editor-core.js`, `tgcloud/lib/miniapp-bridge.js`, `tgcloud/lib/i18n.js`, `app/miniapp_static/app.js`, `app/miniapp_static/miniapp_serverless_api.js`, `app/miniapp_static/editor.html`, `tests/serverless/channel-post-edit-import.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `md_files/log.md`.
+- **التحقق:** نجحت الاختبارات المستهدفة (22/22) ومجموعة Serverless الكاملة `npm.cmd test` (444/444)، و`npm.cmd run check:miniapp` (60 asset)، وفحوص `node --check` و`git diff --check`. عدد وحدات Telegram Serverless هو 98 من 100.
+- **GitHub/النشر:** لا commit أو push لـGitHub. حاولنا `tgcloud push` للملفات الثلاثة المعدلة ونسخة Mini App المبنية؛ رفض CLI تمرير ملفات static منفردة، ثم انتهت مهلة الاتصال بـ`https://cloud.telegram.org` قبل إتمام الرفع. أكد `tgcloud status` بقاء Local revision 183 وثلاثة ملفات Serverless وثلاثة أصول Mini App كتغييرات معلقة. لا migration أو نشر Cloudflare؛ يلزم إعادة المحاولة عند عودة اتصال Telegram Cloud.
+
+## 2026-11-16 — تفكيك معالج إجراءات منشور القناة
+
+- **السبب:** كان `handleEditorChannelPostCallback` يجمع التحقق من الرسالة والصلاحيات ومسارات الاختيار والإغلاق والتأكيد وتعديل المنشور في دالة طويلة متشعبة؛ يصعّب ذلك مراجعة كل انتقال وحماية ترتيب التحقق.
+- **التغيير:** فصل توجيه الأزرار والتحقق من معرّف الرسالة ومسارات الإغلاق/الاستيراد/التأكيد/التطبيق إلى دوال صغيرة، مع إبقاء ترتيب التحقق من الصلاحيات وتحديثات الجلسة وطلبات Telegram كما كان. صار المعالج الرئيسي ٤١ سطراً، وأطول مسار مساعد ٥٤ سطراً. لم تُضف وحدة أو تتغير واجهات التخزين/API.
+- **الملفات:** `tgcloud/lib/editor-core.js`, `md_files/log.md`.
+- **التحقق:** نجحت اختبارات مسار منشورات القنوات (15/15)، ومجموعة Serverless الكاملة `npm.cmd test` (442/442)، و`node --check tgcloud/lib/editor-core.js` و`git diff --check`. عدد وحدات Telegram Serverless بقي 98 من 100.
+- **GitHub/النشر:** تغيير محلي فقط؛ لا commit أو push أو نشر Telegram Serverless.
+
+## 2026-11-16 — توضيح إدخال وتبديل حالات قائمة المهام
+
+- **السبب:** لم يكن واضحاً للمستخدم كيف يضيف مهمة منجزة، كما لم تبيّن أزرار إعدادات البلوك حالة كل مهمة بوضوح.
+- **التغيير:** توضيح أن كل مهمة تُكتب في سطر، وأن المهمة المنجزة تبدأ بـ`[x]` أو `✅` أو `☑️`، عند إنشاء القائمة أو تعديلها. إضافة تلميح إعدادات يشرح الضغط على زر المهمة للتبديل؛ الأزرار تعرض «منجزة/غير منجزة» في النص، وتظهر المنجزة باللون الأخضر مع بقاء الرسالة قائمة مهام أصلية.
+- **الملفات:** `tgcloud/lib/i18n.js`, `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/editor-block-ui.js`, `tests/serverless/checklist.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت اختبارات قائمة المهام (3/3)، ومجموعة Serverless الكاملة `npm.cmd test` (442/442)، وفحصا `npm.cmd run check:plans` و`npm.cmd run check:miniapp` (60 asset)، وفحوص `node --check` و`git diff --check`. عدد وحدات Telegram Serverless هو 98 من 100.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram Serverless. يلزم نشر كود Serverless لرؤية الإرشادات والأزرار المعدلة في البوت.
+
+## 2026-11-16 — تصحيح عرض قائمة المهام وإزالة زر الحالة غير الصالح
+
+- **السبب:** أُضيف زر غني داخل RichText لعنصر القائمة، وهو ليس طريقة صالحة لتغيير حالة checklist في Rich Message؛ كما أُزيلت حقول `has_checkbox` و`is_checked` من الحمولة. أدى الضغط على الزر إلى تمرير بنية Rich Message غير صالحة ورفضها Telegram (`Can't find field "type"`)، وتحولت القائمة إلى نص وأزرار خلاف المطلوب.
+- **التغيير:** إبقاء القائمة كنوع `list` أصلي وتمرير `has_checkbox` و`is_checked` دون تعديل، وإزالة callbacks التي تعدّل الرسالة المنشورة. تبديل الحالة يظل من إعدادات البلوك (`r:ct`)، وتظهر النتيجة في معاينة Rich Message. الزر القديم `r:task` يعرض تنبيهاً واضحاً بدلاً من محاولة تعديل رسالة. أضيفت اختبارات تثبت نوع القائمة وحالة checkbox والنص وعدم وجود callback button في الحمولة.
+- **الملفات:** `tgcloud/lib/editor-renderer.js`, `tgcloud/lib/page-navigation.js`, `tests/serverless/checklist.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح اختبار قائمة المهام (2/2)، ومجموعة Serverless الكاملة `npm.cmd test` (441/441)، وفحوص `node --check` و`git diff --check`. لم يثبت بعد Bot API الحي أن نسخة النشر المصححة تعمل.
+- **GitHub/النشر:** التصحيح محلي فقط؛ لم ننفذ commit أو push أو نشر Telegram Serverless. يتطلب استبدال النسخة المنشورة بملفات Telegram Serverless المصححة.
+
+## 2026-11-16 — منع تكرار مطالبة ألبوم عرض الشرائح
+
+- **السبب:** يرسل Telegram كل صورة في الألبوم كتحديث مستقل. تكرار المطالبات عولج بتحديث مطالبة واحدة، لكن زر الإنهاء كان يرفض الطلب إذا ضغطه المستخدم خلال ثانية من آخر صورة؛ ظهرت للمستخدم العربي رسالة «إعدادات · album» بسبب مسار الترجمة الاحتياطي.
+- **التغيير:** عند وصول صورة ضمن ألبوم، يحذف البوت رسالة الصورة ويحدّث مطالبة واحدة بالعدد وأزرار الإنهاء. عند الضغط على الإنهاء ينتظر اكتمال تجميع الألبوم حتى 2.5 ثانية، ثم يحفظ الصور بالترتيب. أضيف تعريب واضح لحالة التأخر واختبار انحدار يضغط الإنهاء دون فرض انتظار مسبق.
+- **الملفات:** `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/main-ar-source.js`, `tests/serverless/editor-block-actions.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح اختبارا عرض الشرائح المستهدفان (2/2)، ومجموعة Serverless الكاملة `npm.cmd test` (440/440)، وفحوص `node --check` و`git diff --check`. عُرّف مصدر التنبيه من مسار رد الزر والترجمة الاحتياطية، ثم أضيف انتظار واختبار للإنهاء الفوري بعد وصول الصور.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم ننفذ commit أو push أو نشر Telegram Serverless. يتطلب ظهور الإصلاح نشر `tgcloud/lib/editor-extra-blocks.js` من جهة المالك.
+
+## 2026-11-16 — إصلاح معاينة وسائط الاقتباس
+
+- **السبب:** كان Mini App يعرض نص الاقتباس واسم المؤلف فقط، ولا يقرأ الوسائط المتداخلة المخزنة في `native_data.blocks` أو `media_children`. كما كان تعديل نص اقتباس Native يعيد بناء محتواه دون الحفاظ على بلوكاته غير النصية.
+- **التغيير:** استخراج وسائط الاقتباس الأصلية ووسائط الاقتباس المحررة وعرض معايناتها داخل الاقتباس. الحفاظ على البلوكات المتداخلة غير النصية عند تعديل الاقتباس المستورد.
+- **الملفات:** `app/miniapp_static/app.js`, `app/miniapp_static/live_preview.js`, `app/miniapp_static/media_upload.js`, `app/miniapp_static/editor.html`, `tgcloud/lib/editor-renderer.js`, `tests/serverless/channel-post-edit-import.test.mjs`, `tests/serverless/premium-emoji.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `md_files/log.md`.
+- **التحقق:** نجحت مجموعة Serverless الكاملة `npm.cmd test` (439/439)، و`npm.cmd run check:miniapp` (60 asset)، وفحوص `node --check` و`git diff --check`. بُنيت أصول Telegram Serverless محلياً؛ لا يثبت البناء وحده نشرها.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم ننفذ `tgcloud push` أو migration. يلزم بناء الأصول الثابتة ثم نشر الملفات المعدلة عبر Telegram Serverless قبل ظهور الإصلاح للمستخدمين.
+
+## 2026-11-15 — التحقق من نشر إصلاح عرض منشور القناة في Mini App
+
+- **السبب:** يخزن الاستيراد نص المنشور ككتل `text` وخلايا الجدول الأصلي في `native_data.cells`، بينما كان العرض يتوقع فقرات `paragraph` وصفوف `rows`.
+- **التغيير:** إضافة تهيئة صفوف الجداول المستوردة للعرض العلوي والمتداخل، وتحديث cache-busting لملفات `app.js` و`live_preview.js` و`details_nested_editor.js`. يحافظ المسار على الخلايا/التنسيقات الأصلية حتى يبدأ المستخدم بالتعديل.
+- **الملفات:** `app/miniapp_static/app.js`, `app/miniapp_static/live_preview.js`, `app/miniapp_static/details_nested_editor.js`, `app/miniapp_static/editor.html`, `tests/serverless/channel-post-edit-import.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `md_files/log.md`.
+- **التحقق:** نجحت الاختبارات المستهدفة (27/27)، ومجموعة Serverless الكاملة `npm.cmd test` (438/438)، و`npm.cmd run check:miniapp` (60 asset)، وفحوص `node --check` و`git diff --check`. عند التحقق الحي، أعادت صفحة `/editor` وملفات JS الثلاثة بإصدارات cache-busting المطلوبة HTTP 200، واحتوت على معالجة `text` ومساعد صفوف الجدول. أظهر `npx.cmd tgcloud status` المراجعة 174، وWebhook متزامناً، و70 ملفاً ثابتاً دون تغييرات معلقة.
+- **GitHub/النشر:** الإصلاح موجود بالفعل على Telegram Serverless عند المراجعة 174؛ لم ننفذ `push` إضافياً في هذه الجلسة لأن النسخة الحية كانت مطابقة. لم يُجر اختبار قبول داخل تطبيق Telegram باستخدام الصفحة المحفوظة نفسها.
+
+## 2026-11-15 — إصلاح عرض نص منشور القناة ومعالجة رفض فحص العضوية
+
+- **السبب:** كان مستورد الرسائل الغنية ينتج كتلة `text` الداخلية، لكن Mini App لم يعرضها كنص، فظهرت كعنصر وسائط بعنوان `text` وعدّاد صفر. كذلك كان رفض Telegram المتوقع `member list is inaccessible` أثناء فحص صلاحية القناة يُسجّل كخطأ تقني غير مصنف.
+- **التغيير:** دعم عرض `text` كمحرر فقرة في مساري Mini App مع اسم محلي للفقرة؛ فحص صلاحية البوت قبل استعلام المستخدم؛ عند تعذر قراءة قائمة أعضاء القناة يفشل خيار تعديل المنشور مغلقاً مع إبقاء الاستيراد، دون تسجيل إنذار تقني غير متوقع. أضيفت اختبارات انحدار للمسارين.
+- **الملفات:** `tgcloud/lib/editor-core.js`, `app/miniapp_static/app.js`, `app/miniapp_static/live_preview.js`, `tests/serverless/harness.mjs`, `tests/serverless/channel-post-edit-import.test.mjs`, `md_files/docs/channel-post-edit-import-plan.md`, `md_files/log.md`.
+- **التحقق:** نجح اختبار المسار وMini App المستهدف (16/16)، ومجموعة Serverless الكاملة `npm.cmd test` (437/437)، و`npm.cmd run check:miniapp` (60 asset)، و`node --check` للملفات المعدلة و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم يُنفذ commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-09 — فتح صفحات الضيف برسائل مؤقتة
+
+- **السبب:** أضاف Bot API إرسال ردود مؤقتة مرتبطة باستعلامات الأزرار دون توجيهها إلى الخاص، ما يسمح بفتح صفحات Guest مباشرة في المحادثة الأصلية.
+- **التغيير:** استبدال إرسال صفحات CBD إلى الخاص أو إلى المحادثة العادية برد `sendRichMessage` مؤقت يستعمل `callback_query_id` دون `chat_id` أو `receiver_user_id`. بقي تعديل الرسالة المؤقتة الحالية عند التنقل داخل الصفحة، وبقي التحقق من عضوية الأزرار المقيدة معتمداً على سياق دردشة الضيف المسجل. لا يشمل دعم Telegram غرف الرسائل المباشرة للقنوات.
+- **الملفات:** `tgcloud/lib/page-navigation.js`, `tests/serverless/page-navigation-ephemeral.test.mjs`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق:** تغطي الاختبارات فتح الصفحة من Guest inline، وضغط مالك الصفحة وعضو آخر من المجموعة على الرسالة نفسها؛ نجح `node --experimental-vm-modules --test tests/serverless/page-navigation-ephemeral.test.mjs tests/serverless/tutorial-i18n.test.mjs` (4/4).
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-09 — قبول اسم الصفحة في أزرار CBD
+
+- **السبب:** كان إدخال CBD يتطلب كود الصفحة فقط، رغم أن المستخدم قد يتوقع أن الاسم المحفوظ صالح أيضاً؛ ورسالة الخطأ كانت طويلة وغير مهيكلة.
+- **التغيير:** يقبل CBD كود الصفحة أو اسم صفحة المالك المطابق بعد تطبيع المسافات وUnicode NFC، مع إبقاء فحص الملكية واستخدام الكود عند تكرار الاسم. أصبحت الإشارة إلى خطأ التنسيق قصيرة، والتوضيح يظهر داخل اقتباس Rich Message.
+- **الملفات:** `tgcloud/lib/rich-text.js`, `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/i18n-source.js`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح `node --experimental-vm-modules --test tests/serverless/large-button-block.test.mjs tests/serverless/workflow-copy.test.mjs tests/serverless/page-name-delivery.test.mjs` (22/22)، وفحوص `node --check` للملفات المعدلة و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-09 — توضيح خطأ كود CBD في الزر الكبير
+
+- **السبب:** عند إدخال اسم صفحة أو نص CBD لا يصلح ككود، كان المحلل يعيد دليل الصيغة دون بيان سبب الرفض؛ النص العربي لم يوضح أن CBD يحتاج كود الصفحة.
+- **التغيير:** إظهار رسالة صريحة بأن زر CBD يتطلب كود صفحة محفوظة لا اسمها، مع التحقق من ملكية الصفحة. يشمل ذلك صيغ CBD التي لا يستطيع محلل الأزرار تفسيرها بسبب المسافات أو الأحرف غير الصالحة. أضيف اختبار يثبت ظهور الرسالة ثم نجاح إعادة المحاولة بكود الصفحة.
+- **الملفات:** `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/i18n-source.js`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح `node --experimental-vm-modules --test tests/serverless/large-button-block.test.mjs tests/serverless/workflow-copy.test.mjs` (18/18)، وفحوص `node --check` للملفات المعدلة و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-09 — ترتيب رسالة إضافة الزر الكبير
+
+- **السبب:** طلب المالك أن تتكون الرسالة من العنوان، وتذييل يطلب إرسال تنسيق الزر مع الإحالة إلى الدليل، وفاصل، ثم بلوكة التفاصيل فقط.
+- **التغيير:** ترتيب Rich Message إلى `heading` ثم `paragraph` للتذييل ثم `divider` ثم `details`. أزيل المثال والتعليمات الإضافية من خارج التفاصيل؛ بقي دليل الصيغ داخلها. حُدّث fallback النصي بما يتوافق مع الترتيب.
+- **الملفات:** `tgcloud/lib/editor-guide.js`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح `node --experimental-vm-modules --test tests/serverless/large-button-block.test.mjs` (16/16)، و`node --check` للملفين المعدلين و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-09 — استعادة الدليل القابل للفتح للزر الكبير
+
+- **السبب:** طلب المالك إعادة بلوكة التفاصيل القابلة للفتح التي أزيلت من رسالة إضافة الزر الكبير.
+- **التغيير:** استعادة دليل الصيغ الكامل داخل بلوكة Details مطوية، مع إبقاء العنوان والتعليمات والمثال المختصر ظاهرة قبلها؛ وتحديث المثال ليسمي صف الأزرار المتعددة بوضوح. أصبح fallback النصي يتضمن الدليل الكامل أيضاً.
+- **الملفات:** `tgcloud/lib/editor-guide.js`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح `node --experimental-vm-modules --test tests/serverless/large-button-block.test.mjs` (16/16)، و`node --check` للملفين المعدلين و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-09 — تبسيط دليل الزر الكبير ودعم عدة أزرار
+
+- **السبب:** طلب المالك أن تقتصر رسالة «إضافة زر كبير» على عنوان ودليل نظيف، وأن يسمح البلوك بإرسال عدة أزرار معاً لعرضها جنباً إلى جنب.
+- **التغيير:** اختصار الرسالة إلى عنوان وتعليمات ومثال متجاور لثلاثة أنواع أزرار وملاحظة USER الضرورية. أصبح الإدخال يقبل حتى 100 زر في البلوك الواحد، وتسمح به معاينة Rich Message والتحقق في Mini App، مع رفض التجاوز؛ أزيل مسار المطالبة القديم المتكرر.
+- **الملفات:** `tgcloud/lib/editor-guide.js`, `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/editor-renderer.js`, `tgcloud/lib/editor-block-flow.js`, `app/miniapp_static/publish_validation.js`, `app/miniapp_static/miniapp_i18n.js`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت اختبارات الزر الكبير واستعادة المحرر والأخطاء التشغيلية (36/36)، وفحوص `node --check` للملفات المعدلة و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-09 — دعم التنسيقات الغنية في بلوك الزر الكبير
+
+- **السبب:** طلب المالك استعمال صيغ الأزرار الغنية الموجودة مسبقاً عند إضافة بلوك زر كبير، وتوضيح الأنواع المدعومة في رسالة الإدخال.
+- **التغيير:** توصيل إدخال الزر الكبير بمحلّل `rich-text` الحالي بدلاً من إعادة كتابة صيغ الأزرار؛ دعم USER عبر منتقي تليكرام القائم، مع إبقاء تحقق ملكية صفحات CBD. أصبحت مطالبة الإدخال رسالة Rich Message وبداخلها تفاصيل قابلة للفتح تعرض أمثلة USER والتنبيه وcallback والنسخ وWeb App وLogin URL والبحث والألوان. أضيف رجوع نصي إذا تعذر إرسال الرسالة الغنية.
+- **الملفات:** `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/editor-block-flow.js`, `tgcloud/lib/editor-guide.js`, `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح `node --experimental-vm-modules --test tests/serverless/large-button-block.test.mjs` (13/13)، وفحوص تشخيص الملفات و`git diff --check`. جُرّبت `npm.cmd run test:ci` لكن الطرفية لم تُظهر حالة الإنهاء أو ملخص الاختبارات؛ لذلك لا أعدّه تحققاً ناجحاً.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-09 — ترتيب شرح الزر الكبير وإصلاح روابط الحساب
+
+- **السبب:** رابط `tg://user?id=...` المولّد من اختيار USER قد يرفضه Telegram كـ `BUTTON_USER_INVALID`، وكان رفض معاينة البلوك يعطّل فتح لوحة تحريره. كما أن رسالة الإدخال كانت تخلط الصيغ وتعرض مثال زرين رغم أن هذا البلوك يقبل زراً واحداً.
+- **التغيير:** تتحول اختيارات المستخدم والقناة ذات الاسم العام إلى `https://t.me/<username>`؛ اختيار المستخدم بلا اسم عام يطلب اختيار حساب آخر، وإدخال رابط user-ID المباشر مرفوض في الزر الكبير. معاينة البلوكات القديمة ذات رابط user-ID تعرض تنبيهاً نصياً بدلاً من إعادة إرسال الزر المرفوض، مع بقاء أدوات التحرير متاحة. أخطاء `BUTTON_USER_INVALID` أثناء تعديل المحرر تصنف كأخطاء معاينة/تحرير لا كفشل نشر. رُتبت رسالة الإدخال: صيغة الرابط والصفحة المحفوظة ظاهرة مباشرة، والدليل المصنف يعرض مثالاً واحداً لكل زر مع تنبيه USER والألوان؛ أزيل مثال الأزرار المتعددة. فشل إعادة مطالبة الإدخال يستخدم مسار إرسال الرسالة الغنية الصحيح.
+- **الملفات:** `tgcloud/lib/editor-block-flow.js`, `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/editor-block-ui.js`, `tgcloud/lib/operational-errors.js`, `tgcloud/lib/rich-text.js`, `tgcloud/lib/editor-guide.js`, `tests/serverless/large-button-block.test.mjs`, `tests/serverless/operational-errors.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت اختبارات الزر الكبير واستعادة/إجراءات المحرر وتصنيف الأخطاء بعد ترتيب الرسالة (52/52)، وفحوص `node --check` للملفات المعدلة و`git diff --check`. لم يُختبر الإرسال إلى Telegram فعلياً.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-07 — استعادة مقبض مؤشر الكتابة المخصص
+
+- **السبب:** تأكيد المالك أن المطلوب كان إبقاء المقبض المخصص الذي طلبه وجعله المؤشر الوحيد، لا حذف الميزة والاعتماد على مؤشر المتصفح وحده.
+- **التغيير:** استعادة منطق سحب المقبض وملف CSS. يظهر المقبض على الأجهزة اللمسية وأجهزة سطح المكتب؛ عند ظهوره يصبح هو مؤشر الكتابة المرئي ويُخفى مؤشر `contenteditable` الأصلي، وعند اختفائه يُستعاد المؤشر الأصلي. يشمل السحب بين المحررات والتمرير التلقائي عند الحواف.
+- **الملفات:** `app/miniapp_static/caret_handle.js`, `app/miniapp_static/caret_handle.css`, `app/miniapp_static/editor.html`, `tests/serverless/miniapp-caret-handle.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح اختبار المؤشر المركّز (2/2)، و`npm.cmd run check:miniapp` (60 أصلاً ثابتاً)، و`npm.cmd test` (426/426)، و`node --check` و`git diff --check`. لم يُختبر السحب على Telegram WebView فعلي.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-07 — حفظ نص خانة الكتابة عند إنشاء زر
+
+- **السبب:** عند كتابة النص في خانة «اكتب نصاً، أو / للأوامر» ثم إنشاء زر من شريط النص، لم يكن النص قد أصبح بلوكاً بعد. مسار إنشاء الزر كان ينشئ فقرة جديدة ويفرغ خانة الكتابة، فيختفي النص. عند كتابة النص داخل بلوك فقرة موجود مسبقاً لم تظهر المشكلة.
+- **التغيير:** قبل إنشاء الزر، يُحوّل أي نص عادي معلّق في خانة الكتابة إلى بلوك فقرة ثم يُنشأ الزر في محرر هذا البلوك. تبقى أوامر `/` دون تحويل، ويستمر سلوك المؤشر/التحديد داخل المحرر كما هو. تحديث نسخة أصل `inline_text_tools.js` في HTML.
+- **الملفات:** `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/editor.html`, `tests/serverless/miniapp-inline-button-selection.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح الاختبار المركز (5/5)، و`npm.cmd run check:miniapp` (58 أصلاً ثابتاً)، و`npm.cmd test` (426/426)، وفحوص `node --check` و`git diff --check`. لم يُختبر الإصلاح في WebView حي.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-07 — إبقاء نص الفقرة عند إنشاء زر من تحديد
+
+- **السبب:** إنشاء زر غني من نص محدد كان يحذف النص المحدد، لأن مسار إدراج الزر يستبدل نطاق التحديد بالزر. لذلك اختفت عبارة «1. ادواتي» عند تحويلها لزر.
+- **التغيير:** عند إنشاء زر من تحديد، يُحفظ النص ويُدرج الزر بعده؛ أما إنشاء زر عند المؤشر فيبقى على سلوك الاستبدال الحالي. تحديث نسخة أصل `inline_text_tools.js` في HTML لإجبار المتصفح على تحميل الإصلاح.
+- **الملفات:** `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/editor.html`, `tests/serverless/miniapp-inline-button-selection.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح الاختبار المركز (3/3)، و`npm.cmd run check:miniapp` (58 أصلاً ثابتاً)، و`npm.cmd test` (424/424)، و`node --check`، و`git diff --check`. لم يُختبر الإصلاح داخل WebView حي.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-07 — بدء المسودة ببلوك فقرة
+
+- **السبب:** تسهيل البدء بالكتابة فور فتح التطبيق المصغر بدلاً من عرض شاشة بداية بلا بلوكات.
+- **التغيير:** المسودة الجديدة تبدأ بفقرة فارغة، مع إبقاء نص خانة الكتابة والأوامر كما هو. لا تُعامل الفقرة الافتراضية وحدها كمحتوى صالح للحفظ أو كمسودة محلية قابلة للاستعادة قبل الكتابة؛ يبقى سلوك الصفحات المحفوظة والبلوكات الأخرى كما كان.
+- **الملفات:** `app/miniapp_static/app.js`, `tests/serverless/miniapp-default-paragraph.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح `npm.cmd test` (421/421)، و`npm.cmd run check:miniapp` (58 أصلاً ثابتاً)، والاختبار المركّز (3/3)، و`node --check` للملفين المعدلين برمجياً، و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare.
+
+## 2026-11-06 — تحسين كفاءة لوحة المطور وقياسات Mini App
+
+- **السبب:** إحصاءات المستخدمين كانت تنفذ استعلاماً منفصلاً لعدد الصفحات لكل مستخدم، وتفريغ قياسات Mini App المتزامن قد يرفع الدفعة نفسها أكثر من مرة. كما أن لوحة المطور تتعامل مع نسخ احتياطية وإعدادات حساسة، وتعذر الرسالة الغنية كان يخفي محتوى التقرير وأزراره.
+- **التغيير:** قصر فتح لوحة المطور ومعالجة إدخالها وأزرارها على المحادثة الخاصة، ومنع توجيه الحالات القديمة إلى مجموعة. أصبح الرجوع النصي يعرض النص والجداول ويحتفظ بإجراءات اللوحة؛ فشل الرجوع عند تعديل رسالة موجودة يُرفع بدلاً من تجاهله. استبدال استعلامات الصفحات المتكررة باستعلام تجميعي واحد لمعرفات المستخدمين الموثوقة بعد التحقق أنها أعداد صحيحة موجبة. توحيد ردود إدخال المطور المتكررة، وإظهار حجم قاعدة البيانات المجهول كغير متاح بدلاً من صفر، وتسجيل تعذر حذف ملف النسخة الوارد. إضافة مشاركة للطلب الجاري لتفريغ قياسات الأداء كي لا تتكرر الطلبات المتزامنة. تصحيح خريطة المعمارية لتوضح أن CRUD الصفحات المباشر على Serverless لا يمر عبر Cloudflare. تحديث اختبارات harness وإضافة اختبارات سلوكية/تزامن.
+- **الملفات:** `tgcloud/lib/developer.js`, `app/miniapp_static/app.js`, `tests/serverless/harness.mjs`, `tests/serverless/developer-panel.test.mjs`, `tests/serverless/miniapp-performance.test.mjs`, `md_files/ARCHITECTURE.md`, `md_files/log.md`.
+- **التحقق:** نجح `npm.cmd run test:ci` (فحص الخطط، 58 أصلاً ثابتاً، و418/418 اختباراً)، والاختبارات المركزة (14/14)، وفحوص `node --check` و`git diff --check`. عدد وحدات Telegram Serverless الحالي 98/100.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر.
+
+## 2026-11-06 — إيقاف نسخ الصفحات المحفوظة إلى Cloudflare
+
+- **السبب:** طلب المالك أن تبقى الصفحات المحفوظة في Telegram Serverless وألا تُرسل نسخها إلى Cloudflare/D1.
+- **التغيير:** إيقاف إنشاء/إرسال أحداث مزامنة الصفحة في CRUD المباشر وفي مسارات إدارة الصفحات والمحرر، وتعطيل `full_sync` وإزالة إجراء إعادة المزامنة من لوحة المطور. تبقى الصفحات محفوظة في `rich_pages` مع استمرار مراجعات CAS، ولا تُحذف المرايا أو صفوف outbox القديمة. تحديث وثائق حدود الاعتماد.
+- **الملفات:** `tgcloud/lib/editor-session.js`, `tgcloud/lib/editor-pages.js`, `tgcloud/lib/miniapp-bridge.js`, `tgcloud/lib/developer.js`, `tests/serverless/miniapp-serverless-endpoint.test.mjs`, `md_files/docs/cloudflare-pages-miniapp.md`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/docs/miniapp-serverless-cloudflare-dependencies.md`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق:** نجح `npm.cmd run test:ci` (فحص الخطط، 58 أصلاً ثابتاً، و411/411 اختباراً)، والاختبار المركز (5/5)، وفحوص `node --check` و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram/Cloudflare ولا تنظيف لبيانات الإنتاج.
+
+## 2026-11-06 — استبدال معاينة المحتوى الفارغ بلوحة استعادة واضحة
+
+- **السبب:** كان مسار معاينة جلسة بلا بلوكات يرسل تذييلاً عاماً كأنه معاينة، من دون إخبار المستخدم بسبب الحالة أو طريقة المتابعة.
+- **التغيير:** عند خلو الجلسة أو رفض Telegram حمولة المعاينة برسالة عدم وجود بلوكات، لا تُرسل معاينة نصية. تُعاد تهيئة حالة التفاعل المؤقتة فقط، وتُرسل لوحة محرر جديدة برسالة واضحة تشرح تعطل اللوحة السابقة، وتؤكد الحفاظ على أي بلوكات موجودة، وتتيح المتابعة أو الإضافة. أضيف نص محدد لكل لغة مدعومة واختبارات لاستعادة الجلسة الفارغة وغير الفارغة.
+- **الملفات:** `tgcloud/lib/editor-block-flow.js`, `tgcloud/lib/editor-block-ui.js`, `tgcloud/lib/i18n-source.js`, `tests/serverless/editor-block-flow-recovery.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح `npm.cmd run test:ci` (فحص الخطط، 58 أصلاً ثابتاً، و409/409 اختبارات)، والاختبارات المركزة (8/8)، وفحوص `node --check` و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram.
+
+## 2026-11-06 — تضييق استعادة لوحة الإدارة عند أخطاء Telegram
+
+- **السبب:** مسار الرجوع كان ينشئ لوحة بديلة لأي فشل في تعديل لوحة الإدارة، حتى أخطاء الخدمة المؤقتة، كما كان يحذف رسالة الرجوع قبل اكتمال التعديل أو إنشاء البديل؛ قد يؤدي ذلك إلى لوحات مكررة أو إزالة واجهة المستخدم عند فشل مؤقت.
+- **التغيير:** قصر إنشاء لوحة بديلة على أخطاء Telegram التي تؤكد أن الرسالة المستهدفة مفقودة، وترك الأخطاء الأخرى ظاهرة. تأجيل حذف رسالة الرجوع إلى ما بعد نجاح تعديل اللوحة أو إعادة إنشائها. إضافة اختبارات تغطي التعافي عند الرسالة المفقودة، وعدم التكرار أو حذف رسالة المستخدم عند فشل مؤقت.
+- **الملفات:** `tgcloud/lib/editor-block-flow.js`, `tests/serverless/editor-block-flow-recovery.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح `npm.cmd run test:ci` (فحص الخطط، 58 أصلاً ثابتاً، و407/407 اختبارات)، والاختبارات المركزة (22/22)، وفحوص `node --check` و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram.
+
+## 2026-11-06 — إصلاح معاينة المحرر الفارغة
+
+- **السبب:** عند الضغط على معاينة النتيجة في جلسة بلا بلوكات، كان منشئ الرسالة يرمي `The rich message has no blocks`؛ مصنّف الاسترجاع لم يتعرف على نص الخطأ، فتحولت الحالة الفارغة إلى فشل مسجل بدلاً من معاينة بديلة.
+- **التغيير:** توسيع التعرف على خطأ الرسالة الفارغة ليشمل رسالة المحرر الحالية، مع الحفاظ على مسار المعاينة البديلة الموجود. إضافة اختبار رجوع يتحقق من إرسال معاينة بديلة وتسجيل معرّفها دون إرسال رسالة فشل.
+- **الملفات:** `tgcloud/lib/editor-block-flow.js`, `tests/serverless/editor-block-flow-recovery.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجح `npm.cmd run test:ci` (فحص الخطط، 58 أصلاً ثابتاً، و405/405 اختبارات)، وفحوص `node --check` و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram.
+
+## 2026-11-06 — إضافة وسائط دون استبدال وإصلاح استعادة لوحة المحرر
+
+- **السبب:** طلب إضافة وسائط جديدة إلى البلوكات التي تحتوي وسائط دون مسح الموجود، تخطي نص الاقتباس البارز بعد رفع الوسائط، وإصلاح رفض Telegram لتعديل رسالة المطالبة المحذوفة عند إنهاء الرفع.
+- **التغيير:** توسيع الرفع المباشر ليضيف داخل الشرائح والكولاج والاقتباسات، ويُدرج بلوكات وسائط جديدة بجانب بلوك الوسائط المنفرد. صارت مطالبة رفع الاقتباس تعرض زر تخطي للنص، ثم تتيح متابعة الكاتب أو تخطيه. أُزيل حذف رسالة الرفع قبل تعديل لوحة الإدارة؛ وإذا كانت لوحة الإدارة نفسها مفقودة تُنشأ بديلة ويُحدّث معرّفها في الجلسة.
+- **الملفات:** `tgcloud/lib/editor-block-ui.js`, `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/main-ar-source.js`, `tests/serverless/editor-block-actions.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت الاختبارات المركزة (20/20)، و`npm.cmd test` (404/404)، و`node --check` للملفات المعدلة، و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram.
+
+## 2026-11-04 — نقل زر النشر أسفل الأدوات الإضافية
+
+- **السبب:** طلب المالك إظهار زر النشر في لوحة المحرر الرئيسية بدلاً من إخفائه داخل الأدوات الإضافية، مع الحفاظ على لونه.
+- **التغيير:** إضافة زر النشر كسطر مستقل مباشرة بعد سطر الأدوات الإضافية في لوحة المحرر الفارغة والمعبأة، وإزالته من قائمة الأدوات؛ بقي نمطه `success`.
+- **الملفات:** `tgcloud/lib/editor-block-ui.js`, `tests/serverless/editor-main-keyboard.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت الاختبارات المركزة (6/6) لـ`editor-main-keyboard` و`branding-cart-link`، ونجح `git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر.
+
+## 2026-11-04 — تمرير استحقاقات الباقات ومنع تجاوز حصة حزم الإيموجي
+
+- **السبب:** لم يكن `/me` المباشر في Serverless يعيد كل خطة المستخدم وحدودها، كما كان تثبيت حزمة قديمة تتجاوز الحصة يرفعها ضمن الحزم المتاحة، وكان مسار إعادة تفاصيل حزمة مخزنة لا يفحص ظهورها وفق الحصة.
+- **التغيير:** تمرير الخطة الموثقة وحدودها السبع إلى استجابة Serverless `/me` وإتاحتها في بيانات وصول Mini App للعرض فقط؛ Serverless يبقى صاحب قرار الإنفاذ. قُيّدت إعادة ترتيب الحزم بقائمة الحصة قبل التثبيت، وفُحصت إمكانية الحزمة بعد قراءة/تحديث الحالة. تُحفظ بيانات الهجرة القديمة كما هي، لكن لا يفتح تجاوزها حد الاستخدام.
+- **الملفات:** `tgcloud/lib/miniapp-bridge.js`, `tgcloud/lib/miniapp-custom-emoji.js`, `app/miniapp_static/app.js`, `tests/serverless/miniapp-serverless-endpoint.test.mjs`, `tests/serverless/rich-donate-b2b.test.mjs`, `tests/serverless/miniapp-custom-emoji.test.mjs`, `md_files/docs/subscription-rollout.md`, `md_files/docs/miniapp-serverless-cloudflare-dependencies.md`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/log.md`.
+- **التحقق:** نجح `npm.cmd run test:ci` (387/387؛ فحص كتالوج الخطط و58 أصلاً ثابتاً ناجحان)، و`git diff --check`. تغطي الاختبارات استحقاق Free الموثوق، وتمرير Golden الموثق، ورفض الحزمة المستوردة المثبتة خارج الحصة مع حفظ البيانات القديمة.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر.
+
+## 2026-11-04 — اختصار تذييل الحقوق إلى يوزر البوت
+
+- **السبب:** طلب المالك أن يقتصر تذييل الحقوق على يوزر البوت دون عبارة ترويجية.
+- **التغيير:** استبدال نص التذييل ببلوك `footer` واحد يحتوي `@RichCustomizebot` فقط؛ جميع مسارات بناء الرسالة التي تستخدم حقوق النشر تستفيد من البلوك نفسه.
+- **الملفات:** `tgcloud/lib/branding.js`, `tests/serverless/editor-unified-limits.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت الاختبارات المركزة (17/17) لـ`editor-unified-limits` و`branding-preferences`، ونجح `git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر.
+
+## 2026-11-04 — توثيق تنسيق تغييرات الاشتراكات مع بوت التبرع
+
+- **السبب:** طلب المالك إظهار أي إضافة أو تحسين قد يتطلب تغييراً في بوت التبرع، بدلاً من افتراض أن تغييرات المحرر تكفي وحدها.
+- **التغيير:** إضافة قاعدة تلزم بمراجعة تكامل Rich Donate والإبلاغ صراحةً عن التغييرات المطلوبة أو عدم الحاجة إليها، مع فصل المتطلبات المؤكدة عن المقترحات وعدم ادعاء تنفيذ أو اختبار المستودع المنفصل دون دليل. وثّقت الحالة المعروفة: تنفيذ Rich Donate وقبوله بروتوكول RDB عبر المجموعة، مع بقاء المصافحة الحية واختبار Stars غير متحققين.
+- **الملفات:** `README.md`, `docs/README.md`, `AGENTS.md`, `md_files/sups.md`, `md_files/docs/subscription-rollout.md`, `md_files/log.md`.
+- **التحقق:** مراجعة اتساق الروابط والنصوص و`git diff --check`؛ لم تُشغّل اختبارات برمجية (تغيير توثيقي فقط).
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر.
+
+## 2026-11-03 — منع إعادة بيع إزالة الحقوق في تنبيه Golden المدفوع والمهدي
+
+- **السبب:** مراجعة سلوك التجديد أكدت وجوب عدم إضافة إزالة الحقوق إلى العربة لمن اشتراها دائماً. كشف التحقق أن المسار المدفوع كان يفحص الحق، لكن مسار هدية Golden كان يعرض عربة `buyGT` المركبة دون فحص.
+- **التغيير:** توحيد فحص ملكية إزالة الحقوق الدائمة (السجل القديم وأحداث Rich Donate) لكل إشعارات Golden المنتهية، سواء كانت مدفوعة أو هدية، وجعل `/testsubexpiry` يراعي حق المطور أيضاً. مالك الحق يفتح بوت Rich Donate دون عربة مجهزة؛ Plus يظل `buyPlus` وGolden غير المالك يظل `buyGT`.
+- **الملفات:** `tgcloud/lib/subscription-reminders.js`, `tests/serverless/subscription-reminders.test.mjs`, `md_files/log.md`.
+- **التحقق:** نجحت الاختبارات المركزة (17/17)، و`node --check` و`git diff --check`. تطابق SHA-256 وحدة التذكيرات مع النسخة البعيدة.
+- **GitHub/النشر:** نُشرت وحدة التذكيرات وحدها إلى Telegram Serverless revision 146؛ Webhook in sync، والأصول الثابتة الـ70 محدثة. لا schema migration أو GitHub push، ولم تُرفع تغييرات أخرى.
+
+## 2026-11-03 — إضافة عربة Plus وتجنب بيع إزالة الحقوق مجدداً
+
+- **السبب:** طلب المالك رابط إعادة اشتراك Plus `buyPlus`، ومنع إضافة إزالة الحقوق إلى العربة إذا كان المستخدم يملكها دائماً.
+- **التغيير:** اختيار رابط التجديد حسب الخطة: Plus يفتح `https://t.me/RichDonateBot?start=buyPlus`، وGolden يفتح `buyGT` المركب. قبل عرض رابط Golden المركب يفحص النظام امتلاك إزالة الحقوق الدائمة (سجل Rich Donate والسجل القديم). عند وجودها يوجه إلى بوت Rich Donate دون عربة مجهزة كي لا يعيد بيع الحق؛ يختار المستخدم Golden يدوياً. روابط Plus لا تتضمن إزالة الحقوق. تمت إضافة اختبارات رابط Plus وحالة الحقوق الدائمة.
+- **الملفات:** `tgcloud/lib/subscription-reminders.js`, `tests/serverless/subscription-reminders.test.mjs`, `md_files/docs/subscription-rollout.md`, `md_files/log.md`.
+- **التحقق:** نجحت الاختبارات المركزة (15/15) و`npm.cmd run test:ci` (385/385؛ فحص كتالوج الخطط و58 أصلاً ثابتاً ناجحان)، و`node --check` و`git diff --check`. تغطي الاختبارات رابط Plus، Golden مع/بدون حق إزالة دائم، والتنبيه السابق للانتهاء.
+- **GitHub/النشر:** نُشرت `tgcloud/lib/subscription-reminders.js` وحدها إلى Telegram Serverless revision 144؛ Webhook in sync، والأصول الثابتة الـ70 محدثة، وتطابق SHA-256 الملف المحلي والبعيد. لم يُنفذ migration أو GitHub push، ولم تُرفع بقية التغييرات المحلية.
+
+## 2026-11-03 — تصحيح رابط عربة إعادة الاشتراك ونشره
+
+- **السبب:** الرابط السابق `cart_golden_branding` لا يفتح العربة الفعلية عند اختباره؛ أكد المالك أن البوت يدعم `buyGT`.
+- **التغيير:** تحديث زر التجديد وأمر الاختبار إلى `https://t.me/RichDonateBot?start=buyGT`. أكد المالك أن العربة تحتوي Golden Ticket لمدة 30 يوماً وإزالة الحقوق الدائمة بإجمالي 449 نجمة، ولا تصدر فاتورة قبل متابعة المستخدم؛ حدث الشراء يحمل `plan=golden` و`permanent_branding=true` و`amount=449` و`currency=XTR`.
+- **الملفات:** `tgcloud/lib/subscription-reminders.js`, `tests/serverless/subscription-reminders.test.mjs`, `md_files/docs/subscription-rollout.md`, `md_files/log.md`.
+- **التحقق:** نجحت اختبارات التذكير والاشتراك المركزة (13/13)، و`node --check`، و`git diff --check`. تطابق SHA-256 لوحدة التذكيرات مع النسخة البعيدة بعد النشر.
+- **GitHub/النشر:** نُشرت `tgcloud/lib/subscription-reminders.js` وحدها إلى Telegram Serverless revision 143؛ Webhook in sync، والأصول الثابتة الـ70 محدثة. لم يُنفذ schema migration أو GitHub push، ولم تُرفع بقية التغييرات المحلية.
+
+## 2026-11-02 — إصلاح إضافة حزم الإيموجي والتنبيه بتجديد الاشتراك
+
+- **السبب:** إضافة حزمة الإيموجي كانت تفشل بـ`CUSTOM_EMOJI_MIGRATION_REQUIRED` إذا تعذّر استيراد الحزم القديمة، مع أن تعذّر الاستيراد لا ينبغي أن يمنع إضافة حزمة جديدة. كما طُلب إشعار قبل انتهاء الاشتراك وآخر بعده، مع رابط تجديد وأمر اختبار.
+- **التغيير:** السماح بالإضافة إلى حالة Serverless أثناء انتظار الترحيل، مع الإبقاء على علامة الترحيل ودمج الحزم القديمة لاحقاً دون محو المضافة. توسيع المسح اليومي لإشعار قبل ٤–٥ أيام، وإشعار بعد الانتهاء للاشتراك المدفوع والهدايا اليدوية وGolden، مع منع الإشعار إذا وجد استحقاق موثوق ممتد. زر الإشعار المنتهي ورابط اختبار `/testsubexpiry` (للمطور في الخاص) أُطلقا أولاً برابط `cart_golden_branding`، ثم صُحح في 2026-11-03 إلى `buyGT` بعد تأكيد صاحب بوت التبرع. أضيفت نصوص الحالات الجديدة للغات العشرين.
+- **الملفات:** `tgcloud/lib/miniapp-custom-emoji.js`, `tgcloud/lib/subscription-reminders.js`, `tgcloud/lib/subscription-copy.js`, `tgcloud/lib/subscription-rich.js`, `tgcloud/handlers/message.js`, `tests/serverless/miniapp-custom-emoji.test.mjs`, `tests/serverless/subscription-reminders.test.mjs`, `tests/serverless/subscription-schedule.test.mjs`, `tests/serverless/harness.mjs`, `md_files/docs/premium-emoji.md`, `md_files/docs/subscription-rollout.md`, `md_files/log.md`.
+- **التحقق وقت التنفيذ الأول:** نجح `npm.cmd run test:ci` (383/383؛ فحص كتالوج الخطط و58 أصلاً ثابتاً ناجحان)، والاختبارات المركزة (17/17)، و`node --check` للملفات المعدلة، و`git diff --check`. الاختبارات محاكاة محلية؛ لا تثبت قبول Telegram أو Rich Donate للرابط المركب.
+- **GitHub/النشر وقت التنفيذ الأول:** نُشرت تغييرات التذكيرات والإيموجي سابقاً في revision 142؛ تبين لاحقاً أن رابط العربة غير صحيح، وصُحح في التحديث التالي.
+
+## 2026-11-02 — عرض أسماء المستخدم الفعالة في `/info`
+
+- **السبب:** طلب المالك عرض أسماء المستخدم المتاحة في وضع الضيف والمجموعات والخاص، وإزالة تكرار المعرّف النصي مع الإبقاء على زر نسخه.
+- **التغيير:** توثّق [Telegram Bot API](https://core.telegram.org/bots/api#chatfullinfo) أن `getChat` يعيد `ChatFullInfo`، وأن `active_usernames` حقل اختياري للمحادثات الخاصة أيضاً. يجلب `/info` بيانات المحادثة الخاصة بمعرّف المستخدم المستهدف فقط، ويدمج الاسم الأساسي والأسماء الفعالة، ويزيل التكرار دون حساسية حالة الأحرف. إذا تعذر الاستعلام، يُسجّل التحذير ويستمر العرض بالاسم الأساسي المتاح؛ لا scraping ولا استخدام لاسم طالب الأمر أو البوت. حُذف سطر معرّف الحساب النصي، مع إبقاء زر النسخ الغني.
+- **الملفات:** `tgcloud/lib/user-info.js`, `tgcloud/lib/user-info-copy.js`, `tests/serverless/user-info.test.mjs`, `tests/serverless/harness.mjs`, `md_files/log.md`.
+- **التحقق:** اجتاز الاختبار المركّز `tests/serverless/user-info.test.mjs` (21/21) و`npm.cmd run test:ci` (374/374؛ فحص كتالوج الخطط والأصول الثابتة، 58 أصلاً، ناجحان)، إضافة إلى `node --check` للملفات المعدلة و`git diff --check`. التغطية تشمل الأسماء المكررة والهوية المستهدفة، وضع الضيف والمجموعة والخاص، والرجوع للاسم الأساسي عند فشل `getChat`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم يُنفذ Git push أو نشر Telegram Serverless.
+
+## 2026-11-02 — البحث عن المستخدم عبر كل يوزراته الفعالة
+
+- **السبب:** طلب المالك أن يرد `/info` ووضع الضيف على أي يوزر فعّال يخص المستخدم، لا الاسم الأساسي فقط.
+- **التغيير:** إضافة فهرس SQLite لليوزرات الإضافية المستلمة من `getChat.active_usernames` مع تحديث مؤجل لكل مستخدم مرة كل 24 ساعة عند تفاعله، وحذف الأسماء القديمة من الفهرس بعد نجاح تحديث Telegram. يبحث `/info` والضيف بالاسم الأساسي أو الاسم الإضافي المفهرس، ويعيد ملف الحساب واليوزرات الحالية. عند نجاح `getChat` يتحقق الطلب من أن الاسم ما زال فعالاً؛ وعند تعذر Telegram لا يُقبل الاسم الإضافي المخزن إلا إذا تأكد خلال آخر 7 أيام. لا يمسح التنفيذ سجل المستخدمين للعثور على الاسم ولا يفترض أن Bot API يحل اسماً خاصاً غير مفهرس. حسابات المستخدمين التاريخية تُفهرس تدريجياً عند تحديث جديد، لا فوراً.
+- **الملفات:** `tgcloud/schema.js`, `tgcloud/lib/usage-stats.js`, `tgcloud/lib/user-info.js`, `tests/serverless/harness.mjs`, `tests/serverless/user-info.test.mjs`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق:** نجح الاختبار المركّز `tests/serverless/user-info.test.mjs` (24/24) و`npm.cmd run test:ci` (377/377، مع فحوص كتالوج الخطط والأصول الثابتة) وفحوص الصياغة و`git diff --check`. الاختبارات تغطي بناء الفهرس، البحث بالاسم الإضافي في `/info` والضيف، تحديث الفهرس مرة يومياً وإزالة الأسماء القديمة، فصل هوية طالب الأمر، ورفض الاسم الذي لم يعد فعالاً عند نجاح Telegram lookup أو عندما يكون التخزين أقدم من سبعة أيام مع تعذر Telegram.
+- **GitHub/النشر:** طُبّق ترحيل الجدولين الإضافيين `user_aliases` و`user_alias_syncs` ثم نُشرت وحدات `tgcloud/schema.js`, `tgcloud/lib/usage-stats.js`, `tgcloud/lib/user-info-copy.js`, `tgcloud/lib/user-info.js` إلى Telegram Serverless revision 141. أكد `tgcloud status` أن مساحة Serverless نظيفة وملفات Mini App الـ70 محدثة، وأكد `migrate --local --dry-run` أن المخطط متزامن. لم يُنفذ Git push؛ لم يُختبر بحث حي لحساب بعينه في Telegram.
+
+## 2026-11-02 — إزالة المؤشر المخصص خلافاً للمطلوب
+
+- **توضيح المالك (2026-11-07):** الطلب كان حل ازدواج المؤشر بالاعتماد على المقبض المخصص الذي طلبه المالك، لا إلغاء المقبض والعودة إلى مؤشر `contenteditable` الأصلي. وصف السجل السابق السبب/القرار بصورة غير صحيحة؛ لا يوجد دليل أن المالك طلب حذف المقبض.
+- **التغيير الذي نُفذ حينها:** أزيل العنصر المرئي المخصص وملفاه من المحرر، واعتمد التنفيذ مؤشر `contenteditable` الأصلي في المتصفح وTelegram WebView. كان ذلك تفسيراً وتنفيذاً غير مطابقين للطلب. نتيجة ذلك لم تعد ميزة المقبض المخصص موجودة في المصدر بعد هذا التغيير.
+- **الملفات:** `app/miniapp_static/caret_handle.js` (حذف), `app/miniapp_static/caret_handle.css` (حذف), `app/miniapp_static/editor.html`, `tests/serverless/miniapp-caret-handle.test.mjs`, `md_files/log.md`.
+- **التحقق:** اجتاز اختبار Mini App المركّز 2/2 و`npm.cmd run check:miniapp` (58 أصلاً ثابتاً) و`npm.cmd run test:ci` (372/372؛ الكتالوج والأصول ناجحان) و`node --check` و`git diff --check`. لم يُختبر شكل مقبض المؤشر الأصلي في Telegram WebView على جهاز فعلي.
+- **GitHub/النشر:** نُشر `.tgcloud-miniapp-static/editor.html` وحده إلى Telegram Serverless revision 140 (ملف ثابت واحد؛ 70 ملفاً متزامناً). أكد `tgcloud status` عدم وجود تغييرات نشر أخرى، وجلب الصفحة الحية عبر GET تباعاً أكد أنها لم تعد تحمّل `caret_handle`؛ بقي زر جميع البلوكات. طلب HEAD يعيد 308 إلى `/editor`، بينما GET المتبع أعاد الصفحة بنجاح. لم يُنفذ Git push.
+
+## 2026-11-02 — إصلاح استقبال إهداء Rich Donate في جسر لوحة المطور
+
+- **السبب:** ظهر `REQUEST_FIELDS_INVALID` في مجموعة الإدارة عند طلب الإهداء؛ بوت Rich Donate الحالي يرسل `gift_subscription` وحقول `target/plan/months/entitlement_status/recipient_message`، بينما مستقبل المحرر كان يرفض هذا الإجراء وكل حقوله.
+- **التغيير:** إضافة تحقق الحقول والإجراء، مع الحفاظ على فحص هوية Rich Donate ورقمه المثبت ومجموعة الإدارة وصلاحية المطور. أضيف دفتر دائم `editor_gift_entitlements` يمنح Plus/Golden لحساب معروف فقط، يبدأ المدة بعد الاستحقاق الحالي، ويمنع تكرار المدة بمعرف الطلب. فشل إشعار المستلم يعيد محاولة الإشعار فقط؛ يعرض `/sup` الهدية المجدولة ومدة الانتهاء المجمعة. تستجيب الطلبات غير الصالحة تشخيصياً عند وجود معرّف/إجراء/مستخدم صالحين. لا تُستخدم رسالة العميل في إشعار المستلم.
+- **الملفات:** `tgcloud/lib/donate-console.js`, `tgcloud/lib/editor-subscriptions.js`, `tgcloud/lib/subscription-status.js`, `tgcloud/lib/subscription-rich.js`, `tgcloud/schema.js`, `tests/serverless/donate-console-gifts.test.mjs`, `tests/serverless/harness.mjs`, `md_files/docs/subscription-rollout.md`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجحت الاختبارات المركزة (26/26) و`npm.cmd run test:ci` (372/372؛ فحوص الكتالوج والأصول ناجحة)، و`node --check` للوحدات المعدلة، و`git diff --check`. عدد وحدات Telegram Serverless بعد التغيير 84 من أصل 100.
+- **GitHub/النشر:** بعد موافقة المالك، أظهر `tgcloud migrate --dry-run` أن المخطط متزامن ولا يحتاج ترحيلاً. نُشر `tgcloud/lib/donate-console.js` وحده إلى Telegram Serverless revision 139؛ أكد `tgcloud status` أن مساحة Serverless نظيفة وملفات Mini App الـ70 محدثة. لم يُنفذ Git push. لم يُرسل طلب هدية حي ولم يُختبر إشعار المستلم في Telegram؛ ولا يثبت هذا اختبار Stars أو تفعيل READY.
+
+## 2026-10-31 — سحب مؤشر الكتابة وإظهار قائمة جميع البلوكات
+
+- **السبب:** طلب المالك عرض مقبض المؤشر كما في لقطة Telegram، تكبيره أثناء السحب لنقل موضع الكتابة بين الكلمات والأسطر والبلوكات، وإتاحة العثور على البلوكات عبر `/اسم البلوكة` مع إظهار القائمة كاملة من زر الإضافة.
+- **التغيير:** إضافة مقبض مؤشر للمحررات الغنية القابلة للتحرير، يحافظ على موضع المؤشر ويستخدم موضع اللمس لتحديد نقطة الكتابة ويتبع المؤشر بين المحررات مع تمرير تلقائي قرب حواف منطقة التمرير؛ يعود لحجمه بعد الإفلات. إظهار زر جميع البلوكات وتوصيله بكامل الكتالوج، وتحسين بحث الأوامر ذات الوسائط باسم البلوك. داخل التفاصيل، اختيار «قائمة» يعرض منقطة/مرقمة/مهام، واختيار «عنوان» يعرض H1–H6؛ يعمل الاختيار من القائمة ومن `/اسم البلوك`.
+- **الملفات:** `app/miniapp_static/caret_handle.js`, `app/miniapp_static/caret_handle.css`, `app/miniapp_static/editor.html`, `app/miniapp_static/toolbar_sections.js`, `app/miniapp_static/editor_features.js`, `app/miniapp_static/telegram_compact_layout.css`, `app/miniapp_static/details_nested_editor.js`, `app/miniapp_static/details_nested_editor.css`, `app/miniapp_static/miniapp_i18n.js`, `tests/serverless/miniapp-caret-handle.test.mjs`, `tests/serverless/miniapp-composite-blocks.test.mjs`, `md_files/docs/serverless.md`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/docs/miniapp-serverless-cloudflare-dependencies.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm.cmd run test:ci` (364/364؛ فحوص الخطة والأصول ناجحة)، والاختبارات المركزية وفحوص الصياغة و`git diff --check`. نُشرت 4 ملفات ثابتة، وأكد `tgcloud status` revision 136 و70 ملفًا محدثًا. طلب HTTP للصفحة والـJS والـCSS وملف الترجمة أعاد 200؛ فُحص الـJS الحي وتأكد وجود اختيارات الأنواع. السحب داخل Telegram WebView على جهاز حقيقي لم يُختبر.
+- **GitHub/النشر:** أصول Mini App منشورة على Telegram Serverless revision 136؛ لم يُنفذ Git push أو تغيير BotFather.
+
+## 2026-10-31 — دمج كتالوجي اللغة الصينية
+
+- **السبب:** تقليل عدد وحدات Telegram Serverless مع الحفاظ على واجهتي الصينية المبسطة والتقليدية.
+- **التغيير:** جمع كتالوجي الرسائل ودليل الاستخدام في `tgcloud/lib/lang/chinese.js`، مع إبقاء `zh-hans` و`zh-hant` مستقلين في الاختيار والمحتوى؛ تحديث مستهلك الترجمة واختبار اكتمال كتالوجات الإيموجي.
+- **الملفات:** `tgcloud/lib/lang/chinese.js`, `tgcloud/lib/lang/zh-hans.js` (حذف بعد الدمج), `tgcloud/lib/lang/zh-hant.js` (حذف بعد الدمج), `tgcloud/lib/i18n.js`, `tests/serverless/premium-emoji.test.mjs`, `md_files/log.md`.
+- **التحقق/النشر:** نجح `npm.cmd run test:ci` (361/361؛ فحوص الخطة والأصول ناجحة)، وفحص الصياغة، ومقارنة آلية أكدت تطابق كتالوج الرسائل ودليل الاستخدام لكلتا اللغتين حرفياً مع النسختين قبل الدمج، و`git diff --check`. انخفض عدد وحدات Serverless من 99 إلى 98. ترحيل `tgcloud migrate --safe` أكد توافق المخطط؛ `npm.cmd run deploy` لم يجد تغييرات جديدة. جلب snapshot revision 134 أكد وجود `chinese.js` و`i18n.js` المطابقين محلياً بالـSHA-256، كما أظهر status أن الأصول الثابتة الـ68 محدثة.
+- **GitHub/النشر:** Telegram Serverless revision 134 مؤكد، بما فيه كتالوجا الصينية؛ لا Git push. لم يُنشر Cloudflare Worker ولم يُرسل READY، ولا يوجد اختبار حي للدفع أو قبول التطبيق في Telegram WebView.
+
+## 2026-10-31 — دمج وحدة RDB والالتزام بسقف وحدات Telegram Serverless
+
+- **السبب:** رفض نشر Telegram Serverless بسبب تجاوز حد الوحدات، مع طلب إبقاء العدد الكلي عند 100 أو أقل ومنع الإضافات المستقبلية غير المحسوبة.
+- **التغيير:** دمج استقبال/تحقق أحداث Rich Donate ومزامنتها وقراءة الاستحقاقات داخل `editor-subscriptions.js` بدلاً من وحدة منفصلة؛ أصبح عدد وحدات JavaScript القابلة للنشر 99. أضيف إلى `AGENTS.md` شرط عدّ كل وحدات Serverless قبل أي إضافة وعدم تجاوز 100.
+- **الملفات:** `AGENTS.md`, `tgcloud/lib/editor-subscriptions.js`, `tgcloud/lib/rich-donate-b2b.js` (حذف بعد الدمج), `tgcloud/lib/branding.js`, `tgcloud/handlers/message.js`, `tgcloud/lib/miniapp-bridge.js`, `tests/serverless/rich-donate-b2b.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** يُستكمل بعد الدمج.
+- **GitHub/النشر:** يُحدّث بعد محاولة النشر؛ لا يُعد تغيير Worker منشوراً.
+
+## 2026-10-31 — تشغيل مزامنة Rich Donate عبر مجموعة RCB1
+
+- **السبب:** طلب المالك تمرير جميع رسائل RDB بين البوتين عبر مجموعة RCB1 الوسيطة، رغم أن العقد الأصلي اشترط الخاص.
+- **التغيير:** يقبل المستقبل رسائل غير محوّلة من بوت Rich Donate المثبّت فقط، داخل المجموعة المحددة، وبأوامر موجّهة صراحةً إلى Rich Customize؛ ويرسل ACK موجهاً إلى Rich Donate بعد ثبات الحدث. يرسل Worker الحالي إشارة مؤقت RCB1 كل 10 دقائق بلا بيانات مستخدم أو دفع؛ ويطلب Serverless hello حتى تثبيت هوية البوت ثم sync. لا يرسل READY أو PAUSE.
+- **مخاطر/حدود:** بيانات الحدث، ومنها user_id ومعرّف دفعة Telegram، تظهر لمشاركي المجموعة؛ يجب إبقاء العضوية محصورة. بوت Rich Donate يحتاج تنفيذ صيغة المجموعة نفسها؛ لا يوجد handshake حي أو اختبار دفع/استرداد حقيقي، لذا لا تفعيل أو مبيعات ولا READY.
+- **الملفات:** `tgcloud/lib/rich-donate-b2b.js`, `tgcloud/lib/miniapp-bridge.js`, `workers/schedule-reminders/worker.js`, `workers/schedule-reminders/wrangler.toml`, `tests/serverless/rich-donate-b2b.test.mjs`, `tests/serverless/subscription-schedule.test.mjs`, `md_files/docs/subscription-rollout.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح الاختبار المركز (13/13)، و`npm.cmd run test:ci` (361/361 مع فحوص الخطة والأصول)، و`node --check` للملفات المعدلة، و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم يُنفّذ migration أو Telegram `push` أو نشر Worker أو Git push. المخطط المضاف سابقاً لم يُطبّق بعد.
+
+## 2026-10-31 — استقبال أحداث اشتراك Rich Donate عبر RDB1
+
+- **السبب:** تجهيز جهة Rich Customize لاستقبال أحداث شراء/استرداد موثوقة من Rich Donate وفق RDB1، مع منع التكرار وعدم منح مزايا من رسائل غير موثقة.
+- **التغيير:** إضافة تحقق من هوية البوت والمحادثة الخاصة والرسائل غير المحوّلة، وتثبيت رقمي لهوية Rich Donate بعد hello ACK، والتحقق الصارم من حقول الحدث والأسعار وتركيبات Plus/Golden وإزالة الحقوق. أضيف سجل أحداث واحد فريد لكل حدث/طلب/شحنة؛ السجل نفسه هو مصدر استحقاق الاشتراك والحقوق الدائمة، وتُشتق منه الحالة عند القراءة. يعالج refunds كـ tombstones حتى لا تعيد أحداث شراء متأخرة تفعيل الطلب. اشتراكات الشراء الجديدة تزيد المدة وتحوّل الخطة الجديدة فوراً، وتنعكس مدة الصلاحية الإجمالية في `/sup`. تم توثيق انحراف التخزين عن عقد الجدولين/المعاملة الذرية لأن SDK لا يوفر معاملات متعددة الجداول. أمر هدايا المطور مؤجل؛ السياسة التي حددها المالك (بدء الهدية بعد المدة الحالية وإظهار الإجمالي) موثقة لكنها غير موصولة.
+- **الملفات:** `tgcloud/schema.js`, `tgcloud/lib/rich-donate-b2b.js`, `tgcloud/lib/editor-subscriptions.js`, `tgcloud/lib/subscription-status.js`, `tgcloud/lib/branding.js`, `tgcloud/handlers/message.js`, `tests/serverless/harness.mjs`, `tests/serverless/rich-donate-b2b.test.mjs`, `md_files/docs/subscription-rollout.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm.cmd run test:ci` (فحوص الخطة والأصول و359/359 اختباراً)، وفحوص `node --check` للملفات المعدلة، و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم يُنفذ commit أو push أو ترحيل مخطط أو نشر Telegram Serverless. لا يوجد handshake حي أو اختبار Stars فعلي. لم يُنفذ أو يُرسل READY؛ مزامنة الأحداث الدورية وأمر هدايا المطور ما زالا غير منفذين.
+
+## 2026-10-31 — إظهار الإيموجي المخصص في عناوين التفاصيل دون اعتماد على CDN
+
+- **السبب:** تهيئة عرض الإيموجي المخصص داخل المحرر كانت تنتظر تحميل كتالوج Unicode من CDN خارجي. عند تعذر الكتالوج، كان المسار يخرج قبل طلب معاينة الإيموجي المخصص؛ لذلك لا يظهر إيموجي عنوان التفاصيل رغم بقاء معرّفه محفوظاً.
+- **التغيير:** تشغيل تزيين الإيموجي المخصص فوراً للمحررات الجديدة والحالية، ثم تحميل كتالوج Unicode اختيارياً وإعادة التزيين عند نجاحه. تحديث إصدار ملف العرض في صفحة المحرر وإضافة اختبار يمنع ربط معاينة الإيموجي المخصص بنجاح CDN.
+- **الملفات:** `app/miniapp_static/apple_inline_emoji.js`, `app/miniapp_static/editor.html`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (فحوص الخطة والأصول و351/351 اختباراً)، والاختبار المركز `tests/serverless/miniapp-custom-emoji-code.test.mjs` (7/7)، و`node --check app/miniapp_static/apple_inline_emoji.js`، و`git diff --check`.
+- **GitHub/النشر:** إصلاح محلي فقط؛ لم يُنفذ commit أو push أو نشر Telegram Serverless أو Cloudflare. لا تغيير مخطط أو بيانات.
+
+## 2026-10-31 — مزامنة حالة فتح التفاصيل عند نشر الصفحة المحفوظة
+
+- **السبب:** الصفحة المحفوظة كانت تُرسل بمحتوى تفاصيل محدث، لكن بلوكات التفاصيل المستوردة تحتفظ بـ`is_open` القديم داخل `native_data`. هذا يجعل محتوى التفاصيل التي فتحها المستخدم في المحرر يظهر مغلقاً/مخفياً في الرسالة المنشورة.
+- **التغيير:** عند بناء حمولة النشر، تُنسخ حالة `is_open` الحالية من بيانات المحرر إلى بلوك التفاصيل الأصلي، مع إبقاء القيمة القديمة فقط إذا لم توجد قيمة تحرير صريحة. أضيف اختبار نشر فعلي لصفحة محفوظة يتحقق من حالة Details المتداخلة ومحتواها المعدل.
+- **الملفات:** `tgcloud/lib/editor-renderer.js`, `tests/serverless/premium-emoji.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (فحوص الخطة والأصول و350/350 اختباراً)، والاختبار المركز للتفاصيل والبلوكات المركبة (27/27)، و`node --check tgcloud/lib/editor-renderer.js`، و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم يُنفذ commit أو push أو نشر Telegram Serverless أو Cloudflare. لا تغيير مخطط أو بيانات.
+
+## 2026-10-31 — توحيد تحرير وعرض البلوكات المستوردة في Mini App
+
+- **السبب:** اختلاف عرض بعض البلوكات بين محرر Mini App والرسالة المنشورة، خصوصاً عنوان التفاصيل الذي لم يقبل تنسيق Rich Text أو الإيموجي المخصص، وإمكانية نشر `native_data` قديم بدلاً من قيم التحرير الحالية.
+- **التغيير:** استبدال حقول عنوان التفاصيل (الرئيسية والداخلية) بمحرر Rich Text يدعم معاينة الإيموجي والتحويل إلى بيانات محفوظة. مزامنة القيم المعدلة للبلوكات الأصلية قبل الإرسال، بما فيها التفاصيل والاقتباسات والنصوص والقوائم والجداول والوسائط والخرائط ومحتوى collage/slideshow؛ وإعادة استخدام `file_id` عند تطبيع الوسائط المتداخلة.
+- **الملفات:** `app/miniapp_static/details_nested_editor.js`, `app/miniapp_static/details_nested_editor.css`, `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/editor_features.css`, `app/miniapp_static/editor.html`, `tgcloud/lib/editor-renderer.js`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `tests/serverless/premium-emoji.test.mjs`, `tests/serverless/miniapp-motion.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (فحوص الخطة والأصول و349/349 اختباراً)، والاختبار المركز لبلوكات التفاصيل والوسائط المركبة (26/26)، واختبار عقد محرر الإيموجي (6/6)، و`git diff --check` وفحوص صياغة JavaScript.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم يُنفذ commit أو push إلى GitHub أو نشر إلى Telegram Serverless أو Cloudflare. لا تغيير مخطط أو بيانات.
+
+## 2026-10-31 — تحويل كود الإيموجي في حمولة الإرسال
+
+- **السبب:** كان تحويل أكواد HTML/Markdown يعمل في استقبال رسائل البوت ومحرر Mini App، لكن مسار نشر صفحة محفوظة قد يمرر كوداً بقي نصاً في بيانات RichText/HTML إلى Telegram كما هو.
+- **التغيير:** إضافة تحويل خادمي لأكواد الإيموجي الكاملة داخل نصوص HTML والمحتوى النصي وحقول RichText النصية إلى كيانات Telegram `custom_emoji`، مع إبقاء الأكواد غير المطابقة كما هي. إضافة اختبار إرسال تكاملي يفحص حمولة Telegram لا مجرد العرض في المحرر.
+- **الملفات:** `tgcloud/lib/rich-text.js`, `tests/serverless/premium-emoji.test.mjs`, `md_files/docs/premium-emoji.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (346/346)، والاختبار المركز `tests/serverless/premium-emoji.test.mjs` (21/21)، و`git diff --check`. الاختبار التكاملي يفحص حمولة `sendRichMessage` نفسها بصيغ HTML وMarkdown والنص المخزّن.
+- **GitHub/النشر:** نُشر `tgcloud/lib/rich-text.js` إلى Telegram Serverless revision 127. أكد `npx tgcloud status` أن webhook في المزامنة والأصول الثابتة الـ68 متزامنة، وأكد `npx tgcloud diff` عدم وجود تغييرات نشر متبقية. لم يُدفع GitHub ولم يُختبر الإرسال إلى دردشة حقيقية بعد. لا تغيير مخطط أو بيانات.
+
+## 2026-10-31 — تحويل أكواد الإيموجي عند تحميل محتوى Mini App
+
+- **السبب:** المحول كان يُشغّل عند اللصق أو بعد تعديل المحرر، لا عند تهيئة محتوى محفوظ يحتوي كود HTML حرفياً؛ لذلك يبقى الكود ظاهراً بمجرد فتح الصفحة.
+- **التغيير:** تشغيل محول كود الإيموجي بعد إدراج المحررات في الصفحة وعند تحميل النصوص الغنية والقوائم وخلايا الجداول، دون تحويل بلوكات الكود أو تفسير HTML عشوائي.
+- **الملفات:** `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/live_preview.js`, `app/miniapp_static/editor.html`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (فحوص الخطة والأصول، والاختبارات 345/345)، والاختبار المركز `tests/serverless/miniapp-custom-emoji-code.test.mjs` (5/5)، و`git diff --check`.
+- **GitHub/النشر:** نُشرت الأصول الثابتة الأربعة إلى Telegram Serverless revision 126. أكد `npx tgcloud status` تزامن 68 ملفاً، وأعادت `/editor` و`/inline_text_tools.js?v=0.3.71` و`/live_preview.js?v=0.3.100` و`/editor_features.css` الحالة 200؛ احتوى ملفا المحرر على مسار تحويل الإيموجي. لم يُدفع GitHub ولم يُختبر التفاعل داخل Telegram WebView. لا تغيير مخطط أو بيانات.
+
+## 2026-10-31 — نقل مقبض تحريك البلوك إلى الهامش الأيسر
+
+- **السبب:** مقبض السحب كان يستخدم بداية السطر المنطقية، فتظهر جهته اليمنى في واجهة RTL وقد يتراكب مع النص أو عناصر البلوك.
+- **التغيير:** تثبيت المقبض عند الحافة اليسرى الفيزيائية، وحجز هامش داخل كل بلوك كي لا يغطي النص أو عناصر الإدخال. يظل مخفياً في وضع المعاينة.
+- **الملفات:** `app/miniapp_static/editor_features.css`, `app/miniapp_static/editor.html`, `tests/serverless/miniapp-motion.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجحت اختبارات `tests/serverless/miniapp-motion.test.mjs` (6/6)، وفحص `node scripts/check-miniapp-static.mjs`، و`git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لم تُدفع أو تُنشر. لا تغيير مخطط أو بيانات.
+
+## 2026-10-31 — إصلاح قوائم المهام متعددة الأسطر والنقر على الإنجاز
+
+- **السبب:** كان محرر Mini App يعرض مربعاً شكلياً غير قابل للنقر، ويعيد تعيين حالة الإنجاز عند تعديل أي مهمة. كما لم تكن القوائم الفارغة تعرض خانة إدخال يمكن بدء قائمة منها.
+- **التغيير:** إضافة خانات اختيار فعلية لكل مهمة في القائمة الرئيسية وقوائم التفاصيل، مع حفظ حالة الإنجاز في بيانات العناصر وإظهار المهمة المنجزة بوضوح. Enter ينشئ عنصراً جديداً مع الحفاظ على حالات العناصر السابقة. واجهة البوت تحتوي أصلاً على أزرار مهام تفاعلية؛ أُضيف اختبار تكاملي يثبت إنشاء عنصر لكل سطر وإمكانية إنجاز وإلغاء إنجاز عنصر بعد السطر الثاني.
+- **الملفات:** `app/miniapp_static/live_preview.js`, `app/miniapp_static/details_nested_editor.js`, `app/miniapp_static/app.js`, `app/miniapp_static/miniapp_icons.css`, `app/miniapp_static/editor.html`, `tests/serverless/checklist.test.mjs`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (343/343؛ فحوص الخطط وأصول Mini App نجحت)، وبناء `node scripts/build-miniapp-serverless.mjs`، والاختبار المركز لقائمة المهام (1/1)، واختبارات مسار المحرر (3/3)، و`git diff --check`.
+- **GitHub/النشر:** نُشرت أصول Mini App إلى Telegram Serverless revision 125؛ أكد `npx tgcloud status` مزامنة 68 ملفاً. أعادت أصول `live_preview.js` و`details_nested_editor.js` و`miniapp_icons.css` الحالة 200 وتضمنت معرّف مربع الاختيار. لم يُدفع GitHub ولم يُختبر التفاعل داخل Telegram WebView أو يُنشر إلى Cloudflare. لا تغيير مخطط أو بيانات.
+
+## 2026-10-31 — استعادة إضافة حزم الإيموجي عند تعذر استيراد D1
+
+- **السبب:** كان تعذر جلب قائمة الحزم القديمة من Cloudflare يُسقط مزامنة الإيموجي برسالة `CUSTOM_EMOJI_LEGACY_IMPORT_UNAVAILABLE` ويمنع الحساب من إكمال الإضافة.
+- **التغيير:** إرجاع حالة الاستيراد المعلقة مع رمز HTTP الآمن بدلاً من فشل تحميل قائمة Serverless، والسماح لحساب المطور الموثوق فقط بإضافة حزم أثناء انتظار الاستيراد. تُحفظ علامة الترحيل المعلقة، وتُدمج قائمة D1 لاحقاً مع الحزم الجديدة دون فقد أو تجاوز حصص المستخدمين الآخرين. أُبقيت الحزم المحلية دون حذف إلى أن ينجح الاستيراد.
+- **الملفات:** `tgcloud/lib/miniapp-custom-emoji.js`, `app/miniapp_static/miniapp_serverless_api.js`, `app/miniapp_static/apple_emoji_picker.js`, `tests/serverless/miniapp-custom-emoji.test.mjs`, `tests/serverless/miniapp-serverless-client.test.mjs`, `md_files/docs/miniapp-serverless-migration.md`, `md_files/docs/miniapp-serverless-cloudflare-dependencies.md`, `md_files/docs/serverless.md`, `md_files/log.md`.
+- **التحقق الفعلي:** نجح `npm run test:ci` (342/342)، وبناء `node scripts/build-miniapp-serverless.mjs`، والاختبارات المركزة (10/10)، و`git diff --check`. أظهر `npx tgcloud diff` تغيير كود Serverless والأصول فقط دون تغيير مخطط.
+- **GitHub/النشر:** نُشر بـ`npx tgcloud push` إلى Telegram Serverless revision 124؛ أكد `npx tgcloud status` أن 68 أصلاً ثابتاً متزامنة، وأعادت ملفات `apple_emoji_picker.js` و`miniapp_serverless_api.js` الحالة 200 مع وجود علامة الاستيراد. لم يُدفع GitHub، ولم يتغير رابط BotFather أو Cloudflare، ولم يُختبر المسار المصادق عليه داخل Telegram WebView. لا `migrate` ولا حذف أو تعديل بيانات D1.
+
 ## 2026-10-31 — إصلاح لصق كود الإيموجي في Mini App
 
 - **السبب:** بقي كود الإيموجي الملصوق ظاهراً، كما كانت مزامنة قائمة الحزم تعرض Toast مضللاً يوحي بفشل تحميل الحزمة حتى عند لصق إيموجي منفرد.
@@ -20,7 +493,7 @@
 - **التغيير:** تحويل `<tg-emoji emoji-id="…">بديل</tg-emoji>` و`![بديل](tg://emoji?id=…)` إلى كيانات Telegram مخصصة مع إبقاء بديل النص، وإعادة تعيين إزاحات كيانات Telegram الموجودة. في Mini App تتحول الأكواد المكتملة أثناء التحرير إلى عناصر معاينة مخصصة، وتُحفظ المعرفات في النصوص والقوائم والخلايا؛ وتبقى بلوكات الكود حرفية. توثيق السلوك وحدود المعاينة.
 - **الملفات:** `tgcloud/lib/rich-text.js`, `app/miniapp_static/custom_emoji_code.js`, `app/miniapp_static/editor.html`, `app/miniapp_static/inline_text_tools.js`, `app/miniapp_static/live_preview.js`, `app/miniapp_static/apple_inline_emoji.js`, `app/miniapp_static/apple_inline_emoji.css`, `tests/serverless/premium-emoji.test.mjs`, `tests/serverless/miniapp-custom-emoji-code.test.mjs`, `md_files/docs/premium-emoji.md`, `md_files/log.md`.
 - **التحقق الفعلي:** نجح `npm run test:ci` (339/339؛ فحوص الخطط وأصول Mini App نجحت)، و`npm run test:emoji` (20/20)، واختبار تحويل Mini App (3/3)، وفحص صياغة الملفات المعدلة و`git diff --check`.
-- **GitHub/النشر:** تغييرات محلية فقط؛ لم تُدفع إلى GitHub ولم تُنشر إلى Telegram Serverless أو Mini App. لا تغيير مخطط أو ترحيل.
+- **GitHub/النشر:** دُفع commit `9104112` إلى فرع `serverless-cleanup`. تحقق نشر Cloudflare Pages بجلب `https://rich-customize.pages.dev/miniapp/static/custom_emoji_code.js?v=0.1.0` وظهور محوّل HTML/Markdown الحالي. صفحة المحرر تعيد التوجيه للتحقق من جلسة Telegram خارج WebView، لذلك لم يُختبر إدخال حي. تعديل `tgcloud/lib/rich-text.js` موجود على GitHub ولم يُنفّذ له `tgcloud push`. لا تغيير مخطط أو ترحيل.
 
 ## 2026-10-31 — دليل الوكيل لبناء ميزة Telegram Serverless
 

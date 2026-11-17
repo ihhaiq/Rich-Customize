@@ -29,12 +29,6 @@ import {
   renderPagesScreen,
 } from 'lib/pages';
 import { resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
-import {
-  enqueuePageDeleteSync,
-  enqueuePageUpsertSync,
-  flushMiniAppSyncOutbox,
-  nextPageSyncVersion,
-} from 'lib/miniapp-sync';
 import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { safePlanLimit } from 'lib/subscription-policy';
@@ -222,7 +216,7 @@ export async function persistPage(userId, title, session, existingId = null, { r
     }
     await assertQuota();
     stamp = Math.max(stamp, Number(existing.updatedAt || 0) + 1);
-    const version = await nextPageSyncVersion(existing.revision || 1);
+    const revision = Math.max(1, Number(existing.revision || 1)) + 1;
     const changed = await db.update(richPages).set({
       title: cleanedTitle,
       blocks: clone(session.blocks || []),
@@ -230,8 +224,8 @@ export async function persistPage(userId, title, session, existingId = null, { r
       buttonsPerRow: Math.max(1, Math.min(8, Number(session.buttonsPerRow || 1))),
       buttonsAlign: String(session.buttonsAlign || 'center'),
       updatedAt: stamp,
-      revision: version.revision,
-      syncSeq: version.syncSeq,
+      revision,
+      syncSeq: Number(existing.syncSeq || 0),
     }).where(and(
       eq(richPages.pageId, String(existingId)),
       eq(richPages.ownerId, Number(userId)),
@@ -241,15 +235,6 @@ export async function persistPage(userId, title, session, existingId = null, { r
       const error = new Error('PAGE_CONFLICT');
       error.pageBusy = true;
       throw error;
-    }
-    const saved = await getPage(existingId);
-    if (saved) {
-      try {
-        await enqueuePageUpsertSync(saved);
-        await flushMiniAppSyncOutbox({ limit: 1 });
-      } catch (error) {
-        await logError('miniapp_sync.editor_save', error, { userId, extra: 'page=' + String(existingId) });
-      }
     }
     return String(existingId);
   }
@@ -262,7 +247,6 @@ export async function persistPage(userId, title, session, existingId = null, { r
       throw error;
     }
     const id = reservedId || await allocatePageId();
-    const version = await nextPageSyncVersion(0);
     await db.insert(richPages).values({
       pageId: id,
       ownerId: Number(userId),
@@ -274,18 +258,9 @@ export async function persistPage(userId, title, session, existingId = null, { r
       createdAt: stamp,
       updatedAt: stamp,
       quotaVersion:2,
-      revision: version.revision,
-      syncSeq: version.syncSeq,
+      revision:1,
+      syncSeq:0,
     }).run();
-    const saved = await getPage(id);
-    if (saved) {
-      try {
-        await enqueuePageUpsertSync(saved);
-        await flushMiniAppSyncOutbox({ limit: 1 });
-      } catch (error) {
-        await logError('miniapp_sync.editor_create', error, { userId, extra: 'page=' + String(id) });
-      }
-    }
     return id;
   } finally {
     await releaseOwnerPageLock(ownerLock);
@@ -307,7 +282,6 @@ async function restorePage(userId, pageId, snapshot) {
     // content. Quotas apply only if the restored page is subsequently edited.
     // Telegram's transport limits still apply whenever it is published.
     const stamp = nowSeconds();
-    const version = await nextPageSyncVersion(snapshot.revision || 1);
     await db.insert(richPages).values({
       pageId: String(pageId),
       ownerId: Number(userId),
@@ -319,18 +293,9 @@ async function restorePage(userId, pageId, snapshot) {
       createdAt: Number(snapshot.createdAt || stamp),
       updatedAt: stamp,
       quotaVersion: Math.max(1, Number(snapshot.quotaVersion || 1)),
-      revision: version.revision,
-      syncSeq: version.syncSeq,
+      revision:Math.max(1, Number(snapshot.revision || 1)) + 1,
+      syncSeq:Number(snapshot.syncSeq || 0),
     }).run();
-    const restored = await getPage(pageId);
-    if (restored) {
-      try {
-        await enqueuePageUpsertSync(restored);
-        await flushMiniAppSyncOutbox({ limit: 1 });
-      } catch (error) {
-        await logError('miniapp_sync.editor_restore', error, { userId, extra: 'page=' + String(pageId) });
-      }
-    }
     return true;
   } finally {
     await releaseOwnerPageLock(ownerLock);
@@ -619,20 +584,7 @@ export async function handleEditorPageCallback(query) {
     const session = await loadEditorSession(query.from.id);
     if (!session) return false;
     const wasCurrent = String(session.currentPageId || '') === pageId;
-    const deleteVersion = await nextPageSyncVersion(page.revision || 1);
     await db.delete(richPages).where(eq(richPages.pageId, pageId)).run();
-    try {
-      await enqueuePageDeleteSync({
-        ownerId: query.from.id,
-        pageId,
-        revision: deleteVersion.revision,
-        syncSeq: deleteVersion.syncSeq,
-        updatedAt: nowSeconds(),
-      });
-      await flushMiniAppSyncOutbox({ limit: 1 });
-    } catch (error) {
-      await logError('miniapp_sync.editor_delete', error, { userId: query.from.id, extra: 'page=' + pageId });
-    }
     if (wasCurrent) await rememberEditorState(query.from.id, session);
     await updateEditorSession(query.from.id, {
       ...(wasCurrent ? { currentPageId: null, currentPageTitle: null } : {}),
@@ -872,13 +824,13 @@ async function receiveRename(message, session, code) {
   }
   try {
     await assertUniquePageTitle(userId, title, pageId);
-  const renameVersion = await nextPageSyncVersion(page.revision || 1);
+  const renameRevision = Math.max(1, Number(page.revision || 1)) + 1;
   const renamedAt = Math.max(nowSeconds(), Number(page.updatedAt || 0) + 1);
   const renamedRows=await db.update(richPages).set({
     title,
     updatedAt: renamedAt,
-    revision: renameVersion.revision,
-    syncSeq: renameVersion.syncSeq,
+    revision:renameRevision,
+    syncSeq:Number(page.syncSeq || 0),
   }).where(and(eq(richPages.pageId,pageId),
     eq(richPages.ownerId,Number(userId)),
     eq(richPages.revision,Number(page.revision||1))))
@@ -888,16 +840,6 @@ async function receiveRename(message, session, code) {
       text:code==='ar'?'الصفحة تغيرت بوقت ثاني. افتحها من جديد قبل تعديل الاسم.':'Page changed. Reopen it before renaming.'});
     return true;
   }
-  try {
-    const renamed = await getPage(pageId);
-    if (renamed) {
-      await enqueuePageUpsertSync(renamed);
-      await flushMiniAppSyncOutbox({ limit: 1 });
-    }
-  } catch (error) {
-    await logError('miniapp_sync.editor_rename', error, { userId, extra: 'page=' + pageId });
-  }
-
   const draftChanged = String(session.currentPageId || '') === pageId
     && String(session.currentPageTitle || '') !== title;
   if (draftChanged) await rememberEditorState(userId, session);

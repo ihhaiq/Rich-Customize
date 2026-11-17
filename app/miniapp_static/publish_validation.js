@@ -73,7 +73,7 @@
         if(native&&!hasText(data.name))fail('missing_anchor');
       }else if(kind==='buttons'){
         if(!Array.isArray(data.buttons)||!data.buttons.length)fail('missing_buttons');
-        else if(!native&&data.buttons.length!==1)fail('invalid_button_layout');
+        else if(data.buttons.length>100)fail('invalid_button_layout');
         else if(data.buttons.some(button=>{
           if(!object(button)||!String(button.text||'').trim()||String(button.text).length>64)return true;
           const actions=['url','callback_data','copy_text','web_app','login_url','switch_inline_query','switch_inline_query_current_chat','disabled'];

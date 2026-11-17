@@ -1,11 +1,11 @@
 // Beta 0.2 live-preview layer: the rendered block is also the editor.
-function liveEditable(block, className, placeholder) {
+function liveEditable(block, className, placeholder, initialText = blockText(block)) {
   const el = document.createElement("div");
   el.className = `live-editor ${className}`;
   el.contentEditable = "true";
   el.spellcheck = true;
   el.dataset.placeholder = placeholder || info(block.type).label;
-  el.textContent = blockText(block);
+  el.textContent = initialText;
   el.addEventListener("focus", () => selectBlock(block.id));
   el.addEventListener("input", () => {
     applyText(block, el.innerText.replace(/\r/g, ""));
@@ -17,7 +17,22 @@ function liveEditable(block, className, placeholder) {
 function quoteWithCredit(block, className, quotePlaceholder) {
   const wrap = document.createElement("div");
   wrap.className = "live-quote-wrap";
-  wrap.appendChild(liveEditable(block, className, quotePlaceholder));
+  const media = window.RichMiniAppQuoteMedia?.(block) || [];
+  if (media.length) {
+    const mediaWrap = document.createElement("div");
+    mediaWrap.className = "live-quote-media";
+    media.forEach(child => {
+      const preview = window.RichMiniAppStoredMediaPreview?.(child);
+      if (preview) mediaWrap.appendChild(preview);
+    });
+    if (mediaWrap.childElementCount) wrap.appendChild(mediaWrap);
+  }
+  const data = block.data || {};
+  const safeQuoteHtml = window.RichInlineTextTools?.sanitizeInlineHtml?.(data.quote_html || "");
+  const quoteTemplate = document.createElement("template");
+  quoteTemplate.innerHTML = safeQuoteHtml || "";
+  const quoteText = blockText(block) || quoteTemplate.content.textContent || "";
+  wrap.appendChild(liveEditable(block, className, quotePlaceholder, quoteText));
 
   const credit = document.createElement("div");
   credit.className = "live-editor live-credit";
@@ -82,10 +97,12 @@ listEditor = function(block) {
   const kind = d.kind || "bullet";
   const list = document.createElement(kind === "numbered" ? "ol" : "ul");
   list.className = `telegram-list${kind === "checklist" ? " telegram-checklist" : ""}`;
-  const values = (d.items || [{text:""}]).map(item => typeof item === "object" ? (item.text || "") : String(item));
+  const values = (Array.isArray(d.items) && d.items.length ? d.items : [{text:""}])
+    .map(item => typeof item === "object" ? (item.text || "") : String(item));
 
   function sync() {
     const editors = Array.from(list.querySelectorAll("[contenteditable]"));
+    const checkboxes = Array.from(list.querySelectorAll(".checklist-toggle"));
     editors.forEach(editor => window.RichCustomEmojiCode?.convertEditor?.(editor));
     const entries = editors.map(editor => {
       const clone = editor.cloneNode(true);
@@ -96,44 +113,55 @@ listEditor = function(block) {
     });
     const lines = entries.map(entry => entry.text);
     d.items = entries.map(({text, html}, index) => kind === "checklist"
-      ? {text, html, has_checkbox:true, is_checked:false}
+      ? {text, html, has_checkbox:true, is_checked:Boolean(checkboxes[index]?.checked)}
       : kind === "numbered"
         ? {text, html, value:index + 1, type:"1"}
         : {text, html});
+    list.querySelectorAll("li").forEach((li, index) => {
+      if (kind === "checklist") li.classList.toggle("is-checked", Boolean(checkboxes[index]?.checked));
+    });
     d.text = lines.join("\n");
     const tag = kind === "numbered" ? "ol" : "ul";
     d.html = `<${tag}>${entries.map(entry => `<li>${sanitizeTableCellHtml(entry.html, entry.text)}</li>`).join("")}</${tag}>`;
     markDirty();
   }
 
-  values.forEach((value, index) => {
+  function makeListItem(value, item = {}) {
     const li = document.createElement("li");
+    if (kind === "checklist") {
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "checklist-toggle";
+      checkbox.checked = Boolean(item?.is_checked);
+      checkbox.setAttribute("aria-label", String(value || mt("list.task")));
+      checkbox.addEventListener("change", sync);
+      li.classList.toggle("is-checked", checkbox.checked);
+      li.appendChild(checkbox);
+    }
     const editor = document.createElement("div");
     editor.contentEditable = "true";
     editor.className = "rich-inline-editor";
     editor.dataset.placeholder = mt("list.item");
-    const item = (d.items || [])[index];
     editor.innerHTML = sanitizeTableCellHtml(item?.html, value);
     editor.addEventListener("focus", () => selectBlock(block.id));
     editor.addEventListener("input", sync);
     editor.addEventListener("keydown", event => {
       if (event.key === "Enter") {
         event.preventDefault();
-        const next = document.createElement("li");
-        const nextEditor = document.createElement("div");
-        nextEditor.contentEditable = "true";
-        nextEditor.className = "rich-inline-editor";
-        nextEditor.addEventListener("focus", () => selectBlock(block.id));
-        nextEditor.addEventListener("input", sync);
-        next.appendChild(nextEditor);
+        const next = makeListItem("", {is_checked:false});
         li.after(next);
-        nextEditor.focus();
+        next.querySelector("[contenteditable]")?.focus();
         sync();
       }
     });
     li.appendChild(editor);
-    list.appendChild(li);
-  });
+    requestAnimationFrame(() => {
+      if (editor.isConnected) window.RichCustomEmojiCode?.convertEditor?.(editor);
+    });
+    return li;
+  }
+
+  values.forEach((value, index) => list.appendChild(makeListItem(value, d.items?.[index])));
   return list;
 };
 
@@ -203,6 +231,9 @@ function createRichTableCellEditor(cell, placeholder, {onFocus,onPointerDown,onI
   editor.setAttribute("role", "textbox");
   editor.setAttribute("aria-multiline", "false");
   editor.innerHTML = sanitizeTableCellHtml(cell?.html, cell?.text || "");
+  requestAnimationFrame(() => {
+    if (editor.isConnected) window.RichCustomEmojiCode?.convertEditor?.(editor);
+  });
 
   const sync = () => {
     window.RichCustomEmojiCode?.convertEditor?.(editor);
@@ -256,7 +287,7 @@ function renderRichBlocks() {
     main.className = "block-main";
 
     let editor;
-    if (["paragraph","heading","footer","preformatted","blockquote","pullquote","anchor","mathematical_expression"].includes(block.type)) editor = textEditor(block);
+    if (["paragraph","text","heading","footer","preformatted","blockquote","pullquote","anchor","mathematical_expression"].includes(block.type)) editor = textEditor(block);
     else if (block.type === "details") editor = detailsEditor(block);
     else if (block.type === "list") editor = listEditor(block);
     else if (block.type === "table") editor = tableEditor(block);
@@ -339,8 +370,7 @@ window.RichLiveRenderer.render=renderRichBlocks;
 
   function rowsFor(block) {
     if (!block) return [];
-    const d = block.data || (block.data = {});
-    return Array.isArray(d.rows) ? d.rows : (d.rows = []);
+    return window.RichMiniAppTableRows?.(block) || [];
   }
 
   function ensureCell(block, ri, ci) {
@@ -609,7 +639,7 @@ window.RichLiveRenderer.render=renderRichBlocks;
     const table=document.createElement("table");
     const rtl=String(document.documentElement.lang||"ar").toLowerCase().startsWith("ar");
     table.setAttribute("dir",rtl?"rtl":"ltr");
-    const rows=Array.isArray(d.rows)?d.rows:(d.rows=[]);
+    const rows=window.RichMiniAppTableRows?.(block)||[];
     const body=document.createElement("tbody");
     rows.forEach((row,ri)=>{
       const tr=document.createElement("tr");

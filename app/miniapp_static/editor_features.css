@@ -36,7 +36,8 @@ body{background:var(--bg)!important}
 
 .editor-drag-handle{
   position:absolute;
-  inset-inline-start:-7px;
+  left:2px;
+  right:auto;
   top:50%;
   z-index:12;
   width:28px;
@@ -59,6 +60,7 @@ body{background:var(--bg)!important}
   backdrop-filter:blur(14px);
   -webkit-backdrop-filter:blur(14px);
 }
+.block{padding-left:36px}
 .editor-drag-handle span{width:4px;height:4px;border-radius:50%;background:currentColor}
 .block.selected>.editor-drag-handle,.block:hover>.editor-drag-handle{opacity:.82}
 .editor-drag-handle:active{cursor:grabbing;transform:translateY(-50%) scale(.95)}
@@ -151,6 +153,9 @@ html.editor-dragging{user-select:none;-webkit-user-select:none}
   pointer-events:none!important;
   caret-color:transparent!important;
 }
+.preview-mode .telegram-details-v036 .details-title-input{
+  pointer-events:none!important;
+}
 .preview-mode .telegram-table :is(input,.rich-table-cell-editor){
   border:0!important;
   background:transparent!important;
@@ -238,7 +243,7 @@ html.editor-dragging{user-select:none;-webkit-user-select:none}
 .slash-menu .menu-item:first-child .menu-icon{color:var(--accent)}
 
 @media(max-width:430px){
-  .editor-drag-handle{inset-inline-start:-2px;width:25px;height:38px}
+  .editor-drag-handle{left:2px;right:auto;width:25px;height:38px}
   .rich-button-dialog{padding:15px;border-radius:20px;gap:12px}
   .button-style-row{gap:4px}.button-style-pill{padding-inline:10px}
   .multi-select-bar{bottom:max(10px,env(safe-area-inset-bottom));padding:7px 8px}
@@ -312,4 +317,3 @@ html.mobile-performance .rich-button-dialog{
   .table-align-grid{gap:4px}.table-tool-icon{height:42px}.table-tool-icon svg{width:23px;height:23px}.table-cell-handle{left:-15px;width:30px;height:40px}
 }
 html.mobile-performance .table-cell-menu{backdrop-filter:blur(12px) saturate(118%);-webkit-backdrop-filter:blur(12px) saturate(118%);box-shadow:0 11px 28px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.04)}
-

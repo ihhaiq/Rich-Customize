@@ -11,9 +11,14 @@ Cloudflare is responsible only for:
 - forwarding Mini App media uploads to Telegram to obtain reusable `file_id` values;
 - storing short-lived B2B correlation/identity metadata.
 
-Telegram Serverless remains authoritative for pages and managed chats. D1 also contains transitional owner-specific page mirrors used by quota-baseline checks; these mirrors are not an independent source of truth.
+Telegram Serverless remains authoritative for pages and managed chats. Serverless Mini App page CRUD reads and writes `rich_pages` directly; it no longer sends saved-page documents or mirror updates to Cloudflare. D1 may still contain older owner-specific page mirrors used by legacy Cloudflare quota checks, but Serverless no longer refreshes them.
 
 ## Architecture
+
+For the Serverless-hosted Mini App, saved-page CRUD goes directly to the
+Telegram Serverless `miniapp` endpoint. The relay diagram below describes
+legacy Cloudflare-origin routes and bridge operations; it is not the page
+storage path for the Serverless-hosted app.
 
 ```text
 Telegram Mini App
@@ -152,6 +157,8 @@ Large reads such as page bodies, page lists and destination lists return as Tele
 
 Small mutation results use ACK responses.
 
+This relay flow is retained for legacy Cloudflare-origin routes. The Serverless-hosted Mini App uses its direct `miniapp` endpoint for page CRUD instead.
+
 ## Source-of-truth rules
 
 Telegram Serverless is authoritative for:
@@ -163,6 +170,8 @@ Telegram Serverless is authoritative for:
 - page ownership and revision checks.
 
 Cloudflare must not treat its transitional page mirrors as authoritative page storage.
+
+As of 2026-11-06, Serverless no longer enqueues or sends `PAGE_SYNC` page documents, and the `full_sync` bridge action is disabled. Existing D1 mirrors and outbox rows are left untouched; no migration or production cleanup is implied. Because old D1 mirrors can now be stale, legacy Cloudflare quota-baseline checks must continue to fail closed when a matching mirror is missing or outdated.
 
 The old server-side discard rollback was removed after autosave was removed. The trash/close flow now discards only unsaved local WebView changes; an explicit Save is never silently undone.
 
@@ -228,7 +237,7 @@ npx tgcloud webhook sync
 
 Bot-to-Bot Communication Mode must be enabled for both bots before smoke testing.
 
-## A1 phased rollout: Cloudflare before tgcloud (2026-10-09)
+## A1 phased rollout: Cloudflare before tgcloud (2026-10-09, historical)
 
 The production branch is `serverless-cleanup` and the owner has approved **automatic Cloudflare deployment on branch commits**. Do not use `[CF-Pages-Skip]` while this instruction remains in force. This does not authorize `tgcloud push` or `tgcloud migrate`.
 

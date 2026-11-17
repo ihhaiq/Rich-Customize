@@ -121,6 +121,23 @@ test('legacy emoji pack names are imported once into Serverless-owned state',asy
   assert.equal(client.requests.length,1);
 });
 
+test('Serverless pack access stays usable when Cloudflare legacy import is unavailable',async()=>{
+  const client=loadClient('app8416656269.tgcloud.ai',{
+    endpointResult:input=>input.action==='custom_emoji_packs'
+      ? {ok:true,access:{migration_required:true,custom_emoji_packs:[]}}
+      : {ok:true},
+    fetchResult:async()=>new Response('unauthorized',{status:401}),
+  });
+  const response=await client.window.fetch('/miniapp/api/custom-emoji/packs',{
+    headers:{'X-Telegram-Init-Data':'signed-data'},
+  });
+  const data=await response.json();
+  assert.equal(response.status,200);
+  assert.equal(data.access.migration_required,true);
+  assert.equal(data.access.legacy_import_pending,true);
+  assert.equal(data.access.legacy_import_status,401);
+});
+
 test('Cloudflare fallback APIs allow CORS only from this bot Serverless origin',async()=>{
   const middlewareSource=readFileSync(new URL('../../functions/_middleware.js',import.meta.url),'utf8');
   const context=vm.createContext({URL,Response,Headers});

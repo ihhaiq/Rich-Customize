@@ -95,6 +95,18 @@ test('editor motion is wired to block, preview, save and selection actions with 
   assert.match(html,/interactions\.css\?v=0\.3\.21/);
 });
 
+test('block drag handle stays at the physical left edge in a reserved non-interactive gutter', () => {
+  const styles=read('editor_features.css');
+  const html=read('editor.html');
+  assert.match(styles,/\.block\{padding-left:36px\}/);
+  const handleRule=styles.match(/\.editor-drag-handle\{[^}]*\}/)?.[0]||"";
+  assert.match(handleRule,/left:2px;[^}]*right:auto;/);
+  assert.doesNotMatch(styles,/\.editor-drag-handle\{[^}]*inset-inline-start:/);
+  assert.match(styles, /\.editor-drag-handle\{left:2px;right:auto;width:25px;height:38px\}/);
+  assert.match(styles,/\.preview-mode \.editor-drag-handle[^}]*display:none!important/);
+  assert.match(html,/editor_features\.css\?v=0\.3\.35/);
+});
+
 test('media upload UI contains an accessible progress bar and updates it from XHR progress', () => {
   const source=read('media_upload.js');
   const styles=read('media_upload.css');

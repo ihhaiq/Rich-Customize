@@ -5,7 +5,7 @@ import {
   anchorName,
   anchorNavigationRichText,
 } from 'lib/editor-anchors';
-import { dataRichText, plainRichText } from 'lib/rich-text';
+import { dataRichText, htmlRichText, plainRichText } from 'lib/rich-text';
 import { richMessageDirection, validateEditorLimits, validateTableRows } from 'lib/editor-blocks';
 import { brandingFooterBlock } from 'lib/branding';
 import { isDeveloper } from 'lib/developer-access';
@@ -75,7 +75,11 @@ function defined(target, key, value) {
 }
 
 function inputMediaPayload(type, source, hasSpoiler = null) {
-  const fileId = String(source?.file_id || '');
+  const fileId = String(source?.file_id || (
+    source?.type === type && typeof source.media === 'string'
+      ? source.media
+      : ''
+  ));
   if (!fileId) throw new Error('native ' + type + ' block has no reusable file_id');
 
   const media = {
@@ -241,7 +245,9 @@ function renderGeneratedBlock(block) {
 
   if (kind === 'buttons') {
     const buttons = Array.isArray(data.buttons) ? data.buttons : [];
-    if (buttons.length !== 1) throw new Error('large button block must contain exactly one button');
+    if (!buttons.length || buttons.length > 100) {
+      throw new Error('large button block must contain between 1 and 100 buttons');
+    }
     buttons.forEach(validateRichButton);
     return {
       type: 'buttons',
@@ -382,6 +388,101 @@ function nativeTablePayload(data) {
   return payload;
 }
 
+function nativeEditablePayload(block, payload) {
+  const data = block.data;
+  const kind = canonicalInputNativeType(payload.type)
+    || canonicalInputNativeType(data.native_type)
+    || canonicalInputNativeType(block.type);
+  const hasEditableText = Object.hasOwn(data, 'html')
+    || Object.hasOwn(data, 'text')
+    || Object.hasOwn(data, 'rich_text');
+
+  if (kind === 'details') {
+    const summary = dataRichText(data, 'summary_rich_text', 'summary_html', 'summary_text');
+    if (summary != null) payload.summary = summary;
+    if (typeof data.is_open === 'boolean') payload.is_open = data.is_open;
+    if (Array.isArray(data.children)) {
+      payload.blocks = data.children.flatMap((child) => renderBlockPayloads(child));
+    }
+  } else if (kind === 'blockquote' || kind === 'pullquote') {
+    const hasQuote = ['quote_rich_text', 'quote_html', 'quote_text'].some((key) => Object.hasOwn(data, key));
+    if (hasQuote || Array.isArray(data.media_children)) {
+      const quote = dataRichText(data, 'quote_rich_text', 'quote_html', 'quote_text');
+      if (kind === 'pullquote') {
+        if (quote != null) payload.text = quote;
+      } else {
+        const editableMedia = Array.isArray(data.media_children)
+          ? data.media_children.flatMap((child) => renderBlockPayloads(child))
+          : null;
+        const nativeContent = Array.isArray(payload.blocks) ? payload.blocks : [];
+        const preservedNativeContent = nativeContent
+          .filter((child) => ![
+            'paragraph', 'text', 'heading', 'section_heading', 'footer',
+            'preformatted', 'blockquote', 'block_quotation', 'pullquote',
+            'pull_quotation',
+          ].includes(String(child?.type || '')));
+        const blocks = editableMedia || preservedNativeContent;
+        if (quote != null && quote !== '') blocks.push({type:'paragraph', text:quote});
+        payload.blocks = blocks;
+      }
+    }
+    if (['credit_rich_text', 'credit_html', 'credit_text'].some((key) => Object.hasOwn(data, key))) {
+      payload.credit = dataRichText(data, 'credit_rich_text', 'credit_html', 'credit_text') || null;
+    }
+  } else if (['paragraph', 'heading', 'section_heading', 'footer'].includes(kind) && hasEditableText) {
+    payload.text = dataRichText(data, 'rich_text', 'html', 'text') || '';
+    if (kind === 'heading' && data.size != null) payload.size = Math.max(1, Math.min(6, Number(data.size) || 2));
+  } else if (kind === 'preformatted' && hasEditableText) {
+    payload.text = String(data.text ?? plainRichText(htmlRichText(data.html, '')));
+  } else if (kind === 'list' && Array.isArray(data.items)) {
+    payload.items = data.items.map((item, index) => {
+      const source = item && typeof item === 'object' && !Array.isArray(item)
+        ? item
+        : {text:String(item ?? '')};
+      const blocks = Array.isArray(source.blocks)
+        ? source.blocks.flatMap((child) => renderBlockPayloads(child))
+        : [{
+            type:'paragraph',
+            text:dataRichText(source, 'rich_text', 'html', 'text') || '',
+          }];
+      return {
+        blocks,
+        ...(source.has_checkbox ? {has_checkbox:true} : {}),
+        ...(source.is_checked ? {is_checked:true} : {}),
+        ...(source.value != null ? {value:source.value} : kind === 'list' && data.kind === 'numbered' ? {value:index + 1} : {}),
+        ...(source.type != null ? {type:source.type} : data.kind === 'numbered' ? {type:'1'} : {}),
+      };
+    });
+  } else if (['collage', 'slideshow'].includes(kind) && Array.isArray(data.children)) {
+    payload.blocks = data.children.flatMap((child) => renderBlockPayloads(child));
+  } else if (kind === 'table') {
+    return nativeTablePayload(data);
+  } else if (['photo', 'video', 'animation', 'audio', 'voice_note'].includes(kind)) {
+    const file = data.file;
+    if (file && typeof file === 'object' && file.file_id) {
+      const field = kind === 'voice_note' ? 'voice_note' : kind;
+      payload[field] = file;
+      if (data.has_spoiler === true) payload.has_spoiler = true;
+      else delete payload.has_spoiler;
+    }
+    const caption = captionPayload(data);
+    if (caption) payload.caption = caption;
+    else if (data.caption_html != null || data.caption_text != null || data.caption_rich_text != null) delete payload.caption;
+  } else if (kind === 'map') {
+    if (data.latitude != null && data.longitude != null) {
+      payload.location = {
+        ...(payload.location && typeof payload.location === 'object' ? payload.location : {}),
+        latitude:Number(data.latitude),
+        longitude:Number(data.longitude),
+      };
+    }
+    for (const key of ['zoom', 'width', 'height']) {
+      if (data[key] != null) payload[key] = Number(data[key]);
+    }
+  }
+  return payload;
+}
+
 function renderBlockPayloads(block) {
   const kind = String(block?.type || '');
   const data = block?.data && typeof block.data === 'object' && !Array.isArray(block.data)
@@ -389,9 +490,7 @@ function renderBlockPayloads(block) {
     : {};
 
   if (data.native && data.native_data && typeof data.native_data === 'object' && !Array.isArray(data.native_data)) {
-    const nativePayload = kind === 'table'
-      ? nativeTablePayload(data)
-      : data.native_data;
+    const nativePayload = nativeEditablePayload(block, JSON.parse(JSON.stringify(data.native_data)));
     return [normalizeNativeInputBlock(
       nativePayload,
       legacyNativeType(kind, data.native_type),

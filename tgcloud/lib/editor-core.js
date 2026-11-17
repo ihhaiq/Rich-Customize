@@ -6,7 +6,7 @@ import { richPages, legacyStates } from 'schema';
 import { buildInputRichMessage, tutorialView } from 'lib/editor-renderer';
 import { persistPage } from 'lib/editor-pages';
 import { acquireEditorMutationLock, releaseEditorMutationLock, createEditorSession } from 'lib/editor-session';
-import { tutorialCopy, resolveUserLanguage } from 'lib/i18n';
+import { tutorialCopy, resolveUserLanguage, channelPostMiniAppLabel } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import {
   blockId,
@@ -26,6 +26,7 @@ import {
   writeTutorial,
 } from 'lib/editor-session';
 import { openEditor } from 'lib/editor-home';
+import { directMiniAppLink } from 'lib/miniapp';
 import { parseMessageButtons, parseRichMessage, clone, orderBlocks, templateBlocks, TEMPLATE_IDS, TYPES, advice, applyAdvice, blockAt, fromInput, exampleBlock } from 'lib/editor-import';
 import { buildMessageButtonsKeyboard } from 'lib/page-buttons';
 import { resolveLanguage, t, tr } from 'lib/i18n';
@@ -133,6 +134,10 @@ function importedDraft(message) {
     currentPageId: null,
     currentPageTitle: null,
   };
+}
+
+function messageButtonsSnapshot(buttons) {
+  return JSON.stringify(Array.isArray(buttons) ? buttons : []);
 }
 
 function hasEditorContent(session) {
@@ -330,16 +335,27 @@ function canEditAsChannelAdmin(member) {
     || (status === 'administrator' && Boolean(member?.can_edit_messages));
 }
 
+function isChannelMemberListUnavailable(error) {
+  const detail = String(error?.description || error?.message || error).toLowerCase();
+  return detail.includes('member list is inaccessible');
+}
+
 async function canEditChannelPost(userId, target) {
   try {
     const me = await api.getMe();
     if (!Number.isSafeInteger(Number(me?.id)) || Number(me.id) <= 0) return false;
-    const [botMember, userMember] = await Promise.all([
-      api.getChatMember({ chat_id: target.chatId, user_id: Number(me.id) }),
-      api.getChatMember({ chat_id: target.chatId, user_id: Number(userId) }),
-    ]);
-    return canEditAsChannelAdmin(botMember) && canEditAsChannelAdmin(userMember);
+    const botMember = await api.getChatMember({
+      chat_id: target.chatId,
+      user_id: Number(me.id),
+    });
+    if (!canEditAsChannelAdmin(botMember)) return false;
+    const userMember = await api.getChatMember({
+      chat_id: target.chatId,
+      user_id: Number(userId),
+    });
+    return canEditAsChannelAdmin(userMember);
   } catch (error) {
+    if (isChannelMemberListUnavailable(error)) return false;
     await logError('editor.channel_post_access', error, {
       userId,
       chatId: target.chatId,
@@ -354,6 +370,15 @@ function channelPostChoiceKeyboard(locale) {
       { text:t(locale, 'channel_post.edit'), callback_data:'r:channel:edit', style:'success' },
       { text:t(locale, 'channel_post.import'), callback_data:'r:channel:import', style:'primary' },
     ]],
+  };
+}
+
+function channelPostChoiceKeyboardWithMiniApp(locale, miniAppUrl) {
+  return {
+    inline_keyboard: [
+      channelPostChoiceKeyboard(locale).inline_keyboard[0],
+      [{ text:channelPostMiniAppLabel(locale), url:miniAppUrl }],
+    ],
   };
 }
 
@@ -385,10 +410,16 @@ async function editManagementPrompt(userId, session, text, replyMarkup) {
 async function showChannelPostChoice(userId, session, draft, target, sourceMessage) {
   const locale = resolveLanguage(languageCode(sourceMessage));
   const chatId = Number(session?.managementChatId || session?.chatId || userId);
+  const bot = await api.getMe();
+  const miniAppToken = globalThis.crypto.randomUUID().replaceAll('-', '');
+  const miniAppUrl = directMiniAppLink(
+    bot?.username,
+    'draft_' + miniAppToken,
+  );
   const prompt = await api.sendMessage({
     chat_id:chatId,
     text:t(locale, 'channel_post.choice'),
-    reply_markup:channelPostChoiceKeyboard(locale),
+    reply_markup:channelPostChoiceKeyboardWithMiniApp(locale, miniAppUrl),
   });
   await updateEditorSession(userId, {
     pendingUserState:{
@@ -399,6 +430,8 @@ async function showChannelPostChoice(userId, session, draft, target, sourceMessa
       sourceMessageId:Number(sourceMessage.message_id),
       sourceLanguageCode:languageCode(sourceMessage),
       choiceMessageId:Number(prompt.message_id),
+      miniAppToken,
+      miniAppExpiresAt:Math.floor(Date.now() / 1000) + 15 * 60,
       previousPendingUserState:session.pendingUserState ?? null,
     },
   });
@@ -526,6 +559,206 @@ function answerExpiredChannelPostAction(query) {
   });
 }
 
+function channelActionMessageId(action, pending, managementMessageId) {
+  if (action === 'r:channel:edit' || action === 'r:channel:import') {
+    return Number(pending?.choiceMessageId || 0);
+  }
+  if (
+    action === 'r:channel:close'
+    || action === 'r:channel:stay'
+    || action === 'r:channel:apply'
+    || action === 'r:channel:cancel'
+  ) {
+    return Number(pending?.promptMessageId || 0);
+  }
+  return managementMessageId;
+}
+
+async function handleChannelPostCloseAction(query, session, pending, action, userId) {
+  const chatId = Number(query.message.chat.id);
+  const messageId = Number(query.message.message_id);
+  if (pending?.kind !== 'channel_post_close_warning' || !pending.importDraft || !pending.target) {
+    await answerExpiredChannelPostAction(query);
+    return;
+  }
+  if (action === 'r:channel:stay') {
+    await updateEditorSession(userId, {
+      pendingUserState:pending.previousPendingUserState ?? null,
+    });
+    await deleteQuietly(chatId, messageId);
+    await api.answerCallbackQuery({ callback_query_id:query.id });
+    return;
+  }
+
+  const cleared = await closeEditorForChannelPost(userId, session);
+  await showChannelPostChoice(
+    userId,
+    cleared || session,
+    pending.importDraft,
+    pending.target,
+    {
+      from:{language_code:pending.sourceLanguageCode},
+      chat:{id:Number(pending.sourceChatId)},
+      message_id:Number(pending.sourceMessageId),
+    },
+  );
+  await deleteQuietly(chatId, messageId);
+  await api.answerCallbackQuery({ callback_query_id:query.id });
+}
+
+async function handleChannelPostChoiceAction(query, session, pending, action, userId, locale) {
+  const chatId = Number(query.message.chat.id);
+  const messageId = Number(query.message.message_id);
+  if (
+    pending?.kind !== 'channel_post_choice'
+    || Number(pending.choiceMessageId) !== messageId
+    || !pending.importDraft
+  ) {
+    await answerExpiredChannelPostAction(query);
+    return;
+  }
+  const target = action === 'r:channel:edit' ? pending.target : null;
+  if (action === 'r:channel:edit' && !target) {
+    await answerExpiredChannelPostAction(query);
+    return;
+  }
+  if (target && !await canEditChannelPost(userId, target)) {
+    await api.answerCallbackQuery({
+      callback_query_id:query.id,
+      text:t(locale, 'channel_post.no_access'),
+      show_alert:true,
+    });
+    return;
+  }
+
+  await updateEditorSession(userId, {
+    pendingUserState:{
+      kind:'rich_import_replace',
+      importDraft:pending.importDraft,
+      channelPostTarget:target,
+      sourceChatId:pending.sourceChatId,
+      sourceMessageId:pending.sourceMessageId,
+      choiceChatId:chatId,
+      choiceMessageId:messageId,
+      previousPendingUserState:pending.previousPendingUserState ?? null,
+    },
+  });
+  if (hasEditorContent(session)) {
+    const latest = await loadEditorSession(userId, { touch:false });
+    await showImportWarning(userId, latest || session, locale);
+  } else {
+    await applyImportedDraft(
+      userId,
+      session,
+      pending.importDraft,
+      locale,
+      { chatId:Number(pending.sourceChatId), messageId:Number(pending.sourceMessageId) },
+      target,
+    );
+    await deleteChannelChoicePrompt(pending, chatId);
+  }
+  await api.answerCallbackQuery({ callback_query_id:query.id });
+}
+
+async function handleChannelPostConfirmAction(query, session, pending, userId, locale) {
+  const target = session.channelPostTarget;
+  if (!target || pending != null) {
+    await api.answerCallbackQuery({
+      callback_query_id:query.id,
+      text:pending != null
+        ? t(locale, 'channel_post.busy')
+        : t(locale, 'channel_post.expired'),
+      show_alert:true,
+    });
+    return;
+  }
+  if (!await canEditChannelPost(userId, target)) {
+    await updateEditorSession(userId, { channelPostTarget:null });
+    const updated = await loadEditorSession(userId, { touch:false });
+    const current = updated || session;
+    await editSavedUi(
+      userId,
+      current,
+      editorDashboardRichMessage(current, locale),
+      buildEditorKeyboard(current, locale),
+    );
+    await api.answerCallbackQuery({
+      callback_query_id:query.id,
+      text:t(locale, 'channel_post.no_access'),
+      show_alert:true,
+    });
+    return;
+  }
+  await showChannelPostWarning(userId, session, query);
+  await api.answerCallbackQuery({ callback_query_id:query.id });
+}
+
+async function applyChannelPostEdit(query, session, target, userId, locale) {
+  const entitlement = await getEditorEntitlement(userId);
+  const richMessage = buildInputRichMessage(session.blocks || [], {
+    userId,
+    entitlement,
+  });
+  const messageButtons = Array.isArray(session.messageButtons) ? session.messageButtons : [];
+  const buttonsChanged = typeof target.messageButtonsSnapshot !== 'string'
+    || target.messageButtonsSnapshot !== messageButtonsSnapshot(messageButtons);
+  try {
+    await api.editMessageText({
+      chat_id:target.chatId,
+      message_id:target.messageId,
+      rich_message:richMessage,
+      ...(buttonsChanged ? {
+        reply_markup:buildMessageButtonsKeyboard(messageButtons, {
+          buttonsPerRow:session.buttonsPerRow,
+        }),
+      } : {}),
+    });
+  } catch (error) {
+    const reason = String(error?.description || error?.message || error).toLowerCase();
+    if (!reason.includes('message is not modified')) throw error;
+  }
+
+  const updated = await updateEditorSession(userId, { pendingUserState:null });
+  const current = updated || session;
+  await editSavedUi(
+    userId,
+    current,
+    editorDashboardRichMessage(current, locale),
+    buildEditorKeyboard(current, locale),
+  );
+  await api.answerCallbackQuery({
+    callback_query_id:query.id,
+    text:t(locale, 'channel_post.success'),
+  });
+}
+
+async function handleChannelPostConfirmationAction(query, session, pending, action, userId, locale) {
+  const target = session.channelPostTarget;
+  if (
+    !target
+    || pending?.kind !== 'channel_post_confirmation'
+    || Number(pending.promptMessageId) !== Number(query.message.message_id)
+  ) {
+    await answerExpiredChannelPostAction(query);
+    return;
+  }
+  if (action === 'r:channel:cancel') {
+    await restoreChannelPostEditor(userId, session, locale);
+    await api.answerCallbackQuery({ callback_query_id:query.id });
+    return;
+  }
+  if (!await canEditChannelPost(userId, target)) {
+    await restoreChannelPostEditor(userId, session, locale, { clearTarget:true });
+    await api.answerCallbackQuery({
+      callback_query_id:query.id,
+      text:t(locale, 'channel_post.no_access'),
+      show_alert:true,
+    });
+    return;
+  }
+  await applyChannelPostEdit(query, session, target, userId, locale);
+}
+
 export async function handleEditorChannelPostCallback(query) {
   const action = String(query?.data || '');
   if (!action.startsWith('r:channel:')) return false;
@@ -538,14 +771,11 @@ export async function handleEditorChannelPostCallback(query) {
   const queryMessageId = Number(query?.message?.message_id || 0);
   const queryChatId = Number(query?.message?.chat?.id || 0);
   const managementChatId = Number(session?.managementChatId || session?.chatId || 0);
-  const managementMessageId = Number(session?.managementMessageId || 0);
-  const actionMessageId = action === 'r:channel:edit' || action === 'r:channel:import'
-    ? Number(pending?.choiceMessageId || 0)
-    : action === 'r:channel:close' || action === 'r:channel:stay'
-      ? Number(pending?.promptMessageId || 0)
-      : action === 'r:channel:apply' || action === 'r:channel:cancel'
-        ? Number(pending?.promptMessageId || 0)
-        : managementMessageId;
+  const actionMessageId = channelActionMessageId(
+    action,
+    pending,
+    Number(session?.managementMessageId || 0),
+  );
   if (
     !session
     || queryChatId !== managementChatId
@@ -557,181 +787,16 @@ export async function handleEditorChannelPostCallback(query) {
 
   const locale = resolveLanguage(languageCode(query));
   if (action === 'r:channel:stay' || action === 'r:channel:close') {
-    if (pending?.kind !== 'channel_post_close_warning' || !pending.importDraft || !pending.target) {
-      await answerExpiredChannelPostAction(query);
-      return true;
-    }
-    if (action === 'r:channel:stay') {
-      await updateEditorSession(userId, {
-        pendingUserState:pending.previousPendingUserState ?? null,
-      });
-      await deleteQuietly(queryChatId, queryMessageId);
-      await api.answerCallbackQuery({ callback_query_id:query.id });
-      return true;
-    }
-
-    const cleared = await closeEditorForChannelPost(userId, session);
-    await showChannelPostChoice(
-      userId,
-      cleared || session,
-      pending.importDraft,
-      pending.target,
-      {
-        from:{language_code:pending.sourceLanguageCode},
-        chat:{id:Number(pending.sourceChatId)},
-        message_id:Number(pending.sourceMessageId),
-      },
-    );
-    await deleteQuietly(queryChatId, queryMessageId);
-    await api.answerCallbackQuery({ callback_query_id:query.id });
-    return true;
+    await handleChannelPostCloseAction(query, session, pending, action, userId);
+  } else if (action === 'r:channel:edit' || action === 'r:channel:import') {
+    await handleChannelPostChoiceAction(query, session, pending, action, userId, locale);
+  } else if (action === 'r:channel:confirm') {
+    await handleChannelPostConfirmAction(query, session, pending, userId, locale);
+  } else if (action === 'r:channel:cancel' || action === 'r:channel:apply') {
+    await handleChannelPostConfirmationAction(query, session, pending, action, userId, locale);
+  } else {
+    await answerExpiredChannelPostAction(query);
   }
-
-  if (action === 'r:channel:edit' || action === 'r:channel:import') {
-    if (
-      pending?.kind !== 'channel_post_choice'
-      || Number(pending.choiceMessageId) !== queryMessageId
-      || !pending.importDraft
-    ) {
-      await answerExpiredChannelPostAction(query);
-      return true;
-    }
-    const target = action === 'r:channel:edit' ? pending.target : null;
-    if (action === 'r:channel:edit' && !target) {
-      await answerExpiredChannelPostAction(query);
-      return true;
-    }
-    if (target && !await canEditChannelPost(userId, target)) {
-      await api.answerCallbackQuery({
-        callback_query_id:query.id,
-        text:t(locale, 'channel_post.no_access'),
-        show_alert:true,
-      });
-      return true;
-    }
-
-    const replaceState = {
-      kind:'rich_import_replace',
-      importDraft:pending.importDraft,
-      channelPostTarget:target,
-      sourceChatId:pending.sourceChatId,
-      sourceMessageId:pending.sourceMessageId,
-      choiceChatId:queryChatId,
-      choiceMessageId:queryMessageId,
-      previousPendingUserState:pending.previousPendingUserState ?? null,
-    };
-    await updateEditorSession(userId, { pendingUserState:replaceState });
-    if (hasEditorContent(session)) {
-      const latest = await loadEditorSession(userId, { touch:false });
-      await showImportWarning(userId, latest || session, locale);
-    } else {
-      await applyImportedDraft(
-        userId,
-        session,
-        pending.importDraft,
-        locale,
-        { chatId:Number(pending.sourceChatId), messageId:Number(pending.sourceMessageId) },
-        target,
-      );
-      await deleteChannelChoicePrompt(pending, queryChatId);
-    }
-    await api.answerCallbackQuery({ callback_query_id:query.id });
-    return true;
-  }
-
-  if (action === 'r:channel:confirm') {
-    const target = session.channelPostTarget;
-    if (!target || pending != null) {
-      await api.answerCallbackQuery({
-        callback_query_id:query.id,
-        text:pending != null
-          ? t(locale, 'channel_post.busy')
-          : t(locale, 'channel_post.expired'),
-        show_alert:true,
-      });
-      return true;
-    }
-    if (!await canEditChannelPost(userId, target)) {
-      await updateEditorSession(userId, { channelPostTarget:null });
-      const updated = await loadEditorSession(userId, { touch:false });
-      await editSavedUi(
-        userId,
-        updated || session,
-        editorDashboardRichMessage(updated || session, locale),
-        buildEditorKeyboard(updated || session, locale),
-      );
-      await api.answerCallbackQuery({
-        callback_query_id:query.id,
-        text:t(locale, 'channel_post.no_access'),
-        show_alert:true,
-      });
-      return true;
-    }
-    await showChannelPostWarning(userId, session, query);
-    await api.answerCallbackQuery({ callback_query_id:query.id });
-    return true;
-  }
-
-  if (action === 'r:channel:cancel' || action === 'r:channel:apply') {
-    const target = session.channelPostTarget;
-    if (
-      !target
-      || pending?.kind !== 'channel_post_confirmation'
-      || Number(pending.promptMessageId) !== queryMessageId
-    ) {
-      await answerExpiredChannelPostAction(query);
-      return true;
-    }
-    if (action === 'r:channel:cancel') {
-      await restoreChannelPostEditor(userId, session, locale);
-      await api.answerCallbackQuery({ callback_query_id:query.id });
-      return true;
-    }
-    if (!await canEditChannelPost(userId, target)) {
-      await restoreChannelPostEditor(userId, session, locale, { clearTarget:true });
-      await api.answerCallbackQuery({
-        callback_query_id:query.id,
-        text:t(locale, 'channel_post.no_access'),
-        show_alert:true,
-      });
-      return true;
-    }
-
-    const entitlement = await getEditorEntitlement(userId);
-    const richMessage = buildInputRichMessage(session.blocks || [], {
-      userId,
-      entitlement,
-    });
-    try {
-      await api.editMessageText({
-        chat_id:target.chatId,
-        message_id:target.messageId,
-        rich_message:richMessage,
-        reply_markup:buildMessageButtonsKeyboard(session.messageButtons, {
-          buttonsPerRow:session.buttonsPerRow,
-        }),
-      });
-    } catch (error) {
-      const reason = String(error?.description || error?.message || error).toLowerCase();
-      if (!reason.includes('message is not modified')) throw error;
-    }
-    const updated = await updateEditorSession(userId, {
-      pendingUserState:null,
-    });
-    await editSavedUi(
-      userId,
-      updated || session,
-      editorDashboardRichMessage(updated || session, locale),
-      buildEditorKeyboard(updated || session, locale),
-    );
-    await api.answerCallbackQuery({
-      callback_query_id:query.id,
-      text:t(locale, 'channel_post.success'),
-    });
-    return true;
-  }
-
-  await answerExpiredChannelPostAction(query);
   return true;
 }
 
@@ -773,14 +838,18 @@ export async function handleEditorCoreMessage(
     forwardedPost
     && await canEditChannelPost(userId, forwardedPost)
   ) {
+    const channelEditTarget = {
+      ...forwardedPost,
+      messageButtonsSnapshot:messageButtonsSnapshot(draft.messageButtons),
+    };
     if (
       hasEditorContent(session)
       || session.state !== 'managing'
       || session.pendingUserState != null
     ) {
-      await showChannelPostCloseWarning(userId, session, draft, forwardedPost, message);
+      await showChannelPostCloseWarning(userId, session, draft, channelEditTarget, message);
     } else {
-      await showChannelPostChoice(userId, session, draft, forwardedPost, message);
+      await showChannelPostChoice(userId, session, draft, channelEditTarget, message);
     }
     return true;
   }

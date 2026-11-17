@@ -168,6 +168,13 @@ export function messageRichText(message) {
   return richRange(text, entities, 0, text.length);
 }
 
+function customEmojiCodeText(value) {
+  const text = String(value ?? '');
+  const parsed = customEmojiHtmlInput({ text });
+  return parsed.text === text ? value : messageRichText(parsed);
+}
+
+
 // Interpret only complete custom-emoji HTML/Markdown codes, never arbitrary pasted HTML.
 // Remap Telegram's UTF-16 entity offsets before building the RichText tree.
 export function customEmojiHtmlInput(message) {
@@ -363,7 +370,7 @@ export function htmlRichText(value, fallback = '') {
   while ((token = tokenRe.exec(value)) !== null) {
     const raw = token[0];
     if (!raw.startsWith('<')) {
-      const data = decodeHtml(raw);
+      const data = customEmojiCodeText(decodeHtml(raw));
       if (data) stack.at(-1).parts.push(data);
       continue;
     }
@@ -429,7 +436,7 @@ function normalizeButtonUrl(value) {
   return null;
 }
 
-function markerParts(marker) {
+export function parseInlineButtonMarker(marker) {
   if (!marker.startsWith('{') || !marker.endsWith('}')) return null;
   const body = marker.slice(1, -1).trim();
   const hyphenIndex = body.indexOf('-');
@@ -557,7 +564,7 @@ export function findUserButtonMarkers(text) {
   const pattern = /\{([^{}\n]+)\}/g;
   let match;
   while ((match = pattern.exec(String(text || ''))) !== null) {
-    const parts = markerParts(match[0]);
+    const parts = parseInlineButtonMarker(match[0]);
     if (!parts) continue;
     const [title, buttonType, value, color] = parts;
     if (buttonType === 'user' && !value) {
@@ -571,16 +578,14 @@ export function findUserButtonMarkers(text) {
   return markers;
 }
 
-export function resolveUserButtonMarker(value, marker, userId, username = null) {
-  const parts = markerParts(String(marker || ''));
+export function resolveUserButtonMarker(value, marker, _userId, username = null) {
+  const parts = parseInlineButtonMarker(String(marker || ''));
   if (!parts) return value;
   const [title, , , color] = parts;
+  const safeUsername = String(username || '').replace(/^@/, '');
+  if (!/^[A-Za-z0-9_]{5,32}$/.test(safeUsername)) return value;
   const suffix = color ? '#' + color : '';
-  const cleanUsername = String(username || '').trim().replace(/^@+/, '');
-  const target = cleanUsername
-    ? 'https://t.me/' + cleanUsername
-    : 'tg://user?id=' + String(userId);
-  const replacement = '{' + title + ':url ' + target + suffix + '}';
+  const replacement = '{' + title + ':url https://t.me/' + safeUsername + suffix + '}';
 
   function replace(input) {
     if (typeof input === 'string') {
@@ -623,7 +628,7 @@ export function inlineButtonRichText(value) {
   let changed = false;
   let match;
   while ((match = pattern.exec(value)) !== null) {
-    const parts = markerParts(match[0]);
+    const parts = parseInlineButtonMarker(match[0]);
     if (!parts) continue;
     const payload = buttonPayload(...parts);
     if (!payload) continue;
@@ -640,9 +645,14 @@ export function inlineButtonRichText(value) {
 export function dataRichText(data, richKey = 'rich_text', htmlKey = 'html', textKey = 'text') {
   let value;
   if (data?.[richKey] !== null && data?.[richKey] !== undefined && data?.[richKey] !== '' && !(Array.isArray(data?.[richKey]) && !data[richKey].length)) {
-    value = data[richKey];
+    value = typeof data[richKey] === 'string'
+      ? customEmojiCodeText(data[richKey])
+      : data[richKey];
   } else {
-    value = htmlRichText(data?.[htmlKey], String(data?.[textKey] || ''));
+    const fallback = String(data?.[textKey] || '');
+    value = data?.[htmlKey]
+      ? htmlRichText(data[htmlKey], fallback)
+      : customEmojiCodeText(fallback);
   }
   if (data?.parse_inline_buttons === false) return value;
   return inlineButtonRichText(value);

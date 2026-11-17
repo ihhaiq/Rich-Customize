@@ -83,7 +83,7 @@ export async function createScheduledPublish(ownerId, session, selected, runAt, 
   const includeBranding=defaultBranding||typeof brandingOverride!=='boolean'
     ?defaultBranding:brandingOverride;
   const richMessage=buildInputRichMessage(legacy?savedPage.blocks:session.blocks,{
-    userId,sourcePageId:session.currentPageId||null,
+    userId,    sourcePageId:session.currentPageId||null,
     includeBranding,
     entitlement,technicalOnly:legacy,
   });

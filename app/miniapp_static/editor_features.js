@@ -560,7 +560,12 @@
         }
       }));
     });
-    const blockQuery = q.split(/\s+/, 1)[0];
+    const firstToken = q.split(/\s+/, 1)[0];
+    const firstTokenIsBlockName = BLOCKS.some(item =>
+      item.type === firstToken
+      || String(item.keys || "").toLowerCase().split(/\s+/).includes(firstToken),
+    );
+    const blockQuery = filteredBlocks(q).length ? q : firstTokenIsBlockName ? firstToken : q;
     filteredBlocks(blockQuery).forEach(item => {
       slashItems.appendChild(menuButton(item.icon, item.label, item.desc, () => addBlock(item.type)));
     });

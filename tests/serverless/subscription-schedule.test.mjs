@@ -31,31 +31,48 @@ function fakeWorker(sent,stats) {
   );
 }
 
-test('Cloudflare Cron: minute runs scheduled jobs only; daily starts subscriptions only',async()=>{
+test('Cloudflare Cron: scheduled posts, RDB sync and daily subscription scan use separate ticks',async()=>{
   const sent=[],stats={minute:0,reserved:0};
   const worker=fakeWorker(sent,stats);
   const env={DB:{},B2B_BOT_TOKEN:'test-only-token'};
   await worker.scheduled({cron:'* * * * *'},env,{});
   assert.equal(stats.minute,1);
-  assert.equal(sent.length,1);
+  assert.equal(sent.length,2);
   assert.match(sent[0].text,/^\/rcb_schedule_due@RichCustomizebot/);
   assert.doesNotMatch(sent[0].text,/rcb_subscription_tick/);
+  assert.match(sent[1].text,/^\/rcb_broadcast_tick@RichCustomizebot\n/);
+  const broadcast=JSON.parse(sent[1].text.split('\n')[1]);
+  assert.deepEqual(Object.keys(broadcast).sort(),['kind','minute','protocol']);
+  assert.equal(broadcast.kind,'broadcast');
+
+  await worker.scheduled({cron:'*/10 * * * *'},env,{});
+  assert.equal(stats.minute,1);
+  assert.equal(stats.reserved,3);
+  assert.equal(sent.length,3);
+  assert.match(sent[2].text,/^\/rcb_rdb_tick@RichCustomizebot\n/);
+  const rdbBody=JSON.parse(sent[2].text.split('\n')[1]);
+  assert.equal(rdbBody.protocol,'RCB1');
+  assert.equal(rdbBody.kind,'richdonate_sync');
+  assert.equal(typeof rdbBody.minute,'number');
 
   await worker.scheduled({cron:'0 9 * * *'},env,{});
   assert.equal(stats.minute,1);
-  assert.equal(stats.reserved,2);
-  assert.equal(sent.length,2);
-  assert.match(sent[1].text,/^\/rcb_subscription_tick@RichCustomizebot\n/);
-  const body=JSON.parse(sent[1].text.split('\n')[1]);
+  assert.equal(stats.reserved,4);
+  assert.equal(sent.length,4);
+  assert.match(sent[3].text,/^\/rcb_subscription_tick@RichCustomizebot\n/);
+  const body=JSON.parse(sent[3].text.split('\n')[1]);
   assert.equal(body.protocol,'RCB1');
   assert.equal(body.kind,'daily');
   assert.equal(typeof body.minute,'number');
   await assert.rejects(worker.scheduled({cron:'0 3 * * *'},env,{}),/Unknown schedule trigger/);
 });
 
-test('new daily and minute Cron expressions are both deployed by wrangler',()=>{
-  assert.match(wrangler,/crons\s*=\s*\["\* \* \* \* \*",\s*"0 9 \* \* \*"\]/);
+test('minute, ten-minute RDB and daily Cron expressions are deployed by wrangler',()=>{
+  assert.match(wrangler,/crons\s*=\s*\["\* \* \* \* \*",\s*"\*\/10 \* \* \* \*",\s*"0 9 \* \* \*"\]/);
   assert.match(bridgeSource,/data\.kind!=='daily'/);
+  assert.match(bridgeSource,/data\.kind!=='richdonate_sync'/);
+  assert.match(bridgeSource,/data\.kind!=='broadcast'/);
+  assert.match(bridgeSource,/runDeveloperBroadcastTick\(data\.minute\)/);
   assert.match(bridgeSource,/receiveSubscriptionReminderSchedule\(scheduleSource\)/);
 });
 
@@ -66,8 +83,10 @@ test('daily subscription batch has a single idempotent per-day cycle and bounded
   assert.match(serverlessSource,/await cycleControl\('register',day,nextRevision/);
   assert.match(serverlessSource,/await cycleControl\('result',day,options\.revision/);
   assert.match(serverlessSource,/eq\(subscriptionReminderScans\.cursor,expected\)/);
-  assert.match(serverlessSource,/await scan\('paid',now\)/);
-  assert.match(serverlessSource,/await scan\('gift',now\)/);
+  for(const source of ['paid','gift','manual_gift']){
+    assert.ok(serverlessSource.includes(`await scan('${source}',now,'before')`));
+    assert.ok(serverlessSource.includes(`await scan('${source}',now,'expired')`));
+  }
   const source=schedulerSource.replace(/\bexport\s+/g,'');
   const parse=new Function(source+';return {parseScheduleBridgeEvent,scheduleDueCommand,JOB_ID_RE};')();
   const jobId='sub_'+(20800).toString(16).padStart(32,'0');

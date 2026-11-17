@@ -199,7 +199,13 @@ export default async function (query, ctx = {}) {
     throw error;
   } finally {
     try {
-      await observeRequest(query?.from, Date.now() - started, failed);
+      await observeRequest(
+        query?.from,
+        Date.now() - started,
+        failed,
+        undefined,
+        query?.message?.chat?.type === 'private',
+      );
     } catch (error) {
       console.warn('Could not record callback usage stats', error);
     }

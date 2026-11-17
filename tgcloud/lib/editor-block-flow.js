@@ -82,6 +82,11 @@ function languageCode(source) {
   return source?.from?.language_code || 'en';
 }
 
+function publicUsername(value) {
+  const username = String(value || '').replace(/^@/, '');
+  return /^[A-Za-z0-9_]{5,32}$/.test(username) ? username : null;
+}
+
 function footerInputFromRichMessage(message) {
   const blocks = message?.rich_message?.blocks;
   if (!Array.isArray(blocks) || !blocks.length) return null;
@@ -355,6 +360,18 @@ async function completeButtonTarget(message, session, targetId, username, code) 
     return true;
   }
 
+  const safeUsername = publicUsername(username);
+  if (!safeUsername) {
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      text: resolveLanguage(code) === 'ar'
+        ? 'زر الحساب يحتاج اسم مستخدم عام (@username). اختار حساباً عنده اسم مستخدم.'
+        : tr(resolveLanguage(code), 'A user button requires a public @username. Select an account with one.'),
+    });
+    await askForButtonUser(message.from.id, message.chat.id, pending, code);
+    return true;
+  }
+
   const marker = pending.markers[index];
   const resolutions = Array.isArray(pending.resolutions)
     ? [...pending.resolutions]
@@ -362,7 +379,7 @@ async function completeButtonTarget(message, session, targetId, username, code) 
   resolutions.push({
     marker: String(marker.marker || ''),
     userId: Number(targetId),
-    username: username || null,
+    username: safeUsername,
   });
 
   const nextIndex = index + 1;
@@ -391,6 +408,16 @@ async function completeButtonTarget(message, session, targetId, username, code) 
   });
 
   const original = JSON.parse(JSON.stringify(pending.message));
+  if (resumeState === 'adding_block' && session.pendingAddType === 'buttons') {
+    for (const resolution of resolutions) {
+      original.text = resolveUserButtonMarker(
+        original.text,
+        String(resolution.marker || ''),
+        Number(resolution.userId),
+        resolution.username,
+      );
+    }
+  }
   await handleEditorBlockMessage(original);
 
   const resumed = await loadEditorSession(message.from.id, { touch: false });
@@ -435,18 +462,13 @@ async function handleButtonTargetSelection(message, session, code) {
     }
     const selected = sharedUsers.users[0];
     const userId = Number(selected.user_id);
-    let username = selected.username || null;
+    let username = publicUsername(selected.username);
     if (!username) {
       try {
         const known = await api.getChat({ chat_id: userId });
-        username = known?.username || null;
+        username = publicUsername(known?.username);
       } catch {
-        await api.sendMessage({
-          chat_id: message.chat.id,
-          text: t(resolveLanguage(code), 'ux.buttons.missing'),
-        });
-        await askForButtonUser(message.from.id, message.chat.id, pending, code);
-        return true;
+        username = null;
       }
     }
     return completeButtonTarget(message, session, userId, username, code);
@@ -468,7 +490,7 @@ async function handleButtonTargetSelection(message, session, code) {
       message,
       session,
       Number(sharedChat.chat_id),
-      sharedChat.username,
+      publicUsername(sharedChat.username),
       code,
     );
   }
@@ -496,6 +518,27 @@ async function repostManagement(userId, oldSession, code, notice = null) {
     await deleteQuietly(oldSession.managementChatId || chatId, oldSession.managementMessageId);
   }
   return sent;
+}
+
+async function recoverEmptyResultPreview(query, session, code) {
+  await resetEditorTransientState(query.from.id);
+  const sent = await repostManagement(
+    query.from.id,
+    session,
+    code,
+    editorCopy(code).emptyRecovery,
+  );
+  if (!sent) throw new Error('EDITOR_RECOVERY_PANEL_UNAVAILABLE');
+  try {
+    await recordOperation('preview', false);
+  } catch (error) {
+    console.error('Empty result preview recovery metric failed', error);
+    await logError('editor.preview.recovery_metrics', error, {
+      userId: query?.from?.id,
+      chatId: query?.message?.chat?.id,
+      callbackData: query?.data,
+    });
+  }
 }
 
 async function finishAdd(userId, session, triggerMessage, block, code) {
@@ -743,11 +786,11 @@ async function showDashboard(query, session) {
   if (isManagementCallback) {
     await editMessage(callbackChatId, callbackMessageId, dashboard, keyboard);
   } else {
-    await deleteQuietly(callbackChatId, callbackMessageId);
     if (managementChatId && managementMessageId) {
       try {
         await editMessage(managementChatId, managementMessageId, dashboard, keyboard);
-      } catch {
+      } catch (error) {
+        if (!isMissingMessageTarget(error)) throw error;
         const sent = await api.sendRichMessage({
           chat_id: managementChatId,
           rich_message: dashboard,
@@ -769,6 +812,7 @@ async function showDashboard(query, session) {
         managementMessageId: sent.message_id,
       });
     }
+    await deleteQuietly(callbackChatId, callbackMessageId);
   }
   await clearPublishPanel(query.from.id);
   await api.answerCallbackQuery({ callback_query_id: query.id });
@@ -777,7 +821,7 @@ async function showDashboard(query, session) {
 function isEmptyRichMessageError(error) {
   const reason = String(error?.description || error?.message || error);
   return reason.toUpperCase().includes('RICH_MESSAGE_EMPTY')
-    || reason.toLowerCase().includes('rich message must be non-empty');
+    || /rich message (?:must be non-empty|has no blocks)/i.test(reason);
 }
 
 function friendlyRichError(error, code) {
@@ -891,6 +935,10 @@ async function previewResult(query, session) {
   const code = languageCode(query);
   const copy = prompts(code);
   await api.answerCallbackQuery({ callback_query_id: query.id, text: copy.previewGenerating });
+  if (!Array.isArray(session.blocks) || session.blocks.length === 0) {
+    await recoverEmptyResultPreview(query, session, code);
+    return;
+  }
   const includeBranding = await shouldIncludeBranding(query.from.id);
   let panelNotice = '✅ ' + t(resolveLanguage(code), 'preview_ready');
 
@@ -918,22 +966,8 @@ async function previewResult(query, session) {
       });
     } catch (error) {
       if (!isEmptyRichMessageError(error)) throw error;
-      const context = makeBlock('footer', {
-        text: editorCopy(code).preview,
-        parse_inline_buttons: false,
-      }, (session.blocks || []).length);
-      sent = await api.sendRichMessage({
-        chat_id: query.from.id,
-        rich_message: buildInputRichMessage(
-          [...(session.blocks || []), context],
-          {
-            userId: session.userId,
-            sourcePageId: session.currentPageId || null,
-            includeBranding,
-          },
-        ),
-        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
-      });
+      await recoverEmptyResultPreview(query, session, code);
+      return;
     }
     if (sent?.message_id != null) {
       const oldIds = Array.isArray(session.previewMessageIds) ? session.previewMessageIds : [];
@@ -1155,21 +1189,6 @@ export async function handleEditorBlockCallback(query) {
         text: t(resolveLanguage(code), 'unsupported'),
         show_alert: true,
       });
-      return true;
-    }
-
-    if (type === 'buttons') {
-      await setEditorState(query.from.id, 'adding_block', {
-        pendingAddType: type,
-        addStep: 'large_button_entry',
-        addPayload: {},
-      });
-      await sendPrompt(
-        query.from.id,
-        chatId,
-        tr(resolveLanguage(code), 'Send one line in this format:\nButton name - URL\nor\nButton name - cbd:page_code'),
-      );
-      await api.answerCallbackQuery({ callback_query_id: query.id });
       return true;
     }
 

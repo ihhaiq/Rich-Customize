@@ -79,3 +79,112 @@ test('non-missing edit failures still surface instead of creating a replacement 
   );
   assert.equal(h.calls.filter(call => call.method === 'sendRichMessage').length, 0);
 });
+
+test('empty result preview opens a clear recovery panel instead of sending placeholder text', async () => {
+  const h = await harness({ extraModules:{ editorBlocks:'lib/editor-block-flow' } });
+  await h.session.createEditorSession(userId, chatId, managementMessageId);
+
+  await h.editorBlocks.handleEditorBlockCallback({
+    id:'preview-empty',
+    from:{ id:userId, language_code:'en' },
+    message:{ chat:{ id:chatId, type:'private' }, message_id:managementMessageId },
+    data:'r:result',
+  });
+
+  const replacement = h.calls.find(call => call.method === 'sendRichMessage');
+  assert.ok(replacement);
+  assert.match(
+    replacement.args.rich_message.blocks[0].text,
+    /previous editor panel stopped working/i,
+  );
+  assert.match(
+    replacement.args.rich_message.blocks[0].text,
+    /kept any existing blocks/i,
+  );
+  assert.ok(replacement.args.reply_markup.inline_keyboard.flat().some(button =>
+    button.callback_data === 'r:addmenu'));
+
+  const session = await h.session.loadEditorSession(userId, { touch:false });
+  assert.equal(session.state, 'managing');
+  assert.equal(session.managementMessageId, 100);
+  assert.deepEqual(session.blocks, []);
+  assert.equal(h.calls.some(call => call.method === 'sendMessage'), false);
+});
+
+test('empty-result recovery keeps existing blocks when Telegram rejects the rendered message', async () => {
+  const { h, blocks } = await fixture();
+  h.apiState.richSendErrors = {
+    [String(userId)]: [new Error('The rich message has no blocks')],
+  };
+
+  await h.editorBlocks.handleEditorBlockCallback({
+    id:'preview-rendered-empty',
+    from:{ id:userId, language_code:'en' },
+    message:{ chat:{ id:chatId, type:'private' }, message_id:managementMessageId },
+    data:'r:result',
+  });
+
+  const session = await h.session.loadEditorSession(userId, { touch:false });
+  assert.deepEqual(session.blocks.map(block => block.id), blocks.map(block => block.id));
+  assert.equal(session.state, 'managing');
+  const replacement = h.calls.filter(call => call.method === 'sendRichMessage').at(-1);
+  assert.match(replacement.args.rich_message.blocks[0].text, /kept any existing blocks/i);
+});
+
+test('empty-result recovery notice is explicit in every supported locale', async () => {
+  const h = await harness();
+  const locales = [
+    'ar', 'en', 'es', 'de', 'it', 'pt', 'nl', 'pl', 'uk', 'ru',
+    'tr', 'ur', 'hi', 'id', 'ja', 'ko', 'vi', 'th', 'zh-hans', 'zh-hant',
+  ];
+  const english = h.ui.editorCopy('en').emptyRecovery;
+  for (const locale of locales) {
+    const notice = h.ui.editorCopy(locale).emptyRecovery;
+    assert.ok(notice.length > 40, locale);
+    if (locale !== 'en') assert.notEqual(notice, english, locale);
+  }
+});
+
+test('back replaces the management message only when Telegram reports it missing', async () => {
+  const { h } = await fixture();
+  h.apiState.editError = 'Bad Request: message to edit not found';
+
+  await h.editorBlocks.handleEditorBlockCallback({
+    id:'back-missing-panel',
+    from:{ id:userId, language_code:'en' },
+    message:{ chat:{ id:chatId, type:'private' }, message_id:901 },
+    data:'r:back',
+  });
+
+  const session = await h.session.loadEditorSession(userId, { touch:false });
+  assert.equal(session.managementMessageId, 100);
+  const replacementCall = h.calls.findIndex(call => call.method === 'sendRichMessage');
+  const callbackDeleteCall = h.calls.findIndex(call =>
+    call.method === 'deleteMessage' && call.args.message_id === 901);
+  assert.ok(replacementCall >= 0 && callbackDeleteCall > replacementCall);
+  assert.equal(
+    h.calls.filter(call => call.method === 'sendRichMessage').length,
+    1,
+  );
+});
+
+test('back does not create a duplicate management message after unrelated edit failures', async () => {
+  const { h } = await fixture();
+  h.apiState.editError = 'Telegram temporarily unavailable';
+
+  await assert.rejects(
+    () => h.editorBlocks.handleEditorBlockCallback({
+      id:'back-edit-failure',
+      from:{ id:userId, language_code:'en' },
+      message:{ chat:{ id:chatId, type:'private' }, message_id:901 },
+      data:'r:back',
+    }),
+    /Telegram temporarily unavailable/,
+  );
+  assert.equal(h.calls.filter(call => call.method === 'sendRichMessage').length, 0);
+  assert.equal(
+    h.calls.some(call =>
+      call.method === 'deleteMessage' && call.args.message_id === 901),
+    false,
+  );
+});

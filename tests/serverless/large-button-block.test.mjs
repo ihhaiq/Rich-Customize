@@ -33,13 +33,28 @@ test('large button blocks render Rich Message buttons and validate their actions
   }]);
   assert.throws(
     () => h.renderer.buildInputRichMessage([h.blocks.makeBlock('buttons', { buttons: [] })]),
-    /must contain exactly one button/,
+    /between 1 and 100 buttons/,
+  );
+  const multipleButtons = [
+    { text: 'One', url: 'https://example.com' },
+    { text: 'Two', url: 'https://example.org' },
+  ];
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(h.renderer.buildInputRichMessage([
+      h.blocks.makeBlock('buttons', { buttons: multipleButtons }),
+    ]).blocks[0].buttons)),
+    multipleButtons,
   );
   assert.throws(
     () => h.renderer.buildInputRichMessage([
-      h.blocks.makeBlock('buttons', { buttons: [{ text: 'One', url: 'https://example.com' }, { text: 'Two', url: 'https://example.com' }] }),
+      h.blocks.makeBlock('buttons', {
+        buttons: Array.from({ length: 101 }, (_, index) => ({
+          text: 'Button ' + index,
+          url: 'https://example.com',
+        })),
+      }),
     ]),
-    /must contain exactly one button/,
+    /between 1 and 100 buttons/,
   );
   assert.throws(
     () => h.renderer.buildInputRichMessage([
@@ -66,10 +81,10 @@ test('large button labels count toward the text quota and are trimmed safely', a
 test('publish validation rejects empty and malformed large-button blocks', () => {
   assert.equal(check({ blocks: [{ type: 'buttons', data: { buttons: [] } }] })[0].code, 'missing_buttons');
   assert.equal(check({
-    blocks: [{ type: 'buttons', data: { buttons: [
-      { text: 'One', url: 'https://example.com' },
-      { text: 'Two', url: 'https://example.com' },
-    ] } }],
+    blocks: [{ type: 'buttons', data: { buttons: Array.from({ length: 101 }, (_, index) => ({
+      text: 'Button ' + index,
+      url: 'https://example.com',
+    })) } }],
   })[0].code, 'invalid_button_layout');
   assert.equal(check({
     blocks: [{ type: 'buttons', data: { buttons: [{ text: 'Broken', callback_data: 'x'.repeat(65) }] } }],
@@ -77,6 +92,24 @@ test('publish validation rejects empty and malformed large-button blocks', () =>
   assert.equal(check({
     blocks: [{ type: 'buttons', data: { buttons: [{ text: 'Open', url: 'https://example.com' }] } }],
   }).length, 0);
+  assert.equal(check({
+    blocks: [{ type: 'buttons', data: { buttons: [
+      { text: 'One', url: 'https://example.com' },
+      { text: 'Two', url: 'https://example.org' },
+    ] } }],
+  }).length, 0);
+  assert.equal(check({
+    blocks: [{ type: 'buttons', data: { buttons: Array.from({ length: 100 }, (_, index) => ({
+      text: 'Button ' + index,
+      url: 'https://example.com',
+    })) } }],
+  }).length, 0);
+  assert.equal(check({
+    blocks: [{ type: 'buttons', data: { buttons: Array.from({ length: 101 }, (_, index) => ({
+      text: 'Button ' + index,
+      url: 'https://example.com',
+    })) } }],
+  })[0].code, 'invalid_button_layout');
 });
 
 test('large-button labels resolve for every supported Mini App locale', () => {
@@ -129,7 +162,7 @@ test('Telegram editor lists, creates, and edits large-button blocks', async () =
     from: { id: userId, language_code: 'en' },
     chat: { id: chatId },
     message_id: 901,
-    text: 'Open website - https://example.com #r',
+    text: '{Open website - https://example.com #r} {Copy link - copy:https://example.com #g}',
   });
 
   let updated = await h.session.loadEditorSession(userId, { touch: false });
@@ -139,7 +172,15 @@ test('Telegram editor lists, creates, and edits large-button blocks', async () =
     text: 'Open website',
     url: 'https://example.com',
     style: 'danger',
+  }, {
+    text: 'Copy link',
+    copy_text: { text: 'https://example.com' },
+    style: 'success',
   }]);
+  assert.equal(
+    h.renderer.buildInputRichMessage(updated.blocks, { technicalOnly: true }).blocks.at(-1).buttons.length,
+    2,
+  );
 
   await h.editorBlocks.handleEditorBlockCallback({
     id: 'edit-large-button',
@@ -185,6 +226,31 @@ test('large-button editor rejects invalid URLs without ending the add flow', asy
   assert.equal(session.state, 'adding_block');
   assert.equal(session.addStep, 'large_button_entry');
   assert.equal(session.blocks.length, 0);
+});
+
+test('large-button editor rejects direct user-ID links', async () => {
+  const h = await harness({ extraModules: { editorBlocks: 'lib/editor-block-flow' } });
+  const userId = 79;
+  await h.session.createEditorSession(userId, userId, 912);
+  await h.editorBlocks.handleEditorBlockCallback({
+    id: 'add-large-button-user-id',
+    from: { id: userId, language_code: 'en' },
+    message: { chat: { id: userId }, message_id: 912 },
+    data: 'r:add:buttons',
+  });
+  await h.editorBlocks.handleEditorBlockMessage({
+    from: { id: userId, language_code: 'en' },
+    chat: { id: userId },
+    message_id: 913,
+    text: '{Profile:USER 12345}',
+  });
+
+  const session = await h.session.loadEditorSession(userId, { touch: false });
+  assert.equal(session.state, 'adding_block');
+  assert.equal(session.addStep, 'large_button_entry');
+  assert.equal(session.blocks.length, 0);
+  assert.ok(h.calls.some(call => call.method === 'sendMessage'
+    && String(call.args.text).includes('public @username')));
 });
 
 test('large-button CBD input only links to a page owned by the editor', async () => {
@@ -269,6 +335,220 @@ test('large-button input accepts Telegram usernames, t.me links, and color codes
       session.blocks.at(-1).data.buttons[0],
     );
   }
+});
+
+test('large-button input reuses rich formats and shows a concise multiple-button guide', async () => {
+  const h = await harness({ extraModules: { editorBlocks: 'lib/editor-block-flow' } });
+  const userId = 78;
+  await h.session.createEditorSession(userId, userId, 928);
+  await h.editorBlocks.handleEditorBlockCallback({
+    id: 'large-button-rich-prompt',
+    from: { id: userId, language_code: 'en' },
+    message: { chat: { id: userId }, message_id: 928 },
+    data: 'r:add:buttons',
+  });
+  const promptCall = h.calls.find(call => call.method === 'sendRichMessage');
+  assert.ok(promptCall);
+  assert.deepEqual(
+    promptCall.args.rich_message.blocks.map(block => block.type),
+    ['heading', 'paragraph', 'divider', 'details'],
+  );
+  const guideText = JSON.stringify(promptCall.args.rich_message.blocks);
+  assert.ok(guideText.includes('Add large button'));
+  assert.ok(guideText.includes('Send the button format'));
+  const details = promptCall.args.rich_message.blocks[3];
+  assert.equal(details.type, 'details');
+  const detailsText = JSON.stringify(details.blocks);
+  for (const format of ['USER', 'alert:', 'callback_data:', 'copy:', 'web_app:', 'login_url:', 'switch_inline_query']) {
+    assert.ok(detailsText.includes(format), `missing ${format} from the expandable button guide`);
+  }
+  assert.ok(detailsText.includes('Multiple buttons side by side'));
+  assert.ok(!JSON.stringify(promptCall.args.rich_message.blocks.slice(0, 3)).includes('Website'));
+
+  const cases = [
+    ['{Alert - alert:Hello #r}', { text: 'Alert', callback_data: 'r:poptext:Hello', style: 'danger' }],
+    ['{Action - callback_data:action:1 #r}', { text: 'Action', callback_data: 'action:1', style: 'danger' }],
+    ['{Copy - copy:ABC #g}', { text: 'Copy', copy_text: { text: 'ABC' }, style: 'success' }],
+    ['{Search - switch_inline_query:tea}', { text: 'Search', switch_inline_query: 'tea' }],
+    ['{Search here - switch_inline_query_current_chat:tea}', { text: 'Search here', switch_inline_query_current_chat: 'tea' }],
+    ['{Open app - web_app:https://example.com #b}', { text: 'Open app', web_app: { url: 'https://example.com' }, style: 'primary' }],
+    ['{Sign in - login_url:https://example.com #b}', { text: 'Sign in', login_url: { url: 'https://example.com' }, style: 'primary' }],
+    ['{Disabled - disabled #r}', { text: 'Disabled', disabled: {}, style: 'danger' }],
+  ];
+  for (let index = 0; index < cases.length; index += 1) {
+    const [text, expected] = cases[index];
+    const nextUserId = userId + index + 1;
+    await h.session.createEditorSession(nextUserId, nextUserId, 940 + index);
+    await h.editorBlocks.handleEditorBlockCallback({
+      id: 'large-button-rich-' + index,
+      from: { id: nextUserId, language_code: 'en' },
+      message: { chat: { id: nextUserId }, message_id: 940 + index },
+      data: 'r:add:buttons',
+    });
+    await h.editorBlocks.handleEditorBlockMessage({
+      from: { id: nextUserId, language_code: 'en' },
+      chat: { id: nextUserId },
+      message_id: 950 + index,
+      text,
+    });
+    const session = await h.session.loadEditorSession(nextUserId, { touch: false });
+    assert.deepEqual(session.blocks.at(-1).data.buttons, [expected]);
+  }
+});
+
+test('large-button CBD accepts saved page names and reports invalid references in a quote', async () => {
+  const h = await harness({ extraModules: { editorBlocks: 'lib/editor-block-flow' } });
+  const userId = 78;
+  h.records.richPages.push({
+    pageId: 'page-code-1',
+    ownerId: userId,
+    title: 'صفحة المستخدم',
+    blocks: [{ type: 'paragraph', data: { text: 'Saved content' } }],
+    buttons: [],
+  });
+  await h.session.createEditorSession(userId, userId, 928);
+  await h.editorBlocks.handleEditorBlockCallback({
+    id: 'large-button-cbd-name',
+    from: { id: userId, language_code: 'ar' },
+    message: { chat: { id: userId }, message_id: 928 },
+    data: 'r:add:buttons',
+  });
+
+  await h.editorBlocks.handleEditorBlockMessage({
+    from: { id: userId, language_code: 'ar' },
+    chat: { id: userId },
+    message_id: 929,
+    text: '{افتح الصفحة - CBD: صفحة المستخدم}',
+  });
+  let session = await h.session.loadEditorSession(userId, { touch: false });
+  assert.deepEqual(session.blocks.at(-1).data.buttons, [{
+    text: 'افتح الصفحة',
+    callback_data: 'r:cbd:page-code-1',
+  }]);
+
+  const otherUserId = 79;
+  await h.session.createEditorSession(otherUserId, otherUserId, 931);
+  await h.editorBlocks.handleEditorBlockCallback({
+    id: 'large-button-cbd-invalid',
+    from: { id: otherUserId, language_code: 'ar' },
+    message: { chat: { id: otherUserId }, message_id: 931 },
+    data: 'r:add:buttons',
+  });
+  await h.editorBlocks.handleEditorBlockMessage({
+    from: { id: otherUserId, language_code: 'ar' },
+    chat: { id: otherUserId },
+    message_id: 932,
+    text: '{افتح الصفحة - CBD: صفحة غير موجودة}',
+  });
+  const error = h.calls.find(call => (
+    call.method === 'sendRichMessage'
+    && call.args.rich_message?.blocks?.[0]?.text === 'التنسيق غلط.'
+  ));
+  assert.ok(error);
+  assert.equal(error.args.rich_message.blocks[1].type, 'blockquote');
+  assert.match(error.args.rich_message.blocks[1].blocks[0].text, /اسم صفحة محفوظة عندك كما هو أو كودها/);
+  session = await h.session.loadEditorSession(otherUserId, { touch: false });
+  assert.equal(session.addStep, 'large_button_entry');
+});
+
+test('large-button USER format uses the existing Telegram user picker', async () => {
+  const h = await harness({ extraModules: { editorBlocks: 'lib/editor-block-flow' } });
+  const userId = 77;
+  await h.session.createEditorSession(userId, userId, 927);
+  await h.editorBlocks.handleEditorBlockCallback({
+    id: 'large-button-user',
+    from: { id: userId, language_code: 'en' },
+    message: { chat: { id: userId }, message_id: 927 },
+    data: 'r:add:buttons',
+  });
+  await h.editorBlocks.handleEditorBlockMessage({
+    from: { id: userId, language_code: 'en' },
+    chat: { id: userId },
+    message_id: 928,
+    text: '{Profile - USER #p}',
+  });
+  let session = await h.session.loadEditorSession(userId, { touch: false });
+  assert.equal(session.state, 'selecting_button_user');
+  const picker = h.calls.filter(call => call.method === 'sendMessage').at(-1);
+  const requestId = picker.args.reply_markup.keyboard[0][0].request_users.request_id;
+
+  await h.editorBlocks.handleEditorBlockMessage({
+    from: { id: userId, language_code: 'en' },
+    chat: { id: userId },
+    message_id: 929,
+    users_shared: { request_id: requestId, users: [{ user_id: 12345, username: '@profile_user' }] },
+  });
+  session = await h.session.loadEditorSession(userId, { touch: false });
+  assert.equal(session.state, 'managing');
+  assert.deepEqual(session.blocks.at(-1).data.buttons, [{
+    text: 'Profile',
+    url: 'https://t.me/profile_user',
+    style: 'primary',
+  }]);
+  assert.equal(
+    h.renderer.buildInputRichMessage(session.blocks, { technicalOnly: true }).blocks.at(-1).buttons[0].url,
+    'https://t.me/profile_user',
+  );
+});
+
+test('large-button USER selection without a public username asks for another account', async () => {
+  const h = await harness({ extraModules: { editorBlocks: 'lib/editor-block-flow' } });
+  const userId = 80;
+  await h.session.createEditorSession(userId, userId, 929);
+  await h.editorBlocks.handleEditorBlockCallback({
+    id: 'large-button-user-no-username',
+    from: { id: userId, language_code: 'en' },
+    message: { chat: { id: userId }, message_id: 929 },
+    data: 'r:add:buttons',
+  });
+  await h.editorBlocks.handleEditorBlockMessage({
+    from: { id: userId, language_code: 'en' },
+    chat: { id: userId },
+    message_id: 930,
+    text: '{Profile - USER #p}',
+  });
+  let session = await h.session.loadEditorSession(userId, { touch: false });
+  const firstPicker = h.calls.filter(call => call.method === 'sendMessage').at(-1);
+  const firstRequestId = firstPicker.args.reply_markup.keyboard[0][0].request_users.request_id;
+  await h.editorBlocks.handleEditorBlockMessage({
+    from: { id: userId, language_code: 'en' },
+    chat: { id: userId },
+    message_id: 931,
+    users_shared: { request_id: firstRequestId, users: [{ user_id: 12346 }] },
+  });
+
+  session = await h.session.loadEditorSession(userId, { touch: false });
+  const nextPicker = h.calls.filter(call => call.method === 'sendMessage').at(-1);
+  const nextRequestId = nextPicker.args.reply_markup.keyboard[0][0].request_users.request_id;
+  assert.equal(session.state, 'selecting_button_user');
+  assert.notEqual(nextRequestId, firstRequestId);
+  assert.equal(session.blocks.length, 0);
+  assert.ok(h.calls.some(call => call.method === 'sendMessage'
+    && String(call.args.text).includes('public @username')));
+});
+
+test('old direct user-ID buttons remain editable without sending the invalid target', async () => {
+  const h = await harness({ extraModules: { editorBlocks: 'lib/editor-block-flow' } });
+  const userId = 81;
+  const chatId = 81;
+  const block = h.blocks.makeBlock('buttons', {
+    buttons: [{ text: 'Profile', url: 'tg://user?id=12345' }],
+  });
+  await h.session.createEditorSession(userId, chatId, 940);
+  await h.session.updateEditorSession(userId, { blocks: [block] });
+  await h.editorBlocks.handleEditorBlockCallback({
+    id: 'open-old-account-button',
+    from: { id: userId, language_code: 'en' },
+    message: { chat: { id: chatId }, message_id: 940 },
+    data: 'r:b:' + block.id,
+  });
+
+  const edit = h.calls.filter(call => call.method === 'editMessageText').at(-1);
+  assert.ok(edit);
+  assert.ok(JSON.stringify(edit.args.rich_message.blocks).includes('Telegram rejected'));
+  assert.equal(JSON.stringify(edit.args.rich_message.blocks).includes('tg://user?id=12345'), false);
+  assert.equal(JSON.stringify(edit.args.rich_message.blocks).includes('"type":"buttons"'), false);
+  assert.ok(edit.args.reply_markup.inline_keyboard.length > 0);
 });
 
 test('media choice preserves each incoming Telegram media type', async () => {

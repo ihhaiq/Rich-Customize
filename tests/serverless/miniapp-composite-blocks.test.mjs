@@ -45,6 +45,8 @@ test('Details blocks accept repeated child additions without replacing earlier c
   const context = {
     window,
     defaultBlock: type => ({id:`child-${++nextId}`,type,position:0,data:{}}),
+    applyText(block, text) { block.data.html = `<h${block.data.size}>${text}</h${block.data.size}>`; },
+    blockText: block => block.data.text || "",
     markDirty() {},
     pushHistory() {},
     renderBlocks() {},
@@ -59,6 +61,10 @@ test('Details blocks accept repeated child additions without replacing earlier c
   };
   window.RichDetailsNestedEditor.addNestedBlock(details, 'heading');
   window.RichDetailsNestedEditor.addNestedBlock(details, 'photo');
+  window.RichDetailsNestedEditor.addNestedBlock(details, 'list', null, '', {kind:'checklist'});
+  window.RichDetailsNestedEditor.addNestedBlock(details, 'heading', null, '', {headingLevel:5});
+  assert.equal(details.data.children[3].data.kind, 'checklist');
+  assert.equal(details.data.children[4].data.size, 5);
 
   assert.deepEqual(
     JSON.parse(JSON.stringify(details.data.children.map(({id,type,position}) => ({id,type,position})))),
@@ -66,6 +72,8 @@ test('Details blocks accept repeated child additions without replacing earlier c
       {id:'existing',type:'paragraph',position:0},
       {id:'child-1',type:'heading',position:1},
       {id:'child-2',type:'photo',position:2},
+      {id:'child-3',type:'list',position:3},
+      {id:'child-4',type:'heading',position:4},
     ],
   );
 
@@ -74,8 +82,10 @@ test('Details blocks accept repeated child additions without replacing earlier c
     JSON.parse(JSON.stringify(details.data.children.map(({id,type,position}) => ({id,type,position})))),
     [
       {id:'existing',type:'paragraph',position:0},
-      {id:'child-3',type:'video',position:1},
+      {id:'child-5',type:'video',position:1},
       {id:'child-2',type:'photo',position:2},
+      {id:'child-3',type:'list',position:3},
+      {id:'child-4',type:'heading',position:4},
     ],
   );
   window.RichDetailsNestedEditor.moveNestedBlock(details, 'child-2', -1);
@@ -84,9 +94,23 @@ test('Details blocks accept repeated child additions without replacing earlier c
     [
       {id:'existing',position:0},
       {id:'child-2',position:1},
-      {id:'child-3',position:2},
+      {id:'child-5',position:2},
+      {id:'child-3',position:3},
+      {id:'child-4',position:4},
     ],
   );
+});
+
+test('nested list and heading selections expose all formatting variants', () => {
+  const source = read('details_nested_editor.js');
+  assert.match(source, /function nestedVariantOptions\(type\)/);
+  assert.match(source, /kind:"bullet"/);
+  assert.match(source, /kind:"numbered"/);
+  assert.match(source, /kind:"checklist"/);
+  assert.match(source, /headingLevel:index \+ 1/);
+  assert.match(source, /Array\.from\(\{length:6\}/);
+  assert.match(source, /makeNestedCommandMenu\(detailsBlock, editor, child\.id, value\.slice\(1\), first\)/);
+  assert.match(source, /details\.back/);
 });
 
 test('collage and slideshow media uploads append to existing media across selections', async () => {

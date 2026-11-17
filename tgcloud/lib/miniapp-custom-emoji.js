@@ -40,7 +40,11 @@ function unpackState(row) {
     if (safe && !names.includes(safe)) names.push(safe);
   }
   const pinnedPack = names.includes(packName(payload.pinnedPack)) ? packName(payload.pinnedPack) : '';
-  return { packNames: names, pinnedPack };
+  return {
+    packNames: names,
+    pinnedPack,
+    legacyImported: Boolean(row) && payload.legacyImported !== false,
+  };
 }
 
 async function loadState(ownerId) {
@@ -57,21 +61,22 @@ function entitlementLimit(ownerId) {
 }
 
 function visibleNames(state, limit) {
-  const ordered = state.pinnedPack
-    ? [state.pinnedPack, ...state.packNames.filter((name) => name !== state.pinnedPack)]
-    : state.packNames;
-  return limit == null ? ordered : ordered.slice(0, limit);
+  const eligible = limit == null ? state.packNames : state.packNames.slice(0, limit);
+  return state.pinnedPack && eligible.includes(state.pinnedPack)
+    ? [state.pinnedPack, ...eligible.filter((name) => name !== state.pinnedPack)]
+    : eligible;
 }
 
 function accessPayload(state, limit, developer) {
-  const names = visibleNames(state, limit);
+  const effectiveLimit = developer ? null : limit;
+  const names = visibleNames(state, effectiveLimit);
   return {
     is_developer: developer,
-    custom_emoji_pack_limit: limit,
+    custom_emoji_pack_limit: effectiveLimit,
     custom_emoji_pack_count: state.packNames.length,
     custom_emoji_packs: names,
     custom_emoji_pinned_pack: state.pinnedPack,
-    migration_required: !state.exists,
+    migration_required: !state.legacyImported,
   };
 }
 
@@ -91,7 +96,12 @@ async function compareAndSwapState(ownerId, update) {
     if (!row) {
       const inserted = await db.insert(legacyStates).values({
         namespace,
-        payload: { version: 1, packNames: next.packNames, pinnedPack: next.pinnedPack },
+        payload: {
+          version: 1,
+          packNames: next.packNames,
+          pinnedPack: next.pinnedPack,
+          legacyImported: next.legacyImported,
+        },
         updatedAt,
       }).onConflictDoNothing({ target: legacyStates.namespace })
         .returning({ namespace: legacyStates.namespace }).run();
@@ -99,7 +109,12 @@ async function compareAndSwapState(ownerId, update) {
       continue;
     }
     const updated = await db.update(legacyStates).set({
-      payload: { version: 1, packNames: next.packNames, pinnedPack: next.pinnedPack },
+      payload: {
+        version: 1,
+        packNames: next.packNames,
+        pinnedPack: next.pinnedPack,
+        legacyImported: next.legacyImported,
+      },
       updatedAt,
     }).where(and(
       eq(legacyStates.namespace, namespace),
@@ -131,8 +146,13 @@ export async function importMiniAppCustomEmojiPacks(ownerId, inputNames, inputPi
     throw new Error('INVALID_CUSTOM_EMOJI_PACKS');
   }
   const state = await compareAndSwapState(ownerId, (current, exists) => {
-    if (exists) return null;
-    return { packNames: requested, pinnedPack };
+    if (exists && current.legacyImported) return null;
+    const packNames = [...requested, ...current.packNames.filter((name) => !requested.includes(name))];
+    return {
+      packNames,
+      pinnedPack: pinnedPack || current.pinnedPack,
+      legacyImported: true,
+    };
   });
   return { ok: true, access: accessPayload(state, limit, developer) };
 }
@@ -187,7 +207,6 @@ export async function getMiniAppCustomEmojiPack(ownerId, inputName) {
   const name = packName(inputName);
   if (!name) throw new Error('INVALID_CUSTOM_EMOJI_PACK');
   const state = await stateWithExists(ownerId);
-  if (!state.exists) throw new Error('CUSTOM_EMOJI_MIGRATION_REQUIRED');
   const { developer, limit } = await entitlementLimit(ownerId);
   if (!visibleNames(state, developer ? null : limit).includes(name)) {
     throw new Error('CUSTOM_EMOJI_PACK_NOT_FOUND');
@@ -201,15 +220,21 @@ export async function getMiniAppCustomEmojiPack(ownerId, inputName) {
 }
 
 export async function addMiniAppCustomEmojiPack(ownerId, inputName) {
-  if (!(await loadState(ownerId)).row) throw new Error('CUSTOM_EMOJI_MIGRATION_REQUIRED');
+  const { developer, limit } = await entitlementLimit(ownerId);
   const data = await telegramCustomEmojiPack(inputName);
   const { name } = data;
-  const { developer, limit } = await entitlementLimit(ownerId);
   const state = await compareAndSwapState(ownerId, (current) => {
     if (current.packNames.includes(name)) return null;
     validatePackLimit(current.packNames.concat(name), developer ? null : limit);
-    return { packNames: current.packNames.concat(name), pinnedPack: current.pinnedPack };
+    return {
+      packNames: current.packNames.concat(name),
+      pinnedPack: current.pinnedPack,
+      legacyImported: current.legacyImported,
+    };
   });
+  if (!visibleNames(state, developer ? null : limit).includes(name)) {
+    throw new Error('CUSTOM_EMOJI_PACK_NOT_FOUND');
+  }
   return {
     ok: true,
     access: accessPayload(state, limit, developer),
@@ -245,7 +270,7 @@ export async function manageMiniAppCustomEmojiPacks(ownerId, action, input) {
     if (names.length === current.packNames.length
       && names.every((name, index) => name === current.packNames[index])
       && pinnedPack === current.pinnedPack) return null;
-    return { packNames: names, pinnedPack };
+    return { packNames: names, pinnedPack, legacyImported: current.legacyImported };
   });
   return { ok: true, access: accessPayload(state, limit, developer) };
 }

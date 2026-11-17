@@ -9,11 +9,6 @@ import {
   normalizeBlockScrollOffset,
   normalizeBlocks,
 } from 'lib/editor-blocks';
-import {
-  enqueuePageUpsertSync,
-  flushMiniAppSyncOutbox,
-  nextPageSyncVersion,
-} from 'lib/miniapp-sync';
 import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 
@@ -114,14 +109,6 @@ async function syncSavedPageSession(userId, session) {
     return { status:'missing', changed:false };
   }
   if (savedPageMatchesSession(page, session)) {
-    try {
-      await flushMiniAppSyncOutbox({ limit:1 });
-    } catch (error) {
-      await logError('miniapp_sync.editor_manual_retry', error, {
-        userId,
-        extra:'page=' + pageId,
-      });
-    }
     return { status:'unchanged', changed:false, page };
   }
 
@@ -134,7 +121,7 @@ async function syncSavedPageSession(userId, session) {
   });
   if (!quota.ok) return { status:'quota_exceeded', changed:false, limit:quota };
   const stamp = Math.max(nowSeconds(), Number(page.updatedAt || 0) + 1);
-  const version = await nextPageSyncVersion(page.revision || 1);
+  const revision = Math.max(1, Number(page.revision || 1)) + 1;
 
   const changed = await db.update(richPages).set({
     blocks: clone(session.blocks || []),
@@ -142,8 +129,8 @@ async function syncSavedPageSession(userId, session) {
     buttonsPerRow: normalizedButtonsPerRow(session.buttonsPerRow),
     buttonsAlign: normalizedButtonsAlign(session.buttonsAlign),
     updatedAt: stamp,
-    revision: version.revision,
-    syncSeq: version.syncSeq,
+    revision,
+    syncSeq: Number(page.syncSeq || 0),
   }).where(and(
     eq(richPages.pageId, pageId),
     eq(richPages.ownerId, Number(userId)),
@@ -155,17 +142,6 @@ async function syncSavedPageSession(userId, session) {
 
   const saved = await db.select().from(richPages)
     .where(eq(richPages.pageId, pageId)).get();
-  if (saved) {
-    try {
-      await enqueuePageUpsertSync(saved);
-      await flushMiniAppSyncOutbox({ limit:1 });
-    } catch (error) {
-      await logError('miniapp_sync.editor_auto', error, {
-        userId,
-        extra:'page=' + pageId,
-      });
-    }
-  }
   return { status:'synced', changed:true, page:saved || page };
 }
 

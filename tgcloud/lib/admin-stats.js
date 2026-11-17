@@ -58,6 +58,7 @@ export async function audienceAndSubscriptionStats(stamp=Math.floor(Date.now()/1
       COALESCE(SUM(CASE WHEN a.status='sent' THEN 1 ELSE 0 END),0) AS confirmed
     FROM usage_users u
     LEFT JOIN latest a ON a.user_id=u.user_id AND a.rank=1
+    WHERE u.private_seen_at IS NOT NULL
   `));
   return normalizeAudienceStats(tierRows,reach,reach?.known);
 }

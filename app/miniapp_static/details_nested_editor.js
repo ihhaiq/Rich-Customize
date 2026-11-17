@@ -44,10 +44,23 @@
     });
   }
 
-  function addNestedBlock(detailsBlock, type, at = null, initialText = "") {
+  function applyNestedOptions(child, options) {
+    if (!options || typeof options !== "object") return;
+    const data = child.data || (child.data = {});
+    if (child.type === "list" && ["bullet", "numbered", "checklist"].includes(options.kind)) {
+      data.kind = options.kind;
+    }
+    if (child.type === "heading" && Number.isInteger(options.headingLevel)) {
+      data.size = Math.max(1, Math.min(6, options.headingLevel));
+      applyText(child, blockText(child));
+    }
+  }
+
+  function addNestedBlock(detailsBlock, type, at = null, initialText = "", options = null) {
     const children = orderedChildren(detailsBlock);
     const child = defaultBlock(type);
     if (initialText && TEXT_TYPES.has(type)) applyText(child, initialText);
+    applyNestedOptions(child, options);
     const index = Number.isInteger(at)
       ? Math.max(0, Math.min(at, children.length))
       : children.length;
@@ -60,11 +73,12 @@
     return child;
   }
 
-  function replaceNestedBlock(detailsBlock, childId, type) {
+  function replaceNestedBlock(detailsBlock, childId, type, options = null) {
     const children = orderedChildren(detailsBlock);
     const index = children.findIndex(child => String(child?.id) === String(childId));
     if (index < 0) return null;
     const replacement = defaultBlock(type);
+    applyNestedOptions(replacement, options);
     replacement.position = index;
     children.splice(index, 1, replacement);
     syncChildPositions(detailsBlock);
@@ -140,31 +154,84 @@
     return BLOCKS.filter(item => !q || `${item.type} ${item.label} ${item.keys || ""}`.toLowerCase().includes(q));
   }
 
-  function makeNestedCommandMenu(detailsBlock, anchor, replaceChildId = null, query = "") {
+  function nestedVariantOptions(type) {
+    if (type === "heading") {
+      return Array.from({length:6}, (_, index) => ({
+        icon:"heading",
+        label:mt("heading.level",{level:index + 1}),
+        options:{headingLevel:index + 1},
+      }));
+    }
+    if (type === "list") {
+      return [
+        {icon:"list",label:mt("list.bulleted"),options:{kind:"bullet"}},
+        {icon:"numbered",label:mt("list.numbered"),options:{kind:"numbered"}},
+        {icon:"checklist",label:mt("list.tasks"),options:{kind:"checklist"}},
+      ];
+    }
+    return null;
+  }
+
+  function makeNestedCommandMenu(detailsBlock, anchor, replaceChildId = null, query = "", initialItem = null) {
     const menu = document.createElement("aside");
     menu.className = "popup-menu details-command-menu";
     menu.setAttribute("aria-label", mt("details.add_inner"));
+    const head = document.createElement("div");
+    head.className = "menu-head";
     const list = document.createElement("div");
     list.className = "menu-list";
-    const items = filteredNestedBlocks(query);
+    menu.append(head, list);
 
-    if (!items.length) {
-      const empty = document.createElement("div");
-      empty.className = "empty";
-      empty.textContent = mt("editor.no_block_match");
-      list.appendChild(empty);
+    function choose(type, options = null) {
+      menu.remove();
+      if (replaceChildId) replaceNestedBlock(detailsBlock, replaceChildId, type, options);
+      else addNestedBlock(detailsBlock, type, null, "", options);
     }
 
-    items.forEach((item, index) => {
-      const button = menuButton(item.icon, item.label, item.desc || "", () => {
-        menu.remove();
-        if (replaceChildId) replaceNestedBlock(detailsBlock, replaceChildId, item.type);
-        else addNestedBlock(detailsBlock, item.type);
-      }, index === 0 ? "active" : "");
-      list.appendChild(button);
-    });
+    function showVariants(item) {
+      const variants = nestedVariantOptions(item.type);
+      if (!variants) {
+        choose(item.type);
+        return;
+      }
+      head.replaceChildren();
+      const back = document.createElement("button");
+      back.type = "button";
+      back.className = "nested-menu-back";
+      back.textContent = mt("details.back");
+      back.setAttribute("aria-label", mt("details.back"));
+      back.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        renderBlocks();
+      });
+      const title = document.createElement("strong");
+      title.textContent = item.label;
+      head.append(back, title);
+      list.replaceChildren();
+      variants.forEach(variant => {
+        list.appendChild(menuButton(variant.icon, variant.label, "", () => choose(item.type, variant.options)));
+      });
+    }
 
-    menu.appendChild(list);
+    function renderBlocks() {
+      head.textContent = query ? `/${query}` : mt("details.add_inner");
+      list.replaceChildren();
+      const items = filteredNestedBlocks(query);
+      if (!items.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = mt("editor.no_block_match");
+        list.appendChild(empty);
+        return;
+      }
+      items.forEach((item, index) => {
+        list.appendChild(menuButton(item.icon, item.label, item.desc || "", () => showVariants(item), index === 0 ? "active" : ""));
+      });
+    }
+
+    if (initialItem) showVariants(initialItem);
+    else renderBlocks();
     document.body.appendChild(menu);
     placeNestedMenu(menu, anchor);
 
@@ -269,7 +336,9 @@
         if (first) {
           event.preventDefault();
           closeCommandMenu();
-          replaceNestedBlock(detailsBlock, child.id, first.type);
+          const variants = nestedVariantOptions(first.type);
+          if (variants) commandMenu = makeNestedCommandMenu(detailsBlock, editor, child.id, value.slice(1), first);
+          else replaceNestedBlock(detailsBlock, child.id, first.type);
         }
         return;
       }
@@ -287,25 +356,67 @@
     return editor;
   }
 
+  function summaryEditor(block, parentId = block.id) {
+    const d = block.data || (block.data = {});
+    const editor = document.createElement("div");
+    editor.contentEditable = "true";
+    editor.spellcheck = true;
+    editor.className = "details-summary-live details-title-input rich-inline-editor";
+    editor.dataset.richBlockId = block.id;
+    editor.dataset.placeholder = mt("details.title_placeholder");
+    const stored = d.summary_rich_text != null
+      ? window.RichInlineTextTools?.richTextToHtml?.(d.summary_rich_text)
+      : d.summary_html || escapeHtml(d.summary_text || mt("details.title"));
+    editor.innerHTML = window.RichInlineTextTools?.sanitizeInlineHtml?.(stored)
+      || escapeHtml(d.summary_text || mt("details.title"));
+
+    function sync(mark = true) {
+      window.RichCustomEmojiCode?.convertEditor?.(editor);
+      const value = window.RichInlineTextTools?.serializeEditor?.(editor)
+        || {text:editor.textContent || "",html:editor.innerHTML};
+      d.summary_text = value.text;
+      d.summary_html = value.html;
+      d.summary_rich_text = null;
+      if (mark) markDirty();
+    }
+
+    editor.addEventListener("focus", () => selectBlock(parentId));
+    editor.addEventListener("click", event => event.stopPropagation());
+    editor.addEventListener("input", () => sync());
+    editor.addEventListener("keydown", event => {
+      if (event.key === "Enter") event.preventDefault();
+    });
+    requestAnimationFrame(() => {
+      if (editor.isConnected && window.RichCustomEmojiCode?.convertEditor?.(editor)) sync(false);
+    });
+    return editor;
+  }
+
   function listChildEditor(detailsBlock, child) {
     const d = child.data || (child.data = {});
     const kind = d.kind || "bullet";
     const list = document.createElement(kind === "numbered" ? "ol" : "ul");
     list.className = `telegram-list details-inner-list${kind === "checklist" ? " telegram-checklist" : ""}`;
-    const values = (d.items || [{text:""}]).map(item => typeof item === "object" ? String(item.text || "") : String(item || ""));
+    const values = (Array.isArray(d.items) && d.items.length ? d.items : [{text:""}])
+      .map(item => typeof item === "object" ? String(item.text || "") : String(item || ""));
 
     function sync(mark = true) {
-      const entries = Array.from(list.querySelectorAll('[contenteditable="true"]'), editor => {
+      const editors = Array.from(list.querySelectorAll('[contenteditable="true"]'));
+      const checkboxes = Array.from(list.querySelectorAll(".checklist-toggle"));
+      const entries = editors.map(editor => {
         window.RichCustomEmojiCode?.convertEditor?.(editor);
         const text = editor.innerText.replace(/\r/g, "");
         const html = window.RichInlineTextTools?.sanitizeInlineHtml?.(editor.innerHTML) || escapeHtml(text);
         return {text, html};
       });
       d.items = entries.map(({text, html}, index) => kind === "checklist"
-        ? {text, html, has_checkbox:true, is_checked:false}
+        ? {text, html, has_checkbox:true, is_checked:Boolean(checkboxes[index]?.checked)}
         : kind === "numbered"
           ? {text, html, value:index + 1, type:"1"}
           : {text, html});
+      list.querySelectorAll("li").forEach((li, index) => {
+        if (kind === "checklist") li.classList.toggle("is-checked", Boolean(checkboxes[index]?.checked));
+      });
       const lines = entries.map(entry => entry.text);
       d.text = lines.join("\n");
       const tag = kind === "numbered" ? "ol" : "ul";
@@ -313,13 +424,22 @@
       if (mark) markDirty();
     }
 
-    values.forEach((value, index) => {
+    function makeListItem(value, item = {}) {
       const li = document.createElement("li");
+      if (kind === "checklist") {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "checklist-toggle";
+        checkbox.checked = Boolean(item?.is_checked);
+        checkbox.setAttribute("aria-label", String(value || mt("list.task")));
+        checkbox.addEventListener("change", () => sync());
+        li.classList.toggle("is-checked", checkbox.checked);
+        li.appendChild(checkbox);
+      }
       const input = document.createElement("div");
       input.contentEditable = "true";
       input.spellcheck = true;
       input.className = "rich-inline-editor details-child-list-item";
-      const item = (d.items || [])[index];
       input.innerHTML = window.RichInlineTextTools?.sanitizeInlineHtml?.(item?.html)
         || escapeHtml(value);
       input.addEventListener("focus", () => selectBlock(detailsBlock.id));
@@ -327,21 +447,22 @@
       input.addEventListener("keydown", event => {
         if (event.key !== "Enter" || event.shiftKey) return;
         event.preventDefault();
-        const next = document.createElement("li");
-        const nextInput = document.createElement("div");
-        nextInput.contentEditable = "true";
-        nextInput.className = "rich-inline-editor details-child-list-item";
-        nextInput.addEventListener("focus", () => selectBlock(detailsBlock.id));
-        nextInput.addEventListener("input", sync);
-        next.appendChild(nextInput);
+        const next = makeListItem("", {is_checked:false});
         li.after(next);
-        nextInput.focus();
+        next.querySelector('[contenteditable="true"]')?.focus();
         sync();
       });
       li.appendChild(input);
-      list.appendChild(li);
+      return li;
+    }
+
+    values.forEach((value, index) => {
+      const item = d.items?.[index];
+      const input = makeListItem(value, item);
+      list.appendChild(input);
       requestAnimationFrame(() => {
-        if (window.RichCustomEmojiCode?.convertEditor?.(input)) sync(false);
+        const editor = input.querySelector('[contenteditable="true"]');
+        if (window.RichCustomEmojiCode?.convertEditor?.(editor)) sync(false);
       });
     });
     return list;
@@ -355,7 +476,9 @@
     if (d.is_striped) wrap.classList.add("striped");
     if (d.is_compact) wrap.classList.add("compact");
     const table = document.createElement("table");
-    const rows = d.rows || (d.rows = [["", ""], ["", ""]]);
+    const rows = typeof window.RichMiniAppTableRows === "function"
+      ? window.RichMiniAppTableRows(child)
+      : (d.rows || (d.rows = [["", ""], ["", ""]]));
     rows.forEach((row, ri) => {
       const tr = document.createElement("tr");
       row.forEach((raw, ci) => {
@@ -411,16 +534,7 @@
     }
     const section = document.createElement("div");
     section.className = "details-nested-editable";
-    const input = document.createElement("input");
-    input.className = "details-nested-title";
-    input.value = stripHtml(d.summary_html || "") || d.summary_text || mt("details.title");
-    input.addEventListener("focus", () => selectBlock(parentDetails.id));
-    input.addEventListener("input", () => {
-      d.summary_text = input.value || mt("details.title");
-      d.summary_html = escapeHtml(d.summary_text);
-      markDirty();
-    });
-    section.appendChild(input);
+    section.appendChild(summaryEditor(child, parentDetails.id));
     if (depth < 2) {
       d.children.forEach(grandchild => section.appendChild(buildNestedChild(parentDetails, grandchild, depth + 1)));
     }
@@ -509,18 +623,7 @@
     toggle.type = "button";
     toggle.className = "details-toggle-btn";
     toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5"/></svg>';
-    const input = document.createElement("input");
-    input.className = "details-summary-live details-title-input";
-    input.value = stripHtml(d.summary_html || "") || d.summary_text || mt("details.title");
-    input.placeholder = mt("details.title_placeholder");
-    input.addEventListener("focus", () => selectBlock(block.id));
-    input.addEventListener("click", event => event.stopPropagation());
-    input.addEventListener("input", () => {
-      const value = input.value || mt("details.title");
-      d.summary_text = value;
-      d.summary_html = escapeHtml(value);
-      markDirty();
-    });
+    const input = summaryEditor(block);
     titleSide.append(toggle, input);
 
     const state = document.createElement("span");

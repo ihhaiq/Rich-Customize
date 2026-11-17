@@ -304,53 +304,33 @@ async function callbackContext(query) {
   if (message?.chat?.id) {
     return {
       chatId: Number(message.chat.id),
-      chatType: String(message.chat.type || ''),
-      ephemeralMessageId: message.ephemeral_message_id || null,
-      fromMessage: true,
     };
   }
   const guest = await getGuestMessage(query?.inline_message_id || '');
   if (!guest) return null;
   return {
     chatId: guest.chatId,
-    chatType: guest.chatType,
-    ephemeralMessageId: null,
-    fromMessage: false,
   };
 }
 
-async function sendOrReplacePage(query, context, richMessage, replyMarkup) {
-  if (!context) throw new Error('Guest message context is unavailable');
-  const chatId = context.chatId;
-  const chatType = context.chatType;
-
-  if (context.ephemeralMessageId) {
+async function sendOrReplacePage(query, richMessage, replyMarkup) {
+  if (query?.message?.ephemeral_message_id && query.message.chat?.id) {
     return api.editEphemeralMessageText({
-      chat_id: chatId,
+      chat_id: query.message.chat.id,
       receiver_user_id: query.from.id,
-      ephemeral_message_id: context.ephemeralMessageId,
+      ephemeral_message_id: query.message.ephemeral_message_id,
       rich_message: richMessage,
       reply_markup: replyMarkup,
-    });
-  }
-
-  if (['group', 'supergroup', 'channel'].includes(chatType)) {
-    return api.sendRichMessage({
-      chat_id: chatId,
-      rich_message: richMessage,
-      reply_markup: replyMarkup,
-      ephemeral_message_parameters: {
-        receiver_user_id: query.from.id,
-        callback_query_id: query.id,
-        replace_callback_query_message: true,
-      },
     });
   }
 
   return api.sendRichMessage({
-    chat_id: query.from.id,
     rich_message: richMessage,
     reply_markup: replyMarkup,
+    ephemeral_message_parameters: {
+      callback_query_id: query.id,
+      replace_callback_query_message: true,
+    },
   });
 }
 
@@ -434,8 +414,8 @@ async function restoreNavigationRoot(query, nav) {
 
 async function openPage(query, requireSubscription) {
   const code = languageCode(query);
-  const context = await callbackContext(query);
-  if (!context) {
+  const context = requireSubscription ? await callbackContext(query) : null;
+  if (requireSubscription && !context) {
     await api.answerCallbackQuery({
       callback_query_id: query.id,
       text: tr(locale(code), 'Could not determine the Guest message chat.'),
@@ -476,7 +456,7 @@ async function openPage(query, requireSubscription) {
   const nav = await navigate(query.from.id, sourceId, targetId, token);
   try {
     const payload = await pagePayload(page, nav, code);
-    await sendOrReplacePage(query, context, payload.richMessage, payload.replyMarkup);
+    await sendOrReplacePage(query, payload.richMessage, payload.replyMarkup);
   } catch (error) {
     await logError('page_navigation.open', error, {
       userId: query?.from?.id,
@@ -502,6 +482,17 @@ export async function handlePageNavigationCallback(query) {
     query.from.language_code = await resolveUserLanguage(query.from);
   }
   const data = String(query?.data || '');
+  if (data.startsWith('r:task:')) {
+    const code = locale(languageCode(query));
+    await api.answerCallbackQuery({
+      callback_query_id: query.id,
+      text: code === 'ar'
+        ? 'هذا الزر قديم. غيّر حالة المهمة من إعدادات القائمة ثم أعد نشر الصفحة.'
+        : 'This button is outdated. Change task status in the list settings and republish the page.',
+      show_alert: true,
+    });
+    return true;
+  }
   if (data.startsWith('r:poptext:')) {
     await api.answerCallbackQuery({
       callback_query_id: query.id,

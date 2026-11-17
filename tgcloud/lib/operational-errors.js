@@ -43,6 +43,12 @@ export function explainOperationalError(error) {
   if (/message to edit not found|message can't be edited|message_id_invalid|message to delete not found|message can.t be deleted/i.test(value))
     return guide('MESSAGE_TARGET_UNAVAILABLE','expected','الرسالة القديمة ما عادت قابلة للتعديل. افتح المحرر من جديد.','The old message cannot be edited. Reopen the editor.',
       'الرسالة المستهدفة محذوفة أو انتهت إمكانية تعديلها.','أنشئ رسالة واجهة جديدة وحدّث معرّف الرسالة داخل الجلسة.');
+  if (/BUTTON_USER_INVALID/i.test(value) && /editMessageText/i.test(value))
+    return guide('EDITOR_BUTTON_USER_INVALID','expected',
+      'رابط الحساب في معاينة المحرر غير صالح. افتح البلوك وعدّل الزر لاستخدام حساب باسم مستخدم عام (@username).',
+      'The editor preview contains an invalid account link. Edit the block and use an account with a public @username.',
+      'رفض Telegram رابط مستخدم أثناء تعديل رسالة المحرر؛ هذا ليس فشلاً في التعرّف على المستخدم الذي ضغط الزر.',
+      'استعمل رابط t.me لاسم مستخدم عام، واترك أدوات تحرير البلوك متاحة لإصلاح الروابط القديمة.');
   if (/STICKERSET_INVALID|STICKERSET_NOT_FOUND|STICKER_SET_INVALID|sticker set not found/i.test(value))
     return guide('EMOJI_PACK_UNAVAILABLE','expected','رابط حزمة الإيموجي غير صالح أو انحذفت الحزمة.','The emoji pack link is invalid or the pack was removed.',
       'حزمة الملصقات غير موجودة أو لم يعد الوصول إليها متاحاً.','اطلب رابطاً صالحاً وتأكد من اسم مجموعة الملصقات.');

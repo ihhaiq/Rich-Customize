@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { localeValues as germanicValues } from '../../tgcloud/lib/lang/germanic.js';
 import { localeValues as romanceValues } from '../../tgcloud/lib/lang/romance.js';
 import { localeValues as slavicValues } from '../../tgcloud/lib/lang/slavic.js';
+import { localeValues as chineseValues } from '../../tgcloud/lib/lang/chinese.js';
 import { harness } from './harness.mjs';
 const emoji = { type: 'custom_emoji', custom_emoji_id: '5368324170671202286', alternative_text: '👍' };
 const html = '<tg-emoji emoji-id="5368324170671202286">👍</tg-emoji>';
@@ -91,6 +92,162 @@ test('copied code entity becomes emoji; list and table text paths interpret HTML
   assert.equal(markdownCode.text, markdown);
 });
 
+test('literal custom emoji codes in stored blocks become Telegram rich entities before sending', async () => {
+  const h = await harness({ extraModules: { publish: 'lib/publish' } });
+  const cases = [
+    { emojiId: '5368324170671202286', alternative: '👍', data: { html: '<p>HTML <tg-emoji emoji-id="5368324170671202286">👍</tg-emoji></p>', text: 'HTML 👍' } },
+    { emojiId: '5368324170671202287', alternative: '🔥', data: { html: '<p>Markdown ![🔥](tg://emoji?id=5368324170671202287)</p>', text: 'Markdown 🔥' } },
+    { emojiId: '5368324170671202288', alternative: '👍', data: { html: '<p>&lt;tg-emoji emoji-id="5368324170671202288"&gt;👍&lt;/tg-emoji&gt;</p>', text: '👍' } },
+    { emojiId: '5368324170671202289', alternative: '🔥', data: { text: '![🔥](tg://emoji?id=5368324170671202289)' } },
+  ];
+
+  for (const [index, { emojiId, alternative, data }] of cases.entries()) {
+    const ownerId = 700 + index;
+    h.apiState.customEmojiStickers = [{ custom_emoji_id: emojiId, emoji: alternative }];
+    await h.publish.publishPageContentFromBridge({
+      ownerId,
+      blocks: [{ id: `emoji-${index}`, type: 'paragraph', position: 0, data }],
+    });
+    const sent = h.calls.filter(call => call.method === 'sendRichMessage' && call.args.chat_id === ownerId).at(-1);
+    assert.ok(sent, `case ${index} should send a Telegram rich message`);
+    const payload = JSON.stringify(sent.args.rich_message);
+    assert.match(payload, new RegExp(`"type":"custom_emoji","custom_emoji_id":"${emojiId}"`), `case ${index}`);
+    assert.match(payload, new RegExp(`"alternative_text":"${alternative}"`), `case ${index}`);
+    assert.doesNotMatch(payload, /tg:\/\/emoji|&lt;tg-emoji|!\[/, `case ${index} must not send literal code`);
+  }
+});
+
+test('native details use edited summary and child data, including rich custom emoji', async () => {
+  const h = await harness();
+  const emojiId = '5368324170671202286';
+  const details = h.blocks.makeBlock('details', {
+    native: true,
+    summary_html: `<b>Updated <tg-emoji emoji-id="${emojiId}">👍</tg-emoji></b>`,
+    summary_text: 'Updated 👍',
+    children: [
+      h.blocks.makeBlock('text', {
+        native: true,
+        native_data: {type:'paragraph', text:'old child'},
+        html:'<p>New child</p>',
+        text:'New child',
+      }),
+    ],
+    native_data: {
+      type:'details',
+      summary:'Stale title',
+      blocks:[{type:'paragraph',text:'stale child'}],
+    },
+  });
+
+  const rendered = h.renderer.buildSingleBlockRichMessage(details).blocks[0];
+  assert.equal(h.text.plainRichText(rendered.summary), 'Updated 👍');
+  assert.match(JSON.stringify(rendered.summary), new RegExp(`"custom_emoji_id":"${emojiId}"`));
+  assert.equal(h.text.plainRichText(rendered.blocks[0].text), 'New child');
+  assert.doesNotMatch(JSON.stringify(rendered), /Stale title|stale child/);
+});
+
+test('native text and media composites publish their editable Mini App values', async () => {
+  const h = await harness();
+  const paragraph = h.blocks.makeBlock('text', {
+    native: true,
+    native_type: 'paragraph',
+    native_data: {type:'paragraph', text:'old'},
+    text: 'updated',
+    html: '<p>updated</p>',
+  });
+  const collage = h.blocks.makeBlock('collage', {
+    native: true,
+    native_data: {type:'collage', blocks:[{type:'photo',photo:[{file_id:'old-photo'}]}]},
+    children: [
+      h.blocks.makeBlock('photo', {
+        native: true,
+        native_data: {type:'photo',photo:[{file_id:'old-photo'}]},
+        file: {file_id:'new-photo'},
+      }),
+    ],
+  });
+
+  const paragraphPayload = h.renderer.buildSingleBlockRichMessage(paragraph).blocks[0];
+  assert.equal(h.text.plainRichText(paragraphPayload.text), 'updated');
+  const collagePayload = h.renderer.buildSingleBlockRichMessage(collage).blocks[0];
+  assert.equal(collagePayload.blocks[0].photo.media, 'new-photo');
+
+  const quote = h.blocks.makeBlock('blockquote', {
+    native: true,
+    native_data: {type:'blockquote',blocks:[
+      {type:'paragraph',text:'old quote'},
+      {type:'photo',photo:[{file_id:'quote-photo'}]},
+    ]},
+    quote_text: 'updated quote',
+    quote_html: '<p>updated quote</p>',
+  });
+  const quotePayload = h.renderer.buildSingleBlockRichMessage(quote).blocks[0];
+  assert.equal(
+    h.text.plainRichText(quotePayload.blocks.find(block=>block.type==='paragraph').text),
+    'updated quote',
+  );
+  assert.equal(quotePayload.blocks.find(block=>block.type==='photo')?.photo?.media,'quote-photo');
+});
+
+test('publishing a saved native details page uses the edited nested open state and content', async () => {
+  const h = await harness({ extraModules: { publish: 'lib/publish' } });
+  const innerDetails = h.blocks.makeBlock('details', {
+    native: true,
+    is_open: true,
+    summary_text: 'الثلاثاء',
+    summary_html: 'الثلاثاء',
+    children: [
+      h.blocks.makeBlock('paragraph', {
+        native: true,
+        native_type: 'paragraph',
+        native_data: {type:'paragraph', text:'old task'},
+        text:'updated task',
+        html:'<p>updated task</p>',
+      }),
+    ],
+    native_data: {
+      type:'details',
+      summary:'الثلاثاء',
+      is_open:false,
+      blocks:[{type:'paragraph',text:'old task'}],
+    },
+  });
+  const outerDetails = h.blocks.makeBlock('details', {
+    native: true,
+    is_open: true,
+    summary_text: 'الأسبوع السادس',
+    summary_html: 'الأسبوع السادس',
+    children:[innerDetails],
+    native_data:{
+      type:'details',
+      summary:'الأسبوع السادس',
+      is_open:true,
+      blocks:[{
+        type:'details',
+        summary:'الثلاثاء',
+        is_open:false,
+        blocks:[{type:'paragraph',text:'old task'}],
+      }],
+    },
+  });
+  h.records.richPages.push({
+    pageId:'saved-details',
+    ownerId:701,
+    title:'خطة الأسبوع',
+    blocks:[outerDetails],
+    buttons:[],
+  });
+
+  await h.publish.publishSavedPageFromBridge({ownerId:701,pageId:'saved-details'});
+  const sent = h.calls.find(call => call.method === 'sendRichMessage' && call.args.chat_id === 701);
+  assert.ok(sent, 'saved page should be sent through Telegram');
+  const outer = sent.args.rich_message.blocks[0];
+  const inner = outer.blocks[0];
+  assert.equal(outer.is_open, true);
+  assert.equal(inner.is_open, true);
+  assert.equal(h.text.plainRichText(inner.blocks[0].text), 'updated task');
+});
+
 test('grapheme-safe movement preserves RichText, links, Arabic marks and Enter lines', async () => {
   const { movement: m, text, clone } = await harness();
   const value = [{ type: 'bold', text: 'عَرَبِي ' }, { type: 'url', url: 'https://example.com', text: 'é👩🏽‍💻🇮🇶' }, emoji, '\nEnglish\n'];
@@ -169,6 +326,7 @@ test('all 20 catalogs contain every emoji key with matching placeholders', async
     ...germanicValues,
     ...romanceValues,
     ...slavicValues,
+    ...chineseValues,
   };
   for (const locale of SUPPORTED_LOCALES) {
     const values = bundledValues[locale]

@@ -64,7 +64,7 @@ function buildTableEditor(){
   const events={selected:0,rebuilt:0,dirty:0,panned:0};
   const build = new Function(
     'document','selectBlock','rebuildTableHtml','markDirty',
-    'selectedTableCell','activeTablePanId','syncTableHeaderPan','window',
+    'selectedTableCell','activeTablePanId','syncTableHeaderPan','window','miniAppTableRows',
     isolated+';return tableEditor;')(
       mock.document,
       ()=>events.selected++,
@@ -74,6 +74,10 @@ function buildTableEditor(){
       null,
       ()=>events.panned++,
       {RichLiveRenderer:null},
+      block=>{
+        const data=block.data||(block.data={});
+        return Array.isArray(data.rows)?data.rows:(data.rows=data.native_data?.cells||[]);
+      },
     );
   return {build,events};
 }
@@ -259,11 +263,12 @@ test('visible enhancedTableEditor selects once and edits only on the next tap',(
   };
   const fakePan=()=>{};
   const make=new Function(
-    'document','state','cellObject','createRichTableCellEditor',
+    'document','state','cellObject','createRichTableCellEditor','window',
     'selectCell','selectBlock','attachTablePan','current',
     source.slice(start,end)+';return enhancedTableEditor;',
   )(document,state,raw=>typeof raw==='object'?raw:{text:String(raw)},
-    createRichTableCellEditor,selectCell,()=>selected++,fakePan,{legacy_read_only:false});
+    createRichTableCellEditor,{RichMiniAppTableRows:block=>block.data.rows},
+    selectCell,()=>selected++,fakePan,{legacy_read_only:false});
   const viewport=make({id:'table-1',data:{rows:[[{text:'A'},{text:'B'}]]}});
   const td=viewport.children[0].children[0].children[0].children[0];
   const editor=td.children[0];

@@ -2,10 +2,6 @@
 
 /* Beta 0.3.22 — compact centered Telegram-style composer chrome. */
 
-#allBlocksBtn.legacy-all-blocks{
-  display:none!important;
-}
-
 /* All visible bubbles are one compact centered cluster. */
 .composer-toolbar.floating-toolbar{
   display:flex!important;
@@ -27,6 +23,19 @@
   padding:3px 5px!important;
   gap:1px!important;
   border-radius:999px!important;
+}
+.composer-toolbar.floating-toolbar .all-blocks-btn{
+  width:38px!important;
+  height:38px!important;
+  border:1px solid color-mix(in srgb,var(--accent) 25%,var(--glass-border))!important;
+  border-radius:50%!important;
+  color:var(--accent)!important;
+  background:color-mix(in srgb,var(--accent) 9%,transparent)!important;
+}
+.composer-toolbar.floating-toolbar .all-blocks-btn .glyph,
+.composer-toolbar.floating-toolbar .all-blocks-btn svg{
+  width:20px;
+  height:20px;
 }
 
 .composer-toolbar.floating-toolbar .history-bubble{

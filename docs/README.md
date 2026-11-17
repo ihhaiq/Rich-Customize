@@ -18,7 +18,7 @@
 | Change history | [log.md](../md_files/log.md) |
 | Test layout | [tests/README.md](../tests/README.md) |
 | Channel-post edit/import | [channel-post edit/import](../md_files/docs/channel-post-edit-import-plan.md) |
-| Billing source and contract | [richDonate](https://github.com/ihhaiq/richDonate), [B2B contract](https://github.com/ihhaiq/richDonate/blob/main/docs/editor-b2b-contract.md) |
+| Billing source and contract | [richDonate](https://github.com/ihhaiq/richDonate), [B2B contract](https://github.com/ihhaiq/richDonate/blob/main/docs/editor-b2b-contract.md); coordinated changes and current status are tracked in [subscription-rollout.md](../md_files/docs/subscription-rollout.md) |
 
 ## Separate plans
 [Referral strategy](../md_files/Referral.md) and [search design](../md_files/search-engine.md) remain plans; verify code before treating their contents as implemented.

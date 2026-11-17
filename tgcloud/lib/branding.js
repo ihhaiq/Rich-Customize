@@ -2,17 +2,15 @@ import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { brandingEntitlements, brandingPreferences } from 'schema';
 import { logError } from 'lib/error-log';
-import { getEditorEntitlement } from 'lib/editor-subscriptions';
+import {
+  getEditorEntitlement,
+  hasPermanentRichDonateBranding,
+} from 'lib/editor-subscriptions';
 import { planBenefit } from 'lib/subscription-policy';
 import { resolveLanguage, tr } from 'lib/i18n';
 
 export const BRANDING_PRICE_STARS = 99;
 export const BRANDING_INVOICE_PAYLOAD = 'remove_branding:v1';
-
-const BRANDING_TEXT = [
-  'تريد نفس التصميم لقناتك؟',
-  'افتح @RichCustomizebot ← وابدأ المحرر',
-].join('\n');
 
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
@@ -31,7 +29,7 @@ function brandingToggleButton(settings, languageCode) {
 export function brandingFooterBlock() {
   return {
     type: 'footer',
-    text: BRANDING_TEXT,
+    text: '@RichCustomizebot',
   };
 }
 
@@ -43,7 +41,8 @@ export async function isBrandingRemoved(userId) {
   }).from(brandingEntitlements)
     .where(eq(brandingEntitlements.userId, id))
     .get();
-  return Boolean(Number(row?.rightsRemoved || 0));
+  return Boolean(Number(row?.rightsRemoved || 0))
+    || await hasPermanentRichDonateBranding(id);
 }
 
 export async function canManageBranding(userId) {

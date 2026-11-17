@@ -40,6 +40,15 @@ test('deleted panel has an actionable replacement message', () => {
   assert.equal(result.code, 'MESSAGE_TARGET_UNAVAILABLE');
   assert.match(result.userMessageAr, /المحرر/);
 });
+test('invalid user links in editor edits are not misreported as publish failures', () => {
+  const error = new Error(
+    'BotApiError [400]: Bad Request: BUTTON_USER_INVALID | api.editMessageText failed',
+  );
+  const result = explainOperationalError(error);
+  assert.equal(result.code, 'EDITOR_BUTTON_USER_INVALID');
+  assert.match(result.reason, /ليس فشلاً في التعرّف/);
+  assert.match(result.action, /t\.me/);
+});
 test('custom emoji and missing packs are differentiated', () => {
   assert.equal(explainOperationalError(new Error('RICH_MESSAGE_EMOJI_INVALID')).code, 'RICH_EMOJI_INVALID');
   assert.equal(explainOperationalError(new Error('STICKERSET_INVALID')).code, 'EMOJI_PACK_UNAVAILABLE');

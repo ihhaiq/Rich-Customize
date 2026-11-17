@@ -24,6 +24,7 @@ Read [docs/README.md](docs/README.md), [sups.md](md_files/sups.md) and [docs/sub
 Use SDK `api`, `db`, `fetch`, `InputFile` in the isolated V8 runtime. No filesystem/npm runtime dependencies.
 Prefer relative project imports ending in `.js`; existing `schema`/`lib/...` module-name imports are supported.
 Await DB calls. Code deployment and schema migration are separate. Do not reintroduce Aiogram, Railway, PostgreSQL or Redis runtime.
+Telegram Serverless has a hard ceiling of 100 deployable modules. Before adding a runtime module, count `tgcloud/schema.js`, `tgcloud/handlers/*.js`, `tgcloud/endpoints/*.js` and every `tgcloud/lib/**/*.js` file (including locale modules). Keep the total at or below 100; consolidate related code into an existing module before adding a module when necessary, then verify all imports and tests. If the platform rejects a deployment at that count, reduce the count further before retrying.
 
 ## Data and authorization
 Telegram Serverless owns `rich_pages`, editor sessions, publish destinations/permissions, user-picker state, usage, error configuration and compatibility.
@@ -73,6 +74,7 @@ Arabic copy uses the owner's wording, including «تليكرام».
 Do NOT claim these new numbers are enforced merely because they appear in docs/donation UI.
 Editor runtime still has older caps; [rollout](md_files/docs/subscription-rollout.md) tracks remaining work.
 `editor-subscriptions.js` accepts active unexpired records from `richdonate:verified`; complete trusted payment event issuance/ACK remains pending.
+For every subscription, payment, purchase, branding, renewal, refund, gift, receipt, reminder, or billing-contract change, inspect the current local integration and [rollout](md_files/docs/subscription-rollout.md), then explicitly tell the owner whether `ihhaiq/richDonate` also needs a change. If it does, list the required behavior/contract and verification still needed; if it does not, say so. Do not claim a change in that separate repository is implemented or verified without evidence, and do not edit it unless the owner explicitly asks.
 Saved templates and saved page history remain cancelled. The owner approved fixed tutorial starter examples on 2026-10-13; these are a separate onboarding scope documented in [md_files/tutorial.md](md_files/tutorial.md), not a subscription feature or template-management system. Scheduled publishing is deployed and the owner confirmed using it on 2026-10-25. `tgcloud/lib/scheduled-publish.js` stores message snapshots and consumes verified RCB1 reminders; `workers/schedule-reminders/` is the separate Cloudflare Cron Worker. Cloudflare holds IDs/times only. `/scheduled` supports listing and canceling pending jobs; rescheduling an existing job is not implemented. Date entry uses Baghdad `MM-DD hh:mm AM/PM`; Free is limited to four days and active Plus/Golden to two calendar months. See `md_files/docs/scheduling.md` for architecture, known reliability gaps and tests. Free allows 2 destinations per scheduled post; Plus=5 and Golden=15 remain provisional.
 Operational `page_snapshots`, revision CAS and session undo/redo remain required.
 

@@ -372,6 +372,14 @@
     return customPacks.find(pack => pack.name === name) || null;
   }
 
+  function customEmojiPackName(value) {
+    const raw = String(value || "").trim();
+    const match = raw.match(/^(?:https?:\/\/)?(?:t\.me|telegram\.me)\/addemoji\/([A-Za-z0-9_]{1,64})\/?(?:\?[^\s#]*)?$/i)
+      || raw.match(/^tg:\/\/addemoji\?set=([A-Za-z0-9_]{1,64})$/i);
+    const name = match?.[1] || raw;
+    return /^[A-Za-z0-9_]{1,64}$/.test(name) ? name : "";
+  }
+
   async function fetchCatalogData() {
     let lastError = null;
     for (const url of DATA_URLS) {
@@ -1125,7 +1133,24 @@
       status.textContent = "";
 
       try {
-        await loadPackAccessFromServer();
+        const access = await loadPackAccessFromServer();
+        const requestedPackName = customEmojiPackName(value);
+        if (requestedPackName
+          && Array.isArray(access.custom_emoji_packs)
+          && access.custom_emoji_packs.includes(requestedPackName)) {
+          const existingPack = await fetchPackFromServer(requestedPackName);
+          if (!existingPack?.name || !existingPack.emojis.length) {
+            const error = new Error("CUSTOM_EMOJI_PACK_STATUS_UNAVAILABLE");
+            error.code = "CUSTOM_EMOJI_PACK_STATUS_UNAVAILABLE";
+            throw error;
+          }
+          if (!rememberCustomPack(existingPack)) throw new Error("custom_emoji_pack_limit");
+          syncCustomPackTabs();
+          resetSearchUI();
+          renderCustomPack(existingPack.name);
+          try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.("success"); } catch (_) {}
+          return;
+        }
         if (!hasCustomPackCapacity()) {
           const error = new Error("custom_emoji_pack_limit");
           error.code = "CUSTOM_EMOJI_PACK_LIMIT";
@@ -1236,8 +1261,10 @@
       customEmojiPackCount:Math.max(0,Number(access.custom_emoji_pack_count||0)),
       customEmojiPacks:names,
       customEmojiPinnedPack:String(access.custom_emoji_pinned_pack || ""),
+      customEmojiMigrationRequired:Boolean(access.migration_required),
+      customEmojiLegacyImportStatus:Number(access.legacy_import_status || 0),
     };
-    if (names.length) {
+    if (names.length && !access.migration_required) {
       const order = new Map(names.map((name,index) => [name,index]));
       customPacks.sort((a,b) => {
         const ai=order.has(String(a?.name||""))?order.get(String(a.name)):Number.MAX_SAFE_INTEGER;
@@ -1247,7 +1274,7 @@
       const limit=customPackLimit();
       if(Number.isFinite(limit))customPacks=customPacks.filter(pack=>names.includes(String(pack?.name||""))).slice(0,limit);
       saveCustomPacks();
-    } else if (Number.isFinite(customPackLimit())) {
+    } else if (!access.migration_required && Number.isFinite(customPackLimit())) {
       customPacks=[];
       saveCustomPacks();
     }
@@ -1287,11 +1314,12 @@
     accessPackSyncRunning = true;
     try {
       await loadPackAccessFromServer();
+      const migrationPending = Boolean(window.RichMiniAppAccess?.customEmojiMigrationRequired);
       const serverNames = serverPackNames();
       const localNames = customPacks.map(pack => String(pack?.name || "")).filter(Boolean);
       const targets = serverNames.length
         ? serverNames
-        : (Number.isFinite(customPackLimit()) ? localNames.slice(0,customPackLimit()) : localNames);
+        : (migrationPending ? [] : (Number.isFinite(customPackLimit()) ? localNames.slice(0,customPackLimit()) : localNames));
 
       for (const name of targets) {
         if (customPack(name) && serverNames.includes(name)) continue;
@@ -1303,14 +1331,14 @@
       }
 
       const orderedNames = serverPackNames();
-      if (orderedNames.length) {
+      if (orderedNames.length && !window.RichMiniAppAccess?.customEmojiMigrationRequired) {
         const order = new Map(orderedNames.map((name,index)=>[name,index]));
         customPacks = customPacks
           .filter(pack => !Number.isFinite(customPackLimit()) || orderedNames.includes(String(pack?.name||"")))
           .sort((a,b)=>(order.get(String(a?.name||""))??999999)-(order.get(String(b?.name||""))??999999));
       }
       const limit=customPackLimit();
-      if(Number.isFinite(limit))customPacks=customPacks.slice(0,limit);
+      if(!window.RichMiniAppAccess?.customEmojiMigrationRequired&&Number.isFinite(limit))customPacks=customPacks.slice(0,limit);
       saveCustomPacks();
       syncCustomPackTabs();
     } catch (error) {

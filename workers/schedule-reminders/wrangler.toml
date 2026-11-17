@@ -6,7 +6,7 @@ main = "./worker.js"
 compatibility_date = "2026-10-10"
 
 [triggers]
-crons = ["* * * * *", "0 9 * * *"]
+crons = ["* * * * *", "*/10 * * * *", "0 9 * * *"]
 
 [[d1_databases]]
 binding = "DB"

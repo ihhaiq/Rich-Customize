@@ -1,4 +1,4 @@
-import { index, integer, json, real, table, text } from 'sdk/db';
+import { index, integer, json, real, table, text, uniqueIndex } from 'sdk/db';
 
 export const richPages = table('rich_pages', {
   pageId: text('page_id').primaryKey(),
@@ -32,6 +32,53 @@ export const editorSubscriptions = table('editor_subscriptions', {
   expiresIdx: index('idx_editor_subscriptions_expires').on(t.status, t.expiresAt),
 }));
 
+// Each verified donation event is also the durable entitlement record. This
+// keeps event idempotency and the benefit grant in one atomic row.
+export const editorEntitlementEvents = table('editor_entitlement_events', {
+  eventId: text('event_id').primaryKey(),
+  kind: text('kind').notNull(),
+  orderId: text('order_id').notNull(),
+  purchaseOrderId: text('purchase_order_id'),
+  refundOrderId: text('refund_order_id'),
+  userId: integer('user_id').notNull(),
+  plan: text('plan').notNull(),
+  permanentBranding: integer('permanent_branding').notNull().default(0),
+  amount: integer('amount').notNull(),
+  currency: text('currency').notNull(),
+  purchaseChargeId: text('purchase_charge_id'),
+  referenceChargeId: text('reference_charge_id'),
+  paidAt: integer('paid_at').notNull(),
+  receivedAt: integer('received_at').notNull(),
+}, (t) => ({
+  userPaidIdx: index('idx_editor_entitlement_events_user_paid').on(t.userId, t.paidAt),
+  orderIdx: index('idx_editor_entitlement_events_order').on(t.orderId),
+  purchaseOrderUnique: uniqueIndex('uq_editor_entitlement_purchase_order').on(t.purchaseOrderId),
+  purchaseChargeUnique: uniqueIndex('uq_editor_entitlement_purchase_charge').on(t.purchaseChargeId),
+  refundOrderUnique: uniqueIndex('uq_editor_entitlement_refund_order').on(t.refundOrderId),
+}));
+
+export const editorGiftEntitlements = table('editor_gift_entitlements', {
+  requestId: text('request_id').primaryKey(),
+  actorId: integer('actor_id').notNull(),
+  userId: integer('user_id').notNull(),
+  plan: text('plan').notNull(),
+  months: integer('months').notNull(),
+  startedAt: integer('started_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  createdAt: integer('created_at').notNull(),
+  notificationStatus: text('notification_status').notNull().default('pending'),
+  notificationLeaseUntil: integer('notification_lease_until').notNull().default(0),
+  notificationAttempts: integer('notification_attempts').notNull().default(0),
+}, (t) => ({
+  userStartIdx: index('idx_editor_gift_entitlements_user_start').on(t.userId, t.startedAt),
+}));
+
+export const richDonateBridge = table('richdonate_bridge', {
+  key: text('key').primaryKey(),
+  botId: integer('bot_id').notNull(),
+  pinnedAt: integer('pinned_at').notNull(),
+});
+
 export const developerStates = table('developer_states', {
   userId: integer('user_id').primaryKey(),
   state: text('state').notNull(),
@@ -55,10 +102,25 @@ export const usageUsers = table('usage_users', {
   languageCode: text('language_code'),
   firstSeen: integer('first_seen').notNull(),
   lastSeen: integer('last_seen').notNull(),
+  privateSeenAt: integer('private_seen_at'),
   events: integer('events').notNull().default(0),
 }, (t) => ({
   recentIdx: index('idx_usage_users_recent').on(t.lastSeen),
+  privateSeenIdx: index('idx_usage_users_private_seen').on(t.privateSeenAt),
 }));
+
+export const userAliases = table('user_aliases', {
+  username: text('username').primaryKey(),
+  userId: integer('user_id').notNull(),
+  checkedAt: integer('checked_at').notNull(),
+}, (t) => ({
+  userIdx: index('idx_user_aliases_user').on(t.userId),
+}));
+
+export const userAliasSyncs = table('user_alias_syncs', {
+  userId: integer('user_id').primaryKey(),
+  checkedAt: integer('checked_at').notNull(),
+});
 
 export const usageMinutes = table('usage_minutes', {
   minute: integer('minute').primaryKey(),

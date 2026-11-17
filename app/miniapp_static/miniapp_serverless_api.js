@@ -25,6 +25,8 @@
     if (path === "/miniapp/api/me" && method === "GET") return {action:"me"};
     if (path === "/miniapp/api/pages" && method === "GET") return {action:"pages"};
     if (path === "/miniapp/api/pages" && method === "POST") return {...(body||{}),action:"create"};
+    const draftMatch = path.match(/^\/miniapp\/api\/drafts\/([a-f0-9]{32})$/);
+    if (draftMatch && method === "GET") return {action:"draft",token:draftMatch[1]};
     if (path === "/miniapp/api/destinations" && method === "GET") return {action:"destinations"};
     if (path === "/miniapp/api/send" && method === "POST") return {...(body||{}),action:"publish"};
     if (path === "/miniapp/api/rich-buttons/user-picker" && method === "POST") {
@@ -90,6 +92,7 @@
     if (code === "UNAUTHORIZED") return 401;
     if (code === "RATE_LIMITED") return 429;
     if (code === "PAGE_NOT_FOUND") return 404;
+    if (code === "DRAFT_NOT_FOUND") return 404;
     if (code === "PAGE_CONFLICT" || code === "REQUEST_IN_PROGRESS" || code === "DUPLICATE_REQUEST") return 409;
     if (/^INTERNAL|SERVICE_UNAVAILABLE/.test(code)) return 503;
     return 400;
@@ -104,11 +107,24 @@
 
   async function importLegacyEmojiPacks(fetchOptions) {
     const headers = new Headers(fetchOptions?.headers || {});
-    const response = await originalFetch(
-      cloudflareApiOrigin + "/miniapp/api/custom-emoji/packs",
-      {method:"GET",headers,cache:"no-store",credentials:"omit"},
-    );
-    if (!response.ok) throw new Error("CUSTOM_EMOJI_LEGACY_IMPORT_UNAVAILABLE");
+    let response;
+    try {
+      response = await originalFetch(
+        cloudflareApiOrigin + "/miniapp/api/custom-emoji/packs",
+        {method:"GET",headers,cache:"no-store",credentials:"omit"},
+      );
+    } catch (cause) {
+      const error = new Error("CUSTOM_EMOJI_LEGACY_IMPORT_UNAVAILABLE");
+      error.code = "CUSTOM_EMOJI_LEGACY_IMPORT_UNAVAILABLE";
+      error.cause = cause;
+      throw error;
+    }
+    if (!response.ok) {
+      const error = new Error("CUSTOM_EMOJI_LEGACY_IMPORT_UNAVAILABLE");
+      error.code = "CUSTOM_EMOJI_LEGACY_IMPORT_UNAVAILABLE";
+      error.status = response.status;
+      throw error;
+    }
     const legacy = await response.json();
     const sourceNames = legacy?.access?.custom_emoji_all_packs ?? legacy?.access?.custom_emoji_packs;
     const names = Array.isArray(sourceNames)
@@ -157,7 +173,19 @@
     try {
       let result = await callEndpoint(action);
       if (action.action === "custom_emoji_packs" && result?.access?.migration_required) {
-        result = await importLegacyEmojiPacks(init.fetchOptions);
+        try {
+          result = await importLegacyEmojiPacks(init.fetchOptions);
+        } catch (error) {
+          if (error?.code !== "CUSTOM_EMOJI_LEGACY_IMPORT_UNAVAILABLE") throw error;
+          result = {
+            ...result,
+            access:{
+              ...result.access,
+              legacy_import_pending:true,
+              legacy_import_status:Number(error.status) || 0,
+            },
+          };
+        }
       }
       if (action.action === "custom_emoji_preview") return previewResponse(result);
       return jsonResponse(result);

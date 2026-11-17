@@ -4,7 +4,9 @@ import { handleTutorialMessage, pauseTutorialForCommand } from 'lib/editor-core'
 
 import { api, BotApiError } from 'sdk';
 import { sendSubscriptionStatus } from 'lib/subscription-status';
+import { sendSubscriptionExpiryTest } from 'lib/subscription-reminders';
 import { handleDonateConsoleMessage } from 'lib/donate-console';
+import { handleRichDonateB2BMessage } from 'lib/editor-subscriptions';
 import {
   buildWelcomeFallbackText,
   buildWelcomeKeyboard,
@@ -143,6 +145,7 @@ export default async function (message, ctx = {}) {
   let failed = false;
   let bridgeHandled = false;
   try {
+    if (await handleRichDonateB2BMessage(message)) return;
     if (await handleDonateConsoleMessage(message)) return;
     bridgeHandled = await handleMiniAppBridgeMessage(message, { updateId });
     if (bridgeHandled) return;
@@ -197,6 +200,19 @@ export default async function (message, ctx = {}) {
     if (await handleDeveloperPendingMessage(message)) return;
     if (await handleMiniAppShortcut(message)) return;
     if (await handleShowcaseMessage(message)) return;
+
+    if (matchesCommand(command,'testsubexpiry')) {
+      if (message?.chat?.type==='private') {
+        const sent=await sendSubscriptionExpiryTest(message,languageCode);
+        if(!sent)await api.sendMessage({
+          chat_id:message.chat.id,
+          text:languageCode.startsWith('ar')
+            ?'هذا الأمر متاح للمطور فقط.'
+            :'This command is available to developers only.',
+        });
+      }
+      return;
+    }
 
     if (matchesCommand(command,'sup')) {
       if (await sendSubscriptionStatus(message,languageCode)) return;
@@ -337,7 +353,13 @@ export default async function (message, ctx = {}) {
   } finally {
     if (!bridgeHandled) {
       try {
-        await observeRequest(message?.from, Date.now() - started, failed);
+        await observeRequest(
+          message?.from,
+          Date.now() - started,
+          failed,
+          undefined,
+          message?.chat?.type === 'private',
+        );
       } catch (error) {
         console.warn('Could not record message usage stats', error);
       }

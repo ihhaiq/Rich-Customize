@@ -36,11 +36,18 @@
 }
 
 .telegram-checklist li::before {
-  content: "" !important;
-  width: 15px;
-  height: 15px;
-  margin-top: 4px;
-  border: 1.5px solid currentColor;
-  border-radius: 4px;
-  flex: 0 0 auto;
+  display: none !important;
+}
+
+.telegram-checklist .checklist-toggle {
+  width: 18px;
+  height: 18px;
+  margin: 3px 0 0;
+  flex: 0 0 18px;
+  accent-color: var(--tg-rich-accent);
+}
+
+.telegram-checklist li.is-checked [contenteditable] {
+  opacity: .65;
+  text-decoration: line-through;
 }
