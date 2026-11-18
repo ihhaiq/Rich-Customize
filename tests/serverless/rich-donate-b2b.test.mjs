@@ -115,6 +115,8 @@ test('periodic trigger sends hello until pinned, then sync, never READY', async 
   await pin(h, 2_000_000_000);
   await h.b2b.runRichDonateB2BTick();
   assert.equal(h.calls.at(-1).args.text, '/rdb_sync_v1@RichDonateBot');
+  assert.ok(h.calls.some(call => call.method === 'deleteMessage'
+    && call.args.message_id === 100));
   assert.equal(h.calls.some(call => /rdb_ready_v1/i.test(call.args.text || '')), false);
 });
 
@@ -134,6 +136,7 @@ test('only an authenticated RCB1 relay tick can start the group-based RDB exchan
   const message = {
     from: { id: RELAY_BOT_ID, is_bot: true, username: 'RichMiniAppsBot' },
     chat: { id: BRIDGE_CHAT_ID, type: 'supergroup' },
+    message_id: 77,
     text: '/rcb_rdb_tick@RichCustomizebot\n' + JSON.stringify({
       protocol: 'RCB1',
       kind: 'richdonate_sync',
@@ -147,7 +150,9 @@ test('only an authenticated RCB1 relay tick can start the group-based RDB exchan
   }), error => error?.code === 'UNAUTHORIZED_BOT');
   assert.equal(h.calls.length, 0);
   assert.equal(await h.bridge.handleMiniAppBridgeMessage(message), true);
-  assert.equal(h.calls.at(-1).args.text, '/rdb_hello_v1@RichDonateBot');
+  assert.equal(h.calls.find(call => call.method === 'sendMessage').args.text, '/rdb_hello_v1@RichDonateBot');
+  assert.ok(h.calls.some(call => call.method === 'deleteMessage'
+    && call.args.message_id === message.message_id));
 });
 
 test('broadcast Cron tick requires the pinned relay and a fresh RCB1 minute signal', async () => {
@@ -169,6 +174,7 @@ test('broadcast Cron tick requires the pinned relay and a fresh RCB1 minute sign
   const message = {
     from: { id: RELAY_BOT_ID, is_bot: true, username: 'RichMiniAppsBot' },
     chat: { id: BRIDGE_CHAT_ID, type: 'supergroup' },
+    message_id: 78,
     text: '/rcb_broadcast_tick@RichCustomizebot\n' + JSON.stringify({
       protocol: 'RCB1',
       kind: 'broadcast',
@@ -188,6 +194,8 @@ test('broadcast Cron tick requires the pinned relay and a fresh RCB1 minute sign
 
   assert.equal(await h.bridge.handleMiniAppBridgeMessage(message), true);
   assert.deepEqual(ticks, [minute]);
+  assert.ok(h.calls.some(call => call.method === 'deleteMessage'
+    && call.args.message_id === message.message_id));
   assert.equal(await h.bridge.handleMiniAppBridgeMessage({
     ...message,
     text: '/rcb_broadcast_tick@RichCustomizebot\n' + JSON.stringify({

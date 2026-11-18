@@ -1,3 +1,42 @@
+## 2026-11-18 — استكمال إذاعة المطور وتنظيف رسائل الجسر
+
+- **السبب:** كانت إشارة البث الدورية تبقى في مجموعة الجسر، والإذاعة لم تشمل
+  القنوات والمجموعات المكتشفة مستقبلاً، كما احتاجت نتائجها إلى توضيح رفض
+  Telegram واستثناء الوجهات التي لن تنجح محاولتها مجدداً.
+- **التغيير:** حذف إشارات RCB1 بعد معالجتها، وتنظيف طلب Rich Donate السابق
+  عند تكراره/تأكيد الهوية. تضمين قنوات ومجموعات البوت المشرف عليها التي
+  اكتُشفت بعد تفعيل الميزة؛ تخطي مشتركي `@RichCustomize` في الرسائل الخاصة،
+  واستثناء حسابات البوتات والوجهات ذات رفض Telegram النهائي من الإذاعات
+  المستقبلية. تقارير الإذاعة تعرض أسباب الإخفاق والمعرّفات، ولا ترسل إشعار
+  الإكمال إلا بعد إنهاء صفحات التقرير؛ توضح صراحةً إن كان البث أُلغي أو توقف.
+  حد الإرسال 20 وجهة/دقيقة، ولا تُعاد النتائج الملتبسة عميانياً.
+- **الخصوصية والقيود:** التسجيل للمجموعات/القنوات يبدأ بعد نشر التغيير، ولا
+  يجري استيراد الوجهات القديمة. يتطلب تخطي المشتركين أن يكون البوت مشرفاً في
+  `@RichCustomize`. حذف رسائل الإشارات وطلبات Rich Donate يتطلب صلاحية
+  `can_delete_messages` في مجموعة الجسر؛ عند غيابها تسجل أخطاء التنظيف وقد
+  تبقى الرسائل. الجداول `developer_broadcast_chats` و
+  `developer_broadcast_exclusions` تتطلب Migration Serverless قبل النشر.
+- **الملفات:** `tgcloud/lib/developer.js`, `tgcloud/lib/miniapp-bridge.js`,
+  `tgcloud/lib/editor-subscriptions.js`, `tgcloud/lib/publish.js`,
+  `tgcloud/schema.js`, `tgcloud/handlers/message.js`,
+  `tests/serverless/developer-panel.test.mjs`,
+  `tests/serverless/rich-donate-b2b.test.mjs`,
+  `tests/serverless/harness.mjs`, `tgcloud/lib/privacy.js`,
+  `md_files/docs/scheduling.md`, `md_files/log.md`.
+- **التحقق:** نجح الاختبار المركز `node --experimental-vm-modules --test
+  tests/serverless/developer-panel.test.mjs
+  tests/serverless/rich-donate-b2b.test.mjs` (32/32)، و`git diff --check`.
+  فحوص الخطة وأصول Mini App في `npm.cmd run test:ci` نجحت، لكن فشل اختبار
+  غير متعلق بالبث في
+  `tests/serverless/admin-stats.test.mjs`: يتوقع نص `Golden Ticket` غير
+  الموجود في لوحة المطور الحالية؛ وتؤكد نسخة `HEAD` السابقة أن النص غير
+  موجود أساساً. لم يتغير الاختبار أو هذا النص ضمن العمل.
+  عدد وحدات النشر 98، دون إضافة وحدة runtime.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push. لم تُطبّق Migration
+  أو يُنشر Telegram Serverless أو Worker، ولم تُنفذ عمليات إنتاج. لا يتطلب
+  Worker تغييراً لهذه المعالجة. يلزم من المالك ترحيل المخطط ثم نشر Serverless
+  والتحقق الحي من صلاحيات حذف الرسائل وعضوية القناة الرسمية.
+
 ## 2026-11-18 — تبسيط لوحة المطور ونقل الأزرار إلى لوحة Inline
 
 - **السبب:** كانت إجراءات المطور مزدحمة داخل جسم الرسالة الغنية، بينما لوحة Inline لا تعرض إلا أزراراً عامة؛ تكررت الأزرار وكبر حجم الواجهة.

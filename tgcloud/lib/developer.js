@@ -560,7 +560,7 @@ async function excludeBroadcastDestination(destinationId, destinationType, reaso
     destinationId: id,
     destinationType,
     reasonCode,
-    reasonDetail: safeBroadcastErrorDetail(detail),
+    reasonDetail: detail ? safeBroadcastErrorDetail(detail) : '',
     excludedAt: now(),
   }).onConflictDoNothing({ target: developerBroadcastExclusions.destinationId }).run();
 }
@@ -709,12 +709,16 @@ async function completeBroadcastReport(job, jobNamespace) {
 
   if (cursor >= resultCount) {
     if (!job.completionNoticeSent) {
+      const completionText = job.finalStatus === 'cancelled'
+        ? '\n\nأُوقفت الإذاعة قبل معالجة كل الوجهات.'
+        : job.finalStatus === 'failed'
+          ? '\n\nتوقفت الإذاعة قبل اكتمال الجمهور؛ راجع سبب التوقف أعلاه.'
+          : resultCount
+            ? '\n\nاكتملت محاولات الإرسال. أُرسلت ملفات تفاصيل الأخطاء أعلاه.'
+            : '\n\nاكتملت محاولات الإرسال لكل المستلمين المؤهلين.';
       await api.sendMessage({
         chat_id: job.actorId,
-        text: broadcastReport(job)
-          + (resultCount
-            ? '\n\nاكتملت محاولات الإرسال. أُرسلت ملفات تفاصيل الأخطاء أعلاه.'
-            : '\n\nاكتملت محاولات الإرسال لكل المستلمين المؤهلين.'),
+        text: broadcastReport(job) + completionText,
       });
       job.completionNoticeSent = true;
     }
@@ -1297,7 +1301,6 @@ export async function handleDeveloperPendingMessage(message) {
       }
     }
 
-    const startedAt = now();
     const audience = await broadcastAudienceSummary();
     if (!audience.total) {
       await clearState(userId);
@@ -1925,6 +1928,7 @@ async function beginBroadcast(query, chatId) {
       return;
     }
 
+    const startedAt = now();
     const audience = await broadcastAudienceSummary();
     if (!audience.total || (!audience.maxUserId && !audience.minChatId)) {
       await clearState(query.from.id);

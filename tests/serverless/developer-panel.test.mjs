@@ -59,6 +59,29 @@ async function developerHarness({ queryHandler = null, users = [] } = {}) {
   return h;
 }
 
+async function startBroadcast(h, label = 'Broadcast test message') {
+  const query = data => ({
+    id: 'broadcast-helper-' + data,
+    from: { id: developerId },
+    data,
+    message: { chat: { id: developerId, type: 'private' }, message_id: 50 },
+  });
+  await h.developer.handleDeveloperCallback(query('dev:broadcast'));
+  await h.developer.handleDeveloperPendingMessage({
+    from: { id: developerId },
+    chat: { id: developerId, type: 'private' },
+    message_id: 60,
+    text: label,
+  });
+  await h.developer.handleDeveloperCallback(query('dev:broadcast:confirm'));
+  const active = h.records.legacyStates.find(row =>
+    row.namespace === 'developer_broadcast:v1:active');
+  return {
+    jobNamespace: 'developer_broadcast:v1:job:' + active.payload.jobId,
+    active,
+  };
+}
+
 test('developer panel command in a group does not open or expose admin actions', async () => {
   const h = await developerHarness();
 
@@ -258,9 +281,177 @@ test('developer broadcasts copy the rich source to the tracked audience in Cron-
   assert.equal(h.calls.some(call => call.method === 'sendMessage'
     && call.args.text?.includes('اكتمل الإرسال ويجري إرسال تقرير النتائج')), true);
   assert.ok(statements.some(queryText => queryText.includes('private_seen_at')));
-  const recipientQuery = statements.find(queryText => queryText.includes('ORDER BY user_id ASC'));
+  const recipientQuery = statements.find(queryText =>
+    queryText.includes('ORDER BY audience.user_id ASC'));
   assert.match(recipientQuery, /UNION SELECT owner_id AS user_id FROM rich_pages/);
   assert.match(recipientQuery, /UNION SELECT user_id FROM editor_sessions/);
+  assert.match(recipientQuery, /developer_broadcast_exclusions/);
+});
+
+test('developer broadcasts copy messages to newly registered administrator chats', async () => {
+  const chatId = -1009001001;
+  const h = await developerHarness({
+    queryHandler: (statement, { records }) => {
+      if (statement.query.includes('MAX(audience.user_id)')) {
+        return [{
+          total: 0,
+          max_user_id: 0,
+          private_users: 0,
+          total_chats: records.developerBroadcastChats.length,
+          min_chat_id: chatId,
+        }];
+      }
+      if (statement.query.includes('SELECT chats.chat_id')) {
+        const cursor = Number(statement.query.match(/chats\.chat_id < (-?\d+)/)?.[1]);
+        const excluded = records.developerBroadcastExclusions
+          .some(row => row.destinationId === chatId);
+        return cursor > chatId && !excluded
+          ? [{ chat_id: chatId, title: 'Rich Customize updates', type: 'channel' }]
+          : [];
+      }
+      return [];
+    },
+  });
+  h.records.developerBroadcastChats.push({
+    chatId,
+    title: 'Rich Customize updates',
+    type: 'channel',
+    username: 'RichCustomize',
+    discoveredAt: Math.floor(Date.now() / 1000) - 1,
+  });
+
+  const { jobNamespace } = await startBroadcast(h, 'Channel announcement');
+  const minute = Math.floor(Date.now() / 60000) + 1;
+  await h.developer.runDeveloperBroadcastTick(minute);
+  await h.developer.runDeveloperBroadcastTick(minute + 1);
+
+  const job = h.records.legacyStates.find(row => row.namespace === jobNamespace).payload;
+  assert.equal(job.status, 'done');
+  assert.equal(job.sent, 1);
+  assert.equal(job.totalChats, 1);
+  assert.ok(h.calls.some(call => call.method === 'copyMessage'
+    && call.args.chat_id === chatId));
+  assert.ok(h.calls.some(call => call.method === 'sendMessage'
+    && call.args.text?.includes('اكتملت محاولات الإرسال لكل المستلمين المؤهلين')));
+});
+
+test('terminal channel permission failures are explained and excluded from later broadcasts', async () => {
+  const chatId = -1009001002;
+  const h = await developerHarness({
+    queryHandler: (statement, { records }) => {
+      if (statement.query.includes('MAX(audience.user_id)')) {
+        return [{
+          total: 0,
+          max_user_id: 0,
+          private_users: 0,
+          total_chats: 1,
+          min_chat_id: chatId,
+        }];
+      }
+      if (statement.query.includes('SELECT chats.chat_id')) {
+        const cursor = Number(statement.query.match(/chats\.chat_id < (-?\d+)/)?.[1]);
+        const excluded = records.developerBroadcastExclusions
+          .some(row => row.destinationId === chatId);
+        return cursor > chatId && !excluded
+          ? [{ chat_id: chatId, title: 'Announcements', type: 'channel' }]
+          : [];
+      }
+      return [];
+    },
+  });
+  h.records.developerBroadcastChats.push({
+    chatId,
+    title: 'Announcements',
+    type: 'channel',
+    discoveredAt: Math.floor(Date.now() / 1000) - 1,
+  });
+  h.apiState.copyMessageErrors = {
+    [String(chatId)]: new h.BotApiError(403, 'Forbidden: not enough rights to send messages to the chat'),
+  };
+
+  const { jobNamespace } = await startBroadcast(h, 'Channel permission failure');
+  const minute = Math.floor(Date.now() / 60000) + 1;
+  await h.developer.runDeveloperBroadcastTick(minute);
+  await h.developer.runDeveloperBroadcastTick(minute + 1);
+
+  const job = h.records.legacyStates.find(row => row.namespace === jobNamespace).payload;
+  assert.equal(job.status, 'done');
+  assert.equal(job.failed, 1);
+  assert.equal(h.records.developerBroadcastExclusions[0].destinationId, chatId);
+  assert.equal(h.records.developerBroadcastExclusions[0].reasonCode, 'MISSING_SEND_PERMISSION');
+  assert.equal(h.calls.filter(call => call.method === 'copyMessage'
+    && call.args.chat_id === chatId).length, 1);
+  const report = h.calls.find(call => call.method === 'sendDocument');
+  const content = new TextDecoder().decode(new Uint8Array(Object.values(report.args.document.data)));
+  assert.match(content, /قناة\/مجموعة\tتعذر الإرسال\tالبوت لا يملك صلاحية الإرسال في المحادثة/);
+});
+
+test('developer broadcasts skip official-channel subscribers before private delivery', async () => {
+  const h = await developerHarness({
+    queryHandler: statement => {
+      if (statement.query.includes('MAX(audience.user_id)')) {
+        return [{ total: 1, max_user_id: 101, private_users: 1, total_chats: 0, min_chat_id: 0 }];
+      }
+      if (statement.query.includes('ORDER BY audience.user_id ASC')) {
+        return statement.query.includes('audience.user_id > 101') ? [] : [{ user_id: 101 }];
+      }
+      return [];
+    },
+  });
+  h.apiState.members['@RichCustomize:101'] = { status: 'member' };
+
+  const { jobNamespace } = await startBroadcast(h);
+  const minute = Math.floor(Date.now() / 60000) + 1;
+  await h.developer.runDeveloperBroadcastTick(minute);
+  await h.developer.runDeveloperBroadcastTick(minute + 1);
+
+  const job = h.records.legacyStates.find(row => row.namespace === jobNamespace).payload;
+  assert.equal(job.status, 'done');
+  assert.equal(job.sent, 0);
+  assert.equal(job.skippedSubscribers, 1);
+  assert.equal(h.calls.some(call => call.method === 'copyMessage'
+    && call.args.chat_id === 101), false);
+  assert.ok(h.calls.some(call => call.method === 'sendMessage'
+    && /مستثنون لأنهم مشتركوا @RichCustomize: [١1]/.test(call.args.text || '')));
+});
+
+test('bot accounts are stored as permanent broadcast exclusions', async () => {
+  const h = await developerHarness();
+  await h.developer.excludeDeveloperBroadcastBot(7654321);
+
+  assert.deepEqual(h.records.developerBroadcastExclusions[0], {
+    destinationId: 7654321,
+    destinationType: 'user',
+    reasonCode: 'BOT_ACCOUNT',
+    reasonDetail: '',
+    excludedAt: h.records.developerBroadcastExclusions[0].excludedAt,
+  });
+});
+
+test('new administrator chats enter the future broadcast registry and are removed after demotion', async () => {
+  const h = await harness({ extraModules: { publish: 'lib/publish' } });
+  const update = {
+    from: { id: 7001, language_code: 'en' },
+    chat: { id: -1009002002, type: 'supergroup', title: 'Announcements' },
+    new_chat_member: { status: 'administrator' },
+  };
+
+  await h.publish.handleMyChatMember(update);
+  assert.deepEqual(h.records.developerBroadcastChats.map(row => ({
+    chatId: row.chatId,
+    type: row.type,
+    title: row.title,
+  })), [{
+    chatId: -1009002002,
+    type: 'supergroup',
+    title: 'Announcements',
+  }]);
+
+  await h.publish.handleMyChatMember({
+    ...update,
+    new_chat_member: { status: 'member' },
+  });
+  assert.equal(h.records.developerBroadcastChats.length, 0);
 });
 
 test('developer broadcast status reports live progress privately with a refresh action', async () => {
@@ -412,8 +603,12 @@ test('developer broadcasts send a private completion report with failed user IDs
   assert.equal(report.args.chat_id, developerId);
   assert.match(report.args.caption, /تعذر الإرسال:\s*٢/);
   const content = new TextDecoder().decode(new Uint8Array(Object.values(report.args.document.data)));
-  assert.match(content, /101\tتعذر الإرسال\tالمستخدم حظر البوت/);
-  assert.match(content, /202\tتعذر الإرسال\tالمحادثة غير متاحة أو لم يبدأ المستخدم الخاص/);
+  assert.match(content, /101\tمستخدم\tتعذر الإرسال\tالمستخدم حظر البوت/);
+  assert.match(content, /202\tمستخدم\tتعذر الإرسال\tالمحادثة غير موجودة أو غير متاحة للبوت/);
+  assert.deepEqual(
+    h.records.developerBroadcastExclusions.map(row => row.destinationId).sort((a, b) => a - b),
+    [101, 202],
+  );
   assert.ok(statements.some(queryText => queryText.includes('UNION SELECT owner_id AS user_id FROM rich_pages')));
   assert.ok(statements.some(queryText => queryText.includes('UNION SELECT user_id FROM editor_sessions')));
 });
