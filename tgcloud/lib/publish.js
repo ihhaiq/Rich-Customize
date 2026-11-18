@@ -1,6 +1,11 @@
 import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
-import { managedChats, managedPublishPanels, richPages } from 'schema';
+import {
+  developerBroadcastChats,
+  managedChats,
+  managedPublishPanels,
+  richPages,
+} from 'schema';
 import {
   acquireEditorMutationLock,
   loadEditorSession,
@@ -97,6 +102,8 @@ async function removeUserChat(userId,chatId){await db.delete(managedChats).where
 async function removeChatEverywhere(chatId){
   const rows=await db.select().from(managedChats).where(eq(managedChats.chatId,Number(chatId))).all();
   for(const row of rows)await db.delete(managedChats).where(eq(managedChats.key,row.key)).run();
+  await db.delete(developerBroadcastChats)
+    .where(eq(developerBroadcastChats.chatId, Number(chatId))).run();
 }
 async function listChats(userId){
   const rows=await db.select().from(managedChats).where(eq(managedChats.userId,Number(userId))).all();
@@ -452,8 +459,23 @@ export async function handleMyChatMember(update){
   if(!isAdmin(newMember)){await removeChatEverywhere(chat.id);return;}
   const chatType=String(chat.type||'');
   if(chatType==='channel'&&!Boolean(newMember?.can_post_messages)){
+    await db.delete(developerBroadcastChats)
+      .where(eq(developerBroadcastChats.chatId, Number(chat.id))).run();
     if(actor?.id){try{await api.sendMessage({chat_id:actor.id,text:copy(actor.language_code).noPostRight(chat.title||String(chat.id))});}catch{}}
     return;
+  }
+  if(['channel','group','supergroup'].includes(chatType)){
+    await db.insert(developerBroadcastChats).values({
+      chatId:Number(chat.id),
+      title:String(chat.title||chat.id),
+      type:chatType,
+      username:chat.username||null,
+      discoveredAt:nowSeconds(),
+    }).onConflictDoUpdate({target:developerBroadcastChats.chatId,set:{
+      title:String(chat.title||chat.id),
+      type:chatType,
+      username:chat.username||null,
+    }}).run();
   }
   if(!actor?.id||actor?.is_bot)return;
   await rememberChat(actor.id,chat);

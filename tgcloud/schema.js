@@ -341,6 +341,22 @@ export const managedChats = table('managed_chats', {
   chatIdx: index('idx_managed_chats_chat').on(t.chatId),
 }));
 
+export const developerBroadcastChats = table('developer_broadcast_chats', {
+  chatId: integer('chat_id').primaryKey(),
+  title: text('title').notNull().default(''),
+  type: text('type').notNull(),
+  username: text('username'),
+  discoveredAt: integer('discovered_at').notNull(),
+});
+
+export const developerBroadcastExclusions = table('developer_broadcast_exclusions', {
+  destinationId: integer('destination_id').primaryKey(),
+  destinationType: text('destination_type').notNull(),
+  reasonCode: text('reason_code').notNull(),
+  reasonDetail: text('reason_detail').notNull().default(''),
+  excludedAt: integer('excluded_at').notNull(),
+});
+
 // One topic choice per forum group. This is owned by the GROUP (not by an
 // editor account); every admin may change the default with /default.
 export const forumTopicDefaults = table('forum_topic_defaults', {

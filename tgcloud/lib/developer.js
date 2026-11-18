@@ -1,7 +1,16 @@
 import { audienceAndSubscriptionStats } from 'lib/admin-stats';
 import { api, BotApiError, db, InputFile } from 'sdk';
 import { and, eq, gte, lt, sql } from 'sdk/db';
-import { developerStates, editorSessions, legacyStates, maintenanceLocks, richPages, usageUsers } from 'schema';
+import {
+  developerBroadcastChats,
+  developerBroadcastExclusions,
+  developerStates,
+  editorSessions,
+  legacyStates,
+  maintenanceLocks,
+  richPages,
+  usageUsers,
+} from 'schema';
 import { developerAccessConfigured, isDeveloper } from 'lib/developer-access';
 import {
   MAX_IMPORT_ARCHIVE_BYTES,
@@ -30,6 +39,7 @@ const BROADCAST_BATCH_SIZE = 20;
 const BROADCAST_RESULT_CHUNK_SIZE = 2500;
 const BROADCAST_REPORT_PAGE_SIZE = 10000;
 const BROADCAST_ACTIVE_NAMESPACE = 'developer_broadcast:v1:active';
+const BROADCAST_MEMBERSHIP_CHANNEL = '@RichCustomize';
 const PANEL_HOME_TEXT = 'اختر القسم المطلوب. الاشتراكات وإهداء Golden في @richDonateBot.';
 
 const PANEL_HOME_ACTIONS = [
@@ -368,6 +378,11 @@ function positiveSafeInteger(value) {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
 }
 
+function safeBroadcastChatId(value) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed !== 0 ? parsed : 0;
+}
+
 async function loadBroadcast(namespace) {
   const row = await db.select().from(legacyStates)
     .where(eq(legacyStates.namespace, namespace)).get();
@@ -408,15 +423,33 @@ async function broadcastAudienceSummary() {
          SELECT 1 FROM usage_users
          WHERE usage_users.user_id = audience.user_id
            AND usage_users.private_seen_at IS NOT NULL
-       ) THEN 1 ELSE 0 END), 0) AS private_users
-     FROM audience`,
+       ) THEN 1 ELSE 0 END), 0) AS private_users,
+       COALESCE((SELECT COUNT(*) FROM developer_broadcast_chats chats
+         WHERE NOT EXISTS (
+           SELECT 1 FROM developer_broadcast_exclusions exclusions
+           WHERE exclusions.destination_id = chats.chat_id
+         )), 0) AS total_chats,
+       COALESCE((SELECT MIN(chats.chat_id) FROM developer_broadcast_chats chats
+         WHERE NOT EXISTS (
+           SELECT 1 FROM developer_broadcast_exclusions exclusions
+           WHERE exclusions.destination_id = chats.chat_id
+         )), 0) AS min_chat_id
+     FROM audience
+     WHERE NOT EXISTS (
+       SELECT 1 FROM developer_broadcast_exclusions exclusions
+       WHERE exclusions.destination_id = audience.user_id
+     )`,
   ));
   const row = rows?.[0] || {};
-  const total = Math.max(0, Number(row.total) || 0);
+  const totalUsers = Math.max(0, Number(row.total) || 0);
+  const totalChats = Math.max(0, Number(row.total_chats) || 0);
   return {
-    total,
+    total: totalUsers + totalChats,
+    totalUsers,
+    totalChats,
     maxUserId: positiveSafeInteger(row.max_user_id),
-    privateUsers: Math.min(total, Math.max(0, Number(row.private_users) || 0)),
+    minChatId: Math.min(0, safeBroadcastChatId(row.min_chat_id)),
+    privateUsers: Math.min(totalUsers, Math.max(0, Number(row.private_users) || 0)),
   };
 }
 
@@ -425,7 +458,8 @@ function broadcastProgress(job) {
   const processed = Math.min(total,
     positiveSafeInteger(job.sent)
       + positiveSafeInteger(job.failed)
-      + positiveSafeInteger(job.uncertain));
+      + positiveSafeInteger(job.uncertain)
+      + positiveSafeInteger(job.skippedSubscribers));
   return {
     total,
     processed,
@@ -442,7 +476,9 @@ function broadcastReport(job) {
       ? job.finalStatus === 'cancelled'
         ? 'أوقفت ويجري إرسال تقرير النتائج'
         : job.finalStatus === 'failed'
-          ? 'توقفت بسبب رسالة المصدر ويجري إرسال التقرير'
+          ? (job.failureReason === 'membership_check_failed'
+            ? 'توقفت لتعذر التحقق من القناة الرسمية'
+            : 'توقفت بسبب خطأ ويجري إرسال التقرير')
           : 'اكتمل الإرسال ويجري إرسال تقرير النتائج'
       : job.status === 'failed'
         ? 'توقفت بسبب خطأ في رسالة المصدر'
@@ -455,11 +491,18 @@ function broadcastReport(job) {
       + progress.total.toLocaleString() + ' (' + progress.percentage + '%)\n'
     + 'بدأوا الخاص المؤكد: ' + Number(job.privateUsers || 0).toLocaleString() + '\n'
     + 'سجلات قديمة/غير مؤكدة الخاص: '
-      + Math.max(0, Number(job.total || 0) - Number(job.privateUsers || 0)).toLocaleString() + '\n'
+      + Math.max(0, Number(job.totalUsers ?? job.total ?? 0)
+        - Number(job.privateUsers || 0)).toLocaleString() + '\n'
+    + 'القنوات والمجموعات: ' + Number(job.totalChats || 0).toLocaleString() + '\n'
+    + 'مستثنون لأنهم مشتركوا @RichCustomize: '
+      + Number(job.skippedSubscribers || 0).toLocaleString() + '\n'
     + 'قبلها Telegram: ' + Number(job.sent || 0).toLocaleString() + '\n'
     + 'تعذر الإرسال: ' + Number(job.failed || 0).toLocaleString() + '\n'
     + 'نتيجة غير مؤكدة: ' + Number(job.uncertain || 0).toLocaleString() + '\n'
     + 'متبقٍ تقريباً: ' + progress.pending.toLocaleString()
+    + (job.failureReason === 'membership_check_failed'
+      ? '\nسبب التوقف: لم يعد ممكناً التحقق من عضوية @RichCustomize، لذلك أُوقف الإرسال الخاص لتجنب مراسلة المشتركين.'
+      : '')
     + (job.status === 'done' ? '' : '\nتُعالج الدفعات تلقائياً كل دقيقة؛ القبول لا يثبت قراءة الرسالة.');
 }
 
@@ -488,8 +531,12 @@ function broadcastOutcome(userId, status, error) {
     reason = 'BOT_BLOCKED';
   } else if (/user is deactivated|account.*deactivated/.test(value)) {
     reason = 'USER_DEACTIVATED';
+  } else if (/bot was kicked|bot is not a member|not a member of the chat/.test(value)) {
+    reason = 'BOT_REMOVED_FROM_CHAT';
+  } else if (/not enough rights|have no rights|can't post messages|cannot post messages|not allowed to send/.test(value)) {
+    reason = 'MISSING_SEND_PERMISSION';
   } else if (/chat not found|user not found|bot can't initiate|bot cannot initiate|user never started/.test(value)) {
-    reason = 'PRIVATE_CHAT_UNAVAILABLE';
+    reason = 'DESTINATION_UNAVAILABLE';
   } else if (/timed out|timeout|etimedout/.test(value)) {
     reason = 'NETWORK_TIMEOUT';
   } else if (/network|socket|connection|fetch failed|econn/.test(value)) {
@@ -498,12 +545,58 @@ function broadcastOutcome(userId, status, error) {
     reason = 'OUTCOME_UNKNOWN';
   }
   return [
-    positiveSafeInteger(userId),
+    safeBroadcastChatId(userId),
     status,
     apiCode,
     reason,
     reason === 'TELEGRAM_REJECTED' || status === 'uncertain' ? detail : '',
   ];
+}
+
+async function excludeBroadcastDestination(destinationId, destinationType, reasonCode, detail = '') {
+  const id = safeBroadcastChatId(destinationId);
+  if (!id) throw new Error('BROADCAST_EXCLUSION_ID_INVALID');
+  await db.insert(developerBroadcastExclusions).values({
+    destinationId: id,
+    destinationType,
+    reasonCode,
+    reasonDetail: safeBroadcastErrorDetail(detail),
+    excludedAt: now(),
+  }).onConflictDoNothing({ target: developerBroadcastExclusions.destinationId }).run();
+}
+
+export async function excludeDeveloperBroadcastBot(userId) {
+  const id = positiveSafeInteger(userId);
+  if (!id) return;
+  await excludeBroadcastDestination(id, 'user', 'BOT_ACCOUNT');
+}
+
+function isBroadcastChannelMember(member) {
+  const status = String(member?.status?.value || member?.status || '');
+  return ['creator', 'administrator', 'member'].includes(status)
+    || (status === 'restricted' && member?.is_member === true);
+}
+
+function isBroadcastChannelAdmin(member) {
+  const status = String(member?.status?.value || member?.status || '');
+  return status === 'creator' || status === 'administrator';
+}
+
+async function verifyBroadcastMembershipAccess() {
+  const bot = await api.getMe();
+  const botId = positiveSafeInteger(bot?.id);
+  if (!botId) throw new Error('BROADCAST_BOT_ID_UNAVAILABLE');
+  const membership = await api.getChatMember({
+    chat_id: BROADCAST_MEMBERSHIP_CHANNEL,
+    user_id: botId,
+  });
+  if (!isBroadcastChannelAdmin(membership)) {
+    throw new Error('BROADCAST_CHANNEL_ADMIN_REQUIRED');
+  }
+}
+
+function isTerminalBroadcastDestinationError(error) {
+  return error instanceof BotApiError && [400, 403].includes(Number(error.code));
 }
 
 async function loadBroadcastOutcome(job, index) {
@@ -552,10 +645,14 @@ async function persistPendingBroadcastOutcomes(job) {
 
 function broadcastOutcomeReason(code) {
   const labels = {
+    BOT_ACCOUNT: 'حساب بوت؛ مستثنى من الإذاعات',
     BOT_BLOCKED: 'المستخدم حظر البوت',
     USER_DEACTIVATED: 'حساب المستخدم معطل',
-    PRIVATE_CHAT_UNAVAILABLE: 'المحادثة غير متاحة أو لم يبدأ المستخدم الخاص',
+    BOT_REMOVED_FROM_CHAT: 'البوت لم يعد عضواً في المحادثة',
+    MISSING_SEND_PERMISSION: 'البوت لا يملك صلاحية الإرسال في المحادثة',
+    DESTINATION_UNAVAILABLE: 'المحادثة غير موجودة أو غير متاحة للبوت',
     TELEGRAM_REJECTED: 'رفض Telegram الرسالة',
+    MEMBERSHIP_CHECK_FAILED: 'تعذر التحقق من عضوية القناة الرسمية؛ لم تُرسل رسالة خاصة',
     NETWORK_TIMEOUT: 'انتهت مهلة الاتصال؛ نتيجة الإرسال غير محسومة',
     NETWORK_ERROR: 'خطأ اتصال؛ نتيجة الإرسال غير محسومة',
     OUTCOME_UNKNOWN: 'تعذر تأكيد نتيجة الإرسال؛ لم نكرر الإرسال',
@@ -576,16 +673,19 @@ async function broadcastReportPage(job, start) {
       chunkIndex = nextChunkIndex;
     }
     const record = chunkRecords[index % BROADCAST_RESULT_CHUNK_SIZE];
-    if (!Array.isArray(record) || !positiveSafeInteger(record[0])) {
+    if (!Array.isArray(record) || !safeBroadcastChatId(record[0])) {
       throw new Error('BROADCAST_OUTCOME_MISSING');
     }
     records.push(record);
   }
   const lines = [
-    'تفاصيل المستخدمين الذين تعذر الإرسال إليهم أو كانت النتيجة غير مؤكدة',
-    'User ID\tالحالة\tالسبب\tTelegram code\tالتفصيل',
+    'تفاصيل المستخدمين والقنوات والمجموعات التي تعذر الإرسال إليها أو كانت النتيجة غير مؤكدة',
+    'Chat/User ID\tالنوع\tالحالة\tالسبب\tTelegram code\tالتفصيل',
     ...records.map((record) => [
       Number(record[0]),
+      Number(record[0]) < 0
+        ? 'قناة/مجموعة'
+        : record[3] === 'BOT_ACCOUNT' ? 'بوت' : 'مستخدم',
       record[1] === 'failed' ? 'تعذر الإرسال' : 'نتيجة غير مؤكدة',
       broadcastOutcomeReason(record[3]),
       record[2] == null ? '—' : String(record[2]),
@@ -608,17 +708,15 @@ async function completeBroadcastReport(job, jobNamespace) {
   const cursor = Math.max(0, Number(job.reportCursor) || 0);
 
   if (cursor >= resultCount) {
-    if (!job.reportSummarySent) {
-      const report = broadcastReport(job);
-      if (resultCount) {
-        await api.sendMessage({
-          chat_id: job.actorId,
-          text: report + '\n\nأرفقت قائمة المستخدمين المتعذر الوصول إليهم وأسبابها. ستصل بقية الملفات تباعاً إذا كانت القائمة طويلة.',
-        });
-      } else {
-        await api.sendMessage({ chat_id: job.actorId, text: report });
-      }
-      job.reportSummarySent = true;
+    if (!job.completionNoticeSent) {
+      await api.sendMessage({
+        chat_id: job.actorId,
+        text: broadcastReport(job)
+          + (resultCount
+            ? '\n\nاكتملت محاولات الإرسال. أُرسلت ملفات تفاصيل الأخطاء أعلاه.'
+            : '\n\nاكتملت محاولات الإرسال لكل المستلمين المؤهلين.'),
+      });
+      job.completionNoticeSent = true;
     }
     job.status = 'done';
     await saveBroadcast(jobNamespace, job);
@@ -658,13 +756,8 @@ async function completeBroadcastReport(job, jobNamespace) {
     }
   }
   if (job.reportCursor >= resultCount) {
-    job.status = 'done';
     await saveBroadcast(jobNamespace, job);
-    await saveBroadcast(BROADCAST_ACTIVE_NAMESPACE, {
-      jobId: job.jobId,
-      actorId: job.actorId,
-      status: 'done',
-    });
+    return completeBroadcastReport(job, jobNamespace);
   }
   return true;
 }
@@ -763,15 +856,16 @@ export async function runDeveloperBroadcastTick(minute = Math.floor(Date.now() /
       return true;
     }
 
-    if (job.inFlightUserId) {
-      const userId = positiveSafeInteger(job.inFlightUserId);
-      if (!userId) throw new Error('BROADCAST_IN_FLIGHT_USER_INVALID');
+    const inFlightUserId = positiveSafeInteger(job.inFlightUserId);
+    const inFlightChatId = safeBroadcastChatId(job.inFlightChatId);
+    const inFlightId = inFlightUserId || (inFlightChatId < 0 ? inFlightChatId : 0);
+    if (inFlightId) {
       let outcome = await loadBroadcastOutcome(job, Number(job.resultCount) || 0);
-      const hasPersistedOutcome = Array.isArray(outcome) && Number(outcome[0]) === userId;
+      const hasPersistedOutcome = Array.isArray(outcome) && Number(outcome[0]) === inFlightId;
       if (!hasPersistedOutcome) {
         const error = job.inFlightError || {};
         outcome = [
-          userId,
+          inFlightId,
           'uncertain',
           Number.isSafeInteger(Number(error.apiCode)) ? Number(error.apiCode) : null,
           String(error.reason || 'OUTCOME_UNKNOWN'),
@@ -789,8 +883,10 @@ export async function runDeveloperBroadcastTick(minute = Math.floor(Date.now() /
         job.uncertain = Number(job.uncertain || 0) + 1;
       }
       job.attempted = Number(job.attempted || 0) + 1;
-      job.cursor = Math.max(Number(job.cursor) || 0, userId);
+      if (inFlightUserId) job.cursor = Math.max(Number(job.cursor) || 0, inFlightUserId);
+      else job.chatCursor = inFlightChatId;
       job.inFlightUserId = null;
+      job.inFlightChatId = null;
       job.inFlightError = null;
       job.retryAt = 0;
       await saveBroadcast(jobNamespace, job);
@@ -798,19 +894,63 @@ export async function runDeveloperBroadcastTick(minute = Math.floor(Date.now() /
 
     const cursor = Number.isSafeInteger(Number(job.cursor)) ? Math.max(0, Number(job.cursor)) : 0;
     const maxUserId = positiveSafeInteger(job.maxUserId);
-    const recipients = await db.all(sql.raw(
-      `WITH audience AS (
-         SELECT user_id FROM usage_users WHERE user_id > 0
-         UNION SELECT user_id FROM editor_subscriptions WHERE user_id > 0
-         UNION SELECT user_id FROM golden_claims WHERE user_id > 0
-         UNION SELECT owner_id AS user_id FROM rich_pages WHERE owner_id > 0
-         UNION SELECT user_id FROM editor_sessions WHERE user_id > 0
-       )
-       SELECT user_id FROM audience
-       WHERE user_id > ${cursor}
-         AND user_id <= ${maxUserId}
-       ORDER BY user_id ASC LIMIT ${BROADCAST_BATCH_SIZE}`,
-    ));
+    const minChatId = safeBroadcastChatId(job.minChatId);
+    const chatCursor = Number.isSafeInteger(Number(job.chatCursor))
+      ? Number(job.chatCursor)
+      : 0;
+    const recipients = [];
+    if (minChatId < 0 && chatCursor > minChatId) {
+      const chats = await db.all(sql.raw(
+        `SELECT chats.chat_id, chats.title, chats.type
+         FROM developer_broadcast_chats chats
+         WHERE chats.chat_id < ${chatCursor}
+           AND chats.chat_id >= ${minChatId}
+           AND chats.discovered_at <= ${Number(job.startedAt)}
+           AND NOT EXISTS (
+             SELECT 1 FROM developer_broadcast_exclusions exclusions
+             WHERE exclusions.destination_id = chats.chat_id
+           )
+         ORDER BY chats.chat_id DESC LIMIT ${BROADCAST_BATCH_SIZE}`,
+      ));
+      for (const chat of chats || []) {
+        const chatId = safeBroadcastChatId(chat?.chat_id);
+        if (chatId < 0) {
+          recipients.push({
+            id: chatId,
+            type: 'chat',
+            title: String(chat?.title || chatId),
+          });
+        }
+      }
+    }
+
+    const userLimit = BROADCAST_BATCH_SIZE - recipients.length;
+    if (userLimit > 0 && cursor < maxUserId) {
+      const users = await db.all(sql.raw(
+        `WITH audience AS (
+           SELECT user_id FROM usage_users WHERE user_id > 0
+           UNION SELECT user_id FROM editor_subscriptions WHERE user_id > 0
+           UNION SELECT user_id FROM golden_claims WHERE user_id > 0
+           UNION SELECT owner_id AS user_id FROM rich_pages WHERE owner_id > 0
+           UNION SELECT user_id FROM editor_sessions WHERE user_id > 0
+         )
+         SELECT audience.user_id FROM audience
+         WHERE audience.user_id > ${cursor}
+           AND audience.user_id <= ${maxUserId}
+           AND NOT EXISTS (
+             SELECT 1 FROM developer_broadcast_exclusions exclusions
+             WHERE exclusions.destination_id = audience.user_id
+           )
+         ORDER BY audience.user_id ASC LIMIT ${userLimit}`,
+      ));
+      for (const user of users || []) {
+        const userId = positiveSafeInteger(user?.user_id);
+        if (userId > cursor && userId <= maxUserId) {
+          recipients.push({ id: userId, type: 'user' });
+        }
+      }
+    }
+
     if (!recipients?.length) {
       job.status = 'report_pending';
       job.finalStatus = 'done';
@@ -826,22 +966,93 @@ export async function runDeveloperBroadcastTick(minute = Math.floor(Date.now() /
     }
 
     for (const recipient of recipients) {
-      const userId = positiveSafeInteger(recipient?.user_id);
-      if (!userId || userId <= cursor || userId > maxUserId) {
+      const destinationId = safeBroadcastChatId(recipient.id);
+      if (!destinationId || (recipient.type === 'user'
+          && (destinationId <= Number(job.cursor || 0) || destinationId > maxUserId))) {
         continue;
       }
-      job.inFlightUserId = userId;
+
+      if (recipient.type === 'user') {
+        let membership;
+        try {
+          membership = await api.getChatMember({
+            chat_id: BROADCAST_MEMBERSHIP_CHANNEL,
+            user_id: destinationId,
+          });
+        } catch (error) {
+          if (isBroadcastRateLimit(error)) {
+            job.retryAt = stamp + broadcastRetrySeconds(error);
+            job.rateLimited = Number(job.rateLimited || 0) + 1;
+            await saveBroadcast(jobNamespace, job);
+            return true;
+          }
+          await logBroadcastError('developer.broadcast.membership', error, {
+            userId: destinationId,
+            chatId: job.actorId,
+            extra: 'membership_channel=' + BROADCAST_MEMBERSHIP_CHANNEL,
+          });
+          if (isTerminalBroadcastDestinationError(error)) {
+            job.status = 'report_pending';
+            job.finalStatus = 'failed';
+            job.failureReason = 'membership_check_failed';
+            job.completedAt = stamp;
+            await saveBroadcast(jobNamespace, job);
+            await saveBroadcast(BROADCAST_ACTIVE_NAMESPACE, {
+              jobId: current.active.jobId,
+              actorId: job.actorId,
+              status: 'report_pending',
+            });
+            return tryCompleteBroadcastReport(job, jobNamespace, stamp);
+          }
+          job.retryAt = stamp + 60;
+          await saveBroadcast(jobNamespace, job);
+          return true;
+        }
+
+        const membershipStatus = String(membership?.status?.value || membership?.status || '');
+        if (!['creator', 'administrator', 'member', 'restricted', 'left', 'kicked'].includes(membershipStatus)) {
+          const error = new Error('BROADCAST_MEMBERSHIP_STATUS_INVALID');
+          await logBroadcastError('developer.broadcast.membership', error, {
+            userId: destinationId,
+            chatId: job.actorId,
+            extra: 'membership_channel=' + BROADCAST_MEMBERSHIP_CHANNEL,
+          });
+          job.status = 'report_pending';
+          job.finalStatus = 'failed';
+          job.failureReason = 'membership_check_failed';
+          job.completedAt = stamp;
+          await saveBroadcast(jobNamespace, job);
+          await saveBroadcast(BROADCAST_ACTIVE_NAMESPACE, {
+            jobId: current.active.jobId,
+            actorId: job.actorId,
+            status: 'report_pending',
+          });
+          return tryCompleteBroadcastReport(job, jobNamespace, stamp);
+        }
+        if (isBroadcastChannelMember(membership)) {
+          job.cursor = destinationId;
+          job.skippedSubscribers = Number(job.skippedSubscribers || 0) + 1;
+          job.attempted = Number(job.attempted || 0) + 1;
+          await saveBroadcast(jobNamespace, job);
+          continue;
+        }
+      }
+
+      if (recipient.type === 'user') job.inFlightUserId = destinationId;
+      else job.inFlightChatId = destinationId;
       job.inFlightError = null;
       await saveBroadcast(jobNamespace, job);
       try {
         await api.copyMessage({
-          chat_id: userId,
+          chat_id: destinationId,
           from_chat_id: job.sourceChatId,
           message_id: job.sourceMessageId,
         });
-        job.cursor = userId;
+        if (recipient.type === 'user') job.cursor = destinationId;
+        else job.chatCursor = destinationId;
         job.sent = Number(job.sent || 0) + 1;
         job.inFlightUserId = null;
+        job.inFlightChatId = null;
         job.inFlightError = null;
         job.retryAt = 0;
       } catch (error) {
@@ -854,6 +1065,7 @@ export async function runDeveloperBroadcastTick(minute = Math.floor(Date.now() /
           job.status = 'report_pending';
           job.finalStatus = 'failed';
           job.inFlightUserId = null;
+          job.inFlightChatId = null;
           job.inFlightError = null;
           job.completedAt = stamp;
           await saveBroadcast(jobNamespace, job);
@@ -866,28 +1078,37 @@ export async function runDeveloperBroadcastTick(minute = Math.floor(Date.now() /
         }
         if (isBroadcastRateLimit(error)) {
           job.inFlightUserId = null;
+          job.inFlightChatId = null;
           job.inFlightError = null;
           job.retryAt = stamp + broadcastRetrySeconds(error);
           job.rateLimited = Number(job.rateLimited || 0) + 1;
           await saveBroadcast(jobNamespace, job);
           return true;
         }
-        if (error instanceof BotApiError && [400, 403].includes(Number(error.code))) {
-          const outcome = broadcastOutcome(userId, 'failed', error);
+        if (isTerminalBroadcastDestinationError(error)) {
+          const outcome = broadcastOutcome(destinationId, 'failed', error);
+          await excludeBroadcastDestination(
+            destinationId,
+            recipient.type,
+            outcome[3],
+            outcome[4],
+          );
           job.pendingOutcomes = Array.isArray(job.pendingOutcomes) ? job.pendingOutcomes : [];
           job.pendingOutcomes.push(outcome);
-          job.cursor = userId;
+          if (recipient.type === 'user') job.cursor = destinationId;
+          else job.chatCursor = destinationId;
           job.failed = Number(job.failed || 0) + 1;
           job.inFlightUserId = null;
+          job.inFlightChatId = null;
           job.inFlightError = null;
           job.retryAt = 0;
         } else {
           await logBroadcastError('developer.broadcast.delivery', error, {
-            userId,
+            userId: recipient.type === 'user' ? destinationId : job.actorId,
             chatId: job.actorId,
             extra: 'source_message_id=' + Number(job.sourceMessageId || 0),
           });
-          const outcome = broadcastOutcome(userId, 'uncertain', error);
+          const outcome = broadcastOutcome(destinationId, 'uncertain', error);
           job.inFlightError = {
             apiCode: outcome[2],
             reason: outcome[3],
@@ -1076,6 +1297,7 @@ export async function handleDeveloperPendingMessage(message) {
       }
     }
 
+    const startedAt = now();
     const audience = await broadcastAudienceSummary();
     if (!audience.total) {
       await clearState(userId);
@@ -1090,17 +1312,23 @@ export async function handleDeveloperPendingMessage(message) {
         sourceChatId: Number(chatId),
         sourceMessageId,
         targetCount: audience.total,
+        userCount: audience.totalUsers,
+        chatCount: audience.totalChats,
         privateCount: audience.privateUsers,
       },
     });
     await sendPanel(chatId,
       'وصلت رسالة الإذاعة. سيحافظ Telegram على النص والتنسيق والوسائط عند نسخها.\n\n'
       + 'المستهدفون المعروفون: ' + audience.total.toLocaleString()
+      + '\nالمستخدمون الخاص: ' + audience.totalUsers.toLocaleString()
+      + '\nالقنوات والمجموعات التي سُجلت بعد التحديث: '
+      + audience.totalChats.toLocaleString()
       + '\nبدأوا محادثة خاصة مؤكدة: ' + audience.privateUsers.toLocaleString()
       + '\nسجلات قديمة/غير مؤكدة الخاص: '
-      + Math.max(0, audience.total - audience.privateUsers).toLocaleString()
-      + '\n\nقد تشمل السجلات القديمة من تفاعلوا بالمجموعات فقط؛ ستظهر حالات رفض Telegram في التقرير. '
-      + 'تبدأ الدفعات تلقائياً بعد التأكيد، بحد أقصى ' + BROADCAST_BATCH_SIZE + ' مستخدماً في الدقيقة.',
+      + Math.max(0, audience.totalUsers - audience.privateUsers).toLocaleString()
+      + '\nسيُستثنى مشتركو @RichCustomize قبل الإرسال الخاص.'
+      + '\nقد تشمل السجلات القديمة من تفاعلوا بالمجموعات فقط؛ ستظهر حالات رفض Telegram في التقرير. '
+      + 'تبدأ الدفعات تلقائياً بعد التأكيد، بحد أقصى ' + BROADCAST_BATCH_SIZE + ' وجهة في الدقيقة.',
       [
         { text: '✅ تأكيد الإذاعة', callback_data: 'dev:broadcast:confirm', style: 'danger' },
         { text: '❌ إلغاء', callback_data: 'dev:broadcast:cancel-input' },
@@ -1698,14 +1926,33 @@ async function beginBroadcast(query, chatId) {
     }
 
     const audience = await broadcastAudienceSummary();
-    if (!audience.total || !audience.maxUserId) {
+    if (!audience.total || (!audience.maxUserId && !audience.minChatId)) {
       await clearState(query.from.id);
       await api.answerCallbackQuery({
         callback_query_id: query.id,
-        text: 'لا توجد حسابات مستخدمين مسجلة للإذاعة.',
+        text: 'لا توجد حسابات أو قنوات ومجموعات مسجلة للإذاعة.',
         show_alert: true,
       });
       return;
+    }
+
+    if (audience.totalUsers) {
+      try {
+        await verifyBroadcastMembershipAccess();
+      } catch (error) {
+        await logBroadcastError('developer.broadcast.membership_access', error, {
+          userId: Number(query.from.id),
+          chatId: Number(query.from.id),
+          extra: 'membership_channel=' + BROADCAST_MEMBERSHIP_CHANNEL,
+        });
+        await clearState(query.from.id);
+        await api.answerCallbackQuery({
+          callback_query_id: query.id,
+          text: 'تعذر التحقق من مشتركي قناة @RichCustomize. اجعل البوت مشرفاً فيها ثم ابدأ الإذاعة مجدداً.',
+          show_alert: true,
+        });
+        return;
+      }
     }
 
     const jobId = Date.now().toString(36) + '_'
@@ -1717,19 +1964,25 @@ async function beginBroadcast(query, chatId) {
       sourceChatId,
       sourceMessageId,
       maxUserId: audience.maxUserId,
+      minChatId: audience.minChatId,
       total: audience.total,
+      totalUsers: audience.totalUsers,
+      totalChats: audience.totalChats,
       privateUsers: audience.privateUsers,
       cursor: 0,
+      chatCursor: 0,
       sent: 0,
       failed: 0,
       uncertain: 0,
+      skippedSubscribers: 0,
       rateLimited: 0,
       attempted: 0,
       inFlightUserId: null,
+      inFlightChatId: null,
       retryAt: 0,
       lastTickMinute: 0,
       status: 'running',
-      startedAt: now(),
+      startedAt,
     };
     await saveBroadcast(broadcastJobNamespace(jobId), job);
     await saveBroadcast(BROADCAST_ACTIVE_NAMESPACE, {

@@ -20,7 +20,7 @@ export async function harness({
     records[name] = [];
     tables[name] = new Proxy({ _name: name }, { get: (target, prop) => prop === '_name' ? target._name : { table: name, key: prop } });
   }
-  const keys = { goldenBroadcasts:'month', goldenAnnouncements:'key', goldenCampaigns:'month', goldenClaims:'key', legacyStates:'namespace', miniappBridgeRequests:'requestId', editorSessions: 'userId', editorAlbumItems: 'key', maintenanceLocks: 'name', processedUpdates: 'updateId', requestWindows: 'key', richPages: 'pageId', usageUsers: 'userId', userAliases: 'username', userAliasSyncs: 'userId', editorSubscriptions: 'userId', editorEntitlementEvents:'eventId', editorGiftEntitlements:'requestId', richDonateBridge:'key', managedBotOrders:'orderId', managedBotPayments:'chargeId', managedBotLicenses:'licenseId', brandingEntitlements:'userId', brandingPreferences:'userId', forumTopicDefaults:'chatId', subscriptionReminderScans:'id', subscriptionReminderDeliveries:'key' };
+  const keys = { goldenBroadcasts:'month', goldenAnnouncements:'key', goldenCampaigns:'month', goldenClaims:'key', legacyStates:'namespace', miniappBridgeRequests:'requestId', editorSessions: 'userId', editorAlbumItems: 'key', maintenanceLocks: 'name', processedUpdates: 'updateId', requestWindows: 'key', richPages: 'pageId', usageUsers: 'userId', userAliases: 'username', userAliasSyncs: 'userId', editorSubscriptions: 'userId', editorEntitlementEvents:'eventId', editorGiftEntitlements:'requestId', richDonateBridge:'key', managedBotOrders:'orderId', managedBotPayments:'chargeId', managedBotLicenses:'licenseId', brandingEntitlements:'userId', brandingPreferences:'userId', forumTopicDefaults:'chatId', subscriptionReminderScans:'id', subscriptionReminderDeliveries:'key', developerBroadcastChats:'chatId', developerBroadcastExclusions:'destinationId' };
   const clone = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
   class BotApiError extends Error {
     constructor(code, description) {
@@ -90,11 +90,16 @@ export async function harness({
     if (method === 'getChat' && apiState.chats?.[String(args?.chat_id)]) {
       return clone(apiState.chats[String(args.chat_id)]);
     }
-    if (method === 'getChatMember' && apiState.memberErrors?.[String(args?.user_id)]) {
-      throw apiState.memberErrors[String(args.user_id)];
-    }
-    if (method === 'getChatMember' && apiState.members?.[String(args?.user_id)]) {
-      return clone(apiState.members[String(args.user_id)]);
+    if (method === 'getChatMember') {
+      const compositeKey = String(args?.chat_id) + ':' + String(args?.user_id);
+      const userKey = String(args?.user_id);
+      if (apiState.memberErrors?.[compositeKey] || apiState.memberErrors?.[userKey]) {
+        throw apiState.memberErrors[compositeKey] || apiState.memberErrors[userKey];
+      }
+      if (apiState.members?.[compositeKey] || apiState.members?.[userKey]) {
+        return clone(apiState.members[compositeKey] || apiState.members[userKey]);
+      }
+      return { status: 'left' };
     }
     if (method === 'sendMessage' && apiState.messageSendErrors?.[String(args.chat_id)]) throw apiState.messageSendErrors[String(args.chat_id)];
     if (method === 'sendDocument' && apiState.documentSendErrors) {

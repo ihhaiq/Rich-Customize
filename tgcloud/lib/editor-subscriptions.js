@@ -5,6 +5,7 @@ import {
   editorEntitlementEvents,
   editorGiftEntitlements,
   editorSubscriptions,
+  legacyStates,
   richDonateBridge,
 } from 'schema';
 import { isDeveloper } from 'lib/developer-access';
@@ -31,6 +32,7 @@ const EVENT_FIELDS = Object.freeze([
   'paid_at',
 ]);
 const BRIDGE_KEY = 'richdonate-b2b-v1';
+const LAST_RICH_DONATE_REQUEST_NAMESPACE = 'richdonate-b2b-v1:last-request';
 const MAX_EVENT_BYTES = 4096;
 const MAX_CHARGE_ID_LENGTH = 256;
 const MAX_EVENT_AGE_SECONDS = 10 * 365 * 86400;
@@ -231,19 +233,50 @@ async function pinDonationBot(message, now) {
     .where(eq(richDonateBridge.key, BRIDGE_KEY)).get();
   if (Number(pinned?.botId) !== senderId) {
     console.warn('Rich Donate B2B hello rejected: sender differs from pinned identity');
+  } else {
+    await deleteLastRichDonateRequest();
+  }
+}
+
+async function deleteLastRichDonateRequest() {
+  const row = await db.select().from(legacyStates)
+    .where(eq(legacyStates.namespace, LAST_RICH_DONATE_REQUEST_NAMESPACE)).get();
+  const messageId = Number(row?.payload?.messageId);
+  if (!Number.isSafeInteger(messageId) || messageId <= 0) return;
+  try {
+    await api.deleteMessage({
+      chat_id: MINIAPP_BRIDGE_CHAT_ID,
+      message_id: messageId,
+    });
+    await db.delete(legacyStates)
+      .where(eq(legacyStates.namespace, LAST_RICH_DONATE_REQUEST_NAMESPACE)).run();
+  } catch (error) {
+    console.warn('Could not delete previous Rich Donate B2B request', error?.code || error?.name || 'Error');
   }
 }
 
 export async function runRichDonateB2BTick() {
   const pinned = await db.select().from(richDonateBridge)
     .where(eq(richDonateBridge.key, BRIDGE_KEY)).get();
-  await api.sendMessage({
+  await deleteLastRichDonateRequest();
+  const sent = await api.sendMessage({
     chat_id: MINIAPP_BRIDGE_CHAT_ID,
     text: pinned
       ? '/rdb_sync_v1@RichDonateBot'
       : '/rdb_hello_v1@RichDonateBot',
     disable_notification: true,
   });
+  const messageId = Number(sent?.message_id);
+  if (Number.isSafeInteger(messageId) && messageId > 0) {
+    await db.insert(legacyStates).values({
+      namespace: LAST_RICH_DONATE_REQUEST_NAMESPACE,
+      payload: { messageId },
+      updatedAt: nowSeconds(),
+    }).onConflictDoUpdate({
+      target: legacyStates.namespace,
+      set: { payload: { messageId }, updatedAt: nowSeconds() },
+    }).run();
+  }
 }
 
 export async function handleRichDonateB2BMessage(message, { now = nowSeconds() } = {}) {

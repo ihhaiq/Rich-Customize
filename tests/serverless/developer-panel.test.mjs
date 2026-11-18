@@ -51,6 +51,10 @@ async function developerHarness({ queryHandler = null, users = [] } = {}) {
       },
     },
   });
+  h.apiState.me = { id: 8997225442, is_bot: true, username: 'RichCustomizebot' };
+  h.apiState.members = {
+    [String(h.apiState.me.id)]: { status: 'administrator' },
+  };
   h.loggedErrors = loggedErrors;
   return h;
 }

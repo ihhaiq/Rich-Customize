@@ -17,7 +17,11 @@ import {
   editorClosedHint,
   openEditor,
 } from 'lib/editor-home';
-import { handleDeveloperPendingMessage, openDeveloperPanel } from 'lib/developer';
+import {
+  excludeDeveloperBroadcastBot,
+  handleDeveloperPendingMessage,
+  openDeveloperPanel,
+} from 'lib/developer';
 import { handleMiniAppShortcut } from 'lib/miniapp';
 import { sendPrivacyMessage, sendSupportMessage } from 'lib/legal';
 import { handleShowcaseMessage } from 'lib/showcase';
@@ -352,6 +356,13 @@ export default async function (message, ctx = {}) {
     throw error;
   } finally {
     if (!bridgeHandled) {
+      if (message?.from?.is_bot) {
+        try {
+          await excludeDeveloperBroadcastBot(message.from.id);
+        } catch (error) {
+          console.warn('Could not exclude bot account from developer broadcasts', error?.name || 'Error');
+        }
+      }
       try {
         await observeRequest(
           message?.from,

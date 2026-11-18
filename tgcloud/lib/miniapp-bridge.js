@@ -1275,6 +1275,25 @@ export async function handleMiniAppServerlessEndpoint(input, context) {
   }
 }
 
+async function deleteBridgeTickMessage(message, kind) {
+  const chatId = safeInteger(message?.chat?.id);
+  const messageId = positiveInteger(message?.message_id);
+  if (chatId == null || !messageId) return;
+  try {
+    await api.deleteMessage({ chat_id: chatId, message_id: messageId });
+  } catch (error) {
+    console.warn('Could not delete internal RCB1 tick', error?.code || error?.name || 'Error');
+    try {
+      await logError('miniapp_bridge.tick_cleanup', error, {
+        chatId,
+        extra: 'kind=' + String(kind || 'unknown'),
+      });
+    } catch (loggingError) {
+      console.warn('Could not log internal RCB1 tick cleanup failure', loggingError?.name || 'Error');
+    }
+  }
+}
+
 export async function handleMiniAppBridgeMessage(message, context = {}) {
   const scheduleSource=commandSource(message);
   if (/^\/rcb_broadcast_tick@richcustomizebot\b/i.test(scheduleSource)) {
@@ -1283,12 +1302,16 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
         || message?.forward_sender_name || message?.forward_date || message?.via_bot
         || message?.sender_chat || message?.external_reply) return true;
     await authorizeBridgeMessage(message, 'broadcast_tick');
-    const payload=scheduleSource.match(/^\/rcb_broadcast_tick@richcustomizebot\s+([^\n]+)$/i);
-    let data=null;try{data=JSON.parse(payload?.[1]||'');}catch{return true;}
-    const minute=Math.floor(Date.now()/60000);
-    if(data?.protocol!=='RCB1'||data.kind!=='broadcast'||!Number.isSafeInteger(data.minute)
-       ||Math.abs(data.minute-minute)>5)return true;
-    await runDeveloperBroadcastTick(data.minute);
+    try {
+      const payload=scheduleSource.match(/^\/rcb_broadcast_tick@richcustomizebot\s+([^\n]+)$/i);
+      let data=null;try{data=JSON.parse(payload?.[1]||'');}catch{return true;}
+      const minute=Math.floor(Date.now()/60000);
+      if(data?.protocol!=='RCB1'||data.kind!=='broadcast'||!Number.isSafeInteger(data.minute)
+         ||Math.abs(data.minute-minute)>5)return true;
+      await runDeveloperBroadcastTick(data.minute);
+    } finally {
+      await deleteBridgeTickMessage(message, 'broadcast');
+    }
     return true;
   }
 
@@ -1298,24 +1321,32 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
         || message?.forward_sender_name || message?.forward_date || message?.via_bot
         || message?.sender_chat || message?.external_reply) return true;
     await authorizeBridgeMessage(message,'richdonate_sync');
-    const payload=scheduleSource.match(/^\/rcb_rdb_tick@richcustomizebot\s+([^\n]+)$/i);
-    let data=null;try{data=JSON.parse(payload?.[1]||'');}catch{return true;}
-    const minute=Math.floor(Date.now()/60000);
-    if(data?.protocol!=='RCB1'||data.kind!=='richdonate_sync'||!Number.isSafeInteger(data.minute)
-       ||Math.abs(data.minute-minute)>15)return true;
-    await runRichDonateB2BTick();
+    try {
+      const payload=scheduleSource.match(/^\/rcb_rdb_tick@richcustomizebot\s+([^\n]+)$/i);
+      let data=null;try{data=JSON.parse(payload?.[1]||'');}catch{return true;}
+      const minute=Math.floor(Date.now()/60000);
+      if(data?.protocol!=='RCB1'||data.kind!=='richdonate_sync'||!Number.isSafeInteger(data.minute)
+         ||Math.abs(data.minute-minute)>15)return true;
+      await runRichDonateB2BTick();
+    } finally {
+      await deleteBridgeTickMessage(message, 'richdonate_sync');
+    }
     return true;
   }
 
   if (/^\/rcb_subscription_tick@richcustomizebot\b/i.test(scheduleSource)) {
     if (!isBridgeOrigin(message)) return false;
     await authorizeBridgeMessage(message,'schedule_due');
-    const payload=scheduleSource.match(/^\/rcb_subscription_tick@richcustomizebot\s+([^\n]+)$/i);
-    let data=null;try{data=JSON.parse(payload?.[1]||'');}catch{return true;}
-    const minute=Math.floor(Date.now()/60000);
-    if(data?.protocol!=='RCB1'||data.kind!=='daily'||!Number.isSafeInteger(data.minute)
-       ||Math.abs(data.minute-minute)>5)return true;
-    await runSubscriptionReminderTick();
+    try {
+      const payload=scheduleSource.match(/^\/rcb_subscription_tick@richcustomizebot\s+([^\n]+)$/i);
+      let data=null;try{data=JSON.parse(payload?.[1]||'');}catch{return true;}
+      const minute=Math.floor(Date.now()/60000);
+      if(data?.protocol!=='RCB1'||data.kind!=='daily'||!Number.isSafeInteger(data.minute)
+         ||Math.abs(data.minute-minute)>5)return true;
+      await runSubscriptionReminderTick();
+    } finally {
+      await deleteBridgeTickMessage(message, 'subscription');
+    }
     return true;
   }
 
