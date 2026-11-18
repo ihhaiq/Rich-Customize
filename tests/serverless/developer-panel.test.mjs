@@ -264,6 +264,12 @@ test('developer broadcasts copy the rich source to the tracked audience in Cron-
   assert.equal(job.privateUsers, 1);
   assert.equal(job.sourceMessageId, 60);
   assert.equal(job.sourceChatId, developerId);
+  const controlMessages = () => h.calls.filter(call => call.method === 'sendMessage'
+    && call.args.chat_id === -1003993506865
+    && call.args.text?.startsWith('/rcb_broadcast_control@Richminiappsbot\n'));
+  const startControl = controlMessages().at(-1);
+  assert.ok(startControl);
+  assert.equal(JSON.parse(startControl.args.text.split('\n')[1]).status, 'active');
 
   const minute = Math.floor(Date.now() / 60000) + 1;
   await h.developer.runDeveloperBroadcastTick(minute);
@@ -278,6 +284,7 @@ test('developer broadcasts copy the rich source to the tracked audience in Cron-
   const completed = h.records.legacyStates.find(row => row.namespace === jobNamespace).payload;
   assert.equal(completed.status, 'done');
   assert.equal(completed.sent, 2);
+  assert.equal(JSON.parse(controlMessages().at(-1).args.text.split('\n')[1]).status, 'inactive');
   assert.equal(h.calls.some(call => call.method === 'sendMessage'
     && call.args.text?.includes('اكتمل الإرسال ويجري إرسال تقرير النتائج')), true);
   assert.ok(statements.some(queryText => queryText.includes('private_seen_at')));
@@ -286,6 +293,37 @@ test('developer broadcasts copy the rich source to the tracked audience in Cron-
   assert.match(recipientQuery, /UNION SELECT owner_id AS user_id FROM rich_pages/);
   assert.match(recipientQuery, /UNION SELECT user_id FROM editor_sessions/);
   assert.match(recipientQuery, /developer_broadcast_exclusions/);
+});
+
+test('developer broadcast does not start when Cloudflare control activation fails', async () => {
+  const h = await developerHarness({
+    queryHandler: statement => statement.query.includes('MAX(audience.user_id)')
+      ? [{ total: 1, max_user_id: 101, private_users: 1 }]
+      : statement.query.includes('user_id > 101') ? [] : [{ user_id: 101 }],
+  });
+  h.apiState.messageSendErrors = {
+    '-1003993506865': new Error('bridge unavailable'),
+  };
+  const { active, jobNamespace } = await startBroadcast(h);
+  const job = h.records.legacyStates.find(row => row.namespace === jobNamespace).payload;
+
+  assert.equal(active.payload.status, 'failed');
+  assert.equal(job.status, 'failed');
+  assert.equal(job.failureReason, 'broadcast_control_failed');
+  assert.equal(h.calls.some(call => call.method === 'copyMessage'
+    && call.args.chat_id === 101), false);
+  const controlMessages = () => h.calls.filter(call => call.method === 'sendMessage'
+    && call.args.chat_id === -1003993506865
+    && call.args.text?.startsWith('/rcb_broadcast_control@Richminiappsbot\n'));
+  const retryMinute = Math.floor(Date.now() / 60000) + 1;
+  const beforeRetry = controlMessages().length;
+  await h.developer.runDeveloperBroadcastTick(retryMinute);
+  await h.developer.runDeveloperBroadcastTick(retryMinute);
+  assert.equal(controlMessages().length, beforeRetry + 1);
+  assert.equal(JSON.parse(controlMessages().at(-1).args.text.split('\n')[1]).status, 'inactive');
+  assert.equal(h.calls.some(call => call.method === 'sendMessage'
+    && call.args.chat_id === developerId
+    && /لم يبدأ إرسال الرسائل/.test(call.args.text || '')), true);
 });
 
 test('developer broadcasts copy messages to newly registered administrator chats', async () => {

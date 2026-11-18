@@ -12,9 +12,11 @@ import {
   sendBridgeSyncAck,
   sendBridgeSyncFailure,
   sendBridgeFullSyncNotice,
+  deleteBridgeControlMessage,
 } from '../../../_lib/b2b-bridge.js';
 import { handleScheduleBridgeEvent, parseScheduleBridgeEvent } from '../../../_lib/scheduling-reminders.js';
 import { sendScheduleBridgeAck } from '../../../_lib/b2b-bridge.js';
+import { parseBroadcastControl, persistBroadcastControl } from '../../../_lib/broadcast-control.js';
 import {
   applyFullPageSnapshot,
   applyPageMirrorSync,
@@ -91,6 +93,31 @@ export async function onRequestPost(context) {
 
   const source = responseText(message);
   const parsed = fields(source);
+  if (/^\/rcb_broadcast_control@richminiappsbot\b/i.test(source)) {
+    if (
+      message.forward_origin || message.forward_from || message.forward_from_chat
+      || message.forward_sender_name || message.forward_date || message.via_bot
+      || message.sender_chat || message.external_reply
+    ) return json({ ok: true, ignored: 'forwarded_broadcast_control' });
+    const control = parseBroadcastControl(source);
+    if (!control) return json({ ok: true, ignored: 'invalid_broadcast_control' });
+    try {
+      const state = await persistBroadcastControl(db, control);
+      await deleteBridgeControlMessage(context.env, message)
+        .catch(error => console.warn('Broadcast control message cleanup failed', String(error?.message || error).slice(0, 120)));
+      return json({
+        ok: true,
+        broadcast_control: Number(state?.active) === control.active
+          && Number(state?.version) === control.version
+          ? 'applied'
+          : 'stale',
+      });
+    } catch (error) {
+      console.error('Broadcast control webhook error', String(error?.message || error).slice(0, 120));
+      return text('Broadcast control store unavailable', 503);
+    }
+  }
+
   // Main-bot-originated schedule events are trusted only after the pinned
   // sender and exact bridge chat checks above. No page contents enter D1.
   if (/^\/rcb_schedule_(register|cancel|result)@richminiappsbot\b/i.test(source)) {

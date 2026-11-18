@@ -1,3 +1,29 @@
+## 2026-11-18 — إيقاف إشارات البث بعد اكتمال الحملة
+
+- **السبب:** كان Worker يرسل `/rcb_broadcast_tick` كل دقيقة دون قراءة حالة
+  الإذاعة؛ حذف الرسالة بعد وصولها أخفى التراكم لكنه لم يوقف مصدر الإرسال.
+- **التغيير:** عند بدء الإذاعة/إنهائها يرسل Serverless انتقال الحالة عبر
+  مجموعة RCB1. يقبله Cloudflare فقط بعد تحقق Webhook Telegram والمجموعة
+  الدقيقة وهوية بوت المحرر المثبتة، ثم يحفظ في D1 بتاً للحالة ورقم ترتيب فقط؛
+  لا يُحفظ محتوى الرسالة أو الجمهور أو معرّف الحملة. Worker لا يرسل ticks
+  عند غياب الحالة أو كونها متوقفة. فشل التفعيل يمنع بدء الإرسال، وتُعاد
+  محاولة إشارة الإيقاف إذا وصل tick متبقٍ بعد الإنهاء.
+- **الملفات:** `tgcloud/lib/developer.js`,
+  `workers/schedule-reminders/worker.js`,
+  `functions/_lib/broadcast-control.js`, `functions/_lib/b2b-bridge.js`,
+  `functions/miniapp/api/bridge/webhook.js`, `cloudflare/d1/schema.sql`,
+  `cloudflare/d1/migrations/0003-broadcast-tick-control.sql`,
+  `tests/serverless/broadcast-control.test.mjs`,
+  `tests/serverless/developer-panel.test.mjs`,
+  `md_files/docs/scheduling.md`, `md_files/log.md`.
+- **التحقق:** نجحت الاختبارات المركزة للبث والتحكم والجسر (38/38)، وفحوص
+  `node --check` للملفات المعدلة و`git diff --check`. عدد وحدات Telegram
+  Serverless بقي 98؛ لا وحدة runtime جديدة.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو Migration أو نشر.
+  يتطلب الإتاحة تطبيق Migration `0003` ثم نشر Pages/Worker وServerless،
+  وتفعيل Bot-to-Bot Mode مع صلاحية حذف رسائل التحكم لبوت الريلاي. لم يُضف
+  سر مشترك؛ يعتمد المسار على تحقق Webhook وهوية RCB1 المثبتة.
+
 ## 2026-11-18 — استكمال إذاعة المطور وتنظيف رسائل الجسر
 
 - **السبب:** كانت إشارة البث الدورية تبقى في مجموعة الجسر، والإذاعة لم تشمل

@@ -12,6 +12,7 @@ const wrangler=readFileSync('workers/schedule-reminders/wrangler.toml','utf8');
 
 function fakeWorker(sent,stats) {
   const source=workerSource.replace(/^import\s+[^\n]+;?$/gm,'')
+    .replace('export async function broadcastTickEnabled','async function broadcastTickEnabled')
     .replace('export default {','return {');
   const build=new Function('dispatchDueReminders','reserveBridgeSlot','fetch',
     'console','Response',source);
@@ -34,7 +35,12 @@ function fakeWorker(sent,stats) {
 test('Cloudflare Cron: scheduled posts, RDB sync and daily subscription scan use separate ticks',async()=>{
   const sent=[],stats={minute:0,reserved:0};
   const worker=fakeWorker(sent,stats);
-  const env={DB:{},B2B_BOT_TOKEN:'test-only-token'};
+  const env={
+    DB:{
+      prepare(){return{async first(){return{active:1};}};},
+    },
+    B2B_BOT_TOKEN:'test-only-token',
+  };
   await worker.scheduled({cron:'* * * * *'},env,{});
   assert.equal(stats.minute,1);
   assert.equal(sent.length,2);
@@ -65,6 +71,23 @@ test('Cloudflare Cron: scheduled posts, RDB sync and daily subscription scan use
   assert.equal(body.kind,'daily');
   assert.equal(typeof body.minute,'number');
   await assert.rejects(worker.scheduled({cron:'0 3 * * *'},env,{}),/Unknown schedule trigger/);
+});
+
+test('Cloudflare Cron omits broadcast ticks unless D1 has an active campaign',async()=>{
+  const sent=[],stats={minute:0,reserved:0};
+  const worker=fakeWorker(sent,stats);
+  const env={
+    DB:{
+      prepare(){return{async first(){return null;}};},
+    },
+    B2B_BOT_TOKEN:'test-only-token',
+  };
+
+  await worker.scheduled({cron:'* * * * *'},env,{});
+
+  assert.equal(stats.minute,1);
+  assert.equal(sent.length,1);
+  assert.match(sent[0].text,/^\/rcb_schedule_due@RichCustomizebot/);
 });
 
 test('minute, ten-minute RDB and daily Cron expressions are deployed by wrangler',()=>{

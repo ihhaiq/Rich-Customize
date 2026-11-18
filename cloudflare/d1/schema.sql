@@ -46,3 +46,12 @@ CREATE TABLE IF NOT EXISTS schedule_reminders (
 );
 CREATE INDEX IF NOT EXISTS idx_schedule_reminders_due
   ON schedule_reminders(status, next_attempt_at, run_at);
+
+-- One bit of control metadata gates the broadcast Cron relay.
+-- Broadcast content and recipients remain in Telegram Serverless.
+CREATE TABLE IF NOT EXISTS broadcast_tick_control (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  active INTEGER NOT NULL CHECK (active IN (0, 1)),
+  version INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);

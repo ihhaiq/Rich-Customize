@@ -1,5 +1,6 @@
 // Rich editor, subscriber, broadcast content and recipient data stay in Telegram Serverless.
-// Per-minute triggers carry due-job reminders and an ID/time-only broadcast tick.
+// Per-minute triggers carry due-job reminders and an ID/time-only broadcast tick
+// only while Cloudflare D1 says a Serverless broadcast is active.
 // The daily trigger starts ONE subscription scan cycle; unfinished batches queue RCB1 jobs.
 import { dispatchDueReminders } from '../../functions/_lib/scheduling-reminders.js';
 import { reserveBridgeSlot } from '../../functions/_lib/b2b-bridge.js';
@@ -8,6 +9,13 @@ const BRIDGE_CHAT_ID = -1003993506865;
 const MINUTE_CRON = '* * * * *';
 const RICH_DONATE_SYNC_CRON = '*/10 * * * *';
 const SUBSCRIPTIONS_DAILY_CRON = '0 9 * * *'; // 09:00 UTC, once daily.
+
+export async function broadcastTickEnabled(db) {
+  const row = await db.prepare(
+    'SELECT active FROM broadcast_tick_control WHERE id = 1',
+  ).first();
+  return Number(row?.active) === 1;
+}
 
 export default {
   async scheduled(event, env, ctx) {
@@ -54,6 +62,7 @@ export default {
     if (event.cron === MINUTE_CRON) {
       const outcome = await dispatchDueReminders(env.DB, dispatch, Math.floor(Date.now() / 1000), 10);
       console.log('Schedule reminders', outcome.claimed, outcome.delivered);
+      if (!await broadcastTickEnabled(env.DB)) return;
       try {
         await dispatch('/rcb_broadcast_tick@RichCustomizebot\n' + JSON.stringify({
           protocol: 'RCB1',

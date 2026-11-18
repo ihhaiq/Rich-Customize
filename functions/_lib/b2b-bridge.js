@@ -551,6 +551,20 @@ export async function sendScheduleBridgeAck(env, label, jobId, revision) {
   });
 }
 
+export async function deleteBridgeControlMessage(env, message) {
+  const chatId = Number(message?.chat?.id);
+  const messageId = Number(message?.message_id);
+  if (
+    chatId !== bridgeChatId(env)
+    || !Number.isSafeInteger(messageId)
+    || messageId <= 0
+  ) return;
+  return telegramJson(env, 'deleteMessage', {
+    chat_id: chatId,
+    message_id: messageId,
+  });
+}
+
 export async function sendOneWayBridgeEvent(context, {
   action,
   userId,

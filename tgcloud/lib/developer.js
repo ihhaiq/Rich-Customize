@@ -40,6 +40,8 @@ const BROADCAST_RESULT_CHUNK_SIZE = 2500;
 const BROADCAST_REPORT_PAGE_SIZE = 10000;
 const BROADCAST_ACTIVE_NAMESPACE = 'developer_broadcast:v1:active';
 const BROADCAST_MEMBERSHIP_CHANNEL = '@RichCustomize';
+const BROADCAST_CONTROL_CHAT_ID = -1003993506865;
+const BROADCAST_CONTROL_RELAY_BOT = 'Richminiappsbot';
 const PANEL_HOME_TEXT = 'اختر القسم المطلوب. الاشتراكات وإهداء Golden في @richDonateBot.';
 
 const PANEL_HOME_ACTIONS = [
@@ -373,6 +375,23 @@ function broadcastJobNamespace(jobId) {
   return 'developer_broadcast:v1:job:' + String(jobId);
 }
 
+async function sendBroadcastControl(job, status, version = Date.now()) {
+  if (!['active', 'inactive'].includes(status)) {
+    throw new Error('BROADCAST_CONTROL_STATUS_INVALID');
+  }
+  await api.sendMessage({
+    chat_id: BROADCAST_CONTROL_CHAT_ID,
+    text: '/rcb_broadcast_control@' + BROADCAST_CONTROL_RELAY_BOT + '\n'
+      + JSON.stringify({
+        protocol: 'RCB1',
+        kind: 'broadcast_control',
+        status,
+        version,
+      }),
+    disable_notification: true,
+  });
+}
+
 function positiveSafeInteger(value) {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
@@ -481,7 +500,9 @@ function broadcastReport(job) {
             : 'توقفت بسبب خطأ ويجري إرسال التقرير')
           : 'اكتمل الإرسال ويجري إرسال تقرير النتائج'
       : job.status === 'failed'
-        ? 'توقفت بسبب خطأ في رسالة المصدر'
+        ? job.failureReason === 'broadcast_control_failed'
+          ? 'توقفت لتعذر تفعيل إشارة البث'
+          : 'توقفت بسبب خطأ في رسالة المصدر'
         : job.status === 'cancelled'
           ? 'أوقفت'
           : 'قيد الإرسال';
@@ -502,6 +523,8 @@ function broadcastReport(job) {
     + 'متبقٍ تقريباً: ' + progress.pending.toLocaleString()
     + (job.failureReason === 'membership_check_failed'
       ? '\nسبب التوقف: لم يعد ممكناً التحقق من عضوية @RichCustomize، لذلك أُوقف الإرسال الخاص لتجنب مراسلة المشتركين.'
+      : job.failureReason === 'broadcast_control_failed'
+        ? '\nسبب التوقف: تعذر تفعيل إشارة البث الدورية في Cloudflare.'
       : '')
     + (job.status === 'done' ? '' : '\nتُعالج الدفعات تلقائياً كل دقيقة؛ القبول لا يثبت قراءة الرسالة.');
 }
@@ -722,6 +745,11 @@ async function completeBroadcastReport(job, jobNamespace) {
       });
       job.completionNoticeSent = true;
     }
+    await sendBroadcastControl(
+      job,
+      'inactive',
+      Math.max(Date.now(), Number(job.broadcastControlVersion || 0) + 1),
+    );
     job.status = 'done';
     await saveBroadcast(jobNamespace, job);
     await saveBroadcast(BROADCAST_ACTIVE_NAMESPACE, {
@@ -822,11 +850,47 @@ function isInvalidBroadcastSource(error) {
       .test(String(error?.description || error?.message || ''));
 }
 
+async function retryBroadcastControlStop(jobId, tickMinute) {
+  const lock = await acquireLock('developer:broadcast');
+  if (!lock) return false;
+  try {
+    const active = await loadBroadcast(BROADCAST_ACTIVE_NAMESPACE);
+    if (active?.jobId !== jobId) return false;
+    const namespace = broadcastJobNamespace(jobId);
+    const job = await loadBroadcast(namespace);
+    if (!job || !['done', 'failed', 'cancelled'].includes(job.status)
+        || tickMinute <= Number(job.lastControlRetryMinute || 0)) return false;
+
+    job.lastControlRetryMinute = tickMinute;
+    await saveBroadcast(namespace, job);
+    try {
+      await sendBroadcastControl(
+        job,
+        'inactive',
+        Math.max(Date.now(), Number(job.broadcastControlVersion || 0) + 1),
+      );
+    } catch (error) {
+      await logBroadcastError('developer.broadcast.control', error, {
+        userId: job.actorId,
+        chatId: BROADCAST_CONTROL_CHAT_ID,
+        extra: 'job_id=' + String(job.jobId) + '; status=inactive',
+      });
+    }
+    return true;
+  } finally {
+    await releaseLock(lock);
+  }
+}
+
 export async function runDeveloperBroadcastTick(minute = Math.floor(Date.now() / 60000)) {
   const tickMinute = Number(minute);
   if (!Number.isSafeInteger(tickMinute) || tickMinute < 1) return false;
   const current = await activeBroadcast();
-  if (!current || !['running', 'report_pending'].includes(current.job.status)) return false;
+  if (!current) return false;
+  if (['done', 'failed', 'cancelled'].includes(current.job.status)) {
+    return retryBroadcastControlStop(current.job.jobId, tickMinute);
+  }
+  if (!['running', 'report_pending'].includes(current.job.status)) return false;
 
   const lock = await acquireLock('developer:broadcast');
   if (!lock) return false;
@@ -1987,6 +2051,7 @@ async function beginBroadcast(query, chatId) {
       lastTickMinute: 0,
       status: 'running',
       startedAt,
+      broadcastControlVersion: Date.now(),
     };
     await saveBroadcast(broadcastJobNamespace(jobId), job);
     await saveBroadcast(BROADCAST_ACTIVE_NAMESPACE, {
@@ -1994,6 +2059,49 @@ async function beginBroadcast(query, chatId) {
       actorId: Number(query.from.id),
       status: 'running',
     });
+    try {
+      await sendBroadcastControl(job, 'active', job.broadcastControlVersion);
+    } catch (error) {
+      await logBroadcastError('developer.broadcast.control', error, {
+        userId: Number(query.from.id),
+        chatId: BROADCAST_CONTROL_CHAT_ID,
+        extra: 'job_id=' + jobId + '; status=active',
+      });
+      job.status = 'failed';
+      job.finalStatus = 'failed';
+      job.failureReason = 'broadcast_control_failed';
+      job.completedAt = now();
+      await saveBroadcast(broadcastJobNamespace(jobId), job);
+      await saveBroadcast(BROADCAST_ACTIVE_NAMESPACE, {
+        jobId,
+        actorId: Number(query.from.id),
+        status: 'failed',
+      });
+      try {
+        await sendBroadcastControl(
+          job,
+          'inactive',
+          Math.max(Date.now(), job.broadcastControlVersion + 1),
+        );
+      } catch (stopError) {
+        await logBroadcastError('developer.broadcast.control', stopError, {
+          userId: Number(query.from.id),
+          chatId: BROADCAST_CONTROL_CHAT_ID,
+          extra: 'job_id=' + jobId + '; status=inactive',
+        });
+      }
+      await clearState(query.from.id);
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: 'تعذر تفعيل إشارة البث في Cloudflare؛ لم يبدأ الإرسال.',
+        show_alert: true,
+      });
+      await api.sendMessage({
+        chat_id: Number(query.from.id),
+        text: 'تعذر تفعيل إشارة البث في Cloudflare، لذلك لم يبدأ إرسال الرسائل. أُبلغت قناة الأخطاء.',
+      });
+      return;
+    }
     await clearState(query.from.id);
     await api.answerCallbackQuery({
       callback_query_id: query.id,
