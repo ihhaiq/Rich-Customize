@@ -1,6 +1,9 @@
 # تدقيق معالجات الأخطاء — Rich Customize
 
-التاريخ: 2026-10-10 — الفرع `serverless-cleanup`
+لقطة مراجعة: 2026-10-10 — الفرع `serverless-cleanup`
+
+> هذا تقرير مؤرخ عن مراجعة ذلك اليوم، وليس حالة الاختبارات أو GitHub Actions
+> الحالية. افحص الاختبارات وسجل `md_files/log.md` قبل اتخاذ قرار نشر.
 
 ## النطاق
 
@@ -28,7 +31,7 @@
 
 - ملفات الاختبارات: `operational-errors.test.mjs`، `pre-checkout-recovery.test.mjs`، `managed-bot-payment-recovery.test.mjs`، `http-error-safety.test.mjs`، `static-error-guards.test.mjs`، إضافة للاختبارات السابقة.
 - تحقق مستقل من 10 حالات تصنيف، و4 حالات PreCheckout بمحاكيات API، وحالتي إصدار الترخيص أول مرة واستكمال الدفعة السابقة، وفحوص صياغة للملفات المعالجة. **هذا ليس بديلاً عن `npm test` أو اختبار تليكرام الحي.**
-- GitHub Actions: سير العمل `A1 subscription quotas tests` ظاهر بحالة **failure** على الفرع؛ توجد إخفاقات في سجل تشغيل يعود إلى ما قبل هذه الجولة (مثلاً commit `1b83d3b79`). لم تتوفر ملفات سجل Jobs من واجهة GitHub الموصولة (`BlobNotFound`). يجب تحديد سبب الفشل وتشغيل المجموعة الكاملة قبل الإنتاج.
+- GitHub Actions: سجّل فحص 2026-10-10 أن سير العمل `A1 subscription quotas tests` كان **failure** في تشغيل سابق (مثل commit `1b83d3b79`)، ولم تتوفر ملفات Jobs حينها (`BlobNotFound`). هذه نتيجة تاريخية وليست دليلاً على حالة التشغيل الحالية؛ افحص نتيجة CI الأحدث.
 
 ## حدود الضمان ومتابعة العمل
 

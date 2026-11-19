@@ -75,7 +75,7 @@ import {
 import { resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import { getBrandingSettings, shouldIncludeBranding } from 'lib/branding';
-import { isEditorLimitFailure } from 'lib/operational-errors';
+import { isEditorLimitFailure, userOperationalError } from 'lib/operational-errors';
 import { requestEditorLimitConfirmation } from 'lib/editor-limit-confirmation';
 
 function languageCode(source) {
@@ -826,6 +826,9 @@ function isEmptyRichMessageError(error) {
 
 function friendlyRichError(error, code) {
   const reason = String(error?.description || error?.message || error);
+  if (/no reusable (?:file_id|media)|wrong file identifier|file_id.*missing/i.test(reason)) {
+    return userOperationalError(error, resolveLanguage(code));
+  }
   if (reason.startsWith('EDITOR_LIMIT:')) {
     const parts = reason.split(':');
     if (parts.length === 4) {
@@ -850,6 +853,29 @@ function friendlyRichError(error, code) {
     return t(resolveLanguage(code), 'ux.errors.too_long');
   }
   return t(resolveLanguage(code), 'preview_failed');
+}
+
+async function editBlockManagementPanel(chatId, messageId, block, blocks, code, userId) {
+  if (!chatId || !messageId) return false;
+  const keyboard = buildBlockEditorKeyboard(block, blocks, code);
+  try {
+    await editMessage(
+      chatId,
+      messageId,
+      blockEditorRichMessage(block, blocks, code, userId),
+      keyboard,
+    );
+  } catch (error) {
+    const reason = String(error?.description || error?.message || error);
+    if (!/BOT_DOMAIN_INVALID/i.test(reason)) throw error;
+    await editMessage(
+      chatId,
+      messageId,
+      blockPage(block, blocks, code) + '\n\n' + friendlyRichError(error, code),
+      keyboard,
+    );
+  }
+  return true;
 }
 
 async function previewBlock(query, session, block) {
@@ -1285,7 +1311,7 @@ export async function handleEditorBlockCallback(query) {
     await updateEditorSession(query.from.id, {
       currentBlockId: id,
     });
-    await editMessage(chatId, messageId, blockEditorRichMessage(block, session.blocks, code, session.userId), buildBlockEditorKeyboard(block, session.blocks, code));
+    await editBlockManagementPanel(chatId, messageId, block, session.blocks, code, session.userId);
     await api.answerCallbackQuery({ callback_query_id: query.id });
     return true;
   }
@@ -1359,12 +1385,7 @@ export async function handleEditorBlockCallback(query) {
       currentBlockId: duplicate.id,
     });
     const current = getBlockById(updated.blocks, duplicate.id);
-    await editMessage(
-      chatId,
-      messageId,
-      blockEditorRichMessage(current, updated.blocks, code, session.userId),
-      buildBlockEditorKeyboard(current, updated.blocks, code),
-    );
+    await editBlockManagementPanel(chatId, messageId, current, updated.blocks, code, session.userId);
     await api.answerCallbackQuery({
       callback_query_id: query.id,
       text: copy.duplicated,
@@ -1580,12 +1601,7 @@ export async function handleEditorBlockCallback(query) {
       await rememberEditorState(query.from.id, lockedSession);
       const updated = await updateEditorSession(query.from.id, { blocks });
       const anchor = getBlockById(updated.blocks, anchorId);
-      await editMessage(
-        chatId,
-        messageId,
-        blockEditorRichMessage(anchor, updated.blocks, code, session.userId),
-        buildBlockEditorKeyboard(anchor, updated.blocks, code),
-      );
+      await editBlockManagementPanel(chatId, messageId, anchor, updated.blocks, code, session.userId);
       await api.answerCallbackQuery({
         callback_query_id: query.id,
         text: t(resolveLanguage(code), 'anchor.target_changed'),
@@ -1701,18 +1717,16 @@ export async function handleEditorBlockCallback(query) {
       await rememberEditorState(query.from.id, lockedSession);
       const updated = await updateEditorSession(query.from.id, { blocks });
       const moved = getBlockById(updated.blocks, id);
-      const richMessage = blockEditorRichMessage(moved, updated.blocks, code, session.userId);
-      const replyMarkup = buildBlockEditorKeyboard(moved, updated.blocks, code);
       try {
-        await editMessage(chatId, messageId, richMessage, replyMarkup);
+        await editBlockManagementPanel(chatId, messageId, moved, updated.blocks, code, session.userId);
       } catch (error) {
         if (!isMissingMessageTarget(error)) throw error;
         await replaceMissingManagementMessage(
           query.from.id,
           updated,
           chatId,
-          richMessage,
-          replyMarkup,
+          blockEditorRichMessage(moved, updated.blocks, code, session.userId),
+          buildBlockEditorKeyboard(moved, updated.blocks, code),
         );
       }
       await api.answerCallbackQuery({ callback_query_id: query.id, text: p.moved });
@@ -1889,10 +1903,13 @@ export async function handleEditorBlockMessage(message) {
   const latest = await loadEditorSession(userId, { touch: false });
   const current = getBlockById(latest.blocks, block.id);
   if (current) {
-    await editManagement(
-      latest,
-      blockEditorRichMessage(current, latest.blocks, code, session.userId),
-      buildBlockEditorKeyboard(current, latest.blocks, code),
+    await editBlockManagementPanel(
+      latest.managementChatId || latest.chatId,
+      latest.managementMessageId,
+      current,
+      latest.blocks,
+      code,
+      session.userId,
     );
   }
   return true;

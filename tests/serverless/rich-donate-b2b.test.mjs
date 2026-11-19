@@ -15,7 +15,7 @@ function helloAck() {
   return {
     from: { id: BOT_ID, is_bot: true, username: 'RichDonateBot' },
     chat: { id: BRIDGE_CHAT_ID, type: 'supergroup' },
-    text: `/rdb_hello_ack_v1@RichCustomizebot ${BOT_ID} v1`,
+    text: `/rdb_hello_ack_v1@RichCustomizebot ${BOT_ID} v1 #مزامنة_ريتش_دونيت`,
   };
 }
 
@@ -103,18 +103,32 @@ test('only the pinned-group bot hello acknowledgment can pin Rich Donate identit
   assert.equal(h.records.richDonateBridge[0].botId, BOT_ID);
 });
 
+test('legacy untagged HELLO ACK still pins the donation bot identity', async () => {
+  const h = await setup();
+  const now = 2_000_000_000;
+  await h.b2b.handleRichDonateB2BMessage({
+    ...helloAck(),
+    text: `/rdb_hello_ack_v1@RichCustomizebot ${BOT_ID} v1`,
+  }, { now });
+  assert.deepEqual(h.records.richDonateBridge, [{
+    key: 'richdonate-b2b-v1',
+    botId: BOT_ID,
+    pinnedAt: now,
+  }]);
+});
+
 test('periodic trigger sends hello until pinned, then sync, never READY', async () => {
   const h = await setup();
   await h.b2b.runRichDonateB2BTick();
   assert.deepEqual(h.calls.at(-1).args, {
     chat_id: BRIDGE_CHAT_ID,
-    text: '/rdb_hello_v1@RichDonateBot',
+    text: '/rdb_hello_v1@RichDonateBot #مزامنة_ريتش_دونيت',
     disable_notification: true,
   });
 
   await pin(h, 2_000_000_000);
   await h.b2b.runRichDonateB2BTick();
-  assert.equal(h.calls.at(-1).args.text, '/rdb_sync_v1@RichDonateBot');
+  assert.equal(h.calls.at(-1).args.text, '/rdb_sync_v1@RichDonateBot #مزامنة_ريتش_دونيت');
   assert.ok(h.calls.some(call => call.method === 'deleteMessage'
     && call.args.message_id === 100));
   assert.equal(h.calls.some(call => /rdb_ready_v1/i.test(call.args.text || '')), false);
@@ -150,7 +164,10 @@ test('only an authenticated RCB1 relay tick can start the group-based RDB exchan
   }), error => error?.code === 'UNAUTHORIZED_BOT');
   assert.equal(h.calls.length, 0);
   assert.equal(await h.bridge.handleMiniAppBridgeMessage(message), true);
-  assert.equal(h.calls.find(call => call.method === 'sendMessage').args.text, '/rdb_hello_v1@RichDonateBot');
+  assert.equal(
+    h.calls.find(call => call.method === 'sendMessage').args.text,
+    '/rdb_hello_v1@RichDonateBot #مزامنة_ريتش_دونيت',
+  );
   assert.ok(h.calls.some(call => call.method === 'deleteMessage'
     && call.args.message_id === message.message_id));
 });
@@ -223,7 +240,7 @@ test('verified purchases are durable, idempotent and reflected in /sup', async (
   const first = event({ paidAt: plusPaidAt });
   assert.equal(await h.b2b.handleRichDonateB2BMessage(eventMessage(first), { now }), true);
   assert.equal(h.records.editorEntitlementEvents.length, 1);
-  assert.equal(h.calls.at(-1).args.text, `/rdb_ack_v1@RichDonateBot ${first.event_id} applied`);
+  assert.equal(h.calls.at(-1).args.text, `/rdb_ack_v1@RichDonateBot ${first.event_id} applied #مزامنة_ريتش_دونيت`);
 
   const second = event({
     orderId: ORDER_B,
@@ -234,7 +251,7 @@ test('verified purchases are durable, idempotent and reflected in /sup', async (
   await h.b2b.handleRichDonateB2BMessage(eventMessage(second), { now });
   await h.b2b.handleRichDonateB2BMessage(eventMessage(second), { now });
   assert.equal(h.records.editorEntitlementEvents.length, 2);
-  assert.equal(h.calls.at(-1).args.text, `/rdb_ack_v1@RichDonateBot ${second.event_id} duplicate`);
+  assert.equal(h.calls.at(-1).args.text, `/rdb_ack_v1@RichDonateBot ${second.event_id} duplicate #مزامنة_ريتش_دونيت`);
 
   const state = await h.status.subscriptionSnapshot(USER_ID, now);
   assert.equal(state.plan, 'golden');
@@ -297,7 +314,7 @@ test('a reused Telegram charge cannot create a second paid order', async () => {
     /RDB_PURCHASE_IDENTITY_CONFLICT/,
   );
   assert.equal(h.records.editorEntitlementEvents.length, 1);
-  assert.equal(h.calls.at(-1).args.text, `/rdb_ack_v1@RichDonateBot ${first.event_id} applied`);
+  assert.equal(h.calls.at(-1).args.text, `/rdb_ack_v1@RichDonateBot ${first.event_id} applied #مزامنة_ريتش_دونيت`);
 });
 
 test('rejects invalid event identity, pricing, fields and non-pinned senders without ACK', async () => {
@@ -358,7 +375,7 @@ test('refund tombstones take precedence over delayed purchase events', async () 
   assert.equal(state.active, false);
   assert.equal(await h.b2b.hasPermanentRichDonateBranding(USER_ID), false);
   assert.equal(h.records.editorEntitlementEvents.length, 2);
-  assert.equal(h.calls.at(-1).args.text, `/rdb_ack_v1@RichDonateBot ${purchase.event_id} applied`);
+  assert.equal(h.calls.at(-1).args.text, `/rdb_ack_v1@RichDonateBot ${purchase.event_id} applied #مزامنة_ريتش_دونيت`);
 });
 
 test('refund removes only the refunded purchase while preserving earlier paid time', async () => {

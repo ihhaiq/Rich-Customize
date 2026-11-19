@@ -18,6 +18,7 @@ export const RICH_DONATE_BRANDING_PRICE = 99;
 const PLAN_PRICES = Object.freeze({ free: 0, plus: 150, golden: 350 });
 const MINIAPP_BRIDGE_CHAT_ID = -1003993506865;
 const EDITOR_BOT_USERNAME = 'richcustomizebot';
+const RICH_DONATE_SYNC_TAG = '#مزامنة_ريتش_دونيت';
 const EVENT_FIELDS = Object.freeze([
   'protocol',
   'event_id',
@@ -219,7 +220,7 @@ async function persistRichDonateEvent(event, now) {
 
 async function pinDonationBot(message, now) {
   const match = String(message?.text || '').trim()
-    .match(/^\/rdb_hello_ack_v1@richcustomizebot\s+(\d{1,20})\s+v1$/i);
+    .match(/^\/rdb_hello_ack_v1@richcustomizebot\s+(\d{1,20})\s+v1(?:\s+#مزامنة_ريتش_دونيت)?$/i);
   const senderId = Number(message?.from?.id);
   if (!match || !Number.isSafeInteger(senderId) || senderId <= 0
       || Number(match[1]) !== senderId) return;
@@ -262,8 +263,8 @@ export async function runRichDonateB2BTick() {
   const sent = await api.sendMessage({
     chat_id: MINIAPP_BRIDGE_CHAT_ID,
     text: pinned
-      ? '/rdb_sync_v1@RichDonateBot'
-      : '/rdb_hello_v1@RichDonateBot',
+      ? '/rdb_sync_v1@RichDonateBot ' + RICH_DONATE_SYNC_TAG
+      : '/rdb_hello_v1@RichDonateBot ' + RICH_DONATE_SYNC_TAG,
     disable_notification: true,
   });
   const messageId = Number(sent?.message_id);
@@ -308,7 +309,7 @@ export async function handleRichDonateB2BMessage(message, { now = nowSeconds() }
   const status = await persistRichDonateEvent(event, now);
   await api.sendMessage({
     chat_id: message.chat.id,
-    text: `/rdb_ack_v1@RichDonateBot ${event.eventId} ${status}`,
+    text: `/rdb_ack_v1@RichDonateBot ${event.eventId} ${status} ${RICH_DONATE_SYNC_TAG}`,
     disable_notification: true,
   });
   return true;

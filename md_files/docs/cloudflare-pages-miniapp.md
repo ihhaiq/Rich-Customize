@@ -2,7 +2,8 @@
 
 The current architecture keeps persistent bot/application state in Telegram Serverless.
 
-Cloudflare is responsible only for:
+For the legacy Cloudflare-origin Mini App and the remaining cross-origin
+services, Cloudflare is responsible for:
 
 - hosting the Mini App frontend;
 - validating Telegram Mini App `initData`;
@@ -10,6 +11,10 @@ Cloudflare is responsible only for:
 - receiving the relay-bot webhook;
 - forwarding Mini App media uploads to Telegram to obtain reusable `file_id` values;
 - storing short-lived B2B correlation/identity metadata.
+- media upload and preview, performance telemetry, and first-time import of
+  legacy custom-emoji pack names when requested by the Serverless-hosted app.
+- the separate scheduled-reminder Worker and its D1 metadata; this Worker is
+  not the Mini App frontend.
 
 Telegram Serverless remains authoritative for pages and managed chats. Serverless Mini App page CRUD reads and writes `rich_pages` directly; it no longer sends saved-page documents or mirror updates to Cloudflare. D1 may still contain older owner-specific page mirrors used by legacy Cloudflare quota checks, but Serverless no longer refreshes them.
 

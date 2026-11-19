@@ -37,10 +37,15 @@ Cloudflare Pages Functions live in:
 
 - `functions/`
 
-Cloudflare is limited to:
+When the Mini App is served from the Telegram Serverless origin, saved-page
+reads and mutations use the authenticated Serverless `miniapp` endpoint
+directly. Cloudflare remains responsible for its own Mini App routes, relay,
+webhook and media-upload flows; it is not the authoritative saved-page store.
+
+Cloudflare is responsible for:
 
 - hosting the Mini App
-- validating Telegram `initData`
+- validating Telegram `initData` for Cloudflare-origin routes
 - relaying B2B requests through `@Richminiappsbot`
 - receiving the relay webhook
 - forwarding Mini App media uploads to Telegram
@@ -216,6 +221,12 @@ Obsolete Python/Aiogram files under `app/**/*.py` were removed in the cleanup pa
 
 ## Documentation and tests
 
-Start with [docs/README.md](docs/README.md), [ROADMAP.md](md_files/ROADMAP.md) and [sups.md](md_files/sups.md). Changes go in [log.md](md_files/log.md).
-Active tests are [tests/serverless/](tests/serverless/) and run with `npm test`. The 58 Python-era tests are preserved as `.py.txt` in `docs/archive/python-tests/`; they are historical references, not runnable tests for this branch.
+Start with the Arabic [project map](md_files/PROJECT-MAP.md), then use
+[docs/README.md](docs/README.md) to find the focused guides. Product plans
+such as [ROADMAP.md](md_files/ROADMAP.md) and [sups.md](md_files/sups.md)
+are not proof of implementation. Changes go in [log.md](md_files/log.md).
+The active JavaScript tests are in [tests/serverless/](tests/serverless/)
+and run with `npm test`. The 58 Python-era tests are preserved as `.py.txt`
+in [docs/archive/python-tests/](docs/archive/python-tests/); they are
+historical references, not runnable tests for this branch.
 The payment bot is maintained in [ihhaiq/richDonate](https://github.com/ihhaiq/richDonate). The former `subscription-bot/` scaffold is archived. For any subscription, purchase or billing feature, explicitly report whether Rich Donate needs a coordinated change; see the [subscription rollout](md_files/docs/subscription-rollout.md).

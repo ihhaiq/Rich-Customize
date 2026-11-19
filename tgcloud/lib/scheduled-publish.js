@@ -52,7 +52,7 @@ async function relay(action, jobId, revision, extras={}){
     chat_id:CHAT_ID,
     disable_notification:true,
     text:'/rcb_schedule_'+action+'@'+B2B+'\n'+JSON.stringify({
-      protocol:'RCB1',request_id:'sch_'+action+'_'+jobId+'_'+revision,
+      protocol:'RCB1',tag:'#جدولة',request_id:'sch_'+action+'_'+jobId+'_'+revision,
       job_id:jobId,revision,...extras,
     }),
   });

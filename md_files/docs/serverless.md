@@ -6,7 +6,10 @@ Primary reference: https://core.telegram.org/bots/serverless
 
 - Isolated V8 runtime.
 - Built-in persistent SQLite-backed database.
-- `tgcloud/schema.js`, `tgcloud/lib/**/*.js`, `tgcloud/endpoints/*.js`, and one-level `tgcloud/handlers/*.js` are deployed. A configured Mini App static build can be hosted with the bot. Run CLI from the repository root.
+- The deployable source set is `tgcloud/schema.js`, `tgcloud/lib/**/*.js`,
+  `tgcloud/endpoints/*.js`, and one-level `tgcloud/handlers/*.js`. A
+  configured Mini App static build can be hosted with the bot. Run CLI from
+  the repository root; the current live deployment is not inferred here.
 - Prefer project-relative imports ending in `.js`; existing module-name imports (`schema`, `lib/...`) are still present. SDK imports use `sdk` and `sdk/db`.
 - The Serverless SDK supplies `api`, `db`, `fetch`, `InputFile`, `BotApiError`, and `EndpointError`.
 - `api.getFileContent(file_id)` returns a `Uint8Array`; Bot API downloads are capped at 20 MB.
@@ -48,7 +51,21 @@ The old backup format `rich-customize-json-backup-v1` remains supported so Railw
 
 ## Mini App B2B bridge
 
-The existing Mini App launch link still uses Cloudflare Pages/Functions. A Serverless static build is published at `https://app8416656269.tgcloud.ai/` (revision 136; 70 static files), with direct endpoints for editor identity, pages, destinations, publishing, native user-picker, and custom-emoji pack/import/preview operations. The BotFather launch link has not been changed and the app has not yet been accepted in a Telegram WebView. Media, performance telemetry, subscriptions, and first-time legacy emoji-pack import still use Cloudflare. If that first import fails, only a trusted configured developer may add packs while migration remains pending; later import merges old names without dropping those new packs. D1 keeps bridge/support metadata and legacy emoji-pack data; records are not deleted during import. Serverless page CRUD no longer sends saved pages to Cloudflare; old owner-specific D1 mirrors remain untouched and may be stale. The legacy `full_sync` bridge action is disabled. See the [migration plan](./miniapp-serverless-migration.md) for the approved boundary and outstanding gates.
+The repository configures a Serverless static build and direct Mini App
+endpoints. A prior deployment note records revision 136 with 70 static files;
+the live revision and BotFather launch URL are not verified here. Direct
+endpoints cover editor identity, pages, destinations, publishing, native
+user-picker, and custom-emoji pack/import/preview operations. Media,
+performance telemetry, and first-time legacy emoji-pack import still use
+Cloudflare; the Cloudflare-origin `/me` does not provide trusted paid-plan
+data. If the first import fails, only a trusted configured developer may add
+packs while migration remains pending; later import merges old names without
+dropping those new packs. D1 keeps bridge/support metadata and legacy emoji
+pack data; records are not deleted during import. Serverless page CRUD no
+longer sends saved pages to Cloudflare; old owner-specific D1 mirrors remain
+untouched and may be stale. The legacy `full_sync` bridge action is disabled.
+See the [migration plan](./miniapp-serverless-migration.md) for the boundary
+and outstanding acceptance gates.
 
 Serverless bridge commands are accepted only from `@Richminiappsbot` in private bridge chat `-1003993506865`, addressed to `@RichCustomizebot` with protocol `RCB1`. Numeric relay identity is paired only by the initial PING.
 

@@ -73,7 +73,13 @@ Arabic copy uses the owner's wording, including «تليكرام».
 
 Do NOT claim these new numbers are enforced merely because they appear in docs/donation UI.
 Editor runtime still has older caps; [rollout](md_files/docs/subscription-rollout.md) tracks remaining work.
-`editor-subscriptions.js` accepts active unexpired records from `richdonate:verified`; complete trusted payment event issuance/ACK remains pending.
+`editor-subscriptions.js` receives, validates and persists RDB purchase/refund
+events from Rich Donate, and acknowledges accepted or duplicate events. The
+event ledger and gift-entitlement path exist in this repository; a live
+Bot-to-Bot handshake, Telegram Stars acceptance, and production entitlement
+activation/renewal/refund remain unverified. Do not describe those live flows
+as complete based on local code or tests alone; see the [rollout](md_files/docs/subscription-rollout.md).
+Legacy trusted records from `richdonate:verified` remain readable.
 For every subscription, payment, purchase, branding, renewal, refund, gift, receipt, reminder, or billing-contract change, inspect the current local integration and [rollout](md_files/docs/subscription-rollout.md), then explicitly tell the owner whether `ihhaiq/richDonate` also needs a change. If it does, list the required behavior/contract and verification still needed; if it does not, say so. Do not claim a change in that separate repository is implemented or verified without evidence, and do not edit it unless the owner explicitly asks.
 Saved templates and saved page history remain cancelled. The owner approved fixed tutorial starter examples on 2026-10-13; these are a separate onboarding scope documented in [md_files/tutorial.md](md_files/tutorial.md), not a subscription feature or template-management system. Scheduled publishing is deployed and the owner confirmed using it on 2026-10-25. `tgcloud/lib/scheduled-publish.js` stores message snapshots and consumes verified RCB1 reminders; `workers/schedule-reminders/` is the separate Cloudflare Cron Worker. Cloudflare holds IDs/times only. `/scheduled` supports listing and canceling pending jobs; rescheduling an existing job is not implemented. Date entry uses Baghdad `MM-DD hh:mm AM/PM`; Free is limited to four days and active Plus/Golden to two calendar months. See `md_files/docs/scheduling.md` for architecture, known reliability gaps and tests. Free allows 2 destinations per scheduled post; Plus=5 and Golden=15 remain provisional.
 Operational `page_snapshots`, revision CAS and session undo/redo remain required.

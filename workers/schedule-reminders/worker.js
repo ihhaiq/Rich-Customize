@@ -43,6 +43,7 @@ export default {
       await dispatch('/rcb_subscription_tick@RichCustomizebot\n' + JSON.stringify({
         protocol: 'RCB1',
         kind: 'daily',
+        tag: '#اشتراكات',
         minute: Math.floor(Date.now() / 60000),
       }));
       console.log('Daily subscription reminder scan requested');
@@ -53,6 +54,7 @@ export default {
       await dispatch('/rcb_rdb_tick@RichCustomizebot\n' + JSON.stringify({
         protocol: 'RCB1',
         kind: 'richdonate_sync',
+        tag: '#مزامنة_ريتش_دونيت',
         minute: Math.floor(Date.now() / 60000),
       }));
       console.log('Rich Donate B2B sync requested');
@@ -67,6 +69,7 @@ export default {
         await dispatch('/rcb_broadcast_tick@RichCustomizebot\n' + JSON.stringify({
           protocol: 'RCB1',
           kind: 'broadcast',
+          tag: '#بث',
           minute: Math.floor(Date.now() / 60000),
         }));
       } catch (error) {

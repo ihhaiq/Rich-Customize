@@ -269,7 +269,9 @@ test('developer broadcasts copy the rich source to the tracked audience in Cron-
     && call.args.text?.startsWith('/rcb_broadcast_control@Richminiappsbot\n'));
   const startControl = controlMessages().at(-1);
   assert.ok(startControl);
-  assert.equal(JSON.parse(startControl.args.text.split('\n')[1]).status, 'active');
+  const startPayload = JSON.parse(startControl.args.text.split('\n')[1]);
+  assert.equal(startPayload.status, 'active');
+  assert.equal(startPayload.tag, '#بث');
 
   const minute = Math.floor(Date.now() / 60000) + 1;
   await h.developer.runDeveloperBroadcastTick(minute);
@@ -284,7 +286,9 @@ test('developer broadcasts copy the rich source to the tracked audience in Cron-
   const completed = h.records.legacyStates.find(row => row.namespace === jobNamespace).payload;
   assert.equal(completed.status, 'done');
   assert.equal(completed.sent, 2);
-  assert.equal(JSON.parse(controlMessages().at(-1).args.text.split('\n')[1]).status, 'inactive');
+  const stopPayload = JSON.parse(controlMessages().at(-1).args.text.split('\n')[1]);
+  assert.equal(stopPayload.status, 'inactive');
+  assert.equal(stopPayload.tag, '#بث');
   assert.equal(h.calls.some(call => call.method === 'sendMessage'
     && call.args.text?.includes('اكتمل الإرسال ويجري إرسال تقرير النتائج')), true);
   assert.ok(statements.some(queryText => queryText.includes('private_seen_at')));
@@ -320,7 +324,9 @@ test('developer broadcast does not start when Cloudflare control activation fail
   await h.developer.runDeveloperBroadcastTick(retryMinute);
   await h.developer.runDeveloperBroadcastTick(retryMinute);
   assert.equal(controlMessages().length, beforeRetry + 1);
-  assert.equal(JSON.parse(controlMessages().at(-1).args.text.split('\n')[1]).status, 'inactive');
+  const stopPayload = JSON.parse(controlMessages().at(-1).args.text.split('\n')[1]);
+  assert.equal(stopPayload.status, 'inactive');
+  assert.equal(stopPayload.tag, '#بث');
   assert.equal(h.calls.some(call => call.method === 'sendMessage'
     && call.args.chat_id === developerId
     && /لم يبدأ إرسال الرسائل/.test(call.args.text || '')), true);

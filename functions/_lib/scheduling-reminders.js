@@ -58,7 +58,8 @@ export function scheduleDueCommand(jobId, revision, attempt) {
     throw new Error('Invalid reminder identity');
   }
   return '/rcb_schedule_due@RichCustomizebot\n' + JSON.stringify({
-    protocol: PROTOCOL, request_id: 'rem_' + jobId + '_' + revision + '_' + attempt,
+    protocol: PROTOCOL, tag: '#جدولة',
+    request_id: 'rem_' + jobId + '_' + revision + '_' + attempt,
     job_id: jobId, revision,
   });
 }

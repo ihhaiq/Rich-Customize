@@ -551,6 +551,43 @@ test('old direct user-ID buttons remain editable without sending the invalid tar
   assert.ok(edit.args.reply_markup.inline_keyboard.length > 0);
 });
 
+test('a rejected login URL domain falls back to an actionable text editor panel', async () => {
+  const h = await harness({ extraModules: { editorBlocks: 'lib/editor-block-flow' } });
+  const userId = 82;
+  const chatId = 82;
+  const block = h.blocks.makeBlock('buttons', {
+    buttons: [{
+      id:'login-button',
+      text:'Sign in',
+      type:'login_url',
+      value:'https://example.com/login',
+      url:'https://example.com/login',
+      style:'default',
+      position:0,
+    }],
+  });
+  await h.session.createEditorSession(userId, chatId, 941);
+  await h.session.updateEditorSession(userId, { blocks:[block] });
+  h.apiState.editErrors = [new Error('BotApiError [400]: Bad Request: BOT_DOMAIN_INVALID')];
+
+  await h.editorBlocks.handleEditorBlockCallback({
+    id:'open-invalid-login-button',
+    from:{ id:userId, language_code:'en' },
+    message:{ chat:{ id:chatId, type:'private' }, message_id:941 },
+    data:'r:b:' + block.id,
+  });
+
+  const edits = h.calls.filter(call => call.method === 'editMessageText');
+  assert.equal(edits.length, 2);
+  assert.ok(edits[0].args.rich_message);
+  assert.equal(edits[1].args.rich_message, undefined);
+  assert.match(edits[1].args.text, /domain is not connected.*\/setdomain/i);
+  assert.ok(edits[1].args.reply_markup.inline_keyboard.flat().some(button =>
+    button.callback_data === 'r:e:' + block.id));
+  const session = await h.session.loadEditorSession(userId, { touch:false });
+  assert.equal(session.currentBlockId, block.id);
+});
+
 test('media choice preserves each incoming Telegram media type', async () => {
   const h = await harness({ extraModules: { editorBlocks: 'lib/editor-block-flow' } });
   const cases = [

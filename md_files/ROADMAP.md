@@ -1,18 +1,28 @@
-# Rich Customize — roadmap
+# Rich Customize — خارطة الطريق
 
-Updated 2026-10-25. Work on `serverless-cleanup`; payment bot work uses `ihhaiq/richDonate/main`.
+> مراجعة مستودع الكود: 2026-11-19، الفرع `serverless-cleanup`.
+> هذا الملخص يفرّق بين تنفيذ موجود في المصدر، وبند يحتاج تحققاً حياً، وفكرة
+> لا يوجد لها تنفيذ معروف في هذا المستودع. لا يثبت وجود الكود نشره للإنتاج.
 
-| Work | Current reference | Next step |
+| المجال | ما هو موجود في المستودع | المتبقي المؤكد |
 | --- | --- | --- |
-| Subscription quotas | [sups.md](sups.md), [rollout](docs/subscription-rollout.md) | Reconcile remaining runtime/Mini App paths with approved table |
-| Entitlements and billing | [donation contract](https://github.com/ihhaiq/richDonate/blob/main/docs/editor-b2b-contract.md) | Complete and live-test trusted event application/ACK |
-| Save reliability | `tgcloud/lib/page-names.js`, `editor-session.js` | Real concurrency and stale-session tests |
-| Inline / guest delivery | `tgcloud/lib/page-delivery.js` | Verify exact name and code delivery in Telegram |
-| Scheduled publishing | [scheduling](docs/scheduling.md) | Feature is active and owner-confirmed in use; close ACK recovery and load-test gaps |
-| Mini App | [Cloudflare guide](docs/cloudflare-pages-miniapp.md) | Confirm Git deployment and real WebView behavior |
-| Search | [search-engine.md](search-engine.md) | Design only; separate implementation scope |
-| Marketing | [Referral.md](Referral.md) | Separate plan; verify actual current behavior |
+| حصص الاشتراك | سياسة الباقات وكتالوج Mini App المولّد وفحوص Serverless موجودة. | بعض مسارات المحرر لا تزال تحتاج مطابقة حدودها مع السياسة واختبارات حدود شاملة؛ الأرقام المعتمدة ليست دليلاً على إنفاذها في كل مسار. [الحالة](docs/subscription-rollout.md) |
+| الدفع والاستحقاقات | مستقبل RDB، سجل أحداث الشراء/الاسترداد، مسار الهدايا، وأهلية الحقوق موجودة في الكود. | المصافحة الحية وقبول Telegram Stars وتفعيل دورة الشراء/الاسترداد في الإنتاج غير مثبتة. [الحالة](docs/subscription-rollout.md) |
+| Mini App | الأصول وendpoint Serverless المباشر لعمليات الصفحات والوجهات والنشر والمنتقي والإيموجي موجودة. | ما زالت مسارات Cloudflare للوسائط والقياس وبعض عمليات الترحيل قائمة؛ إعداد رابط الإطلاق وقبول WebView الفعلي غير مثبتين هنا. [النواقص](docs/miniapp-serverless-cloudflare-dependencies.md) |
+| الجدولة | الجدولة الفعلية موجودة ومستخدمة بحسب تأكيد المالك؛ D1 يحمل بيانات التذكير لا محتوى المنشور. | إعادة الجدولة غير موجودة؛ استعادة ACK والحمل والتعافي تحتاج تحققاً تشغيلياً. [التفاصيل](docs/scheduling.md) |
+| تعديل/استيراد منشورات القنوات | مسارا التعديل والاستيراد موجودان في المحرر والـMini App ولهما اختبارات. | اختبار Telegram حي بعد النشر؛ لا يستطيع Bot API إثبات أن المنشور الأصلي لم يتغير منذ استيراده. [التفاصيل](docs/channel-post-edit-import-plan.md) |
+| المواضيع الافتراضية للمجموعات | `/default` وتوجيه النشر المشترك بين النشر اليدوي والجدولة وMini App موجودة ولها اختبارات. | حالة migration والنشر في البيئة المستهدفة يجب التحقق منها منفصلة. [التفاصيل](docs/forum-default.md) |
+| الحفظ والتزامن | CAS وأقفال/leases ولقطات الاستعادة موجودة في الكود. | اختبارات الحمل والتزامن الحقيقية وقياس حدود الإنتاج غير مثبتة؛ الاختبارات الوحدوية لا تثبت exactly-once. |
+| الإحالة | لم يُعثر على نظام إحالة في runtime؛ نسب الحملات التسويقية الموجودة ليست إحالة أو مكافأة. | التصميم في [Referral.md](Referral.md) اقتراح غير منفذ. |
+| بحث الإيموجي | بحث محلي في منتقي Mini App يشمل الإيموجي العادي وحزم المستخدم، مع أسماء إنجليزية ومرادفات عربية. | خدمة بحث Telegram/TDLib والميزات الإضافية المقترحة في [search-engine.md](search-engine.md) ليست منفذة. |
+| Golden early access | استحقاق الوصول المبكر يظهر للمشترك النشط في `/sup` وبطاقة الخطة. | لا توجد ميزة تجريبية مسماة مربوطة بهذا الاستحقاق؛ مقترحات [soon.md](soon.md) ليست وعوداً أو وظائف قائمة. |
+| القوالب وسجل الصفحات | أمثلة الدليل التعليمية الثابتة منفصلة عن نظام قوالب المستخدم. | القوالب المحفوظة للمستخدم وسجل نسخ الصفحات ما زالا خارج النطاق؛ لا تعِد تسميتهما كميزة مستقبلية. |
 
-No templates or saved page history. Subscription rollout and other remaining work are tracked in [soon.md](soon.md).
-Root `md_files/log.md` is the only active change log. [Archived decisions](docs/archive/project-decisions-2026-10-08.md) are historical.
-Runtime is JavaScript under `tgcloud/`; archived Python tests are not active.
+ابدأ من [فهرس الوثائق](../docs/README.md). [sups.md](sups.md) مواصفة
+المنتج، و[soon.md](soon.md) يسرد البحوث والاختبارات المفتوحة فقط. يحتفظ
+[log.md](log.md) بتاريخ التغييرات؛ أما وثائق `archive/` فهي سجل تاريخي وليست
+تعليمات تنفيذ.
+
+أي نشر أو migration أو تغيير إعدادات Telegram/Cloudflare يتطلب التحقق من
+البيئة المستهدفة والموافقة المناسبة؛ لا يُستنتج من هذا الجدول أو من اختبارات
+محلية أن الإنتاج محدّث.

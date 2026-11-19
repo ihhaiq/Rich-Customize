@@ -111,6 +111,30 @@ test('empty result preview opens a clear recovery panel instead of sending place
   assert.equal(h.calls.some(call => call.method === 'sendMessage'), false);
 });
 
+test('result preview explains and preserves a media block without a reusable file id', async () => {
+  const h = await harness({ extraModules:{ editorBlocks:'lib/editor-block-flow' } });
+  const video = h.blocks.makeBlock('video', { file:{} }, 0, null, 'missing-video-file');
+  await h.session.createEditorSession(userId, chatId, managementMessageId);
+  await h.session.updateEditorSession(userId, { blocks:[video] });
+
+  await h.editorBlocks.handleEditorBlockCallback({
+    id:'preview-missing-video-file',
+    from:{ id:userId, language_code:'en' },
+    message:{ chat:{ id:chatId, type:'private' }, message_id:managementMessageId },
+    data:'r:result',
+  });
+
+  const notice = h.calls.find(call => call.method === 'sendMessage');
+  assert.ok(notice);
+  assert.match(notice.args.text, /Re-upload or remove it/i);
+  assert.equal(h.calls.some(call =>
+    call.method === 'sendRichMessage'
+    && JSON.stringify(call.args.rich_message).includes('"type":"video"')), false);
+  const session = await h.session.loadEditorSession(userId, { touch:false });
+  assert.equal(session.blocks[0].id, 'missing-video-file');
+  assert.equal(session.blocks[0].data.file.file_id, undefined);
+});
+
 test('empty-result recovery keeps existing blocks when Telegram rejects the rendered message', async () => {
   const { h, blocks } = await fixture();
   h.apiState.richSendErrors = {

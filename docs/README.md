@@ -3,10 +3,10 @@
 ## Current references
 | Topic | Reference |
 | --- | --- |
+| شرح مبسط لخريطة المشروع | [PROJECT-MAP.md](../md_files/PROJECT-MAP.md) |
 | Repository orientation and invariants | [AGENTS.md](../AGENTS.md) |
 | Runtime and storage map | [ARCHITECTURE.md](../md_files/ARCHITECTURE.md) |
-| Serverless workflow | [serverless.md](../md_files/docs/serverless.md) |
-| Agent guide: building a Telegram Serverless feature | [telegram-serverless-feature-agent-guide.md](../md_files/docs/telegram-serverless-feature-agent-guide.md) |
+| Telegram Serverless workflow and platform notes | [serverless.md](../md_files/docs/serverless.md) |
 | Mini App / Cloudflare | [cloudflare-pages-miniapp.md](../md_files/docs/cloudflare-pages-miniapp.md) |
 | خطة نقل Mini App إلى Serverless | [miniapp-serverless-migration.md](../md_files/docs/miniapp-serverless-migration.md) |
 | نواقص Mini App المعتمدة على Cloudflare | [miniapp-serverless-cloudflare-dependencies.md](../md_files/docs/miniapp-serverless-cloudflare-dependencies.md) |
@@ -28,4 +28,4 @@
 Compatibility pointers moved under `md_files/`; README files remain in their original locations. Archived instructions are not current deployment guidance.
 
 ## Tutorial plan
-[Interactive tutorial specification](../md_files/tutorial.md) records the approved UI, single-message preview, starter examples, lessons, implementation phases and acceptance checks. Implementation and localization are recorded in section 19; Telegram deployment and live acceptance remain pending.
+[Interactive tutorial specification](../md_files/tutorial.md) records the approved UI, single-message preview, starter examples, lessons and acceptance checks. The module-consolidation release was confirmed deployed on 2026-10-14; later UX changes remain subject to separate Telegram deployment and live acceptance (section 20).

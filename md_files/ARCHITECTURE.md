@@ -1,6 +1,6 @@
 # Rich Customize — Architecture Map
 
-> Branch: `serverless-cleanup` · Reviewed against repository documentation: 2026-10-10
+> Branch: `serverless-cleanup` · Reviewed against source and documentation: 2026-11-19
 > This describes the documented design, not an independent live-production audit.
 
 ## System overview
@@ -15,34 +15,28 @@ Telegram users
    |
    +--> Mini App (app/miniapp_static/)
           |
-          v
-      Cloudflare Pages + Functions (functions/)
-          |   validates Telegram initData
-          |   D1 (DB): bridge/support state and transitional emoji packs
-          v
-      @Richminiappsbot (relay)
+          +--> Serverless-hosted origin --> authenticated `miniapp` endpoint
+          |                                --> Telegram Serverless data
           |
-          v
-      Private bot-to-bot bridge (RCB1)
-          |
-          v
-      @RichCustomizebot / Telegram Serverless
+          +--> Cloudflare-origin routes --> Pages Functions / D1 / RCB1 relay
+                                           --> @RichCustomizebot / Serverless
 ```
 
-When the Mini App is opened from its Telegram Serverless origin, page reads
-and saved-page mutations use the direct `miniapp` endpoint instead of the
-Cloudflare relay. Cloudflare-origin routes and the RCB1 bridge remain for
-legacy routes and other supported operations; they are not the storage path
-for direct Serverless page CRUD.
+When the Mini App is opened from its Telegram Serverless origin, supported
+page reads and mutations use the authenticated `miniapp` endpoint directly.
+Other routes still fall back to Cloudflare for media, telemetry, and legacy
+emoji-pack import. The live BotFather origin is not verifiable from repository
+source. Cloudflare-origin routes and RCB1 remain for legacy and supported
+operations; neither is the storage path for direct Serverless page CRUD.
 
 ## Ownership boundaries
 | Component | Paths | Responsibility |
 | --- | --- | --- |
 | Telegram Serverless | `tgcloud/schema.js`, `tgcloud/handlers/*.js`, `tgcloud/lib/**/*.js` | Authoritative page and editor data, permissions, publication, compatibility and operational state |
 | Mini App | `app/miniapp_static/**` | Browser UI and local unsaved edits; direct Serverless page operations use authenticated `initData` and the `miniapp` endpoint |
-| Cloudflare Functions | `functions/**` | Cloudflare-origin authentication, legacy relay transport, webhook and upload handling |
+| Cloudflare Functions | `functions/**` | Cloudflare-origin authentication, legacy relay transport, webhook, media, telemetry and compatibility handling |
 | Cloudflare D1 | `cloudflare/d1/schema.sql` | Request correlation, identity, and transitional emoji-pack storage; older page mirrors may remain but Serverless no longer refreshes them. Binding `DB`; saved page truth remains Serverless |
-| Documentation | `docs/**`, root Markdown | Architecture and planning; not an executable source of truth |
+| Documentation | `md_files/**`, `docs/README.md`, root Markdown | Architecture and planning; not an executable source of truth |
 
 ## Data invariants
 1. Do not create a second saved-page database in D1.

@@ -11,6 +11,7 @@ function command(status, version = 1) {
   return '/rcb_broadcast_control@Richminiappsbot\n' + JSON.stringify({
     protocol: 'RCB1',
     kind: 'broadcast_control',
+    tag: '#بث',
     status,
     version,
   });

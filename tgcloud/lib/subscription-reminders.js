@@ -232,6 +232,7 @@ async function cycleControl(action,day,revision,extra={}) {
     chat_id:-1003993506865,disable_notification:true,
     text:'/rcb_schedule_'+action+'@Richminiappsbot\n'+JSON.stringify({
       protocol:'RCB1',
+      tag:'#اشتراكات',
       request_id:'subscription_'+action+'_'+day+'_'+revision,
       job_id:subscriptionCycleJobId(day),
       revision,...extra,

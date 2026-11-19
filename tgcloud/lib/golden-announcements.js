@@ -110,12 +110,14 @@ async function deliverAnnouncement(user, campaign) {
 async function register(row) {
   await api.sendMessage({chat_id:-1003993506865,disable_notification:true,
     text:'/rcb_schedule_register@Richminiappsbot\n'+JSON.stringify({protocol:'RCB1',
-      request_id:'birthday_'+row.jobId+'_'+row.revision,job_id:row.jobId,revision:row.revision,run_at:row.runAt})});
+      tag:'#جدولة',request_id:'birthday_'+row.jobId+'_'+row.revision,
+      job_id:row.jobId,revision:row.revision,run_at:row.runAt})});
 }
 async function complete(row) {
   await api.sendMessage({chat_id:-1003993506865,disable_notification:true,
     text:'/rcb_schedule_result@Richminiappsbot\n'+JSON.stringify({protocol:'RCB1',
-      request_id:'birthday_done_'+row.jobId+'_'+row.revision,job_id:row.jobId,revision:row.revision,status:'sent'})});
+      tag:'#جدولة',request_id:'birthday_done_'+row.jobId+'_'+row.revision,
+      job_id:row.jobId,revision:row.revision,status:'sent'})});
 }
 export async function ensureBirthdayBroadcast(campaign, actorId) {
   await db.insert(goldenBroadcasts).values({month:campaign.month,

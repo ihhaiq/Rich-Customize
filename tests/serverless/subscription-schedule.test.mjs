@@ -19,7 +19,7 @@ function fakeWorker(sent,stats) {
   return build(
     async (_db,deliver)=>{
       stats.minute++;
-      await deliver('/rcb_schedule_due@RichCustomizebot\n{"protocol":"RCB1"}');
+      await deliver('/rcb_schedule_due@RichCustomizebot\n{"protocol":"RCB1","tag":"#جدولة"}');
       return {claimed:1,delivered:1};
     },
     async()=>{stats.reserved++;},
@@ -45,11 +45,13 @@ test('Cloudflare Cron: scheduled posts, RDB sync and daily subscription scan use
   assert.equal(stats.minute,1);
   assert.equal(sent.length,2);
   assert.match(sent[0].text,/^\/rcb_schedule_due@RichCustomizebot/);
+  assert.equal(JSON.parse(sent[0].text.split('\n')[1]).tag,'#جدولة');
   assert.doesNotMatch(sent[0].text,/rcb_subscription_tick/);
   assert.match(sent[1].text,/^\/rcb_broadcast_tick@RichCustomizebot\n/);
   const broadcast=JSON.parse(sent[1].text.split('\n')[1]);
-  assert.deepEqual(Object.keys(broadcast).sort(),['kind','minute','protocol']);
+  assert.deepEqual(Object.keys(broadcast).sort(),['kind','minute','protocol','tag']);
   assert.equal(broadcast.kind,'broadcast');
+  assert.equal(broadcast.tag,'#بث');
 
   await worker.scheduled({cron:'*/10 * * * *'},env,{});
   assert.equal(stats.minute,1);
@@ -59,6 +61,7 @@ test('Cloudflare Cron: scheduled posts, RDB sync and daily subscription scan use
   const rdbBody=JSON.parse(sent[2].text.split('\n')[1]);
   assert.equal(rdbBody.protocol,'RCB1');
   assert.equal(rdbBody.kind,'richdonate_sync');
+  assert.equal(rdbBody.tag,'#مزامنة_ريتش_دونيت');
   assert.equal(typeof rdbBody.minute,'number');
 
   await worker.scheduled({cron:'0 9 * * *'},env,{});
@@ -69,6 +72,7 @@ test('Cloudflare Cron: scheduled posts, RDB sync and daily subscription scan use
   const body=JSON.parse(sent[3].text.split('\n')[1]);
   assert.equal(body.protocol,'RCB1');
   assert.equal(body.kind,'daily');
+  assert.equal(body.tag,'#اشتراكات');
   assert.equal(typeof body.minute,'number');
   await assert.rejects(worker.scheduled({cron:'0 3 * * *'},env,{}),/Unknown schedule trigger/);
 });

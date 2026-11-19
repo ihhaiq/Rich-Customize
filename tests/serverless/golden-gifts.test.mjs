@@ -33,6 +33,12 @@ test('manual claims are idempotent, expire individually, and do not overwrite pa
   assert.equal((await h.subscriptions.getEditorEntitlement(101,{now:h.now+30*86400})).plan,'plus');
   assert.equal((await h.subscriptions.getEditorEntitlement(102,{now:h.now+30*86400+60})).plan,'free');
   assert.equal(h.records.editorSubscriptions[0].plan,'plus');
+  await h.gifts.goldenGiftStatus(101,h.now);
+  const reminder=h.calls.find(call=>call.method==='sendMessage'
+    &&call.args.chat_id===-1003993506865
+    &&call.args.text?.startsWith('/rcb_schedule_register'));
+  assert.ok(reminder);
+  assert.equal(JSON.parse(reminder.args.text.split('\n')[1]).tag,'#جدولة');
 });
 test('unclaimed coupon never expires and survives month rollover',async()=>{
   const h=await fixture();

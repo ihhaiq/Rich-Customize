@@ -11,6 +11,10 @@ async function fixture(count=3){
 }
 test('all languages use H1 birthday heading and footer with native cake and inline activation',async()=>{
  const h=await fixture();
+ const scheduler=h.calls.find(c=>c.method==='sendMessage'&&c.args.chat_id===-1003993506865
+  &&c.args.text?.startsWith('/rcb_schedule_register'));
+ assert.ok(scheduler);
+ assert.equal(JSON.parse(scheduler.args.text.split('\n')[1]).tag,'#جدولة');
  for(const lang of ['ar','ar-IQ','en','ru',null]){
   const rich=h.birthday.birthdayAnnouncement(lang),arabic=String(lang).startsWith('ar');
   const texts=rich.blocks.flatMap(b=>b.text);
@@ -162,6 +166,7 @@ test('broadcast status is visible and reports definitive and uncertain failures 
  await Promise.all([h.birthday.runBirthdayBatch(job.jobId,1),h.birthday.runBirthdayBatch(job.jobId,1)]);
  assert.equal(notice.payload.status,'sent');
  assert.ok(completions().length>0);
+ assert.equal(JSON.parse(completions().at(-1).args.text.split('\n')[1]).tag,'#جدولة');
  assert.equal(h.calls.filter(c=>c.method==='sendRichMessage').length,3);
  assert.equal(h.calls.filter(c=>c.args.chat_id==='@richDonateBot'&&c.args.text?.includes('انتهت عملية الإرسال')).length,2);
  });

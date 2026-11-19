@@ -15,6 +15,18 @@ async function reminderHarness() {
   });
 }
 
+test('daily subscription relay controls carry the subscription tag',async()=>{
+  const h=await reminderHarness();
+  await h.reminders.runSubscriptionReminderTick(NOW);
+  const controls=h.calls.filter(call=>call.method==='sendMessage'
+    &&call.args.chat_id===-1003993506865
+    &&call.args.text?.startsWith('/rcb_schedule_'));
+  assert.ok(controls.length>0);
+  for(const control of controls){
+    assert.equal(JSON.parse(control.args.text.split('\n')[1]).tag,'#اشتراكات');
+  }
+});
+
 test('subscription notice stages cover one daily five-day window and a post-expiry window',async()=>{
   const h=await reminderHarness();
   assert.equal(h.reminders.subscriptionReminderStage(NOW+5*DAY,NOW),'before');

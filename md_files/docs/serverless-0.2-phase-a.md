@@ -3,6 +3,13 @@
 ## Scope
 Phase A only: CLI version and source layout. Mini App hosting, endpoints, Cloudflare/RCB1 retirement are **out of scope**. `AGENTS.md` remains unchanged per owner instruction.
 
+> Historical handoff, not current architecture: the later `tgcloud.jsonc`
+> configures static hosting and the repository now contains Mini App
+> endpoints. Use the current [Serverless notes](./serverless.md) and
+> [Mini App migration status](./miniapp-serverless-migration.md) for present
+> source state. The deployment checks below remain historical and are not
+> evidence of today's live revision.
+
 ## Source migration
 - Previous branch head: `d335adc7de03f9b8134c2c803d936d141ca00ce5`
 - Migration commit: `79ca3cc9cb48ebf949e4c69e19301254f84230e4`

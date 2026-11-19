@@ -1,8 +1,9 @@
 # Premium emoji in the Telegram editor
 
-Implemented locally in the Telegram editor and Mini App static assets, using
-JavaScript. No new database tables, runtime npm dependencies, user-Premium
-checks or global Fragment-username requirements are added.
+The Telegram editor and Mini App implementation exists in repository source
+and uses JavaScript. This document does not establish a live deployment.
+No new database tables, runtime npm dependencies, user-Premium checks or
+global Fragment-username requirements are added.
 
 ## Workflow
 

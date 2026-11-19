@@ -1,3 +1,140 @@
+## 2026-11-19 — استعادة لوحة بلوك المحرر عند رفض نطاق تسجيل الدخول
+
+- **السبب:** رفض Telegram تعديل لوحة إدارة البلوك بـ`BOT_DOMAIN_INVALID`
+  عندما احتوت معاينة بلوك الأزرار رابط Login URL من نطاق غير مربوط عبر
+  BotFather؛ كما كانت معاينة النتيجة تعرض خطأً عاماً عند غياب `file_id`
+  لوسيط محفوظ.
+- **التغيير:** عند رفض نطاق تسجيل الدخول تُعرض لوحة نصية قابلة للتحرير مع
+  نفس أزرار الإدارة وإرشاد `/setdomain`، دون إعادة إرسال الرابط المرفوض.
+  وعند غياب معرّف الملف تعرض المعاينة إرشاداً بإعادة رفع الوسيط أو حذفه،
+  مع إبقاء المسودة كما هي ودون إرسال بلوك غير صالح.
+- **الملفات:** `tgcloud/lib/editor-block-flow.js`,
+  `tests/serverless/editor-block-flow-recovery.test.mjs`,
+  `tests/serverless/large-button-block.test.mjs`,
+  `tests/serverless/harness.mjs`, `md_files/log.md`.
+- **الاختبارات:** الاختبارات المركزة نجحت (27/27). `npm.cmd test` شغّل
+  479 اختباراً: نجح 478 وفشل اختبار واحد غير متعلق بالتغيير
+  (`admin-stats.test.mjs` يتوقع عبارة `Golden Ticket` غير الموجودة في
+  نسخة `developer.js` المحلية المعدلة مسبقاً). `git diff --check` نجح؛
+  عدد وحدات Serverless بقي 98.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram
+  Serverless أو تعديل بيانات إنتاج.
+
+## 2026-11-19 — إعداد مسودة إلقاء إعلاني للبوت
+
+- **السبب:** طلب نص عراقي تشجيعي يشرح ميزات البوت من المحرر العادي إلى
+  التطبيق المصغّر، والحفظ كصفحة تفاعلية والنشر.
+- **التغيير:** إنشاء `md_files/ad.md` مع شرح `/editor`، اختيار البلوكات،
+  ربط الصفحات بزر CBD، متطلبات النشر، والحدود التقنية مع تنبيه بعدم تسويق
+  حدود الباقات كأنها مطبقة بالكامل.
+- **الملفات:** `md_files/ad.md`, `md_files/log.md`.
+- **التحقق:** تمت مطابقة خطوات المحرر والحفظ والزر والنشر مع الشيفرة؛
+  لا اختبارات runtime (تغيير توثيقي).
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر.
+
+## 2026-11-19 — مزامنة خطط ووثائق المستودع مع المصدر
+
+- **السبب:** إزالة البنود المنفذة من قوائم المستقبل، وتصحيح معلومات قديمة
+  أو غير قابلة للتحقق من ملفات Markdown النشطة.
+- **التغيير:** فصل تنفيذ المصدر عن النشر والقبول الحي؛ تصحيح حالة صلاحية
+  الصفحات القديمة، أحداث RDB، واجهة Mini App، الجدولة، أوامر المواضيع
+  والقياس؛ تحديث الخطط غير المنفذة للبحث والإحالة؛ إعادة إنشاء `soon.md`
+  ببنود مفتوحة فقط؛ إصلاح رابط فهرس مكسور، واسم Worker وCron ومخططات D1.
+  أُبقي الأرشيف وسجل الوقائع القديمة دون إعادة كتابة.
+- **الملفات:** `docs/README.md`; `md_files/ARCHITECTURE.md`,
+  `md_files/PROJECT-MAP.md`, `md_files/Referral.md`,
+  `md_files/ROADMAP.md`, `md_files/search-engine.md`,
+  `md_files/soon.md`, `md_files/sups.md`, `md_files/tutorial.md`,
+  `md_files/docs/channel-post-edit-import-plan.md`,
+  `md_files/docs/cloudflare-pages-miniapp.md`,
+  `md_files/docs/cloudflare-worker-from-browser.md`,
+  `md_files/docs/error-handling-audit.md`,
+  `md_files/docs/forum-default.md`,
+  `md_files/docs/miniapp-serverless-cloudflare-dependencies.md`,
+  `md_files/docs/miniapp-serverless-migration.md`,
+  `md_files/docs/premium-emoji.md`, `md_files/docs/scheduling.md`,
+  `md_files/docs/serverless-0.2-phase-a.md`,
+  `md_files/docs/serverless.md`,
+  `md_files/docs/subscription-rollout.md`, `md_files/log.md`.
+- **التحقق:** `git diff --check` وفحص الروابط المحلية في 31 ملف Markdown
+  نشطاً (باستثناء الأرشيف) نجحا. لم تُشغّل اختبارات runtime لأن التغييرات
+  توثيقية فقط.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو ترحيل أو
+  `tgcloud push` أو تحقق نشر حي.
+
+## 2026-11-19 — تدقيق خريطة المشروع وملفات التعريف
+
+- **السبب:** مطابقة وصف بنية المستودع ووضع الاشتراكات مع المسارات والاختبارات
+  والكود الحالي، وتسهيل الوصول إلى دليل المشروع.
+- **التغيير:** تحديث `PROJECT-MAP.md` لإظهار عدد وحدات Serverless الحالي
+  (98) والتنبيه إلى قربه من الحد، وتقليل قوائم الوحدات التفصيلية سريعة
+  التقادم. تحديث `README.md` لتوضيح مسار Mini App المباشر إلى Serverless
+  وروابط البدء والاختبارات، وتصحيح `AGENTS.md` بشأن استقبال أحداث الدفع
+  ووجود سجل الاستحقاقات مع إبقاء حالة التحقق الحي غير مؤكدة.
+- **الملفات:** `md_files/PROJECT-MAP.md`, `README.md`, `AGENTS.md`,
+  `md_files/log.md`.
+- **التحقق:** تمت مطابقة عدد الوحدات (88 ملفاً متداخلاً في `lib/`، و8
+  معالجات، وendpoint واحد، و`schema.js` = 98)، وعدد الاختبارات النشطة
+  (66 ملف اختبار) والأرشيف (58 ملف Python نصي) مع الملفات الموجودة.
+  تغييرات توثيق فقط؛ لا اختبارات تشغيلية.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر أو ترحيل.
+
+## 2026-11-18 — اختبار توافق وسم مزامنة RDB
+
+- **السبب:** تأكيد قبول HELLO ACK القديم بلا الوسم الاختياري، إلى جانب ACK
+  الموسوم الذي يرسله Rich Donate.
+- **التغيير:** إضافة اختبار يثبت أن ACK غير الموسوم يثبت `from.id` نفسه؛
+  توضيح أن الوسم بيانات نقل اختيارية ولا يغيّر حدث `rich-donate/1`.
+- **الملفات:** `tests/serverless/rich-donate-b2b.test.mjs`,
+  `md_files/docs/subscription-rollout.md`, `md_files/log.md`.
+- **الاختبارات:** `node --experimental-vm-modules --test
+  tests/serverless/rich-donate-b2b.test.mjs` نجح (12/12).
+- **GitHub/النشر:** تغييرات اختبار وتوثيق محلية فقط؛ لا commit أو push أو
+  نشر. المصافحة الحية ما زالت غير مثبتة.
+
+## 2026-11-18 — إضافة خريطة مبسطة لبنية المشروع
+
+- **السبب:** تسهيل فهم المجلدات ومسارات البيانات والنشر لمن يبدأ من الصفر.
+- **التغيير:** إضافة رسم تدفق وشجرة ملفات وشرح عربي مبسط يفرّق بين
+  Telegram Serverless وMini App وCloudflare وD1 وWorker والاختبارات
+  والأرشيف؛ ربط الخريطة بفهرس الوثائق، مع توضيح المجلدات المحلية والقديمة
+  التي لا تمثل مصدر التشغيل الحالي.
+- **الملفات:** `md_files/PROJECT-MAP.md`, `docs/README.md`, `md_files/log.md`.
+- **التحقق:** توثيق فقط؛ لا حاجة لاختبارات تشغيلية. فُحصت بنية المجلدات
+  والوثائق المشار إليها، ثم `git diff --check`.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر أو ترحيل.
+
+## 2026-11-18 — وسم إشارات الجسر والتذكيرات
+
+- **السبب:** كانت رسائل التحكم والتذكير في مجموعة الجسر متشابهة ويصعب تمييز
+  وظيفتها من الأمر وحده.
+- **التغيير:** إضافة وسوم عربية لإشارات الجدولة والبث والاشتراكات ومزامنة
+  Rich Donate وصفحات Mini App وربط الجسر، دون تغيير حقول RCB1 التشغيلية أو
+  محتوى المنشورات. أضيفت اختبارات للتحقق من الوسوم وقبولها عبر parsers.
+- **التوافق الخارجي:** أوامر `/rdb_hello_v1` و`/rdb_sync_v1` و`/rdb_ack_v1`
+  ترسل الآن اللاحقة `#مزامنة_ريتش_دونيت`. يلزم تحديث Rich Donate لقبولها
+  وإرجاع HELLO ACK موسوم؛ عقد الدفع وحدث الشراء لم يتغيرا. لا تنشر هذه
+  الأوامر قبل تحقق التوافق من الطرف الآخر.
+- **الملفات:** `workers/schedule-reminders/worker.js`,
+  `functions/_lib/b2b-bridge.js`, `functions/_lib/scheduling-reminders.js`,
+  `tgcloud/lib/developer.js`, `tgcloud/lib/editor-subscriptions.js`,
+  `tgcloud/lib/golden-announcements.js`, `tgcloud/lib/golden-gifts.js`,
+  `tgcloud/lib/scheduled-publish.js`, `tgcloud/lib/subscription-reminders.js`,
+  `tests/serverless/broadcast-control.test.mjs`,
+  `tests/serverless/developer-panel.test.mjs`,
+  `tests/serverless/golden-announcements.test.mjs`,
+  `tests/serverless/golden-gifts.test.mjs`,
+  `tests/serverless/rich-donate-b2b.test.mjs`,
+  `tests/serverless/scheduling-reminders.test.mjs`,
+  `tests/serverless/subscription-reminders.test.mjs`,
+  `tests/serverless/subscription-schedule.test.mjs`,
+  `md_files/docs/scheduling.md`, `md_files/docs/subscription-rollout.md`.
+- **التحقق:** نجحت الاختبارات المركزة ذات الصلة (82/82). لم يُنفذ اختبار
+  حي للجسر أو توافق Rich Donate بعد.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram
+  Serverless أو Cloudflare. لا Migration أو تعديل بيانات إنتاج. عدد وحدات
+  Serverless لم يتغير، ولم يضف العمل وحدة runtime جديدة.
+
 ## 2026-11-18 — إيقاف إشارات البث بعد اكتمال الحملة
 
 - **السبب:** كان Worker يرسل `/rcb_broadcast_tick` كل دقيقة دون قراءة حالة

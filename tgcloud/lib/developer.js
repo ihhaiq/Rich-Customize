@@ -385,6 +385,7 @@ async function sendBroadcastControl(job, status, version = Date.now()) {
       + JSON.stringify({
         protocol: 'RCB1',
         kind: 'broadcast_control',
+        tag: '#بث',
         status,
         version,
       }),

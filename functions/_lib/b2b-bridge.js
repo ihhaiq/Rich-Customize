@@ -544,6 +544,7 @@ export async function sendScheduleBridgeAck(env, label, jobId, revision) {
     chat_id: bridgeChatId(env),
     text: '/rcb_schedule_ack@' + targetUsername(env) + '\n' + JSON.stringify({
       protocol: B2B_PROTOCOL,
+      tag: '#جدولة',
       request_id: 'ack_' + String(jobId) + '_' + Number(revision),
       job_id: String(jobId), revision: Number(revision), status: label,
     }),
@@ -790,7 +791,8 @@ export async function sendBridgeSyncAck(env, payload, replyMessage = null) {
 
   const ackText = '✅ ' + B2B_PROTOCOL + ' SYNC_OK\n'
     + 'sync_id: ' + syncId + '\n'
-    + 'sync_seq: ' + String(payload?.sync_seq || payload?.baseline_seq || 0);
+    + 'sync_seq: ' + String(payload?.sync_seq || payload?.baseline_seq || 0) + '\n'
+    + '#مزامنة_الصفحات';
 
   return telegramJson(env, 'sendMessage', {
     chat_id: bridgeChatId(env),
@@ -813,8 +815,8 @@ export async function sendBridgeFullSyncNotice(env, {
   return telegramJson(env, 'sendMessage', {
     chat_id: bridgeChatId(env),
     text: alreadySynced
-      ? '✅ كلشي متزامن أصلًا.'
-      : '✅ كل الصفحات تم مزامنتها.',
+      ? '✅ كلشي متزامن أصلًا.\n#مزامنة_الصفحات'
+      : '✅ كل الصفحات تم مزامنتها.\n#مزامنة_الصفحات',
     disable_notification: false,
     ...(replyId ? { reply_parameters: { message_id: replyId } } : {}),
   });
@@ -827,7 +829,8 @@ export async function sendBridgeSyncFailure(env, error, meta = {}, replyMessage 
     + 'user_id: ' + String(meta.userId || '—') + '\n'
     + 'page_id: ' + String(meta.pageId || '—') + '\n'
     + 'code: ' + String(error?.code || 'SYNC_FAILED') + '\n'
-    + 'detail: ' + String(error?.message || error || 'Unknown sync error').slice(0, 700),
+    + 'detail: ' + String(error?.message || error || 'Unknown sync error').slice(0, 700) + '\n'
+    + '#مزامنة_الصفحات',
     env,
   );
   const replyId = Number(replyMessage?.message_id || 0);
@@ -965,6 +968,7 @@ export async function sendBridgePairingPing(env) {
   const payload = {
     protocol: B2B_PROTOCOL,
     request_id: id,
+    tag: '#ربط_الجسر',
   };
   await telegramJson(env, 'sendMessage', {
     chat_id: bridgeChatId(env),

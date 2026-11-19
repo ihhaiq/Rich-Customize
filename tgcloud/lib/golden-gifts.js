@@ -16,7 +16,7 @@ function newId() {
 async function relay(action, row, runAt) {
   await api.sendMessage({chat_id:-1003993506865,disable_notification:true,
     text:'/rcb_schedule_'+action+'@Richminiappsbot\n'+JSON.stringify({
-      protocol:'RCB1',request_id:'gift_'+action+'_'+row.jobId,
+      protocol:'RCB1',tag:'#جدولة',request_id:'gift_'+action+'_'+row.jobId,
       job_id:row.jobId,revision:1,...(action==='register'?{run_at:runAt}:{status:'sent'}),
     })});
 }

@@ -134,6 +134,14 @@ export async function harness({
         throw errors;
       }
     }
+    if (method === 'editMessageText' && apiState.editErrors) {
+      const errors = apiState.editErrors;
+      if (Array.isArray(errors)) {
+        if (errors.length) throw errors.shift();
+      } else {
+        throw errors;
+      }
+    }
     if (method === 'editMessageText' && apiState.editError) throw new Error(apiState.editError);
     return { message_id: 100, chat: { id: 1 } };
   } });

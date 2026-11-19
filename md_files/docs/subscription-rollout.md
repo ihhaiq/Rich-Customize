@@ -1,6 +1,6 @@
 # Subscription rollout — current code versus production
 
-Updated 2026-10-25 — branch `serverless-cleanup`.
+Reviewed 2026-11-19 — branch `serverless-cleanup`.
 Approved product specification: [sups.md](../sups.md). This document
 describes code in GitHub, **not** production deployment or paid entitlement activation.
 
@@ -35,8 +35,12 @@ Additional runtime decisions may apply; the server performs authoritative checks
   that every editor/runtime path enforces every approved limit: some active
   editor caps are still older than the approved values and must be reconciled
   before claiming full enforcement.
-- Legacy stored pages (`quota_version=1`) remain publish-only; new pages use
-  version 2. Import does not silently lift the legacy restriction.
+- `quota_version` is historical metadata, not an edit permission. A saved
+  page remains editable when its current content fits the account's current
+  entitlement. If it exceeds that quota, it remains readable and can be
+  republished from its stored snapshot, but editing, renaming and syncing are
+  blocked until the current entitlement covers it. This preserves old content
+  without allowing it to expand.
 - The Mini App's Free table UI pre-checks against the authenticated
   `/miniapp/api/me` response; the server ultimately decides enforcement.
 - Serverless custom-emoji pack retrieval enforces the trusted plan-visible
@@ -87,7 +91,16 @@ Bot-to-Bot handshake and Telegram Stars acceptance test remain unverified;
 see the receiver status below. Feature-specific pricing, cart, and event
 contract changes must be assessed separately rather than assumed necessary.
 
-## Rich Donate B2B receiver — Serverless code deployed; live integration unverified
+The current Rich Customize signal-label change is a protocol compatibility
+change: it appends `#مزامنة_ريتش_دونيت` to `/rdb_hello_v1`,
+`/rdb_sync_v1`, and `/rdb_ack_v1`, while accepting either tagged or legacy
+`/rdb_hello_ack_v1`. Local Rich Customize tests cover tagged and untagged
+messages against the receiver harness. Rich Donate's source and live
+acceptance were not independently inspected in this repository review, so do
+not claim the other bot accepts the suffix or that a live handshake succeeds.
+Confirm the target bot identity and the external contract before deployment.
+
+## Rich Donate B2B receiver — source implementation present; live integration unverified
 
 - The owner selected the existing private RCB1 group (`-1003993506865`) for
   the entire RDB exchange, overriding the original direct-private chat
@@ -124,15 +137,14 @@ contract changes must be assessed separately rather than assumed necessary.
   duration. Telegram send and SQLite persistence cannot be one atomic operation:
   if Telegram accepts the notice but saving its success state fails, a retry can
   send a duplicate notice, but cannot extend the gift twice.
-- The receiver code is present in Telegram Serverless revision 134. This is
-  **not** a completed launch: no real Bot-to-Bot group handshake or
-  Telegram Stars acceptance test has been completed. Do not send READY; the
-  donation bot must independently implement and accept this group-routed
-  protocol before paid activation can work. No READY or PAUSE command is sent.
-  The manual gift handler is deployed in revision 139; the schema was already
-  in sync, so no migration was applied. It is separate from Stars purchase
-  delivery and monthly campaign gifts. It has not been tested with a live gift
-  request or recipient notification.
+- The receiver and manual gift handler are present in repository source.
+  Revisions 134/139 are historical deployment notes, not a verified live
+  state. No real Bot-to-Bot group handshake or Telegram Stars acceptance test
+  is established by this repository review. Do not send READY; verify the
+  external bot's implementation, target identity, migration and live
+  acceptance before paid activation. A manual gift request and notification
+  also require live acceptance; this path is separate from Stars purchases
+  and monthly campaign gifts.
 
 ## Not yet an active subscription launch
 
@@ -140,11 +152,11 @@ contract changes must be assessed separately rather than assumed necessary.
   persisted subscriptions with trusted `richdonate:verified` source remain
   readable. Neither local tests nor the receiver implementation prove a live
   handshake, production activation, renewal, expiry or refund.
-- The separate Cloudflare Mini App `/me` still does **not** receive trusted
-  Plus/Golden entitlements; it may show Free editor limits when opened from
-  the Cloudflare origin. The direct Serverless `/me` does return trusted plan
-  and quota data; the BotFather origin cutover and live WebView acceptance
-  remain separate.
+- The separate Cloudflare Mini App `/me` does **not** receive trusted
+  Plus/Golden entitlements; it may show Free editor limits from the Cloudflare
+  origin. The direct Serverless `/me` returns trusted plan and quota data;
+  the BotFather origin and live WebView acceptance are not established by
+  source code.
 - The comparison's 150/350-Star prices are a specification, not a live sale.
   No separate billing engine should be created in Cloudflare.
 
@@ -152,8 +164,8 @@ contract changes must be assessed separately rather than assumed necessary.
 
 1. Run `npm run test:ci` and inspect GitHub Actions; a locally mocked pass
    is not equivalent to a real Telegram WebView or a Cloudflare test.
-2. Review `tgcloud schema.js` migrations on a cloned database. In particular
-   `rich_pages.quota_version`, `forum_topic_defaults`,
+2. Review `tgcloud/schema.js` migrations against a cloned database. In particular
+   `forum_topic_defaults`,
    `scheduled_post_destinations.failure_code`, `branding_preferences`,
    `editor_entitlement_events`, and `richdonate_bridge` need reconciliation
    wherever they have not already been applied. The owner confirmed scheduled
@@ -168,7 +180,7 @@ contract changes must be assessed separately rather than assumed necessary.
 
 Templates and saved-page version history are intentionally excluded from scope.
 
-## Branding visibility preference — local implementation pending rollout
+## Branding visibility preference — source implementation
 
 - `branding_preferences` stores an account-level visibility choice separately
   from the permanent payment/entitlement ledger. Trusted active Plus/Golden
@@ -180,9 +192,8 @@ Templates and saved-page version history are intentionally excluded from scope.
 - Instant publishing, previews, saved-page delivery and scheduled snapshots
   use the effective preference. A scheduled message captures its current
   setting and does not change when the account preference is later changed.
-- This is repository code only until the Serverless schema migration is
-  applied and the corresponding code is deployed. No migration or production
-  deployment is implied by this note.
+- This describes repository behavior only. Verify the target schema and
+  deployment independently; no migration or production deployment is implied.
 
 
 ## Subscription status and expiry notices (2026-10-12, GitHub only)
@@ -207,18 +218,12 @@ Templates and saved-page version history are intentionally excluded from scope.
   expiry), uses per-day CAS cursors, and records one delivery per
   user, expiry timestamp and notice stage. The Worker still stores no
   subscriber IDs.
-- Expiry notices include a renewal button to
-  the plan-specific Rich Donate cart: Plus uses
-  `https://t.me/RichDonateBot?start=buyPlus`; Golden uses
-  `https://t.me/RichDonateBot?start=buyGT`. Rich Donate confirms `buyGT`
-  opens a Golden Ticket (30 days) + permanent branding cart for 449 Stars,
-  without issuing an invoice before the user proceeds. The purchase event
-  carries `plan=golden`, `permanent_branding=true`, `amount=449`,
-  `currency=XTR`. If an expired Golden subscriber already owns permanent
-  branding, the button links to the Rich Donate bot without a prefilled cart
-  to avoid charging for branding again; the user must select Golden manually.
-  `/testsubexpiry` renders the Golden notice for configured developers in
-  private chat.
+- Expiry notices include renewal deep links for Plus (`buyPlus`) and Golden
+  (`buyGT`). Those links are source-level integration points only; this
+  repository does not establish Rich Donate's current cart behavior, invoice
+  amount, or live purchase acceptance. Verify those in Rich Donate before
+  changing or advertising a purchase flow. `/testsubexpiry` renders the Golden
+  notice for configured developers in private chat.
 - Caveat: the 10-per-source-per-batch limit bounds throughput; the scan now
   starts at 09:00 UTC and follow-up batches run at least 75 seconds apart,
   so finishing very large campaigns before UTC midnight is not guaranteed.
