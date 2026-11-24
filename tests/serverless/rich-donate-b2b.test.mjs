@@ -117,59 +117,17 @@ test('legacy untagged HELLO ACK still pins the donation bot identity', async () 
   }]);
 });
 
-test('periodic trigger sends hello until pinned, then sync, never READY', async () => {
+test('legacy sync acknowledgment is ignored without a bot response', async () => {
   const h = await setup();
-  await h.b2b.runRichDonateB2BTick();
-  assert.deepEqual(h.calls.at(-1).args, {
-    chat_id: BRIDGE_CHAT_ID,
-    text: '/rdb_hello_v1@RichDonateBot #مزامنة_ريتش_دونيت',
-    disable_notification: true,
-  });
-
   await pin(h, 2_000_000_000);
-  await h.b2b.runRichDonateB2BTick();
-  assert.equal(h.calls.at(-1).args.text, '/rdb_sync_v1@RichDonateBot #مزامنة_ريتش_دونيت');
-  assert.ok(h.calls.some(call => call.method === 'deleteMessage'
-    && call.args.message_id === 100));
-  assert.equal(h.calls.some(call => /rdb_ready_v1/i.test(call.args.text || '')), false);
-});
-
-test('only an authenticated RCB1 relay tick can start the group-based RDB exchange', async () => {
-  const h = await harness({
-    extraModules: {
-      b2b: 'lib/editor-subscriptions',
-      bridge: 'lib/miniapp-bridge',
-    },
-  });
-  h.records.legacyStates.push({
-    namespace: 'miniapp_bridge_config',
-    payload: { bot_id: RELAY_BOT_ID },
-    updatedAt: 2_000_000_000,
-  });
-  const minute = Math.floor(Date.now() / 60000);
   const message = {
-    from: { id: RELAY_BOT_ID, is_bot: true, username: 'RichMiniAppsBot' },
+    from: { id: BOT_ID, is_bot: true, username: 'RichDonateBot' },
     chat: { id: BRIDGE_CHAT_ID, type: 'supergroup' },
-    message_id: 77,
-    text: '/rcb_rdb_tick@RichCustomizebot\n' + JSON.stringify({
-      protocol: 'RCB1',
-      kind: 'richdonate_sync',
-      minute,
-    }),
+    text: '/rdb_sync_ack_v1@RichCustomizebot',
   };
-
-  await assert.rejects(h.bridge.handleMiniAppBridgeMessage({
-    ...message,
-    from: { ...message.from, id: RELAY_BOT_ID + 1 },
-  }), error => error?.code === 'UNAUTHORIZED_BOT');
-  assert.equal(h.calls.length, 0);
-  assert.equal(await h.bridge.handleMiniAppBridgeMessage(message), true);
-  assert.equal(
-    h.calls.find(call => call.method === 'sendMessage').args.text,
-    '/rdb_hello_v1@RichDonateBot #مزامنة_ريتش_دونيت',
-  );
-  assert.ok(h.calls.some(call => call.method === 'deleteMessage'
-    && call.args.message_id === message.message_id));
+  const callCount = h.calls.length;
+  assert.equal(await h.b2b.handleRichDonateB2BMessage(message), true);
+  assert.equal(h.calls.length, callCount);
 });
 
 test('broadcast Cron tick requires the pinned relay and a fresh RCB1 minute signal', async () => {

@@ -68,6 +68,62 @@ test('Serverless page CRUD does not send saved page documents to Cloudflare',asy
   assert.equal(h.calls.some(call=>call.method==='sendDocument'),false);
 });
 
+test('Serverless page creation and saves restrict login URL buttons to the configured developer',async()=>{
+  const h=await bridgeHarness();
+  const buttons=[{
+    id:'login',
+    text:'Sign in',
+    type:'login_url',
+    value:'https://example.com/login',
+    url:'https://example.com/login',
+  }];
+  await assert.rejects(
+    ()=>h.miniapp.handleMiniAppServerlessEndpoint({
+      action:'create',
+      request_id:'create-login-regular',
+      title:'Regular page',
+      blocks:[{type:'paragraph',data:{text:'Page content'}}],
+      buttons,
+    },{initData:{user:{id:123,language_code:'ar'}}}),
+    error=>error.code==='LOGIN_URL_FORBIDDEN'
+      && error.message==='زر تسجيل الدخول غير متاح, لانك لست مخول لاستعماله',
+  );
+  assert.equal(h.records.richPages.length,0);
+
+  const regularPage=await h.miniapp.handleMiniAppServerlessEndpoint({
+    action:'create',
+    request_id:'create-login-plain',
+    title:'Regular page',
+    blocks:[{type:'paragraph',data:{text:'Page content'}}],
+    buttons:[],
+  },{initData:{user:{id:123}}});
+  await assert.rejects(
+    ()=>h.miniapp.handleMiniAppServerlessEndpoint({
+      action:'save',
+      request_id:'save-login-regular',
+      page_id:regularPage.page_id,
+      base_revision:regularPage.revision,
+      title:'Regular page',
+      blocks:[{type:'paragraph',data:{text:'Updated page content'}}],
+      buttons,
+    },{initData:{user:{id:123}}}),
+    error=>error.code==='LOGIN_URL_FORBIDDEN',
+  );
+  assert.deepEqual(h.records.richPages[0].buttons,[]);
+
+  const developerId=8997225441;
+  const result=await h.miniapp.handleMiniAppServerlessEndpoint({
+    action:'create',
+    request_id:'create-login-developer',
+    title:'Developer page',
+    blocks:[{type:'paragraph',data:{text:'Page content'}}],
+    buttons,
+  },{initData:{user:{id:developerId}}});
+  assert.equal(result.ok,true);
+  assert.equal(h.records.richPages.at(-1).ownerId,developerId);
+  assert.equal(h.records.richPages.at(-1).buttons[0].type,'login_url');
+});
+
 test('Serverless Mini App endpoint does not expose a full-sync action',async()=>{
   const h=await bridgeHarness();
   await assert.rejects(

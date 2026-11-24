@@ -7,7 +7,13 @@ import { handleGoldenGiftCallback } from 'lib/golden-gifts';
 import { api } from 'sdk';
 import { handlePremiumEmojiCallback } from 'lib/editor-premium-emoji';
 import { handleEditorImportCallback } from 'lib/editor-core';
-import { openEditor } from 'lib/editor-home';
+import {
+  groupEditorAccessText,
+  groupEditorTitleHelp,
+  isGroupEditorChat,
+  openEditor,
+  verifyGroupEditorAdmin,
+} from 'lib/editor-home';
 import { handleDeveloperCallback } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
 import { resolveUserLanguage } from 'lib/i18n';
@@ -93,6 +99,15 @@ export default async function (query, ctx = {}) {
     if (query?.from && !query.from.language_code) {
       query.from.language_code = await resolveUserLanguage(query.from);
     }
+    const data = String(query.data || '');
+    if (data === 'r:group_editor:title_help') {
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: groupEditorTitleHelp(query.from?.language_code).slice(0, 200),
+        show_alert: true,
+      });
+      return;
+    }
     if (await handleTutorialCallback(query)) return;
     await pauseTutorialForCommand({ ...query.message, from: query.from, data: query.data });
     if (await handleDeveloperCallback(query)) return;
@@ -103,9 +118,33 @@ export default async function (query, ctx = {}) {
     if (await handleBrandingCallback(query)) return;
     if (await handleManagedBotCallback(query)) return;
     if (await handleScheduleCancelCallback(query)) return;
+    if (
+      isGroupEditorChat(query?.message?.chat)
+      && (data === 'r:starteditor' || isEditorSessionCallback(data))
+    ) {
+      const access = await verifyGroupEditorAdmin(
+        query.message.chat.id,
+        query.from?.id,
+      );
+      if (access.status !== 'admin') {
+        if (access.status === 'unavailable') {
+          await logErrorSafely('editor.group_callback_access', access.error, {
+            updateId,
+            userId: query?.from?.id,
+            chatId: query?.message?.chat?.id,
+            callbackData: data,
+          });
+        }
+        await api.answerCallbackQuery({
+          callback_query_id: query.id,
+          text: groupEditorAccessText(query.from?.language_code, access.status),
+          show_alert: true,
+        });
+        return;
+      }
+    }
     if (await guardEditorCallback(query)) return;
 
-    const data = String(query.data || '');
     if (data === 'r:channels_soon') {
       await api.answerCallbackQuery({
         callback_query_id: query.id,

@@ -1,3 +1,104 @@
+## 2026-11-24 — حذف تذكير مزامنة Rich Donate الدوري
+
+- **السبب:** طلب المالك إيقاف رسالة التذكير الدورية بين Rich Customize وRich
+  Donate بالكامل.
+- **التغيير:** حذف Cron كل 10 دقائق ومسار RCB1 الذي كان يحرّك إرسال HELLO/SYNC،
+  وإزالة إرسال `/rdb_sync_v1`. أبقينا استقبال HELLO ACK وإقرار أحداث الدفع
+  بعد حفظها، مع وسم التوافق في إقرار الأحداث. لا يوجد معالج مستقل لـ
+  `/rdb_sync_ack_v1`؛ أضيف اختبار يثبت تجاهله دون رد.
+- **الملفات:** `workers/schedule-reminders/wrangler.toml`,
+  `workers/schedule-reminders/worker.js`, `tgcloud/lib/miniapp-bridge.js`,
+  `tgcloud/lib/editor-subscriptions.js`,
+  `tests/serverless/subscription-schedule.test.mjs`,
+  `tests/serverless/rich-donate-b2b.test.mjs`,
+  `md_files/docs/subscription-rollout.md`, `md_files/docs/scheduling.md`,
+  `md_files/docs/cloudflare-worker-from-browser.md`, `md_files/PROJECT-MAP.md`,
+  `md_files/log.md`.
+- **الاختبارات:** اختبارات RDB والجدولة المركزة نجحت (15/15)، وفحوص الصياغة
+  و`git diff --check` نجحت.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Cloudflare
+  أو Telegram Serverless. يلزم نشر Worker حتى ينعكس حذف Cron فعلياً.
+  تغييرات Rich Donate المذكورة من المالك لم تُراجع أو تُنشر من هذا المستودع.
+
+## 2026-11-21 — تقييد محرر المجموعات وإخفاء أكواد الصفحات
+
+- **السبب:** السماح للمشرفين فقط باستخدام المحرر وصفحاتهم في المجموعة،
+  مع منع كشف أكواد الصفحات أو نسخها لأعضاء المجموعة.
+- **التغيير:** التحقق من صفة المشرف قبل فتح المحرر أو التعامل مع callbacks
+  ورسائل الإدخال؛ مطابقة هوية المشرف المجهول بعنوان إداري فريد، مع إرشاده
+  لفتح الخاص أو ضبط لقب مخصص وإعادة `/start`. تعرض قائمة الصفحات أسماءها
+  وتفتح الصفحة للتحرير، ويُعطّل زر نسخ الكود. يظل رد `/start` الأول في موضوع
+  المنتدى الأصلي.
+- **الملفات:** `tgcloud/lib/editor-home.js`, `tgcloud/handlers/message.js`,
+  `tgcloud/handlers/callback_query.js`, `tgcloud/lib/pages.js`,
+  `tgcloud/lib/editor-pages.js`, `tgcloud/lib/editor-block-ui.js`,
+  `tgcloud/lib/editor-buttons.js`, `tgcloud/lib/i18n-source.js`,
+  `tests/serverless/harness.mjs`,
+  `tests/serverless/group-editor-access.test.mjs`,
+  `tests/serverless/message-topic-reply.test.mjs`, `md_files/log.md`.
+- **الاختبارات:** الاختبارات المركزة نجحت (68/68)، و`git diff --check` نجح.
+  `npm.cmd test` شغّل 494 اختباراً: نجح 493 وفشل اختبار سابق غير متعلق
+  بالتغيير (`admin-stats.test.mjs` يتوقع `Golden Ticket` في
+  `developer.js` المحلية). عدد وحدات Serverless بقي 98.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram
+  Serverless.
+
+## 2026-11-21 — إبقاء رد الترحيب داخل موضوع المنتدى
+
+- **السبب:** كان `/start` يرسل رسالة الترحيب والاحتياط النصي دون
+  `message_thread_id`؛ لذلك قد يحاول Telegram الإرسال إلى General المغلق بدل
+  الموضوع الذي أرسل فيه المستخدم الأمر، وينتهي المسار الاحتياطي بـ`TOPIC_CLOSED`.
+- **التغيير:** تمرير معرّف الموضوع الأصلي إلى Rich Message والنص الاحتياطي.
+  عند رفض Telegram الإرسال بسبب موضوع مغلق، يسجل المسار الخطأ المحدد ولا يعيد
+  محاولة الإرسال أو يوجّه الرسالة إلى موضوع آخر.
+- **الملفات:** `tgcloud/handlers/message.js`,
+  `tests/serverless/message-topic-reply.test.mjs`, `md_files/log.md`.
+- **الاختبارات:** اختبار المسار الجديد واختبارات `forum-default.test.mjs`
+  نجحت (8/8)، و`git diff --check` نجح.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram
+  Serverless.
+
+## 2026-11-21 — تقييد أزرار تسجيل الدخول للمطور
+
+- **السبب:** أزرار `login_url` لا تعمل إلا بنطاق مربوط بالبوت، لذلك لا ينبغي
+  أن يضيفها المستخدم العادي أو يستوردها أو يحفظها في صفحة.
+- **التغيير:** إخفاء خيار النوع للمستخدم العادي ورفض محاولات الإضافة/تغيير
+  النوع والكتابة في بلوك الأزرار واستيراد الرسائل وحفظ صفحات Mini App؛ يسمح
+  بها فقط `isDeveloper` على هوية Telegram الموثوقة. رسالة المنع العربية:
+  «زر تسجيل الدخول غير متاح, لانك لست مخول لاستعماله».
+- **الملفات:** `tgcloud/lib/editor-buttons.js`,
+  `tgcloud/lib/editor-extra-blocks.js`, `tgcloud/lib/editor-core.js`,
+  `tgcloud/lib/button-validation.js`, `tgcloud/lib/miniapp-bridge.js`,
+  `tgcloud/lib/i18n.js`,
+  `tests/serverless/large-button-block.test.mjs`,
+  `tests/serverless/channel-post-edit-import.test.mjs`,
+  `tests/serverless/miniapp-serverless-endpoint.test.mjs`, `md_files/log.md`.
+- **الاختبارات:** الاختبارات المركزة نجحت (59/59)، و`git diff --check` نجح.
+  `npm.cmd test` شغّل 485 اختباراً: نجح 484 وفشل اختبار سابق غير متعلق
+  بالتغيير (`admin-stats.test.mjs` يتوقع عبارة `Golden Ticket` غير الموجودة
+  في `developer.js` المحلية، كما هو موثق في سجل 2026-11-19).
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram
+  Serverless.
+
+## 2026-11-21 — استعادة معاينة النتيجة عند رفض نطاق Login URL
+
+- **السبب:** رفض Telegram معاينة النتيجة كاملةً بـ`BOT_DOMAIN_INVALID` عند
+  وجود زر `login_url` من نطاق غير مربوط مع البوت.
+- **التغيير:** تعيد المعاينة المحاولة مرة واحدة بعد استبعاد أزرار تسجيل الدخول
+  من حمولة المعاينة فقط، وتعرض إرشاد `/setdomain`؛ تبقى المسودة والأزرار
+  المحفوظة دون تعديل. حُذف مثال `login_url` من دليل الأزرار، مع بقاء دعم
+  نوع الزر نفسه للمحتوى الذي يدخله المستخدم.
+- **الملفات:** `tgcloud/lib/editor-block-flow.js`,
+  `tgcloud/lib/editor-guide.js`,
+  `tests/serverless/editor-block-flow-recovery.test.mjs`,
+  `tests/serverless/large-button-block.test.mjs`, `md_files/log.md`.
+- **الاختبارات:** الاختبارات المركزة نجحت (28/28)، و`git diff --check` نجح.
+  `npm.cmd test` شغّل 480 اختباراً: نجح 479 وفشل اختبار سابق غير متعلق
+  بالتغيير (`admin-stats.test.mjs` يتوقع عبارة `Golden Ticket` غير الموجودة
+  في `developer.js` المحلية، كما هو موثق في سجل 2026-11-19).
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Telegram
+  Serverless.
+
 ## 2026-11-19 — استعادة لوحة بلوك المحرر عند رفض نطاق تسجيل الدخول
 
 - **السبب:** رفض Telegram تعديل لوحة إدارة البلوك بـ`BOT_DOMAIN_INVALID`

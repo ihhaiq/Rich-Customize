@@ -18,7 +18,6 @@ function guideCopy(languageCode) {
       [t(locale, 'ux.buttons.type.callback'), [tr(locale, '{Action - callback_data: action:1 #r}')]],
       [tr(locale, '• Copy button:'), [tr(locale, '{Copy - copy: text to copy #g}')]],
       [t(locale, 'ux.buttons.type.web_app'), ['{Open app - web_app: https://example.com #b}']],
-      [t(locale, 'ux.buttons.type.login_url'), ['{Sign in - login_url: https://example.com #b}']],
       [tr(locale, '• Inline search buttons:'), [
         tr(locale, '{Search - switch_inline_query: search words}'),
         tr(locale, '{Search here - switch_inline_query_current_chat: search words}'),

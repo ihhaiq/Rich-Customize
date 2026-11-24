@@ -1,7 +1,7 @@
 import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { richPages } from 'schema';
-import { resolveLanguage, resolveUserLanguage, t } from 'lib/i18n';
+import { resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
 import {
   loadEditorSession,
   updateEditorSession,
@@ -122,6 +122,7 @@ export function buildPagesRichMessage(
   languageCode,
   pageIndex = 0,
   headingText = null,
+  { hideCodes = false } = {},
 ) {
   const copy = pagesCopy(languageCode);
   const blocks = [{
@@ -130,36 +131,63 @@ export function buildPagesRichMessage(
   }];
 
   if (pages.length) {
-    const rows = [[
-      textCell('🗑️', { header: true }),
-      textCell('🕘', { header: true }),
-      textCell('✏️', { header: true }),
-      textCell(copy.copyCode, { header: true }),
-      textCell(copy.sortTitle, { header: true, align: 'right' }),
-    ]];
+    const rows = hideCodes
+      ? [[
+          textCell('🗑️', { header: true }),
+          textCell('✏️', { header: true }),
+          textCell(copy.copyCode, { header: true }),
+          textCell(copy.sortTitle, { header: true, align: 'right' }),
+        ]]
+      : [[
+          textCell('🗑️', { header: true }),
+          textCell('🕘', { header: true }),
+          textCell('✏️', { header: true }),
+          textCell(copy.copyCode, { header: true }),
+          textCell(copy.sortTitle, { header: true, align: 'right' }),
+        ]];
 
     for (const page of pages) {
       const pageId = String(page.pageId);
-      rows.push([
-        buttonCell({
-          text: '🗑️',
-          callback_data: 'r:pdelete:' + pageId + ':' + pageIndex,
-          style: 'danger',
-        }),
-        buttonCell({
-          text: '✏️',
-          callback_data: 'r:prename:' + pageId + ':' + pageIndex,
-        }),
-        buttonCell({
-          text: copy.copyCode,
-          copy_text: { text: pageId },
-        }),
-        buttonCell({
-          text: String(page.title || pageId),
-          callback_data: 'r:pageopen:' + pageId,
-          style: 'primary',
-        }, 'right'),
-      ]);
+      if (hideCodes) {
+        rows.push([
+          buttonCell({
+            text: '🗑️',
+            callback_data: 'r:pdelete:' + pageId + ':' + pageIndex,
+            style: 'danger',
+          }),
+          buttonCell({
+            text: '✏️',
+            callback_data: 'r:prename:' + pageId + ':' + pageIndex,
+          }),
+          buttonCell({ text: copy.copyCode, disabled: {} }),
+          buttonCell({
+            text: String(page.title || tr(languageCode, 'Untitled page')),
+            callback_data: 'r:pageopen:' + pageId,
+            style: 'primary',
+          }, 'right'),
+        ]);
+      } else {
+        rows.push([
+          buttonCell({
+            text: '🗑️',
+            callback_data: 'r:pdelete:' + pageId + ':' + pageIndex,
+            style: 'danger',
+          }),
+          buttonCell({
+            text: '✏️',
+            callback_data: 'r:prename:' + pageId + ':' + pageIndex,
+          }),
+          buttonCell({
+            text: copy.copyCode,
+            copy_text: { text: pageId },
+          }),
+          buttonCell({
+            text: String(page.title || pageId),
+            callback_data: 'r:pageopen:' + pageId,
+            style: 'primary',
+          }, 'right'),
+        ]);
+      }
     }
 
     blocks.push(
@@ -318,17 +346,18 @@ export async function renderPagesScreen(
     resetSearch = false,
     fallbackChatId = null,
     fallbackMessageId = null,
+    hideCodes = false,
     saved = false,
   } = {},
 ) {
   let session = await loadEditorSession(userId, { touch: false });
-  if (!session) return false;
-  if (resetSearch && session.pagesSearchQuery) {
+  if (!session && !hideCodes) return false;
+  if (resetSearch && session?.pagesSearchQuery) {
     session = await updateEditorSession(userId, { pagesSearchQuery: '' });
   }
 
-  const query = String(session.pagesSearchQuery || '');
-  const sortMode = String(session.pagesSortMode || 'updated');
+  const query = String(session?.pagesSearchQuery || '');
+  const sortMode = String(session?.pagesSortMode || 'updated');
   const result = await queryPages(userId, requestedIndex, query, sortMode);
   const copy = pagesCopy(languageCode);
 
@@ -347,6 +376,7 @@ export async function renderPagesScreen(
     languageCode,
     result.pageIndex,
     heading,
+    { hideCodes },
   );
   const replyMarkup = buildPagesKeyboard({
     showControls: result.totalCount > 1,

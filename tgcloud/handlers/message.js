@@ -13,9 +13,14 @@ import {
   buildWelcomeRichMessage,
 } from 'lib/welcome';
 import {
+  buildAnonymousGroupEditorPrompt,
   buildStartEditorKeyboard,
   editorClosedHint,
+  groupEditorAccessText,
+  isGroupEditorChat,
   openEditor,
+  resolveGroupEditorActor,
+  verifyGroupEditorAdmin,
 } from 'lib/editor-home';
 import {
   excludeDeveloperBroadcastBot,
@@ -26,7 +31,7 @@ import { handleMiniAppShortcut } from 'lib/miniapp';
 import { sendPrivacyMessage, sendSupportMessage } from 'lib/legal';
 import { handleShowcaseMessage } from 'lib/showcase';
 import { observeRequest } from 'lib/usage-stats';
-import { resolveUserLanguage } from 'lib/i18n';
+import { resolveLanguage, resolveUserLanguage } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import {
   explainOperationalError,
@@ -69,6 +74,19 @@ function commandArgument(text, name) {
   const parts = text.trim().split(/\s+/);
   if (!parts.length || !matchesCommand(String(parts[0] || '').toLowerCase(), name)) return '';
   return String(parts.slice(1).join(' ') || '').trim();
+}
+
+function messageThreadOptions(message) {
+  const threadId = Number(message?.message_thread_id);
+  return Number.isSafeInteger(threadId) && threadId > 0
+    ? { message_thread_id: threadId }
+    : {};
+}
+
+function isTopicClosedError(error) {
+  return /TOPIC_CLOSED|topic is closed|forum topic is closed/i.test(
+    String(error?.description || error?.message || error),
+  );
 }
 
 async function logErrorSafely(scope, error, context) {
@@ -129,6 +147,103 @@ async function reportDatabaseFailure(message, error) {
   } catch (feedbackError) {
     console.warn('Could not send database outage notice', feedbackError?.name || 'Error');
   }
+}
+
+async function handleGroupEditorEntry(message, updateId, languageCode) {
+  const access = await resolveGroupEditorActor(message);
+  if (access.status === 'admin') {
+    const actor = access.matchedByTitle
+      ? { id: access.userId }
+      : message.from;
+    const actorLanguage = await resolveUserLanguage(actor);
+    await openEditor(
+      message.chat.id,
+      actorLanguage,
+      access.userId,
+      { messageThreadId: message.message_thread_id },
+    );
+    return true;
+  }
+
+  const locale = resolveLanguage(languageCode);
+  let text;
+  let replyMarkup;
+  if (access.status === 'anonymous') {
+    ({ text, reply_markup: replyMarkup } = buildAnonymousGroupEditorPrompt(locale));
+  } else {
+    text = groupEditorAccessText(locale, access.status);
+  }
+  if (access.status === 'unavailable') {
+    await logErrorSafely('editor.group_access', access.error, {
+      updateId,
+      chatId: message?.chat?.id,
+      request: 'editor_entry',
+    });
+  }
+  await api.sendMessage({
+    chat_id: message.chat.id,
+    ...messageThreadOptions(message),
+    text,
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+  });
+  return true;
+}
+
+async function handleGroupEditorInput(message) {
+  let session;
+  let access;
+  if (message?.sender_chat) {
+    access = await resolveGroupEditorActor(message);
+    if (access.status !== 'admin') return false;
+    session = await loadEditorSession(access.userId, { touch: false });
+  } else {
+    const userId = Number(message?.from?.id);
+    if (!Number.isSafeInteger(userId) || userId <= 0 || message?.from?.is_bot) return false;
+    session = await loadEditorSession(userId, { touch: false });
+    if (!session) return false;
+    access = await verifyGroupEditorAdmin(message.chat.id, userId);
+  }
+  if (access.status === 'unavailable') {
+    await logErrorSafely('editor.group_input_access', access.error, {
+      userId: access.userId,
+      chatId: message?.chat?.id,
+    });
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      ...messageThreadOptions(message),
+      text: groupEditorAccessText(
+        await resolveUserLanguage(message?.from),
+        access.status,
+      ),
+    });
+    return true;
+  }
+  if (access.status !== 'admin' || !session) return false;
+
+  let editorMessage = message;
+  if (access.matchedByTitle) {
+    editorMessage = {
+      ...message,
+      from: {
+        ...(message.from || {}),
+        id: access.userId,
+        is_bot: false,
+        language_code: await resolveUserLanguage({ id: access.userId }),
+      },
+    };
+  }
+
+  if (
+    isForwardedRichMessage(editorMessage)
+    && await handleEditorCoreMessage(editorMessage, { confirmReplace: true })
+  ) return true;
+  if (await handleScheduledTimeMessage(editorMessage)) return true;
+  if (await guardLegacyEditorMessage(editorMessage)) return true;
+  if (await handlePremiumEmojiMessage(editorMessage)) return true;
+  if (await handleEditorBlockMessage(editorMessage)) return true;
+  if (await handleEditorButtonMessage(editorMessage)) return true;
+  if (await handleEditorPageMessage(editorMessage)) return true;
+  return handleEditorCoreMessage(editorMessage);
 }
 
 export default async function (message, ctx = {}) {
@@ -201,6 +316,24 @@ export default async function (message, ctx = {}) {
       return;
     }
 
+    const marketingSource = commandArgument(message?.text, 'start');
+    if (
+      matchesCommand(command, 'start')
+      && message?.chat?.type === 'private'
+      && marketingSource === 'group_editor'
+    ) {
+      await openEditor(message.chat.id, languageCode, message.from?.id);
+      return;
+    }
+
+    if (
+      (matchesCommand(command, 'start') || matchesCommand(command, 'editor'))
+      && isGroupEditorChat(message?.chat)
+    ) {
+      await handleGroupEditorEntry(message, updateId, languageCode);
+      return;
+    }
+
     if (await handleDeveloperPendingMessage(message)) return;
     if (await handleMiniAppShortcut(message)) return;
     if (await handleShowcaseMessage(message)) return;
@@ -232,9 +365,11 @@ export default async function (message, ctx = {}) {
     }
 
     if (!matchesCommand(command, 'start')) {
-      // Ordinary editor/input messages are private-chat only.
-      // In groups/supergroups the bot must stay silent unless a supported command
-      // was handled above.
+      // Group input is limited to a verified administrator with an active session.
+      if (isGroupEditorChat(message?.chat)) {
+        await handleGroupEditorInput(message);
+        return;
+      }
       if (String(message?.chat?.type || '') !== 'private') return;
 
       if (await handleTutorialMessage(message)) return;
@@ -289,28 +424,45 @@ export default async function (message, ctx = {}) {
       return;
     }
 
-    const marketingSource = commandArgument(message?.text, 'start');
     if (await sendMarketingLanding(message, marketingSource)) return;
 
     const replyMarkup = buildWelcomeKeyboard(languageCode);
+    const threadOptions = messageThreadOptions(message);
     try {
       await api.sendRichMessage({
         chat_id: message.chat.id,
+        ...threadOptions,
         rich_message: buildWelcomeRichMessage(message.from, languageCode),
         reply_markup: replyMarkup,
       });
     } catch (error) {
-      console.error('sendRichMessage welcome failed; using plain fallback', error);
-      await logErrorSafely('welcome.start_rich_fallback', error, {
+      const errorContext = {
         updateId,
         userId: message?.from?.id,
         chatId: message?.chat?.id,
-      });
-      await api.sendMessage({
-        chat_id: message.chat.id,
-        text: buildWelcomeFallbackText(message.from, languageCode),
-        reply_markup: replyMarkup,
-      });
+        threadId: message?.message_thread_id,
+      };
+      if (isTopicClosedError(error)) {
+        await logErrorSafely('welcome.start_topic_closed', error, errorContext);
+        return;
+      }
+      console.error('sendRichMessage welcome failed; using plain fallback', error);
+      try {
+        await api.sendMessage({
+          chat_id: message.chat.id,
+          ...threadOptions,
+          text: buildWelcomeFallbackText(message.from, languageCode),
+          reply_markup: replyMarkup,
+        });
+      } catch (fallbackError) {
+        if (!isTopicClosedError(fallbackError)) {
+          await logErrorSafely('welcome.start_rich_fallback', error, errorContext);
+          throw fallbackError;
+        }
+        await logErrorSafely('welcome.start_topic_closed', fallbackError, errorContext);
+        return;
+      }
+      await logErrorSafely('welcome.start_rich_fallback', error, errorContext);
     }
   } catch (error) {
     failed = true;

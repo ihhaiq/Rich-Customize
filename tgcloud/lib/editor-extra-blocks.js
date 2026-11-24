@@ -79,6 +79,7 @@ import {
 } from 'lib/editor-albums';
 import {
   checklistPrompt,
+  loginUrlRestrictionMessage,
   resolveLanguage,
   resolveUserLanguage,
   t,
@@ -558,6 +559,7 @@ async function parseLargeButtonInput(input, userId) {
     ].filter(([key]) => Object.hasOwn(button, key));
     if (actions.length !== 1) return { error: 'format' };
     const [, type, value] = actions[0];
+    if (type === 'login_url' && !isDeveloper(userId)) return { error: 'login' };
     if (type === 'url' && /^tg:(?:\/\/)?user(?:[/?#]|$)/i.test(String(value || ''))) {
       return { error: 'user' };
     }
@@ -605,6 +607,12 @@ async function replyLargeButtonInputError(message, error, languageCode) {
       text: localeOf(languageCode) === 'ar'
         ? 'رابط الحساب يحتاج اسم مستخدم عام (@username). استخدم صيغة USER واختار حساباً عنده اسم مستخدم.'
         : tr(localeOf(languageCode), 'Account links require a public @username. Use USER and select an account with one.'),
+    });
+    await sendPrompt(message.from.id, message.chat.id, largeButtonInputPrompt(languageCode));
+  } else if (error === 'login') {
+    await api.sendMessage({
+      chat_id: message.chat.id,
+      text: loginUrlRestrictionMessage(languageCode),
     });
     await sendPrompt(message.from.id, message.chat.id, largeButtonInputPrompt(languageCode));
   } else {

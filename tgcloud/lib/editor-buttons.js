@@ -10,7 +10,8 @@ import {
   buildMessageButtonsKeyboard,
   prepareMessageButtons,
 } from 'lib/page-buttons';
-import { resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
+import { loginUrlRestrictionMessage, resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
+import { isDeveloper } from 'lib/developer-access';
 
 const MAX_BUTTONS = 100;
 const BUTTON_STYLES = new Set(['default', 'primary', 'success', 'danger', 'link']);
@@ -83,6 +84,7 @@ function copy(languageCode) {
     pageLinked: (title) => tr(locale, '✅ Button linked to page “{title}”.', { title }),
     pageMissing: tr(locale, 'The page code does not exist or does not belong to you.'),
     savePageFirst: tr(locale, 'Save a page first so you can link the button to it.'),
+    loginUrlRestricted: loginUrlRestrictionMessage(locale),
     choosePage: tr(locale, 'Choose the page opened by this button:'),
     editing: (title) => t(locale, 'ux.buttons.editing', { title }),
     currentType: (type) => t(locale, 'ux.buttons.current_type', { type }),
@@ -314,11 +316,13 @@ function pickerKeyboard(buttons,action,languageCode) {
   return {inline_keyboard:out};
 }
 function inputKeyboard(languageCode){return {inline_keyboard:[[{text:copy(languageCode).back,callback_data:'r:buttons'}]]};}
-function typeKeyboard(prefix,languageCode) {
+function typeKeyboard(prefix,languageCode,includeLoginUrl=true) {
   const c=copy(languageCode);
+  const webAppTypes=[{text:c.types.web_app,callback_data:prefix+':web_app'}];
+  if(includeLoginUrl)webAppTypes.push({text:c.types.login_url,callback_data:prefix+':login_url'});
   return {inline_keyboard:[
     [{text:c.types.url,callback_data:prefix+':url'}],
-    [{text:c.types.web_app,callback_data:prefix+':web_app'},{text:c.types.login_url,callback_data:prefix+':login_url'}],
+    webAppTypes,
     [{text:c.types.callback_data,callback_data:prefix+':callback_data'},{text:c.types.copy,callback_data:prefix+':copy'}],
     [{text:c.types.popup,callback_data:prefix+':popup'}],
     [{text:c.types.page,callback_data:prefix+':page'}],
@@ -341,7 +345,7 @@ function positionKeyboard(buttons,id,languageCode) {
 }
 function pageKeyboard(pages,id,languageCode) {
   const c=copy(languageCode);
-  const result=pages.map(p=>[{text:'📄 '+String(p.title||p.pageId),callback_data:'r:bpg:change:'+id+':'+p.pageId}]);
+  const result=pages.map(p=>[{text:'📄 '+String(p.title||tr(languageCode,'Untitled page')),callback_data:'r:bpg:change:'+id+':'+p.pageId}]);
   result.push([{text:c.back,callback_data:'r:buttons'}]);return {inline_keyboard:result};
 }
 function deleteKeyboard(id,languageCode){const c=copy(languageCode);return {inline_keyboard:[[{text:c.yesDelete,callback_data:'r:bdelok:'+id,style:'danger'},{text:c.cancel,callback_data:'r:bed:'+id}]]};}
@@ -471,7 +475,7 @@ export async function handleEditorButtonCallback(query) {
       await edit(query,c.editing(button.text||'—'),positionKeyboard(clone(session.messageButtons||[]),id,languageCode));
     }else if(action==='type'){
       await updateEditorSession(userId,{currentButtonId:id});
-      await edit(query,c.editing(button.text||'—'),typeKeyboard('r:bct:'+id,languageCode));
+      await edit(query,c.editing(button.text||'—'),typeKeyboard('r:bct:'+id,languageCode,isDeveloper(userId)));
     }else if(['value','url','title'].includes(action)){
       const pending=action==='title'?'title':'value';
       await prompt(query,userId,pending==='title'?c.sendTitle:c.sendValue,{pendingButtonAction:pending,currentButtonId:id});
@@ -486,7 +490,7 @@ export async function handleEditorButtonCallback(query) {
     if(!b){await api.answerCallbackQuery({callback_query_id:query.id,text:c.missing,show_alert:true});return true;}
     if(action==='style')await edit(query,c.editing(b.text||'—'),styleKeyboard(id,String(b.style||'default'),languageCode));
     else if(action==='move')await edit(query,c.editing(b.text||'—'),positionKeyboard(clone(session.messageButtons||[]),id,languageCode));
-    else if(action==='type'){await updateEditorSession(userId,{currentButtonId:id});await edit(query,c.editing(b.text||'—'),typeKeyboard('r:bct:'+id,languageCode));}
+    else if(action==='type'){await updateEditorSession(userId,{currentButtonId:id});await edit(query,c.editing(b.text||'—'),typeKeyboard('r:bct:'+id,languageCode,isDeveloper(userId)));}
     else if(action==='title'||action==='value')await prompt(query,userId,action==='title'?c.sendTitle:c.sendValue,{pendingButtonAction:action,currentButtonId:id});
     else {await api.answerCallbackQuery({callback_query_id:query.id,text:c.invalid,show_alert:true});return true;}
     await api.answerCallbackQuery({callback_query_id:query.id});return true;
@@ -494,6 +498,7 @@ export async function handleEditorButtonCallback(query) {
   if(data.startsWith('r:bct:')){
     const parts=data.split(':'),id=parts[2],type=parts[3],b=getButton(session.messageButtons||[],id);
     if(!b||!BUTTON_TYPES.has(type)){await api.answerCallbackQuery({callback_query_id:query.id,text:c.invalid,show_alert:true});return true;}
+    if(type==='login_url'&&!isDeveloper(userId)){await api.answerCallbackQuery({callback_query_id:query.id,text:c.loginUrlRestricted,show_alert:true});return true;}
     if(type==='disabled'){
       const buttons=clone(session.messageButtons||[]);changeType(getButton(buttons,id),'disabled','');
       const updated=await saveDraft(userId,session,{messageButtons:buttons,state:'managing',currentButtonId:null});
@@ -576,6 +581,7 @@ export async function handleEditorButtonMessage(message) {
   if(action==='add_spec'){
     const spec=parseSpec(value);if(!spec){await api.sendMessage({chat_id:message.chat.id,text:c.invalidFormat});return true;}
     const [title,type,raw]=spec;if(title.length>64){await api.sendMessage({chat_id:message.chat.id,text:c.longTitle});return true;}
+    if(type==='login_url'&&!isDeveloper(userId)){await api.sendMessage({chat_id:message.chat.id,text:c.loginUrlRestricted});return true;}
     const [normalized,error]=validateValue(type,raw,languageCode);if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:error||c.invalid});return true;}
     if(type==='page'&&!await ownedPage(userId,normalized)){await api.sendMessage({chat_id:message.chat.id,text:c.pageMissing});return true;}
     if(buttons.length>=MAX_BUTTONS){await api.sendMessage({chat_id:message.chat.id,text:c.max});await updateEditorSession(userId,{state:'managing'});return true;}
@@ -584,12 +590,16 @@ export async function handleEditorButtonMessage(message) {
   }else{
     const b=getButton(buttons,String(session.currentButtonId||''));if(!b){await api.sendMessage({chat_id:message.chat.id,text:c.missing});await updateEditorSession(userId,{state:'managing'});return true;}
     if(action==='change_type_value'){
-      const type=String(session.pendingButtonType||''),[normalized,error]=validateValue(type,value,languageCode);if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:error||c.invalid});return true;}
+      const type=String(session.pendingButtonType||'');
+      if(type==='login_url'&&!isDeveloper(userId)){await api.sendMessage({chat_id:message.chat.id,text:c.loginUrlRestricted});return true;}
+      const [normalized,error]=validateValue(type,value,languageCode);if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:error||c.invalid});return true;}
       if(type==='page'&&!await ownedPage(userId,normalized)){await api.sendMessage({chat_id:message.chat.id,text:c.pageMissing});return true;}
       changeType(b,type,normalized);notice=c.typeChanged;
     }else if(action==='title'){b.text=value;notice=c.titleChanged;
     }else if(action==='value'){
-      const old=buttonType(b),[type,raw]=infer(value,old),[normalized,error]=validateValue(type,raw,languageCode);if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:error||c.invalid});return true;}
+      const old=buttonType(b),[type,raw]=infer(value,old);
+      if(type==='login_url'&&!isDeveloper(userId)){await api.sendMessage({chat_id:message.chat.id,text:c.loginUrlRestricted});return true;}
+      const [normalized,error]=validateValue(type,raw,languageCode);if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:error||c.invalid});return true;}
       if(type==='page'&&!await ownedPage(userId,normalized)){await api.sendMessage({chat_id:message.chat.id,text:c.pageMissing});return true;}
       changeType(b,type,normalized);notice=type!==old?c.valueTypeChanged:c.valueChanged;
     }else{await api.sendMessage({chat_id:message.chat.id,text:tr(c.locale,'Button editing ended. Return to the manager and try again.')});await updateEditorSession(userId,{state:'managing'});return true;}

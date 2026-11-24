@@ -85,20 +85,21 @@ data fields, and live tests that need a Rich Donate change. Do not edit that
 separate repository unless the owner explicitly asks, and do not describe its
 work as complete without inspecting and verifying it.
 
-The currently documented external prerequisite is Rich Donate's independent
-implementation and acceptance of the group-routed RDB protocol. A live
-Bot-to-Bot handshake and Telegram Stars acceptance test remain unverified;
-see the receiver status below. Feature-specific pricing, cart, and event
-contract changes must be assessed separately rather than assumed necessary.
+The owner reports that Rich Donate's local code removes the `/rdb_sync_v1`
+receiver and its response, and retries delivery on READY or when events are
+added. That separate source was not inspected here and remains unpushed and
+undeployed per the owner. A live Bot-to-Bot handshake and Telegram Stars
+acceptance test remain unverified; see the receiver status below.
+Feature-specific pricing, cart, and event contract changes must be assessed
+separately rather than assumed necessary.
 
-The current Rich Customize signal-label change is a protocol compatibility
-change: it appends `#مزامنة_ريتش_دونيت` to `/rdb_hello_v1`,
-`/rdb_sync_v1`, and `/rdb_ack_v1`, while accepting either tagged or legacy
-`/rdb_hello_ack_v1`. Local Rich Customize tests cover tagged and untagged
-messages against the receiver harness. Rich Donate's source and live
-acceptance were not independently inspected in this repository review, so do
-not claim the other bot accepts the suffix or that a live handshake succeeds.
-Confirm the target bot identity and the external contract before deployment.
+The periodic RDB relay signal and `/rdb_sync_v1` sender have been removed from
+Rich Customize. The `#مزامنة_ريتش_دونيت` compatibility tag remains on event
+ACKs and optional HELLO ACK parsing; this does not enable periodic sync.
+Rich Donate's source and live acceptance were not independently inspected in
+this repository review, so do not claim the other bot accepts the suffix or
+that a live handshake succeeds. Confirm the target bot identity and the
+external contract before deployment.
 
 ## Rich Donate B2B receiver — source implementation present; live integration unverified
 
@@ -110,12 +111,15 @@ Confirm the target bot identity and the external contract before deployment.
   `/rdb_hello_ack_v1`. Events are bounded and validated against the
   `rich-donate/1` schema and exact Stars combinations; ACKs are targeted back
   to `@RichDonateBot` only after the event row is durable.
-- The existing Cloudflare Cron Worker sends a minimal RCB1 timer signal every
-  ten minutes. Telegram Serverless authenticates the relay, sends
-  `/rdb_hello_v1` until the donation bot is pinned, and sends `/rdb_sync_v1`
-  thereafter. The Worker does not receive or relay event contents, user IDs,
-  or charge IDs. Keep group membership restricted: payment events and opaque
-  Telegram charge IDs are visible to its participants.
+- Rich Customize no longer schedules or sends `/rdb_sync_v1`, and no longer
+  has an RCB1 relay tick for periodic RDB synchronization. The bot continues
+  to accept validated events and sends event ACKs after persistence. The
+  owner-reported READY/event-triggered retries in Rich Donate are not verified
+  from that separate source. Keep group membership restricted: payment events
+  and opaque Telegram charge IDs are visible to its participants.
+- Removing the timer also removes this repository's automatic HELLO sender.
+  There is no READY handler here; a new or unpinned integration needs an
+  externally initiated handshake before event messages can be accepted.
 - `editor_entitlement_events` is the authoritative per-event grant and
   idempotency ledger. Its single-row insert is atomic; active paid access and
   permanent branding are derived from those event rows. This is the approved

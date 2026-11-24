@@ -824,6 +824,42 @@ function isEmptyRichMessageError(error) {
     || /rich message (?:must be non-empty|has no blocks)/i.test(reason);
 }
 
+function isLoginDomainError(error) {
+  return /BOT_DOMAIN_INVALID/i.test(String(error?.description || error?.message || error));
+}
+
+function isLoginUrlButton(button) {
+  return String(button?.type || '') === 'login_url'
+    || Object.hasOwn(button || {}, 'login_url');
+}
+
+function withoutLoginUrlButtons(buttons) {
+  return (Array.isArray(buttons) ? buttons : []).filter((button) => !isLoginUrlButton(button));
+}
+
+function withoutLoginUrlBlockButtons(blocks) {
+  return (Array.isArray(blocks) ? blocks : []).map((block) => {
+    if (!Array.isArray(block?.data?.buttons)) return block;
+    const buttons = withoutLoginUrlButtons(block.data.buttons);
+    if (!buttons.length) {
+      return makeBlock('paragraph', {
+        text: block.data.buttons
+          .filter(isLoginUrlButton)
+          .map((button) => String(button?.text || ''))
+          .filter(Boolean)
+          .join(' · ') || 'Login button',
+      }, block.position, null, block.id);
+    }
+    return {
+      ...block,
+      data: {
+        ...block.data,
+        buttons,
+      },
+    };
+  });
+}
+
 function friendlyRichError(error, code) {
   const reason = String(error?.description || error?.message || error);
   if (/no reusable (?:file_id|media)|wrong file identifier|file_id.*missing/i.test(reason)) {
@@ -991,9 +1027,38 @@ async function previewResult(query, session) {
         ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       });
     } catch (error) {
-      if (!isEmptyRichMessageError(error)) throw error;
-      await recoverEmptyResultPreview(query, session, code);
-      return;
+      if (isEmptyRichMessageError(error)) {
+        await recoverEmptyResultPreview(query, session, code);
+        return;
+      }
+      if (!isLoginDomainError(error)) throw error;
+
+      const previewBlocks = withoutLoginUrlBlockButtons(session.blocks);
+      const previewButtons = withoutLoginUrlButtons(preparedButtons);
+      const hasLoginUrlButton = session.blocks.some((block) =>
+        block?.data?.buttons?.some(isLoginUrlButton))
+        || preparedButtons.some(isLoginUrlButton);
+      if (!hasLoginUrlButton) throw error;
+
+      const retryMarkup = previewButtons.length
+        ? buildMessageButtonsKeyboard(previewButtons, {
+            buttonsPerRow: Number(session.buttonsPerRow || 1),
+            sourcePageId: session.currentPageId || null,
+          })
+        : undefined;
+      sent = await api.sendRichMessage({
+        chat_id: query.from.id,
+        rich_message: buildInputRichMessage(
+          previewBlocks,
+          {
+            userId: session.userId,
+            sourcePageId: session.currentPageId || null,
+            includeBranding,
+          },
+        ),
+        ...(retryMarkup ? { reply_markup: retryMarkup } : {}),
+      });
+      panelNotice = '⚠️ ' + friendlyRichError(error, code);
     }
     if (sent?.message_id != null) {
       const oldIds = Array.isArray(session.previewMessageIds) ? session.previewMessageIds : [];

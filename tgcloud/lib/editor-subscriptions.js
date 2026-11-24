@@ -18,7 +18,7 @@ export const RICH_DONATE_BRANDING_PRICE = 99;
 const PLAN_PRICES = Object.freeze({ free: 0, plus: 150, golden: 350 });
 const MINIAPP_BRIDGE_CHAT_ID = -1003993506865;
 const EDITOR_BOT_USERNAME = 'richcustomizebot';
-const RICH_DONATE_SYNC_TAG = '#مزامنة_ريتش_دونيت';
+const RICH_DONATE_TAG = '#مزامنة_ريتش_دونيت';
 const EVENT_FIELDS = Object.freeze([
   'protocol',
   'event_id',
@@ -256,30 +256,6 @@ async function deleteLastRichDonateRequest() {
   }
 }
 
-export async function runRichDonateB2BTick() {
-  const pinned = await db.select().from(richDonateBridge)
-    .where(eq(richDonateBridge.key, BRIDGE_KEY)).get();
-  await deleteLastRichDonateRequest();
-  const sent = await api.sendMessage({
-    chat_id: MINIAPP_BRIDGE_CHAT_ID,
-    text: pinned
-      ? '/rdb_sync_v1@RichDonateBot ' + RICH_DONATE_SYNC_TAG
-      : '/rdb_hello_v1@RichDonateBot ' + RICH_DONATE_SYNC_TAG,
-    disable_notification: true,
-  });
-  const messageId = Number(sent?.message_id);
-  if (Number.isSafeInteger(messageId) && messageId > 0) {
-    await db.insert(legacyStates).values({
-      namespace: LAST_RICH_DONATE_REQUEST_NAMESPACE,
-      payload: { messageId },
-      updatedAt: nowSeconds(),
-    }).onConflictDoUpdate({
-      target: legacyStates.namespace,
-      set: { payload: { messageId }, updatedAt: nowSeconds() },
-    }).run();
-  }
-}
-
 export async function handleRichDonateB2BMessage(message, { now = nowSeconds() } = {}) {
   const text = String(message?.text || '').trim();
   const commandMatch = text.match(/^\/(rdb_[a-z0-9_]+)(?:@([a-z0-9_]+))?(?:\s|$)/i);
@@ -309,7 +285,7 @@ export async function handleRichDonateB2BMessage(message, { now = nowSeconds() }
   const status = await persistRichDonateEvent(event, now);
   await api.sendMessage({
     chat_id: message.chat.id,
-    text: `/rdb_ack_v1@RichDonateBot ${event.eventId} ${status} ${RICH_DONATE_SYNC_TAG}`,
+    text: `/rdb_ack_v1@RichDonateBot ${event.eventId} ${status} ${RICH_DONATE_TAG}`,
     disable_notification: true,
   });
   return true;

@@ -32,7 +32,7 @@ function fakeWorker(sent,stats) {
   );
 }
 
-test('Cloudflare Cron: scheduled posts, RDB sync and daily subscription scan use separate ticks',async()=>{
+test('Cloudflare Cron: scheduled posts and daily subscription scan use separate ticks',async()=>{
   const sent=[],stats={minute:0,reserved:0};
   const worker=fakeWorker(sent,stats);
   const env={
@@ -53,23 +53,15 @@ test('Cloudflare Cron: scheduled posts, RDB sync and daily subscription scan use
   assert.equal(broadcast.kind,'broadcast');
   assert.equal(broadcast.tag,'#بث');
 
-  await worker.scheduled({cron:'*/10 * * * *'},env,{});
-  assert.equal(stats.minute,1);
-  assert.equal(stats.reserved,3);
-  assert.equal(sent.length,3);
-  assert.match(sent[2].text,/^\/rcb_rdb_tick@RichCustomizebot\n/);
-  const rdbBody=JSON.parse(sent[2].text.split('\n')[1]);
-  assert.equal(rdbBody.protocol,'RCB1');
-  assert.equal(rdbBody.kind,'richdonate_sync');
-  assert.equal(rdbBody.tag,'#مزامنة_ريتش_دونيت');
-  assert.equal(typeof rdbBody.minute,'number');
+  await assert.rejects(worker.scheduled({cron:'*/10 * * * *'},env,{}),/Unknown schedule trigger/);
+  assert.equal(sent.length,2);
 
   await worker.scheduled({cron:'0 9 * * *'},env,{});
   assert.equal(stats.minute,1);
-  assert.equal(stats.reserved,4);
-  assert.equal(sent.length,4);
-  assert.match(sent[3].text,/^\/rcb_subscription_tick@RichCustomizebot\n/);
-  const body=JSON.parse(sent[3].text.split('\n')[1]);
+  assert.equal(stats.reserved,3);
+  assert.equal(sent.length,3);
+  assert.match(sent[2].text,/^\/rcb_subscription_tick@RichCustomizebot\n/);
+  const body=JSON.parse(sent[2].text.split('\n')[1]);
   assert.equal(body.protocol,'RCB1');
   assert.equal(body.kind,'daily');
   assert.equal(body.tag,'#اشتراكات');
@@ -94,10 +86,12 @@ test('Cloudflare Cron omits broadcast ticks unless D1 has an active campaign',as
   assert.match(sent[0].text,/^\/rcb_schedule_due@RichCustomizebot/);
 });
 
-test('minute, ten-minute RDB and daily Cron expressions are deployed by wrangler',()=>{
-  assert.match(wrangler,/crons\s*=\s*\["\* \* \* \* \*",\s*"\*\/10 \* \* \* \*",\s*"0 9 \* \* \*"\]/);
+test('minute and daily Cron expressions are deployed without an RDB reminder',()=>{
+  assert.match(wrangler,/crons\s*=\s*\["\* \* \* \* \*",\s*"0 9 \* \* \*"\]/);
+  assert.doesNotMatch(wrangler,/\*\/10/);
+  assert.doesNotMatch(workerSource,/rcb_rdb_tick|richdonate_sync|RICH_DONATE_SYNC_CRON/);
+  assert.doesNotMatch(bridgeSource,/rcb_rdb_tick|richdonate_sync|runRichDonateB2BTick/);
   assert.match(bridgeSource,/data\.kind!=='daily'/);
-  assert.match(bridgeSource,/data\.kind!=='richdonate_sync'/);
   assert.match(bridgeSource,/data\.kind!=='broadcast'/);
   assert.match(bridgeSource,/runDeveloperBroadcastTick\(data\.minute\)/);
   assert.match(bridgeSource,/receiveSubscriptionReminderSchedule\(scheduleSource\)/);

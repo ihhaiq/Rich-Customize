@@ -101,6 +101,11 @@ export async function harness({
       }
       return { status: 'left' };
     }
+    if (method === 'getChatAdministrators') {
+      const chatKey = String(args?.chat_id);
+      if (apiState.adminListErrors?.[chatKey]) throw apiState.adminListErrors[chatKey];
+      return clone(apiState.administrators?.[chatKey] || []);
+    }
     if (method === 'sendMessage' && apiState.messageSendErrors?.[String(args.chat_id)]) throw apiState.messageSendErrors[String(args.chat_id)];
     if (method === 'sendDocument' && apiState.documentSendErrors) {
       const errors = apiState.documentSendErrors;
@@ -145,7 +150,17 @@ export async function harness({
     if (method === 'editMessageText' && apiState.editError) throw new Error(apiState.editError);
     return { message_id: 100, chat: { id: 1 } };
   } });
-  const apiState = { pack: null, profilePhotos: {}, guestQueryErrors: [], customEmojiStickers: [], fileContent: new Uint8Array() };
+  const apiState = {
+    pack: null,
+    profilePhotos: {},
+    guestQueryErrors: [],
+    customEmojiStickers: [],
+    fileContent: new Uint8Array(),
+    members: {},
+    memberErrors: {},
+    administrators: {},
+    adminListErrors: {},
+  };
   const eq = (column, value) => row => row[column.key] === value;
   const lt = (column, value) => row => row[column.key] < value;
   const sql = (parts, ...values) => {

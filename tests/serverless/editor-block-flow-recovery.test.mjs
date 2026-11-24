@@ -135,6 +135,47 @@ test('result preview explains and preserves a media block without a reusable fil
   assert.equal(session.blocks[0].data.file.file_id, undefined);
 });
 
+test('result preview retries without rejected login URL buttons and preserves the draft', async () => {
+  const h = await harness({ extraModules:{ editorBlocks:'lib/editor-block-flow' } });
+  const buttons = h.blocks.makeBlock('buttons', {
+    buttons:[{ text:'Sign in', type:'login_url', value:'https://example.com/login', url:'https://example.com/login' }],
+  });
+  const website = h.blocks.makeBlock('buttons', {
+    buttons:[{ text:'Website', type:'url', value:'https://example.com', url:'https://example.com' }],
+  });
+  await h.session.createEditorSession(userId, chatId, managementMessageId);
+  await h.session.updateEditorSession(userId, {
+    blocks:[buttons, website],
+    messageButtons:[
+      { text:'Sign in', type:'login_url', value:'https://example.com/login', url:'https://example.com/login' },
+      { text:'Website', type:'url', value:'https://example.com', url:'https://example.com' },
+    ],
+  });
+  h.apiState.richSendErrors = {
+    [String(userId)]: [new Error('BotApiError [400]: Bad Request: BOT_DOMAIN_INVALID')],
+  };
+
+  await h.editorBlocks.handleEditorBlockCallback({
+    id:'preview-login-domain',
+    from:{ id:userId, language_code:'en' },
+    message:{ chat:{ id:chatId, type:'private' }, message_id:managementMessageId },
+    data:'r:result',
+  });
+
+  const sends = h.calls.filter(call => call.method === 'sendRichMessage');
+  assert.ok(sends.length >= 2);
+  assert.ok(JSON.stringify(sends[0].args).includes('login_url'));
+  assert.equal(JSON.stringify(sends[1].args).includes('login_url'), false);
+  assert.ok(JSON.stringify(sends[1].args).includes('https://example.com'));
+  assert.equal(h.calls.some(call =>
+    call.method === 'sendMessage' && /domain/i.test(call.args.text || '')), false);
+  assert.ok(JSON.stringify(h.calls).includes('/setdomain'));
+  const session = await h.session.loadEditorSession(userId, { touch:false });
+  assert.equal(session.blocks[0].data.buttons.length, 1);
+  assert.equal(session.blocks[1].data.buttons.length, 1);
+  assert.equal(session.messageButtons.length, 2);
+});
+
 test('empty-result recovery keeps existing blocks when Telegram rejects the rendered message', async () => {
   const { h, blocks } = await fixture();
   h.apiState.richSendErrors = {

@@ -66,6 +66,29 @@ const CHANNEL_POST_LABELS = Object.freeze({
   'zh-hant':'在迷你應用程式中開啟',
 });
 
+const LOGIN_URL_RESTRICTION_MESSAGES = Object.freeze({
+  ar:'زر تسجيل الدخول غير متاح, لانك لست مخول لاستعماله',
+  de:'Anmelde-URL nicht verfügbar.',
+  en:'Login URL unavailable.',
+  es:'URL de inicio de sesión no disponible.',
+  hi:'लॉगिन URL उपलब्ध नहीं है।',
+  id:'URL login tidak tersedia.',
+  it:'URL di accesso non disponibile.',
+  ja:'ログイン URL は利用できません。',
+  ko:'로그인 URL을 사용할 수 없습니다.',
+  nl:'Login-URL niet beschikbaar.',
+  pl:'URL logowania jest niedostępny.',
+  pt:'URL de login indisponível.',
+  ru:'URL для входа недоступен.',
+  th:'URL เข้าสู่ระบบไม่พร้อมใช้งาน',
+  tr:'Giriş URL’si kullanılamıyor.',
+  uk:'URL для входу недоступний.',
+  ur:'لاگ اِن URL دستیاب نہیں۔',
+  vi:'URL đăng nhập không khả dụng.',
+  'zh-hans':'登录 URL 不可用。',
+  'zh-hant':'登入 URL 無法使用。',
+});
+
 export const TUTORIAL_TRANSLATIONS = Object.freeze({
   "de": germanicTutorials.de,
   "es": romanceTutorials.es,
@@ -819,6 +842,11 @@ export function t(locale, key, values = null) {
 
 export function channelPostMiniAppLabel(locale) {
   return CHANNEL_POST_LABELS[resolveLanguage(locale)] || CHANNEL_POST_LABELS.en;
+}
+
+export function loginUrlRestrictionMessage(locale) {
+  return LOGIN_URL_RESTRICTION_MESSAGES[resolveLanguage(locale)]
+    || LOGIN_URL_RESTRICTION_MESSAGES.en;
 }
 
 function legacyNativeFallback(language, english) {

@@ -50,6 +50,22 @@ function callback(data, messageId = 900) {
   };
 }
 
+test('regular users cannot import a rich message with a login URL button',async()=>{
+  const h=await fixture();
+  await h.core.handleEditorCoreMessage(forwardedMessage({
+    reply_markup:{
+      inline_keyboard:[[{text:'Sign in',login_url:{url:'https://example.com/login'}}]],
+    },
+  }),{confirmReplace:true});
+
+  assert.ok(h.calls.some(call=>call.method==='sendMessage'
+    && call.args.text==='زر تسجيل الدخول غير متاح, لانك لست مخول لاستعماله'));
+  const session=await h.session.loadEditorSession(userId,{touch:false});
+  assert.deepEqual(session.blocks,[]);
+  assert.deepEqual(session.messageButtons,[]);
+  assert.equal(session.pendingUserState,null);
+});
+
 test('forwarded channel post offers edit/import and confirms editing the original message',async()=>{
   const h=await fixture();
   const callbackButtons={

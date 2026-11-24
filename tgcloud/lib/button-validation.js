@@ -29,6 +29,13 @@ function valueOf(button) {
   return String(button?.url || '');
 }
 
+export function containsLoginUrlButton(value) {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(containsLoginUrlButton);
+  if (String(value.type || '') === 'login_url' || Object.hasOwn(value, 'login_url')) return true;
+  return Object.values(value).some(containsLoginUrlButton);
+}
+
 export function validateStoredButton(button, index = 0) {
   if (!button || typeof button !== 'object' || Array.isArray(button)) {
     return { ok: false, code: 'BUTTON_OBJECT', index };

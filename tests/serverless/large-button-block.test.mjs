@@ -359,9 +359,10 @@ test('large-button input reuses rich formats and shows a concise multiple-button
   const details = promptCall.args.rich_message.blocks[3];
   assert.equal(details.type, 'details');
   const detailsText = JSON.stringify(details.blocks);
-  for (const format of ['USER', 'alert:', 'callback_data:', 'copy:', 'web_app:', 'login_url:', 'switch_inline_query']) {
+  for (const format of ['USER', 'alert:', 'callback_data:', 'copy:', 'web_app:', 'switch_inline_query']) {
     assert.ok(detailsText.includes(format), `missing ${format} from the expandable button guide`);
   }
+  assert.equal(detailsText.includes('login_url:'), false);
   assert.ok(detailsText.includes('Multiple buttons side by side'));
   assert.ok(!JSON.stringify(promptCall.args.rich_message.blocks.slice(0, 3)).includes('Website'));
 
@@ -377,7 +378,7 @@ test('large-button input reuses rich formats and shows a concise multiple-button
   ];
   for (let index = 0; index < cases.length; index += 1) {
     const [text, expected] = cases[index];
-    const nextUserId = userId + index + 1;
+    const nextUserId = expected.login_url ? 8997225441 : userId + index + 1;
     await h.session.createEditorSession(nextUserId, nextUserId, 940 + index);
     await h.editorBlocks.handleEditorBlockCallback({
       id: 'large-button-rich-' + index,
@@ -394,6 +395,110 @@ test('large-button input reuses rich formats and shows a concise multiple-button
     const session = await h.session.loadEditorSession(nextUserId, { touch: false });
     assert.deepEqual(session.blocks.at(-1).data.buttons, [expected]);
   }
+});
+
+test('regular users cannot add login URL buttons, while bot developers can', async () => {
+  const h = await harness({
+    extraModules: {
+      editorBlocks: 'lib/editor-block-flow',
+      editorButtons: 'lib/editor-buttons',
+    },
+  });
+  const regularUserId = 78321;
+  await h.session.createEditorSession(regularUserId, regularUserId, 1200);
+  await h.session.updateEditorSession(regularUserId, {
+    messageButtons:[{ id:'existing', text:'Website', type:'url', value:'https://example.com', url:'https://example.com' }],
+  });
+
+  await h.editorButtons.handleEditorButtonCallback({
+    id:'hide-login-url-type',
+    from:{ id:regularUserId, language_code:'en' },
+    message:{ chat:{ id:regularUserId }, message_id:1200 },
+    data:'r:bedit:type:existing',
+  });
+  const typeMenu = h.calls.filter(call => call.method === 'editMessageText').at(-1);
+  assert.equal(typeMenu.args.reply_markup.inline_keyboard.flat()
+    .some(button => button.callback_data === 'r:bct:existing:login_url'), false);
+
+  await h.editorButtons.handleEditorButtonCallback({
+    id:'reject-login-url-type',
+    from:{ id:regularUserId, language_code:'en' },
+    message:{ chat:{ id:regularUserId }, message_id:1200 },
+    data:'r:bct:existing:login_url',
+  });
+  assert.equal(h.calls.at(-1).args.text, 'Login URL unavailable.');
+
+  await h.editorButtons.handleEditorButtonCallback({
+    id:'prompt-login-url',
+    from:{ id:regularUserId, language_code:'en' },
+    message:{ chat:{ id:regularUserId }, message_id:1200 },
+    data:'r:ba',
+  });
+  await h.editorButtons.handleEditorButtonMessage({
+    from:{ id:regularUserId, language_code:'en' },
+    chat:{ id:regularUserId },
+    text:'{Sign in - login_url:https://example.com/login}',
+  });
+  const regularSession = await h.session.loadEditorSession(regularUserId, { touch:false });
+  assert.equal(regularSession.messageButtons.length, 1);
+  assert.ok(h.calls.some(call => call.method === 'sendMessage'
+    && call.args.text === 'Login URL unavailable.'));
+
+  const developerId = 8997225441;
+  await h.session.createEditorSession(developerId, developerId, 1201);
+  await h.editorButtons.handleEditorButtonCallback({
+    id:'developer-login-url',
+    from:{ id:developerId, language_code:'en' },
+    message:{ chat:{ id:developerId }, message_id:1201 },
+    data:'r:ba',
+  });
+  await h.editorButtons.handleEditorButtonMessage({
+    from:{ id:developerId, language_code:'en' },
+    chat:{ id:developerId },
+    text:'{Sign in - login_url:https://example.com/login}',
+  });
+  const developerSession = await h.session.loadEditorSession(developerId, { touch:false });
+  assert.equal(developerSession.messageButtons[0].type, 'login_url');
+});
+
+test('login URL restriction copy is brief and available in every supported locale', async () => {
+  const h = await harness();
+  const locales = [
+    'ar', 'en', 'es', 'de', 'it', 'pt', 'nl', 'pl', 'uk', 'ru',
+    'tr', 'ur', 'hi', 'id', 'ja', 'ko', 'vi', 'th', 'zh-hans', 'zh-hant',
+  ];
+  assert.equal(h.i18n.loginUrlRestrictionMessage('ar'),
+    'زر تسجيل الدخول غير متاح, لانك لست مخول لاستعماله');
+  const english = h.i18n.loginUrlRestrictionMessage('en');
+  assert.equal(english, 'Login URL unavailable.');
+  for (const locale of locales) {
+    const text = h.i18n.loginUrlRestrictionMessage(locale);
+    assert.ok(text.length > 0, locale);
+    if (locale !== 'en') assert.notEqual(text, english, locale);
+  }
+});
+
+test('regular users receive a clear rejection for login URLs in large buttons', async () => {
+  const h = await harness({ extraModules:{ editorBlocks:'lib/editor-block-flow' } });
+  const userId = 78322;
+  await h.session.createEditorSession(userId, userId, 1202);
+  await h.editorBlocks.handleEditorBlockCallback({
+    id:'prompt-restricted-large-button',
+    from:{ id:userId, language_code:'en' },
+    message:{ chat:{ id:userId }, message_id:1202 },
+    data:'r:add:buttons',
+  });
+  await h.editorBlocks.handleEditorBlockMessage({
+    from:{ id:userId, language_code:'en' },
+    chat:{ id:userId },
+    message_id:1203,
+    text:'{Sign in - login_url:https://example.com/login}',
+  });
+
+  assert.ok(h.calls.some(call => call.method === 'sendMessage'
+    && call.args.text === 'Login URL unavailable.'));
+  const session = await h.session.loadEditorSession(userId, { touch:false });
+  assert.equal(session.blocks.some(block => block.type === 'buttons'), false);
 });
 
 test('large-button CBD accepts saved page names and reports invalid references in a quote', async () => {

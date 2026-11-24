@@ -1,5 +1,4 @@
 import { runSubscriptionReminderTick, receiveSubscriptionReminderSchedule } from 'lib/subscription-reminders';
-import { runRichDonateB2BTick } from 'lib/editor-subscriptions';
 import { runDeveloperBroadcastTick } from 'lib/developer';
 import { receiveBirthdayReminder } from 'lib/golden-announcements';
 import { goldenGiftStatus, receiveGiftReminder } from 'lib/golden-gifts';
@@ -25,7 +24,8 @@ import { safePlanLimit } from 'lib/subscription-policy';
 import { isLegacySavedPage } from 'lib/saved-page-policy';
 import { loadEditorSession } from 'lib/editor-session';
 import { allowBridgeRequest, allowMiniAppEndpointRequest } from 'lib/request-guard';
-import { validateStoredButtons } from 'lib/button-validation';
+import { containsLoginUrlButton, validateStoredButtons } from 'lib/button-validation';
+import { loginUrlRestrictionMessage } from 'lib/i18n';
 import {
   listMiniAppDestinations,
   publishPageContentFromBridge,
@@ -520,6 +520,16 @@ async function validatePageInput(payload, { requirePageId = true, previousBlocks
     throw new BridgeError('INVALID_PAGE_PAYLOAD', 'Page payload must be a JSON object.', { alert: true });
   }
   const ownerId = userId(payload.user_id);
+  if (
+    !isDeveloper(ownerId)
+    && (containsLoginUrlButton(payload.blocks) || containsLoginUrlButton(payload.buttons))
+  ) {
+    throw new BridgeError(
+      'LOGIN_URL_FORBIDDEN',
+      loginUrlRestrictionMessage(payload.language_code || 'en'),
+      { alert: true },
+    );
+  }
   const id = requirePageId ? pageId(payload.page_id) : null;
   const title = String(payload.title || '').trim();
   if (!title || title.length > 64) {
@@ -1126,7 +1136,12 @@ export async function handleMiniAppServerlessEndpoint(input, context) {
   }
 
   const id = miniAppEndpointRequestId(input.request_id);
-  const envelope = { ...input, request_id: id, user_id: ownerId };
+  const envelope = {
+    ...input,
+    request_id: id,
+    user_id: ownerId,
+    language_code: context?.initData?.user?.language_code || 'en',
+  };
   const pageIdValue = ['page', 'save', 'delete', 'user_picker'].includes(action)
     || (action === 'publish' && !Array.isArray(input.blocks))
     ? pageId(input.page_id)
@@ -1311,25 +1326,6 @@ export async function handleMiniAppBridgeMessage(message, context = {}) {
       await runDeveloperBroadcastTick(data.minute);
     } finally {
       await deleteBridgeTickMessage(message, 'broadcast');
-    }
-    return true;
-  }
-
-  if (/^\/rcb_rdb_tick@richcustomizebot\b/i.test(scheduleSource)) {
-    if (!isBridgeOrigin(message)) return false;
-    if (message?.forward_origin || message?.forward_from || message?.forward_from_chat
-        || message?.forward_sender_name || message?.forward_date || message?.via_bot
-        || message?.sender_chat || message?.external_reply) return true;
-    await authorizeBridgeMessage(message,'richdonate_sync');
-    try {
-      const payload=scheduleSource.match(/^\/rcb_rdb_tick@richcustomizebot\s+([^\n]+)$/i);
-      let data=null;try{data=JSON.parse(payload?.[1]||'');}catch{return true;}
-      const minute=Math.floor(Date.now()/60000);
-      if(data?.protocol!=='RCB1'||data.kind!=='richdonate_sync'||!Number.isSafeInteger(data.minute)
-         ||Math.abs(data.minute-minute)>15)return true;
-      await runRichDonateB2BTick();
-    } finally {
-      await deleteBridgeTickMessage(message, 'richdonate_sync');
     }
     return true;
   }

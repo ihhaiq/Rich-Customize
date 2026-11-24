@@ -7,7 +7,6 @@ import { reserveBridgeSlot } from '../../functions/_lib/b2b-bridge.js';
 
 const BRIDGE_CHAT_ID = -1003993506865;
 const MINUTE_CRON = '* * * * *';
-const RICH_DONATE_SYNC_CRON = '*/10 * * * *';
 const SUBSCRIPTIONS_DAILY_CRON = '0 9 * * *'; // 09:00 UTC, once daily.
 
 export async function broadcastTickEnabled(db) {
@@ -47,17 +46,6 @@ export default {
         minute: Math.floor(Date.now() / 60000),
       }));
       console.log('Daily subscription reminder scan requested');
-      return;
-    }
-
-    if (event.cron === RICH_DONATE_SYNC_CRON) {
-      await dispatch('/rcb_rdb_tick@RichCustomizebot\n' + JSON.stringify({
-        protocol: 'RCB1',
-        kind: 'richdonate_sync',
-        tag: '#مزامنة_ريتش_دونيت',
-        minute: Math.floor(Date.now() / 60000),
-      }));
-      console.log('Rich Donate B2B sync requested');
       return;
     }
 

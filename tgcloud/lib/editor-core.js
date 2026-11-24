@@ -29,7 +29,9 @@ import { openEditor } from 'lib/editor-home';
 import { directMiniAppLink } from 'lib/miniapp';
 import { parseMessageButtons, parseRichMessage, clone, orderBlocks, templateBlocks, TEMPLATE_IDS, TYPES, advice, applyAdvice, blockAt, fromInput, exampleBlock } from 'lib/editor-import';
 import { buildMessageButtonsKeyboard } from 'lib/page-buttons';
-import { resolveLanguage, t, tr } from 'lib/i18n';
+import { loginUrlRestrictionMessage, resolveLanguage, t, tr } from 'lib/i18n';
+import { isDeveloper } from 'lib/developer-access';
+import { containsLoginUrlButton } from 'lib/button-validation';
 
 function languageCode(source) {
   return source?.from?.language_code || 'en';
@@ -809,6 +811,16 @@ export async function handleEditorCoreMessage(
 
   const code = languageCode(message);
   const draft = importedDraft(message);
+  if (
+    !isDeveloper(userId)
+    && (containsLoginUrlButton(draft.blocks) || containsLoginUrlButton(draft.messageButtons))
+  ) {
+    await api.sendMessage({
+      chat_id:message.chat.id,
+      text:loginUrlRestrictionMessage(code),
+    });
+    return true;
+  }
   if (!draft.blocks.length) {
     await api.sendMessage({
       chat_id:message.chat.id,

@@ -94,7 +94,10 @@ function copy(code) {
       ? 'ماكو تغييرات ازامنها.'
       : tr(locale, 'There are no changes to sync.'),
     savedNotice: (title) => tr(locale, '✅ Saved page “{title}”.', { title }),
-    savedMessage: (id, updated) => {
+    savedMessage: (id, updated, includeCode = true) => {
+      if (!includeCode) {
+        return tr(locale, updated ? '✅ Saved page changes.' : '✅ Page saved.');
+      }
       const prefix = tr(locale, updated ? '✅ Saved page changes.\n\nCode: ' : '✅ Page saved.\n\nCode: ');
       return prefix + id
         + '\n\n' + tr(locale, 'You can use it inside text like this:') + '\n'
@@ -385,6 +388,9 @@ export async function handleEditorPageCallback(query) {
   if (!query?.from?.id) return false;
   const code = languageCode(query);
   const c = copy(code);
+  const groupChat = ['group', 'supergroup'].includes(
+    String(query?.message?.chat?.type || ''),
+  );
 
   if (data === 'r:pages' || data.startsWith('r:pages:') || data.startsWith('r:presults:')) {
     const rendered = await renderPagesScreen(
@@ -395,6 +401,7 @@ export async function handleEditorPageCallback(query) {
         resetSearch: data === 'r:pages',
         fallbackChatId: query.message?.chat?.id,
         fallbackMessageId: query.message?.message_id,
+        hideCodes: groupChat,
       },
     );
     await api.answerCallbackQuery({
@@ -781,7 +788,7 @@ async function receiveSaveName(message, session, code) {
 
     await api.sendMessage({
       chat_id: message.chat.id,
-      text: c.savedMessage(id, existingId === id),
+      text: c.savedMessage(id, existingId === id, message.chat?.type === 'private'),
     });
     await editSavedPanel(userId, updated, code, c.savedNotice(title));
     return true;

@@ -93,6 +93,7 @@ export function editorDashboardText(session, languageCode, notice = null) {
   const locale = resolveLanguage(languageCode);
   const blocks = Array.isArray(session?.blocks) ? session.blocks : [];
   const buttons = Array.isArray(session?.messageButtons) ? session.messageButtons : [];
+  const groupChat = Number(session?.managementChatId || session?.chatId) < 0;
   const lines = [];
   if (notice) lines.push(notice, '');
   lines.push(
@@ -102,7 +103,9 @@ export function editorDashboardText(session, languageCode, notice = null) {
     '',
     pageInfoTitle(languageCode) + ': '
       + (session?.currentPageId
-        ? (session.currentPageTitle || session.currentPageId)
+        ? (session.currentPageTitle || (
+            groupChat ? tr(locale, 'Untitled page') : session.currentPageId
+          ))
         : pageUnsavedText(languageCode)),
     '',
     t(locale, 'common.choose_action'),
@@ -154,9 +157,18 @@ function pageInfoRichText(languageCode) {
 
 function pageInfoButtons(session, languageCode) {
   const pageId = String(session?.currentPageId || '');
-  const pageTitle = String(session?.currentPageTitle || pageId || '');
+  const groupChat = Number(session?.managementChatId || session?.chatId) < 0;
+  const pageTitle = String(session?.currentPageTitle || (
+    groupChat ? tr(resolveLanguage(languageCode), 'Untitled page') : pageId
+  ) || '');
   const pageButton = pageId
-    ? {
+    ? groupChat
+      ? {
+          text:pageTitle,
+          disabled:{},
+          style:'primary',
+        }
+      : {
         text:pageTitle || pageId,
         copy_text:{ text:pageId },
         style:'primary',
