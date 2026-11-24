@@ -479,7 +479,8 @@ function broadcastProgress(job) {
     positiveSafeInteger(job.sent)
       + positiveSafeInteger(job.failed)
       + positiveSafeInteger(job.uncertain)
-      + positiveSafeInteger(job.skippedSubscribers));
+      + positiveSafeInteger(job.skippedSubscribers)
+      + positiveSafeInteger(job.membershipCheckFailed));
   return {
     total,
     processed,
@@ -518,6 +519,8 @@ function broadcastReport(job) {
     + 'القنوات والمجموعات: ' + Number(job.totalChats || 0).toLocaleString() + '\n'
     + 'مستثنون لأنهم مشتركوا @RichCustomize: '
       + Number(job.skippedSubscribers || 0).toLocaleString() + '\n'
+    + 'تعذر التحقق من عضويتهم (لم تُرسل لهم): '
+      + Number(job.membershipCheckFailed || 0).toLocaleString() + '\n'
     + 'قبلها Telegram: ' + Number(job.sent || 0).toLocaleString() + '\n'
     + 'تعذر الإرسال: ' + Number(job.failed || 0).toLocaleString() + '\n'
     + 'نتيجة غير مؤكدة: ' + Number(job.uncertain || 0).toLocaleString() + '\n'
@@ -623,6 +626,12 @@ function isTerminalBroadcastDestinationError(error) {
   return error instanceof BotApiError && [400, 403].includes(Number(error.code));
 }
 
+function isInvalidBroadcastMembershipParticipant(error) {
+  return error instanceof BotApiError
+    && Number(error.code) === 400
+    && /PARTICIPANT_ID_INVALID/i.test(String(error.description || error.message || ''));
+}
+
 async function loadBroadcastOutcome(job, index) {
   const chunkIndex = Math.floor(index / BROADCAST_RESULT_CHUNK_SIZE);
   const chunk = await loadBroadcast(broadcastOutcomeNamespace(job.jobId, chunkIndex));
@@ -703,14 +712,15 @@ async function broadcastReportPage(job, start) {
     records.push(record);
   }
   const lines = [
-    'تفاصيل المستخدمين والقنوات والمجموعات التي تعذر الإرسال إليها أو كانت النتيجة غير مؤكدة',
+    'تفاصيل المستخدمين والقنوات والمجموعات التي تعذر الإرسال إليها أو التحقق منها أو كانت النتيجة غير مؤكدة',
     'Chat/User ID\tالنوع\tالحالة\tالسبب\tTelegram code\tالتفصيل',
     ...records.map((record) => [
       Number(record[0]),
       Number(record[0]) < 0
         ? 'قناة/مجموعة'
         : record[3] === 'BOT_ACCOUNT' ? 'بوت' : 'مستخدم',
-      record[1] === 'failed' ? 'تعذر الإرسال' : 'نتيجة غير مؤكدة',
+      record[1] === 'failed' ? 'تعذر الإرسال'
+        : record[1] === 'skipped' ? 'لم تُرسل' : 'نتيجة غير مؤكدة',
       broadcastOutcomeReason(record[3]),
       record[2] == null ? '—' : String(record[2]),
       String(record[4] || ''),
@@ -1054,6 +1064,29 @@ export async function runDeveloperBroadcastTick(minute = Math.floor(Date.now() /
             job.rateLimited = Number(job.rateLimited || 0) + 1;
             await saveBroadcast(jobNamespace, job);
             return true;
+          }
+          if (isInvalidBroadcastMembershipParticipant(error)) {
+            if (!job.membershipCheckErrorLogged) {
+              await logBroadcastError('developer.broadcast.membership', error, {
+                userId: destinationId,
+                chatId: job.actorId,
+                extra: 'membership_channel=' + BROADCAST_MEMBERSHIP_CHANNEL,
+              });
+              job.membershipCheckErrorLogged = true;
+            }
+            job.cursor = destinationId;
+            job.membershipCheckFailed = Number(job.membershipCheckFailed || 0) + 1;
+            job.attempted = Number(job.attempted || 0) + 1;
+            job.pendingOutcomes = Array.isArray(job.pendingOutcomes) ? job.pendingOutcomes : [];
+            job.pendingOutcomes.push([
+              destinationId,
+              'skipped',
+              Number(error.code),
+              'MEMBERSHIP_CHECK_FAILED',
+              '',
+            ]);
+            await saveBroadcast(jobNamespace, job);
+            continue;
           }
           await logBroadcastError('developer.broadcast.membership', error, {
             userId: destinationId,

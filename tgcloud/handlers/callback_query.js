@@ -70,7 +70,10 @@ async function logErrorSafely(scope, error, context) {
 async function reportDatabaseFailure(query, error) {
   console.error('Telegram Serverless database unavailable while handling a callback');
   if (!query?.id) return;
-  const notice = userOperationalError(error, query?.from?.language_code || 'ar');
+  const notice = userOperationalError(error, query?.from?.language_code || 'ar', {
+    scope: errorScope,
+    callbackData: query?.data,
+  });
   try {
     await api.answerCallbackQuery({
       callback_query_id: query.id,
@@ -206,7 +209,12 @@ export default async function (query, ctx = {}) {
       await reportDatabaseFailure(query, error);
       return;
     }
-    const guide = explainOperationalError(error);
+    const isBroadcastCallback = String(query?.data || '').startsWith('dev:broadcast');
+    const errorScope = isBroadcastCallback ? 'developer.broadcast.callback' : 'callback_query';
+    const guide = explainOperationalError(error, {
+      scope: errorScope,
+      callbackData: query?.data,
+    });
     if (guide.silent) {
       console.warn('Harmless callback response rejected by Telegram', guide.code);
       return;
@@ -224,7 +232,7 @@ export default async function (query, ctx = {}) {
       console.warn('Could not report failed callback to user', alertError);
     }
     if (!['EDITOR_LIMIT_REACHED','LEGACY_PAGE_READ_ONLY'].includes(guide.code)) {
-      await logErrorSafely('callback_query', error, {
+      await logErrorSafely(errorScope, error, {
         updateId, userId: query?.from?.id,
         chatId: query?.message?.chat?.id,
         threadId: query?.message?.message_thread_id,

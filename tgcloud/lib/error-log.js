@@ -182,6 +182,14 @@ function errorTypeTitle(scope) {
     'page_navigation.home': 'خطأ الصفحة الرئيسية',
     'page_navigation.restore': 'خطأ استعادة رسالة Ephemeral',
     'publish.send': 'خطأ نشر',
+    'developer.broadcast.source': 'خطأ رسالة مصدر الإذاعة',
+    'developer.broadcast.membership': 'خطأ فحص عضوية الإذاعة',
+    'developer.broadcast.membership_access': 'خطأ صلاحية قناة الإذاعة',
+    'developer.broadcast.delivery': 'خطأ إرسال الإذاعة',
+    'developer.broadcast.control': 'خطأ تحكم الإذاعة',
+    'developer.broadcast.report': 'خطأ تقرير الإذاعة',
+    'developer.broadcast.callback': 'خطأ زر الإذاعة',
+    'developer.broadcast.tick': 'خطأ دفعة الإذاعة',
     'miniapp_bridge.request': 'خطأ جسر التطبيق المصغر',
     'miniapp_bridge.response': 'خطأ رد جسر التطبيق المصغر',
     'miniapp_bridge.state': 'خطأ حالة جسر التطبيق المصغر',
@@ -202,7 +210,7 @@ function tableCell(text, header = false) {
 }
 
 function detailRows(scope, error, context) {
-  const explanation = explainOperationalError(error);
+  const explanation = explainOperationalError(error, { ...context, scope });
   const rows = [
     ['المصدر', sanitize(scope || 'unknown')],
     ['التصنيف', sanitize(explanation.code)],

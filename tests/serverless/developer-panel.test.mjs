@@ -657,6 +657,86 @@ test('developer broadcasts send a private completion report with failed user IDs
   assert.ok(statements.some(queryText => queryText.includes('UNION SELECT user_id FROM editor_sessions')));
 });
 
+test('broadcast skips users with unknown membership and reports only after the remaining audience is sent', async () => {
+  const h = await developerHarness({
+    queryHandler: statement => {
+      const query = statement.query;
+      if (query.includes('MAX(audience.user_id)')) {
+        return [{ total: 3, max_user_id: 202, private_users: 3 }];
+      }
+      if (query.includes('audience.user_id > 202')) return [];
+      if (query.includes('audience.user_id > 151')) return [{ user_id: 202 }];
+      if (query.includes('audience.user_id > 101')) return [{ user_id: 151 }, { user_id: 202 }];
+      return [{ user_id: 101 }, { user_id: 151 }, { user_id: 202 }];
+    },
+  });
+  const { jobNamespace } = await startBroadcast(h);
+  h.apiState.memberErrors = {
+    101: new h.BotApiError(400, 'Bad Request: PARTICIPANT_ID_INVALID'),
+    151: new h.BotApiError(400, 'Bad Request: PARTICIPANT_ID_INVALID'),
+  };
+  const minute = Math.floor(Date.now() / 60000) + 1;
+
+  await h.developer.runDeveloperBroadcastTick(minute);
+
+  const jobRecord = h.records.legacyStates.find(row => row.namespace === jobNamespace);
+  assert.equal(jobRecord.payload.membershipCheckFailed, 2);
+  assert.equal(jobRecord.payload.sent, 1);
+  assert.equal(jobRecord.payload.failed, 0);
+  assert.equal(h.calls.some(call => call.method === 'sendDocument'), false);
+  assert.equal(h.calls.filter(call => call.method === 'copyMessage'
+    && call.args.chat_id === 202).length, 1);
+
+  await h.developer.runDeveloperBroadcastTick(minute + 1);
+
+  const active = h.records.legacyStates.find(row =>
+    row.namespace === 'developer_broadcast:v1:active');
+  assert.equal(active.payload.status, 'done');
+  const reportIndex = h.calls.findIndex(call => call.method === 'sendDocument');
+  const finalDeliveryIndex = h.calls.findIndex(call => call.method === 'copyMessage'
+    && call.args.chat_id === 202);
+  assert.ok(reportIndex > finalDeliveryIndex);
+  const report = h.calls[reportIndex];
+  const content = new TextDecoder().decode(new Uint8Array(Object.values(report.args.document.data)));
+  assert.match(report.args.caption, /تعذر التحقق من عضويتهم \(لم تُرسل لهم\): ٢/);
+  assert.match(content, /101\tمستخدم\tلم تُرسل\tتعذر التحقق من عضوية القناة الرسمية/);
+  assert.match(content, /151\tمستخدم\tلم تُرسل\tتعذر التحقق من عضوية القناة الرسمية/);
+  assert.equal(h.loggedErrors.length, 1);
+  assert.equal(h.loggedErrors[0].scope, 'developer.broadcast.membership');
+  assert.equal(h.loggedErrors[0].context.userId, 101);
+});
+
+test('broadcast error notifications classify scoped failures instead of showing an unclassified error', async () => {
+  const h = await harness({ extraModules: { errorLog: 'lib/error-log' } });
+  h.records.legacyStates.push({
+    namespace: 'error_log',
+    payload: {
+      enabled: true,
+      chat_id: 9001,
+      title: 'Broadcast error log',
+      username: null,
+      last_error_key: null,
+      last_error_at: 0,
+    },
+    updatedAt: 0,
+  });
+
+  await h.errorLog.logError(
+    'developer.broadcast.delivery',
+    new Error('new internal broadcast failure'),
+    { userId: 101, chatId: 8997225441 },
+  );
+
+  const notification = h.calls.find(call => call.method === 'sendRichMessage'
+    && call.args.chat_id === 9001);
+  assert.ok(notification);
+  const table = notification.args.rich_message.blocks.find(block => block.type === 'table');
+  const rows = new Map(table.cells.slice(1).map(row => [row[0].text, row[1].text]));
+  assert.equal(rows.get('المصدر'), 'developer.broadcast.delivery');
+  assert.equal(rows.get('التصنيف'), 'BROADCAST_INTERNAL_ERROR');
+  assert.equal(notification.args.rich_message.blocks[0].text, '🚨 خطأ إرسال الإذاعة');
+});
+
 test('developer broadcast retries a failed private completion report and logs the report error', async () => {
   const h = await developerHarness({
     queryHandler: statement => statement.query.includes('MAX(audience.user_id)')

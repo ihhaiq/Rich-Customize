@@ -49,6 +49,75 @@ test('invalid user links in editor edits are not misreported as publish failures
   assert.match(result.reason, /ليس فشلاً في التعرّف/);
   assert.match(result.action, /t\.me/);
 });
+test('invalid channel participants are recognized as unknown membership checks', () => {
+  const result = explainOperationalError(new Error(
+    'BotApiError [400]: Bad Request: PARTICIPANT_ID_INVALID | api.getChatMember failed',
+  ));
+  assert.equal(result.code, 'BROADCAST_MEMBERSHIP_UNKNOWN');
+  assert.equal(result.kind, 'expected');
+  assert.match(result.reason, /لم تثبت حالة اشتراك/);
+  assert.match(result.action, /لا ترسل/);
+});
+test('known broadcast invariant and input failures have explicit classifications', () => {
+  for (const [marker, code, expected] of [
+    ['BROADCAST_CONTROL_STATUS_INVALID', 'BROADCAST_CONTROL_STATUS_INVALID', false],
+    ['BROADCAST_EXCLUSION_ID_INVALID', 'BROADCAST_EXCLUSION_ID_INVALID', false],
+    ['BROADCAST_BOT_ID_UNAVAILABLE', 'BROADCAST_BOT_ID_UNAVAILABLE', false],
+    ['BROADCAST_CHANNEL_ADMIN_REQUIRED', 'BROADCAST_CHANNEL_ADMIN_REQUIRED', true],
+    ['BROADCAST_MEMBERSHIP_STATUS_INVALID', 'BROADCAST_MEMBERSHIP_STATUS_INVALID', false],
+    ['BROADCAST_OUTCOME_CHUNK_INVALID', 'BROADCAST_OUTCOME_CHUNK_INVALID', false],
+    ['BROADCAST_OUTCOME_CONFLICT', 'BROADCAST_OUTCOME_CONFLICT', false],
+    ['BROADCAST_OUTCOME_SEQUENCE_INVALID', 'BROADCAST_OUTCOME_SEQUENCE_INVALID', false],
+    ['BROADCAST_OUTCOME_MISSING', 'BROADCAST_OUTCOME_MISSING', false],
+    ['BROADCAST_SOURCE_UNSUPPORTED', 'BROADCAST_SOURCE_UNSUPPORTED', true],
+  ]) {
+    const result = explainOperationalError(new Error(marker), {
+      scope: 'developer.broadcast.delivery',
+    });
+    assert.equal(result.code, code, marker);
+    assert.equal(result.expected, expected, marker);
+  }
+
+  const source = explainOperationalError(new Error('Bad Request: MESSAGE_ID_INVALID'), {
+    scope: 'developer.broadcast.source',
+  });
+  assert.equal(source.code, 'BROADCAST_SOURCE_UNAVAILABLE');
+});
+test('unknown errors in broadcast scopes retain a broadcast-specific classification', () => {
+  const internal = explainOperationalError(new Error('new internal broadcast failure'), {
+    scope: 'developer.broadcast.report',
+  });
+  assert.equal(internal.code, 'BROADCAST_INTERNAL_ERROR');
+  assert.equal(internal.expected, false);
+  assert.match(userOperationalError(
+    new Error('new internal broadcast failure'),
+    'ar',
+    { scope: 'developer.broadcast.report' },
+  ), /مسار الإذاعة/);
+
+  const telegram = Object.assign(
+    new Error('Bad Request: NEW_TELEGRAM_ERROR'),
+    { name: 'BotApiError', code: 400 },
+  );
+  assert.equal(
+    explainOperationalError(telegram, { scope: 'developer.broadcast.delivery' }).code,
+    'BROADCAST_TELEGRAM_ERROR',
+  );
+  assert.equal(
+    explainOperationalError(new Error('new callback failure'), {
+      scope: 'callback_query',
+      callbackData: 'dev:broadcast:confirm',
+    }).code,
+    'BROADCAST_INTERNAL_ERROR',
+  );
+  assert.equal(
+    explainOperationalError(new Error('new cleanup failure'), {
+      scope: 'miniapp_bridge.tick_cleanup',
+      extra: 'kind=broadcast',
+    }).code,
+    'BROADCAST_INTERNAL_ERROR',
+  );
+});
 test('custom emoji and missing packs are differentiated', () => {
   assert.equal(explainOperationalError(new Error('RICH_MESSAGE_EMOJI_INVALID')).code, 'RICH_EMOJI_INVALID');
   assert.equal(explainOperationalError(new Error('STICKERSET_INVALID')).code, 'EMOJI_PACK_UNAVAILABLE');

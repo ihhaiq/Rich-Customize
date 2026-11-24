@@ -141,7 +141,7 @@ async function reportDatabaseFailure(message, error) {
     ? (locale.startsWith('ar')
       ? 'قاعدة البيانات غير متاحة مؤقتاً. إذا انخصمت النجوم لا تعيد الدفع؛ تحقق من الترخيص أو تواصل مع الدعم.'
       : 'The database is temporarily unavailable. If Stars were charged, do not pay again; check your entitlement or contact support.')
-    : userOperationalError(error, locale);
+    : userOperationalError(error, locale, { scope: errorScope });
   try {
     await api.sendMessage({ chat_id: message.chat.id, text: notice });
   } catch (feedbackError) {
@@ -474,15 +474,19 @@ export default async function (message, ctx = {}) {
       await reportDatabaseFailure(message, error);
       return;
     }
-    const guide = explainOperationalError(error);
+    const isBroadcastTick = /^\/rcb_broadcast_tick@richcustomizebot(?:\s|$)/i
+      .test(String(message?.text || ''));
+    const errorScope = isBroadcastTick ? 'developer.broadcast.tick' : 'message';
+    const guide = explainOperationalError(error, { scope: errorScope });
     // Normal plan quota rejections and old-page editing attempts are
     // expected user actions, not production incident alerts.
     if (!['EDITOR_LIMIT_REACHED','LEGACY_PAGE_READ_ONLY'].includes(guide.code)) {
-      await logErrorSafely('message', error, {
+      await logErrorSafely(errorScope, error, {
         updateId,
         userId: message?.from?.id,
         chatId: message?.chat?.id,
         threadId: message?.message_thread_id,
+        ...(isBroadcastTick ? { extra: 'command=rcb_broadcast_tick' } : {}),
       });
     }
     // Avoid leaking exception text, tokens or technical details to users.
