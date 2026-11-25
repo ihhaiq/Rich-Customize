@@ -210,6 +210,8 @@ export const MAIN_AR_BY_EN = Object.freeze({
   "Invalid button type. Return to the management panel and try again.": "نوع الزر غير صالح. ارجع إلى لوحة الإدارة وحاول مجدداً.",
   "Invalid cell selection.": "اختيار خلية غير صالح.",
   "Invalid chat selection.": "اختيار محادثة غير صالح.",
+  "Administrator access is missing; check permissions for both the bot and your account.": "صلاحيات المشرف غير مكتملة؛ تحقق من صلاحيات البوت وحسابك في هذه المحادثة.",
+  "Could not verify access to this destination. Try again later.": "تعذر التحقق من صلاحيات هذه الوجهة. حاول مرة أخرى لاحقًا.",
   "Invalid heading level.": "مستوى العنوان غير صالح.",
   "Invalid inner block type.": "نوع بلوك داخلي غير صالح.",
   "Invalid page code.": "كود الصفحة غير صالح.",

@@ -9,17 +9,21 @@ const slashInput = $("slashInput");
 const slashMenu = $("slashMenu");
 const slashItems = $("slashItems");
 const slashQuery = $("slashQuery");
+const blockSearch = $("blockSearch");
+const blockCategoryFilters = $("blockCategoryFilters");
 const blockMenu = $("blockMenu");
 const blockActions = $("blockActions");
 const blockMenuTitle = $("blockMenuTitle");
 const pageTitle = $("pageTitle");
 const saveState = $("saveState");
+const savePageBtn = $("savePageBtn");
 const undoBtn = $("undoBtn");
 const redoBtn = $("redoBtn");
 const pagesPanel = $("pagesPanel");
 const sendPanel = $("sendPanel");
 const backdrop = $("backdrop");
 const pagesEl = $("pages");
+const pagesSearch = $("pagesSearch");
 const destinationsEl = $("destinations");
 
 let current = null;
@@ -609,6 +613,9 @@ function updateSaveState(text,{saving=false,saved=false}={}){
   saveState.textContent=text;
   saveState.classList.toggle("is-saving",Boolean(saving));
   saveState.classList.remove("is-saved");
+  savePageBtn.classList.toggle("hidden",!dirty);
+  savePageBtn.disabled=Boolean(saving);
+  savePageBtn.setAttribute("aria-label",saving?mt("save.saving"):mt("common.save"));
   if(saved&&editorMotionAllowed()){
     void saveState.offsetWidth;
     saveState.classList.add("is-saved");
@@ -1063,25 +1070,76 @@ function openBlockMenu(block){
   blockMenu.classList.remove("hidden");
 }
 
-function filteredBlocks(query="",types=null){const q=query.trim().toLowerCase();return BLOCKS.filter(item=>(!types||types.includes(item.type))&&(!q||`${item.type} ${item.label} ${item.keys}`.toLowerCase().includes(q)))}
-function openSlashMenu(query="",types=null){
-  blockMenu.classList.add("hidden");slashItems.innerHTML="";slashQuery.textContent=query?`/${query}`:"/";const items=filteredBlocks(query,types);
+function filteredBlocks(query="",types=null){const q=query.trim().toLocaleLowerCase();return BLOCKS.filter(item=>(!types||types.includes(item.type))&&(!q||`${item.type} ${item.label} ${item.desc} ${item.keys}`.toLocaleLowerCase().includes(q)))}
+let activeBlockCategory="";
+function renderBlockFilters(){
+  const categories=[
+    ["",mt("common.all")],
+    ["text",mt("top.text")],
+    ["list",mt("top.list")],
+    ["table",mt("top.table")],
+    ["media",mt("top.media")],
+    ["math",mt("top.math")],
+  ];
+  blockCategoryFilters.innerHTML="";
+  categories.forEach(([key,label])=>{
+    const button=document.createElement("button");
+    button.type="button";
+    button.className="block-category-filter";
+    button.textContent=label;
+    button.setAttribute("aria-pressed",String(activeBlockCategory===key));
+    button.addEventListener("click",()=>{
+      activeBlockCategory=key;
+      renderBlockFilters();
+      renderSlashItems(blockSearch.value);
+    });
+    blockCategoryFilters.appendChild(button);
+  });
+}
+function renderSlashItems(query="",types=null){
+  slashItems.innerHTML="";
+  const categoryTypes=activeBlockCategory?CATEGORIES[activeBlockCategory]:null;
+  const items=filteredBlocks(query,types||categoryTypes);
   if(!items.length){const empty=document.createElement("div");empty.className="empty";empty.textContent=mt("editor.no_block_match");slashItems.appendChild(empty)}
   items.forEach((item,index)=>slashItems.appendChild(menuButton(item.icon,item.label,item.desc,()=>addBlock(item.type),index===0?"active":"")));slashMenu.classList.remove("hidden");
+}
+function openBlockCatalog(query="",types=null){
+  blockMenu.classList.add("hidden");
+  slashMenu.classList.remove("list-tool-menu");
+  slashMenu.classList.remove("command-menu");
+  slashQuery.textContent=query?`/${query}`:"/";
+  activeBlockCategory=types?Object.entries(CATEGORIES).find(([,values])=>values===types)?.[0]||"": "";
+  blockSearch.value=query;
+  renderBlockFilters();
+  renderSlashItems(query,types);
+}
+function openSlashMenu(query="",types=null){
+  openBlockCatalog(query,types);
 }
 
 function closeSheets(){pagesPanel.classList.add("hidden");sendPanel.classList.add("hidden");sendIssuesPanel.classList.add("hidden");backdrop.classList.add("hidden")}
 function showSheet(panel){closeSheets();backdrop.classList.remove("hidden");panel.classList.remove("hidden")}
 
+function filterSavedPages(pages,query=""){
+  const normalized=String(query||"").trim().toLocaleLowerCase();
+  return (Array.isArray(pages)?pages:[]).filter(page=>
+    !normalized||String(page?.title||"").toLocaleLowerCase().includes(normalized),
+  );
+}
 function renderPagesList(pages){
   const list=Array.isArray(pages)?pages:[];
+  const query=String(pagesSearch?.value||"").trim();
+  const visible=filterSavedPages(list,query);
   pagesEl.innerHTML="";
-  $("emptyPages").classList.toggle("hidden",list.length>0);
-  list.forEach(page=>{
+  const emptyPages=$("emptyPages");
+  emptyPages.textContent=list.length&&query?mt("pages.search_empty"):mt("pages.empty");
+  emptyPages.classList.toggle("hidden",visible.length>0);
+  pagesSearch?.classList.toggle("hidden",list.length===0);
+  visible.forEach(page=>{
     const btn=document.createElement("button");
     btn.type="button";
     btn.className="sheet-item";
-    btn.innerHTML=`<span class="sheet-item-main"><strong>${escapeHtml(page.title)}</strong><small>${Number(page.block_count||0)} Block · ${escapeHtml(page.page_id)}</small></span><span class="sheet-next"></span>`;
+    btn.innerHTML=`<span class="sheet-item-main"><strong>${escapeHtml(page.title)}</strong><small>${escapeHtml(mt("pages.block_count",{count:Number(page.block_count||0)}))}</small></span><span class="sheet-next"></span>`;
     MiniAppIcons.mount(btn.querySelector(".sheet-next"),"next");
     btn.onclick=()=>openPage(page.page_id);
     pagesEl.appendChild(btn);
@@ -1375,15 +1433,21 @@ pageTitle.addEventListener("input",()=>{if(!current)return;current.title=pageTit
 undoBtn.onclick=undo;redoBtn.onclick=redo;
 $("pagesBtn").onclick=loadPages;
 $("newPageBtn").onclick=async()=>{if(dirty){toast(mt("editor.unsaved"));return}newDraft()};
+savePageBtn.onclick=async()=>{
+  if(!dirty)return;
+  if(!hasSavablePageContent()){toast(mt("send.add_content"));return}
+  try{await flushSave()}catch(error){toast(error.message)}
+};
 $("sendBtn").onclick=openSendPanel;
 sendIssuesBtn.onclick=openPublishIssues;
 backdrop.onclick=closeSheets;
 $("startWritingBtn").onclick=()=>addBlock("paragraph");
 $("startPhotoBtn").onclick=()=>addBlock("photo");
-$("allBlocksBtn").onclick=()=>openSlashMenu("");
-$("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",()=>{hideMenus();if(dirty){toast(mt("editor.unsaved"));return}newDraft()}));blockActions.appendChild(menuButton("save",mt("page.save_now"),"",async()=>{hideMenus();if(!hasSavablePageContent()){toast(mt("send.add_content"));return}try{dirty=true;await flushSave();toast(mt("save.saved"))}catch(error){toast(error.message)}}));blockMenu.classList.remove("hidden")};
+$("allBlocksBtn").onclick=()=>openBlockCatalog("");
+$("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",()=>{hideMenus();if(dirty){toast(mt("editor.unsaved"));return}newDraft()}));blockMenu.classList.remove("hidden")};
 
-document.querySelectorAll(".composer-toolbar [data-tool]").forEach(btn=>btn.addEventListener("click",()=>openSlashMenu("",CATEGORIES[btn.dataset.tool]||null)));
+blockSearch.addEventListener("input",()=>renderSlashItems(blockSearch.value));
+pagesSearch.addEventListener("input",()=>renderPagesList(pagesSnapshot()||[]));
 
 slashInput.addEventListener("focus",()=>{insertIndex=Number.isInteger(insertIndex)?insertIndex:current.blocks.length});
 slashInput.addEventListener("input",()=>{autoGrow(slashInput);scheduleOfflineDraft();const value=slashInput.value;if(value.startsWith("/")){openSlashMenu(value.slice(1))}else slashMenu.classList.add("hidden")});
@@ -1487,10 +1551,6 @@ window.addEventListener("pagehide",()=>{persistOfflineDraftNow();flushPerf({keep
 window.addEventListener("beforeunload",persistOfflineDraftNow);
 window.addEventListener("online",()=>{
   flushPerf();
-  if(dirty&&hasSavablePageContent()){
-    setTimeout(()=>queueSave().catch(error=>{
-      if(String(error?.code||"")!=="OFFLINE_LOCAL_SAVED")toast(Number(error?.status)===409?mt("save.offline_conflict"):mt("save.failed"))
-    }),650)
-  }
+  if(dirty)updateSaveState(current?.page_id?mt("editor.unsaved"):mt("save.new_draft"));
 });
 boot();

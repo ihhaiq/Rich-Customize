@@ -34,22 +34,55 @@ const ADMIN = new Set(['administrator', 'creator']);
 const SUBSCRIBER = new Set(['member', 'administrator', 'creator']);
 const CHANNEL_ADMIN_RIGHTS = 'post_messages+edit_messages+delete_messages+manage_chat+invite_users+restrict_members';
 const GROUP_ADMIN_RIGHTS = 'delete_messages+manage_chat+invite_users+restrict_members';
+const PUBLISH_DESTINATIONS_PER_PAGE = 6;
+const PUBLISH_PICKER_LABELS = Object.freeze({
+  ar:{all:'الكل',channels:'القنوات',groups:'المجموعات',next:'التالي',channel:'قناة',group:'مجموعة',addBot:'➕ اضف البوت الى {target}',selectedButton:'تم التحديد',selectAll:'تحديد الكل',selectAllNote:'يشمل التحديد نتائج الفلتر الحالي فقط، والمحادثات المتاحة للنشر.',allSelectedToast:'تم تحديد الكل',noneSelectableToast:'لا توجد محادثات متاحة للتحديد.'},
+  de:{all:'Alle',channels:'Kanäle',groups:'Gruppen',next:'Weiter',channel:'zum Kanal',group:'zur Gruppe',addBot:'➕ Bot {target} hinzufügen',selectedButton:'Ausgewählt',selectAll:'Alle auswählen',selectAllNote:'Es gelten nur verfügbare Chats im aktuellen Filter.',allSelectedToast:'Alle verfügbaren Chats im Filter wurden ausgewählt.',noneSelectableToast:'Keine verfügbaren Chats zum Auswählen.'},
+  en:{all:'All',channels:'Channels',groups:'Groups',next:'Next',channel:'the channel',group:'the group',addBot:'➕ Add the bot to {target}',selectedButton:'Selected',selectAll:'Select all',selectAllNote:'Only available chats in the current filter are selected.',allSelectedToast:'All available chats in this filter were selected.',noneSelectableToast:'No available chats to select.'},
+  es:{all:'Todo',channels:'Canales',groups:'Grupos',next:'Siguiente',channel:'al canal',group:'al grupo',addBot:'➕ Añadir el bot {target}',selectedButton:'Seleccionado',selectAll:'Seleccionar todo',selectAllNote:'Solo se seleccionan los chats disponibles del filtro actual.',allSelectedToast:'Se seleccionaron todos los chats disponibles del filtro.',noneSelectableToast:'No hay chats disponibles para seleccionar.'},
+  hi:{all:'सभी',channels:'चैनल',groups:'समूह',next:'अगला',channel:'चैनल',group:'समूह',addBot:'➕ बॉट को {target} में जोड़ें',selectedButton:'चयनित',selectAll:'सभी चुनें',selectAllNote:'केवल मौजूदा फ़िल्टर के उपलब्ध चैट चुने जाएंगे।',allSelectedToast:'इस फ़िल्टर के सभी उपलब्ध चैट चुन लिए गए।',noneSelectableToast:'चुनने के लिए कोई उपलब्ध चैट नहीं है।'},
+  id:{all:'Semua',channels:'Kanal',groups:'Grup',next:'Berikutnya',channel:'kanal',group:'grup',addBot:'➕ Tambahkan bot ke {target}',selectedButton:'Dipilih',selectAll:'Pilih semua',selectAllNote:'Hanya chat yang tersedia dalam filter saat ini yang dipilih.',allSelectedToast:'Semua chat yang tersedia dalam filter ini dipilih.',noneSelectableToast:'Tidak ada chat yang tersedia untuk dipilih.'},
+  it:{all:'Tutte',channels:'Canali',groups:'Gruppi',next:'Avanti',channel:'al canale',group:'al gruppo',addBot:'➕ Aggiungi il bot {target}',selectedButton:'Selezionato',selectAll:'Seleziona tutto',selectAllNote:'Vengono selezionate solo le chat disponibili nel filtro attuale.',allSelectedToast:'Selezionate tutte le chat disponibili in questo filtro.',noneSelectableToast:'Nessuna chat disponibile da selezionare.'},
+  ja:{all:'すべて',channels:'チャンネル',groups:'グループ',next:'次へ',channel:'チャンネル',group:'グループ',addBot:'➕ ボットを{target}に追加',selectedButton:'選択済み',selectAll:'すべて選択',selectAllNote:'現在のフィルター内で利用可能なチャットのみ選択されます。',allSelectedToast:'このフィルターの利用可能なチャットをすべて選択しました。',noneSelectableToast:'選択できるチャットがありません。'},
+  ko:{all:'전체',channels:'채널',groups:'그룹',next:'다음',channel:'채널',group:'그룹',addBot:'➕ 봇을 {target}에 추가',selectedButton:'선택됨',selectAll:'모두 선택',selectAllNote:'현재 필터에서 사용 가능한 대화만 선택됩니다.',allSelectedToast:'현재 필터의 사용 가능한 대화를 모두 선택했습니다.',noneSelectableToast:'선택할 수 있는 대화가 없습니다.'},
+  nl:{all:'Alle',channels:'Kanalen',groups:'Groepen',next:'Volgende',channel:'aan het kanaal',group:'aan de groep',addBot:'➕ Bot toevoegen {target}',selectedButton:'Geselecteerd',selectAll:'Alles selecteren',selectAllNote:'Alleen beschikbare chats in het huidige filter worden geselecteerd.',allSelectedToast:'Alle beschikbare chats in dit filter zijn geselecteerd.',noneSelectableToast:'Geen beschikbare chats om te selecteren.'},
+  pl:{all:'Wszystkie',channels:'Kanały',groups:'Grupy',next:'Dalej',channel:'do kanału',group:'do grupy',addBot:'➕ Dodaj bota {target}',selectedButton:'Wybrano',selectAll:'Zaznacz wszystko',selectAllNote:'Zaznaczane są tylko dostępne czaty z bieżącego filtra.',allSelectedToast:'Zaznaczono wszystkie dostępne czaty z tego filtra.',noneSelectableToast:'Brak dostępnych czatów do zaznaczenia.'},
+  pt:{all:'Todos',channels:'Canais',groups:'Grupos',next:'Avançar',channel:'ao canal',group:'ao grupo',addBot:'➕ Adicionar o bot {target}',selectedButton:'Selecionado',selectAll:'Selecionar tudo',selectAllNote:'Apenas os chats disponíveis no filtro atual serão selecionados.',allSelectedToast:'Todos os chats disponíveis neste filtro foram selecionados.',noneSelectableToast:'Não há chats disponíveis para selecionar.'},
+  ru:{all:'Все',channels:'Каналы',groups:'Группы',next:'Далее',channel:'в канал',group:'в группу',addBot:'➕ Добавить бота {target}',selectedButton:'Выбрано',selectAll:'Выбрать все',selectAllNote:'Выбираются только доступные чаты текущего фильтра.',allSelectedToast:'Выбраны все доступные чаты этого фильтра.',noneSelectableToast:'Нет доступных чатов для выбора.'},
+  th:{all:'ทั้งหมด',channels:'ช่อง',groups:'กลุ่ม',next:'ถัดไป',channel:'ช่อง',group:'กลุ่ม',addBot:'➕ เพิ่มบอตไปยัง{target}',selectedButton:'เลือกแล้ว',selectAll:'เลือกทั้งหมด',selectAllNote:'เลือกเฉพาะแชตที่ใช้งานได้ในตัวกรองปัจจุบัน',allSelectedToast:'เลือกแชตที่ใช้งานได้ทั้งหมดในตัวกรองนี้แล้ว',noneSelectableToast:'ไม่มีแชตที่เลือกได้'},
+  tr:{all:'Tümü',channels:'Kanallar',groups:'Gruplar',next:'İleri',channel:'kanala',group:'gruba',addBot:'➕ Botu {target} ekle',selectedButton:'Seçildi',selectAll:'Tümünü seç',selectAllNote:'Yalnızca geçerli filtredeki kullanılabilir sohbetler seçilir.',allSelectedToast:'Bu filtredeki tüm kullanılabilir sohbetler seçildi.',noneSelectableToast:'Seçilebilecek kullanılabilir sohbet yok.'},
+  uk:{all:'Усі',channels:'Канали',groups:'Групи',next:'Далі',channel:'до каналу',group:'до групи',addBot:'➕ Додати бота {target}',selectedButton:'Вибрано',selectAll:'Вибрати всі',selectAllNote:'Вибираються лише доступні чати поточного фільтра.',allSelectedToast:'Вибрано всі доступні чати цього фільтра.',noneSelectableToast:'Немає доступних чатів для вибору.'},
+  ur:{all:'سب',channels:'چینلز',groups:'گروپس',next:'اگلا',channel:'چینل',group:'گروپ',addBot:'➕ بوٹ کو {target} میں شامل کریں',selectedButton:'منتخب',selectAll:'سب منتخب کریں',selectAllNote:'صرف موجودہ فلٹر کی دستیاب چیٹس منتخب ہوں گی۔',allSelectedToast:'اس فلٹر کی تمام دستیاب چیٹس منتخب ہوگئیں۔',noneSelectableToast:'منتخب کرنے کے لیے کوئی دستیاب چیٹ نہیں۔'},
+  vi:{all:'Tất cả',channels:'Kênh',groups:'Nhóm',next:'Tiếp',channel:'kênh',group:'nhóm',addBot:'➕ Thêm bot vào {target}',selectedButton:'Đã chọn',selectAll:'Chọn tất cả',selectAllNote:'Chỉ chọn các cuộc trò chuyện khả dụng trong bộ lọc hiện tại.',allSelectedToast:'Đã chọn tất cả cuộc trò chuyện khả dụng trong bộ lọc này.',noneSelectableToast:'Không có cuộc trò chuyện khả dụng để chọn.'},
+  'zh-hans':{all:'全部',channels:'频道',groups:'群组',next:'下一步',channel:'频道',group:'群组',addBot:'➕ 将机器人添加到{target}',selectedButton:'已选择',selectAll:'全选',selectAllNote:'仅选择当前筛选条件下可用的聊天。',allSelectedToast:'已选择此筛选条件下所有可用聊天。',noneSelectableToast:'没有可选择的聊天。'},
+  'zh-hant':{all:'全部',channels:'頻道',groups:'群組',next:'下一步',channel:'頻道',group:'群組',addBot:'➕ 將機器人新增至{target}',selectedButton:'已選擇',selectAll:'全選',selectAllNote:'僅選取目前篩選條件下可用的聊天。',allSelectedToast:'已選取此篩選條件下所有可用聊天。',noneSelectableToast:'沒有可選取的聊天。'},
+});
 
 function nowSeconds(){return Math.floor(Date.now()/1000);}
 function code(source){return source?.from?.language_code||'en';}
 function copy(languageCode){
   const locale=resolveLanguage(languageCode);
+  const picker=PUBLISH_PICKER_LABELS[locale]||PUBLISH_PICKER_LABELS.en;
   return {
     locale,
+    all:picker.all,
+    channels:picker.channels,
+    groups:picker.groups,
+    next:picker.next,
+    selectedButton:picker.selectedButton,
+    selectAll:picker.selectAll,
+    selectAllNote:picker.selectAllNote,
+    allSelectedToast:picker.allSelectedToast,
+    noneSelectableToast:picker.noneSelectableToast,
+    addBot:(target)=>picker.addBot.replace('{target}',target),
+    channel:picker.channel,
+    group:picker.group,
     create:i18nT(locale,'create_post'),
     none:tr(locale,'There is no group or channel where both you and the bot are administrators.'),
     addHint:i18nT(locale,'publish.add_hint'),
     choose:tr(locale,'Select every group or channel you want to publish to.'),
     selected:tr(locale,'Selected: '),
     select:tr(locale,'Select'),
-    settings:i18nT(locale,'publish.settings_send'),
-    addChannel:i18nT(locale,'publish.add_bot_channel'),
-    addGroup:i18nT(locale,'publish.add_bot_group'),
     back:i18nT(locale,'ux.common.back'),
     silentOn:i18nT(locale,'ux.publish.silent_on'),
     silentOff:i18nT(locale,'ux.publish.silent_off'),
@@ -64,12 +97,13 @@ function copy(languageCode){
     settingsTitle:i18nT(locale,'post_settings'),
     selectedChats:tr(locale,'Selected chats: '),
     settingsHint:tr(locale,'Choose settings, then send:'),
-    confirm:(n)=>i18nT(locale,'ux.publish.confirm',{count:n}),
     yes:i18nT(locale,'ux.publish.confirm_yes'),
     cancel:i18nT(locale,'ux.common.cancel'),
     needChat:i18nT(locale,'select_chat'),
     invalidChat:tr(locale,'Invalid chat selection.'),
     unavailable:tr(locale,'The chat is no longer available, or administrator permissions changed.'),
+    accessRights:tr(locale,'Administrator access is missing; check permissions for both the bot and your account.'),
+    accessLookup:tr(locale,'Could not verify access to this destination. Try again later.'),
     selectedOn:tr(locale,'Chat selected'),
     selectedOff:tr(locale,'Chat unselected'),
     sending:tr(locale,'Publishing…'),
@@ -136,9 +170,10 @@ async function eligible(userId){
   for(const chat of await listChats(userId)){
     const access=await inspectPublishAccess(chat.chatId,userId);
     if(access.ok){out.push(chat);continue;}
-    if(access.reason==='rights'){await removeUserChat(userId,chat.chatId);continue;}
+    if(access.reason==='rights')continue;
     // Transient lookup failures must not delete stored destinations.
     const failure=normalizePublishError(access.error,{kind:'chat'});
+    if(failure.code==='PUBLISH_RIGHTS_MISSING')continue;
     if(shouldForgetDestination(failure.code))await removeUserChat(userId,chat.chatId);
     else out.push(chat);
   }
@@ -148,7 +183,11 @@ async function addLinks(){
   const me=await api.getMe(),username=me?.username||'RichCustomizebot',base='https://t.me/'+username;
   return [base+'?startchannel&admin='+CHANNEL_ADMIN_RIGHTS,base+'?startgroup&admin='+GROUP_ADMIN_RIGHTS];
 }
-function richButton(text,opts={}){return {type:'button',button:{text,...(opts.callback_data?{callback_data:opts.callback_data}:{}),...(opts.url?{url:opts.url}:{}),...(['primary','success','danger'].includes(opts.style)?{style:opts.style}:{})}};}
+function buttonPayload(text,opts={}){
+  return {text,...(opts.callback_data?{callback_data:opts.callback_data}:{}),...(opts.url?{url:opts.url}:{}),...(['primary','success','danger'].includes(opts.style)?{style:opts.style}:{})};
+}
+function richButton(text,opts={}){return {type:'button',button:buttonPayload(text,opts)};}
+function richButtonsBlock(buttons,align='center'){return {type:'buttons',buttons,align};}
 function cell(text,colspan=null){return {text,align:'center',valign:'middle',...(colspan?{colspan}:{})};}
 function chatLink(chat){
   const username=String(chat?.username||'').replace(/^@+/,'');if(username)return 'https://t.me/'+username;
@@ -156,19 +195,63 @@ function chatLink(chat){
   if(['channel','supergroup'].includes(String(chat.type||''))&&numeric.startsWith('100'))return 'https://t.me/c/'+numeric.slice(3)+'/1';
   return 'tg://openmessage?chat_id='+numeric;
 }
-function pickerRich(chats,selected,channelUrl,groupUrl,c){
-  const cc=copy(c),set=new Set(selected||[]),rows=[];
-  for(const chat of chats){
-    const id=Number(chat.chatId),on=set.has(id),icon=chat.type==='channel'?'📢':'👥';
-    rows.push([
-      cell(richButton(icon+' '+String(chat.title||id),{url:chatLink(chat)})),
-      cell(richButton((on?'✅':'⬜')+' '+cc.select,{callback_data:'r:postchat:'+id,style:on?'success':'primary'})),
-    ]);
+function shortChatTitle(title){
+  const chars=Array.from(String(title||''));
+  return chars.length>36?chars.slice(0,35).join('')+'…':chars.join('');
+}
+function pickerRich(chats,selected,hasDestinations,channelUrl,groupUrl,c,page=0,filter='all',accessById=new Map()){
+  const cc=copy(c),set=new Set(selected||[]),totalPages=Math.max(1,Math.ceil(chats.length/PUBLISH_DESTINATIONS_PER_PAGE));
+  const currentPage=Math.max(0,Math.min(totalPages-1,Number(page)||0));
+  const visible=chats.slice(currentPage*PUBLISH_DESTINATIONS_PER_PAGE,(currentPage+1)*PUBLISH_DESTINATIONS_PER_PAGE);
+  const rows=[],accessNotices=[];
+  const filters=[
+    ['all',cc.all],
+    ['channels',cc.channels],
+    ['groups',cc.groups],
+  ];
+  const pageLabel=totalPages>1?'\n'+(currentPage+1)+'/'+totalPages:'';
+  const intro=cc.create+'\n\n'+(hasDestinations
+    ?cc.choose+'\n'+cc.selected+set.size+pageLabel
+    :cc.none);
+  const blocks=[
+    {type:'paragraph',text:intro},
+    {type:'paragraph',text:filters.flatMap(([value,label],index)=>[
+      ...(index?[' | ']:[]),
+      richButton(label,{callback_data:'r:postchat:filter:'+value,style:value==='all'?'success':undefined}),
+    ])},
+  ];
+  for(const chat of visible){
+    const id=Number(chat.chatId),on=set.has(id),icon=chat.type==='channel'?'📢':'👥',access=accessById.get(id);
+    const statusIcon=access?.ok?'':access?.reason==='rights'?'⚠️ ':'❔ ';
+    rows.push([cell([
+      richButton(statusIcon+icon+' '+shortChatTitle(chat.title||id),{url:chatLink(chat)}),
+      ' | ',
+      richButton(on?cc.selectedButton:cc.select,{callback_data:'r:postchat:'+id+':'+currentPage+':'+filter,style:on?'success':'primary'}),
+    ])]);
+    if(access&&!access.ok){
+      const reason=access.reason==='rights'?cc.accessRights:cc.accessLookup;
+      accessNotices.push({type:'paragraph',text:'⚠️ '+shortChatTitle(chat.title||chat.chatId)+': '+reason});
+    }
   }
-  if(chats.length)rows.push([cell(richButton(cc.settings+' ('+set.size+')',{callback_data:'r:postsettings',style:'success'}),2)]);
-  rows.push([cell(richButton(cc.addChannel,{url:channelUrl,style:'primary'})),cell(richButton(cc.addGroup,{url:groupUrl,style:'primary'}))]);
-  const text=cc.create+'\n\n'+(chats.length?cc.choose+'\n'+cc.selected+set.size:cc.none+'\n'+cc.addHint);
-  return {blocks:[{type:'paragraph',text},{type:'table',cells:rows,is_bordered:true,is_compact:true}]};
+  if(rows.length)blocks.push({type:'table',cells:rows,is_bordered:true,is_striped:true,is_compact:true});
+  blocks.push(...accessNotices);
+  const allSelected=chats.length>0&&chats.every(chat=>set.has(Number(chat.chatId)));
+  if(chats.length)blocks.push(richButtonsBlock([
+    buttonPayload(cc.selectAll,{callback_data:'r:postchat:select_all:'+filter+':'+currentPage,style:allSelected?'success':'primary'}),
+  ]));
+  if(totalPages>1){
+    const navigation=[];
+    if(currentPage>0)navigation.push(buttonPayload('‹ '+currentPage,{callback_data:'r:postchat:page:'+filter+':'+(currentPage-1)}));
+    if(currentPage+1<totalPages)navigation.push(buttonPayload((currentPage+2)+' ›',{callback_data:'r:postchat:page:'+filter+':'+(currentPage+1)}));
+    if(navigation.length)blocks.push(richButtonsBlock(navigation));
+  }
+  if(set.size)blocks.push(richButtonsBlock([buttonPayload(cc.next,{callback_data:'r:postsettings',style:'success'})]));
+  blocks.push({type:'footer',text:cc.addHint+'\n'+cc.selectAllNote});
+  blocks.push(richButtonsBlock([
+    buttonPayload(cc.addBot(cc.channel),{url:channelUrl}),
+    buttonPayload(cc.addBot(cc.group),{url:groupUrl}),
+  ]));
+  return {blocks};
 }
 function settingsText(n,c){const cc=copy(c);return cc.settingsTitle+'\n\n'+cc.selectedChats+n+'\n'+cc.settingsHint;}
 function brandingFlag(data,prefix){
@@ -195,13 +278,13 @@ function settingsRich(n,silent,protectedValue,includeBranding,canManageBranding,
       style:includeBranding?'primary':'success',
     }),2)]);
   }
-  rows.push(
-    [cell(richButton(cc.send(n),{callback_data:'r:postconfirm:'+flag,style:'success'}),2)],
-    [cell(richButton(resolveLanguage(c)==='ar'?'جدولة المنشور':'Schedule post',{callback_data:'r:postschedule:'+flag,style:'primary'}),2)],
-  );
-  return {blocks:[{type:'paragraph',text},{type:'table',cells:rows,is_bordered:true,is_compact:true}]};
+  rows.push([cell(richButton(resolveLanguage(c)==='ar'?'جدولة المنشور':'Schedule post',{callback_data:'r:postschedule:'+flag,style:'primary'}),2)]);
+  return {blocks:[
+    {type:'paragraph',text},
+    {type:'table',cells:rows,is_bordered:true,is_compact:true},
+    richButtonsBlock([buttonPayload(cc.yes,{callback_data:'r:postsend:'+flag,style:'success'})]),
+  ]};
 }
-function confirmRich(n,c,includeBranding){const cc=copy(c),flag=includeBranding?'1':'0';return {blocks:[{type:'paragraph',text:cc.confirm(n)},{type:'table',cells:[[cell(richButton(cc.yes,{callback_data:'r:postsend:'+flag,style:'success'}),2)]],is_bordered:true,is_compact:true}]};}
 function backKeyboard(data='r:back',c='en'){return {inline_keyboard:[[{text:copy(c).back,callback_data:data}]]};}
 function editErrorText(error){return String(error?.description||error?.message||error).toLowerCase();}
 async function editRich(query,rich,markup){
@@ -229,11 +312,21 @@ async function withPublishUiLock(query,callback){
   try{await api.answerCallbackQuery({callback_query_id:query.id});}catch{}
   return true;
 }
-async function renderPicker(query,selected){
-  const chats=await eligible(query.from.id),ids=new Set(chats.map(x=>Number(x.chatId))),safe=(selected||[]).map(Number).filter(x=>ids.has(x));
+async function pickerAccessStates(chats,userId,page){
+  const start=page*PUBLISH_DESTINATIONS_PER_PAGE,visible=chats.slice(start,start+PUBLISH_DESTINATIONS_PER_PAGE),states=new Map();
+  for(const chat of visible)states.set(Number(chat.chatId),await inspectPublishAccess(chat.chatId,userId));
+  return states;
+}
+async function renderPicker(query,selected,page=0,filter='all',knownAccessById=null){
+  const allChats=await listChats(query.from.id),ids=new Set(allChats.map(x=>Number(x.chatId))),safe=(selected||[]).map(Number).filter(x=>ids.has(x));
+  const normalizedFilter=['all','channels','groups'].includes(String(filter))?String(filter):'all';
+  const chats=allChats.filter(chat=>normalizedFilter==='all'||(normalizedFilter==='channels'?chat.type==='channel':chat.type!=='channel'));
+  const totalPages=Math.max(1,Math.ceil(chats.length/PUBLISH_DESTINATIONS_PER_PAGE));
+  const currentPage=Math.max(0,Math.min(totalPages-1,Number.isSafeInteger(Number(page))?Number(page):0));
+  const accessById=knownAccessById||await pickerAccessStates(chats,query.from.id,currentPage);
   const [channelUrl,groupUrl]=await addLinks();
   await updateEditorSession(query.from.id,{postSelectedChatIds:safe});
-  await editRich(query,pickerRich(chats,safe,channelUrl,groupUrl,code(query)),backKeyboard('r:back',code(query)));
+  await editRich(query,pickerRich(chats,safe,allChats.length,channelUrl,groupUrl,code(query),currentPage,normalizedFilter,accessById),backKeyboard('r:back',code(query)));
   await rememberPanel(query.from.id,query.message.chat.id,query.message.message_id,safe);
   return chats;
 }
@@ -241,9 +334,10 @@ async function refreshPanel(userId, languageCode='en'){
   const p=await panel(userId);if(!p)return;
   const locked=await withEditorMessageLock(p.chatId,p.messageId,async()=>{
     const session=await loadEditorSession(userId,{touch:false});if(!session)return;
-    const chats=await eligible(userId),ids=new Set(chats.map(x=>Number(x.chatId))),safe=(p.selectedChatIds||[]).map(Number).filter(x=>ids.has(x));
+    const chats=await listChats(userId),ids=new Set(chats.map(x=>Number(x.chatId))),safe=(p.selectedChatIds||[]).map(Number).filter(x=>ids.has(x));
     const [channelUrl,groupUrl]=await addLinks();
-    try{await api.editMessageText({chat_id:p.chatId,message_id:p.messageId,rich_message:pickerRich(chats,safe,channelUrl,groupUrl,languageCode),reply_markup:backKeyboard('r:back',languageCode)});}
+    const accessById=await pickerAccessStates(chats,userId,0);
+    try{await api.editMessageText({chat_id:p.chatId,message_id:p.messageId,rich_message:pickerRich(chats,safe,chats.length,channelUrl,groupUrl,languageCode,0,'all',accessById),reply_markup:backKeyboard('r:back',languageCode)});}
     catch(error){
       const detail=editErrorText(error);
       if(!detail.includes('message is not modified')&&!detail.includes('canceled by new edit message request'))throw error;
@@ -277,27 +371,57 @@ export async function handlePublishCallback(query){
   if(data.startsWith('r:postchat:')){
     return withPublishUiLock(query,async()=>{
       const latest=await loadEditorSession(userId);if(!latest)return true;
-      const id=Number(data.slice('r:postchat:'.length));if(!Number.isSafeInteger(id)){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.invalidChat,show_alert:true});return true;}
-      const registered=(await listChats(userId)).find(x=>Number(x.chatId)===id);
-      if(!registered){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.unavailable,show_alert:true});return true;}
-      const access=await inspectPublishAccess(id,userId);
-      if(!access.ok){
-        const failure=access.reason==='rights'
-          ? publishFailure('PUBLISH_RIGHTS_MISSING','Missing administrator rights')
-          : normalizePublishError(access.error,{kind:'chat'});
-        if(shouldForgetDestination(failure.code))await removeUserChat(userId,id);
-        await api.answerCallbackQuery({callback_query_id:query.id,text:publishFailureMessage(failure,resolveLanguage(c)),show_alert:true});
+      const selectAllMatch=data.match(/^r:postchat:select_all:(all|channels|groups):(\d+)$/);
+      if(selectAllMatch){
+        const filter=selectAllMatch[1],page=Number(selectAllMatch[2]);
+        if(!Number.isSafeInteger(page)){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.invalidChat,show_alert:true});return true;}
+        const chats=(await listChats(userId)).filter(chat=>filter==='all'||(filter==='channels'?chat.type==='channel':chat.type!=='channel'));
+        const accessById=new Map(),selected=new Set((latest.postSelectedChatIds||[]).map(Number));
+        let selectableCount=0;
+        for(const chat of chats){
+          const id=Number(chat.chatId),access=await inspectPublishAccess(id,userId);
+          accessById.set(id,access);
+          if(access.ok){selected.add(id);selectableCount++;}
+        }
+        await renderPicker(query,[...selected],page,filter,accessById);
+        await api.answerCallbackQuery({
+          callback_query_id:query.id,
+          text:selectableCount?cc.allSelectedToast:cc.noneSelectableToast,
+        });
         return true;
       }
+      const filterMatch=data.match(/^r:postchat:filter:(all|channels|groups)$/);
+      if(filterMatch){
+        await renderPicker(query,latest.postSelectedChatIds||[],0,filterMatch[1]);await api.answerCallbackQuery({callback_query_id:query.id});return true;
+      }
+      const pageMatch=data.match(/^r:postchat:page:(?:(all|channels|groups):)?(\d+)$/);
+      if(pageMatch){
+        const page=Number(pageMatch[2]),filter=pageMatch[1]||'all';
+        if(!Number.isSafeInteger(page)){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.invalidChat,show_alert:true});return true;}
+        await renderPicker(query,latest.postSelectedChatIds||[],page,filter);await api.answerCallbackQuery({callback_query_id:query.id});return true;
+      }
+      const selectionMatch=data.match(/^r:postchat:(-?\d+)(?::(\d+))?(?::(all|channels|groups))?$/);
+      const id=Number(selectionMatch?.[1]),page=Number(selectionMatch?.[2]||0),filter=selectionMatch?.[3]||'all';
+      if(!Number.isSafeInteger(id)||!Number.isSafeInteger(page)||page<0){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.invalidChat,show_alert:true});return true;}
+      const registered=(await listChats(userId)).find(x=>Number(x.chatId)===id);
+      if(!registered){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.unavailable,show_alert:true});return true;}
       const selected=(latest.postSelectedChatIds||[]).map(Number),index=selected.indexOf(id);let notice;
-      if(index>=0){selected.splice(index,1);notice=cc.selectedOff;}else{selected.push(id);notice=cc.selectedOn;}
-      await renderPicker(query,selected);await api.answerCallbackQuery({callback_query_id:query.id,text:notice});return true;
+      if(index>=0){selected.splice(index,1);notice=cc.selectedOff;}
+      else{
+        const access=await inspectPublishAccess(id,userId);
+        if(!access.ok){
+          const message=access.reason==='rights'?cc.accessRights:cc.accessLookup;
+          await api.answerCallbackQuery({callback_query_id:query.id,text:message,show_alert:true});return true;
+        }
+        selected.push(id);notice=cc.selectedOn;
+      }
+      await renderPicker(query,selected,page,filter);await api.answerCallbackQuery({callback_query_id:query.id,text:notice});return true;
     });
   }
-  if(data==='r:postsettings'||data.startsWith('r:postsettings:')){
+  if(data==='r:postsettings'||data.startsWith('r:postsettings:')||data==='r:postconfirm'||data.startsWith('r:postconfirm:')){
     return withPublishUiLock(query,async()=>{
       const latest=await loadEditorSession(userId);if(!latest)return true;
-      const chats=await eligible(userId),ids=new Set(chats.map(x=>Number(x.chatId))),selected=(latest.postSelectedChatIds||[]).map(Number).filter(x=>ids.has(x));
+      const chats=await listChats(userId),ids=new Set(chats.map(x=>Number(x.chatId))),selected=(latest.postSelectedChatIds||[]).map(Number).filter(x=>ids.has(x));
       if(!selected.length){await updateEditorSession(userId,{postSelectedChatIds:[]});await api.answerCallbackQuery({callback_query_id:query.id,text:cc.needChat,show_alert:true});return true;}
       const branding=await brandingOptions(userId);
       await updateEditorSession(userId,{postSelectedChatIds:selected});await clearPublishPanel(userId);
@@ -362,16 +486,6 @@ export async function handlePublishCallback(query){
       return true;
     });
   }
-  if(data==='r:postconfirm'||data.startsWith('r:postconfirm:')){
-    return withPublishUiLock(query,async()=>{
-      const latest=await loadEditorSession(userId);if(!latest)return true;
-      if(!Array.isArray(latest.blocks)||!latest.blocks.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.emptyContent,show_alert:true});return true;}
-      const selected=(latest.postSelectedChatIds||[]).map(Number);if(!selected.length){await api.answerCallbackQuery({callback_query_id:query.id,text:cc.needChat,show_alert:true});return true;}
-      const branding=await brandingOptions(userId);
-      const flag=branding.includeBranding?'1':'0';
-      await editRich(query,confirmRich(selected.length,c,branding.includeBranding),backKeyboard('r:postsettings:'+flag,c));await api.answerCallbackQuery({callback_query_id:query.id});return true;
-    });
-  }
   if(data==='r:postsend'||data.startsWith('r:postsend:')){
     const mutationLock=await acquireEditorMutationLock(userId);if(!mutationLock){await api.answerCallbackQuery({callback_query_id:query.id});return true;}
     try{
@@ -419,7 +533,7 @@ export async function handlePublishCallback(query){
           failed.push(title);
           const normalized=normalizePublishError(error,{kind:'chat'});
           if(reasons.length<12)reasons.push(title+': '+publishFailureMessage(normalized,resolveLanguage(c)));
-          if(shouldForgetDestination(normalized.code)){
+          if(shouldForgetDestination(normalized.code)&&normalized.code!=='PUBLISH_RIGHTS_MISSING'){
             try{await removeUserChat(userId,chatId);}catch(cleanupError){console.warn('Could not forget inaccessible chat',cleanupError);}
           }
           if(!EXPECTED_PUBLISH_FAILURES.has(String(normalized.code||''))){

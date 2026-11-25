@@ -338,7 +338,7 @@ test('Mini App renders imported text blocks as editable text instead of empty me
   assert.match(miniAppSource,/function info\(type\)\{const kind=type==="text"\?"paragraph":type;/);
   assert.match(miniAppSource,/if\(\["paragraph","text","heading"/);
   assert.match(livePreviewSource,/if \(\["paragraph","text","heading"/);
-  assert.match(editorHtml,/app\.js\?v=0\.3\.106/);
+  assert.match(editorHtml,/app\.js\?v=0\.3\.108/);
   assert.match(editorHtml,/live_preview\.js\?v=0\.3\.102/);
   assert.match(editorHtml,/media_upload\.js\?v=0\.3\.58/);
   assert.match(editorHtml,/details_nested_editor\.js\?v=0\.3\.44/);
@@ -352,7 +352,7 @@ test('Mini App opens channel handoffs as untitled unsaved drafts after loading s
   assert.match(miniAppSource,/await api\(`\/miniapp\/api\/drafts\/\$\{encodeURIComponent\(draftToken\)\}`\)/);
   assert.match(miniAppSource,/const pageData=await api\("\/miniapp\/api\/pages"\)/);
   assert.match(editorHtml,/miniapp_serverless_api\.js\?v=0\.3\.85/);
-  assert.match(editorHtml,/app\.js\?v=0\.3\.106/);
+  assert.match(editorHtml,/app\.js\?v=0\.3\.108/);
 });
 
 test('Mini App imported quotes preserve Telegram formatting and paragraph breaks',async()=>{
@@ -389,7 +389,7 @@ test('Mini App reports imported-draft rendering failures to the client error rel
   assert.match(miniAppSource,/source:"miniapp\.imported_draft\.render"/);
   assert.match(miniAppSource,/window\.RichMiniAppErrors\?\.report\?\.\(error/);
   assert.match(editorHtml,/inline_text_tools\.js\?v=0\.3\.75/);
-  assert.match(editorHtml,/app\.js\?v=0\.3\.106/);
+  assert.match(editorHtml,/app\.js\?v=0\.3\.108/);
 });
 
 test('Mini App quote preview hydrates media nested in native and editable quotes',()=>{

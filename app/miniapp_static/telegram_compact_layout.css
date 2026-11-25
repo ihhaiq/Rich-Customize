@@ -1,6 +1,6 @@
 @import url("./fullscreen_fix.css?v=0.3.22");
 
-/* Beta 0.3.22 — compact centered Telegram-style composer chrome. */
+/* Beta 0.3.23 — compact centered Telegram-style composer chrome. */
 
 /* All visible bubbles are one compact centered cluster. */
 .composer-toolbar.floating-toolbar{
@@ -24,13 +24,20 @@
   gap:1px!important;
   border-radius:999px!important;
 }
-.composer-toolbar.floating-toolbar .all-blocks-btn{
-  width:38px!important;
+.composer-toolbar.floating-toolbar .tools-bubble .all-blocks-btn{
+  width:auto!important;
+  min-width:118px!important;
   height:38px!important;
+  padding:0 12px!important;
   border:1px solid color-mix(in srgb,var(--accent) 25%,var(--glass-border))!important;
-  border-radius:50%!important;
+  border-radius:14px!important;
   color:var(--accent)!important;
   background:color-mix(in srgb,var(--accent) 9%,transparent)!important;
+  display:flex!important;
+  gap:7px!important;
+  white-space:nowrap!important;
+  font-size:13px!important;
+  font-weight:700!important;
 }
 .composer-toolbar.floating-toolbar .all-blocks-btn .glyph,
 .composer-toolbar.floating-toolbar .all-blocks-btn svg{
@@ -60,6 +67,111 @@
   width:46px!important;
   min-width:46px!important;
   padding:3px!important;
+}
+
+.save-state-row{
+  min-height:22px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.save-page-btn{
+  min-height:28px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  padding:3px 9px;
+  border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));
+  border-radius:999px;
+  background:color-mix(in srgb,var(--accent) 10%,transparent);
+  color:var(--accent);
+  font-size:12px;
+  font-weight:700;
+}
+
+.save-page-btn[disabled]{
+  opacity:.55;
+  cursor:wait;
+}
+
+.save-page-btn svg{
+  width:15px;
+  height:15px;
+}
+
+.block-search-row{
+  padding:8px 10px 4px;
+}
+
+.block-search-row input,
+.pages-search{
+  width:100%;
+  min-height:42px;
+  padding:9px 12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  outline:none;
+  background:var(--bg);
+  color:var(--text);
+}
+
+.block-search-row input:focus,
+.pages-search:focus{
+  border-color:color-mix(in srgb,var(--accent) 60%,var(--line));
+}
+
+.block-category-filters{
+  display:flex;
+  gap:6px;
+  overflow-x:auto;
+  padding:6px 10px;
+  scrollbar-width:none;
+}
+
+.block-category-filters::-webkit-scrollbar{
+  display:none;
+}
+
+.block-category-filter{
+  flex:0 0 auto;
+  min-height:34px;
+  padding:6px 11px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:transparent;
+  color:var(--muted);
+  font-size:12px;
+}
+
+.block-category-filter[aria-pressed="true"]{
+  border-color:color-mix(in srgb,var(--accent) 48%,var(--line));
+  background:color-mix(in srgb,var(--accent) 13%,transparent);
+  color:var(--text);
+}
+
+.pages-search{
+  margin:0 0 10px;
+}
+
+.visually-hidden{
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  padding:0!important;
+  margin:-1px!important;
+  overflow:hidden!important;
+  clip:rect(0,0,0,0)!important;
+  white-space:nowrap!important;
+  border:0!important;
+}
+
+#slashMenu.list-tool-menu .block-search-row,
+#slashMenu.list-tool-menu .block-category-filters,
+#slashMenu.command-menu .block-search-row,
+#slashMenu.command-menu .block-category-filters{
+  display:none;
 }
 
 .composer-toolbar.floating-toolbar .toolbar-bubble button{
@@ -127,6 +239,10 @@
   }
   .composer-toolbar.floating-toolbar .tools-bubble{
     max-width:calc(100vw - 102px)!important;
+  }
+  .composer-toolbar.floating-toolbar .tools-bubble .all-blocks-btn{
+    min-width:104px!important;
+    padding:0 9px!important;
   }
   .composer-toolbar.floating-toolbar .emoji-bubble{
     width:44px!important;

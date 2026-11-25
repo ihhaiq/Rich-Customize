@@ -42,7 +42,7 @@
   const EXPLICIT_KEYS = new Set([
     "app.title",
     "editor.start_title","editor.start_hint","editor.start_writing","editor.add_photo","editor.input_placeholder","editor.add_block",
-    "pages.title","pages.subtitle","pages.new","pages.empty","send.title","send.subtitle",
+    "pages.title","pages.subtitle","pages.new","pages.empty","pages.search_placeholder","pages.search_empty","pages.block_count","send.title","send.subtitle",
     "top.more","top.undo","top.redo","top.text","top.media","top.math","top.emoji",
     "editor.untitled","editor.unsaved","common.cancel","common.save","common.delete","common.done","common.loading",
     "block.paragraph","block.heading","block.footer","block.preformatted","block.blockquote","block.pullquote","block.divider","block.anchor",

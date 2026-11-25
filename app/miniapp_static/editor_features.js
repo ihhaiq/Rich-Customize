@@ -545,6 +545,7 @@
     if (types) return baseOpenSlashMenu(query, types);
     const q = String(query || "").trim().toLowerCase();
     blockMenu.classList.add("hidden");
+    slashMenu.classList.add("command-menu");
     slashItems.innerHTML = "";
     slashQuery.textContent = q ? `/${q}` : "/";
     const commandMatches = COMMANDS.filter(command => !q || `${command.name} ${command.label} ${command.hint}`.toLowerCase().includes(q));
