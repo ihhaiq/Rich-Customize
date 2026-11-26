@@ -56,3 +56,14 @@ test('saving stays explicit and the visible save control appears for dirty work'
   assert.doesNotMatch(app, /if\(dirty&&hasSavablePageContent\(\)\)\{[\s\S]*queueSave\(\)/);
   assert.doesNotMatch(read('page_menu.js'), /page\.save_now/);
 });
+
+test('mobile editor header and popup menus stay clear of overlapping controls', () => {
+  const styles = read('telegram_compact_layout.css');
+  const popupLayout = read('popup_performance.js');
+
+  assert.match(styles, /\.save-state-row\{[^}]*flex-direction:column/);
+  assert.match(styles, /\.save-state-row \.save-state\{[^}]*text-overflow:ellipsis/);
+  assert.match(styles, /\.save-state-row \.save-page-btn\{[^}]*white-space:nowrap/);
+  assert.match(popupLayout, /const safeBottom = Math\.max\([\s\S]*footerTop/);
+  assert.match(popupLayout, /menu\.style\.maxHeight = `\$\{Math\.round\(maxMenuHeight\)\}px`/);
+});

@@ -98,15 +98,6 @@
     if (!menu || menu.classList.contains("hidden")) return;
     const bounds = visibleBounds();
     const margin = 10;
-
-    menu.style.right = "auto";
-    menu.style.bottom = "auto";
-    menu.style.left = `${bounds.left + margin}px`;
-    menu.style.top = `${bounds.top + margin}px`;
-    menu.style.visibility = "hidden";
-    menu.classList.add("popup-floating");
-
-    const menuRect = menu.getBoundingClientRect();
     const anchorRect = anchor?.getBoundingClientRect?.() || {
       left: bounds.left + bounds.width / 2,
       right: bounds.left + bounds.width / 2,
@@ -115,6 +106,23 @@
       width: 0,
       height: 0,
     };
+    const footer = document.querySelector(".bottom-actions");
+    const footerVisible = footer && getComputedStyle(footer).display !== "none";
+    const footerTop = footerVisible ? footer.getBoundingClientRect().top - 12 : bounds.bottom - margin;
+    const safeBottom = Math.max(bounds.top + margin, Math.min(bounds.bottom - margin, footerTop));
+    const spaceAbove = anchorRect.top - bounds.top - margin - 8;
+    const spaceBelow = safeBottom - anchorRect.bottom - 8;
+    const maxMenuHeight = Math.max(120, Math.min(bounds.height * 0.58, Math.max(spaceAbove, spaceBelow)));
+
+    menu.style.right = "auto";
+    menu.style.bottom = "auto";
+    menu.style.maxHeight = `${Math.round(maxMenuHeight)}px`;
+    menu.style.left = `${bounds.left + margin}px`;
+    menu.style.top = `${bounds.top + margin}px`;
+    menu.style.visibility = "hidden";
+    menu.classList.add("popup-floating");
+
+    const menuRect = menu.getBoundingClientRect();
 
     let left = anchorRect.right - menuRect.width;
     left = Math.max(bounds.left + margin, Math.min(left, bounds.right - menuRect.width - margin));
@@ -122,9 +130,9 @@
     const below = anchorRect.bottom + 8;
     const above = anchorRect.top - menuRect.height - 8;
     let top;
-    if (below + menuRect.height <= bounds.bottom - margin) top = below;
+    if (below + menuRect.height <= safeBottom) top = below;
     else if (above >= bounds.top + margin) top = above;
-    else top = Math.max(bounds.top + margin, Math.min(below, bounds.bottom - menuRect.height - margin));
+    else top = Math.max(bounds.top + margin, Math.min(below, safeBottom - menuRect.height));
 
     menu.style.left = `${Math.round(left)}px`;
     menu.style.top = `${Math.round(top)}px`;

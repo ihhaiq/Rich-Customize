@@ -224,6 +224,29 @@
 }
 
 @media(max-width:430px){
+  .save-state-row{
+    align-items:flex-start;
+    flex-direction:column;
+    gap:4px;
+    min-width:0;
+  }
+  .save-state-row .save-state{
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .save-state-row .save-page-btn{
+    flex:0 0 auto;
+    white-space:nowrap;
+  }
+  .page-identity{
+    flex:1 1 0;
+    min-width:0;
+  }
+  .top-actions{
+    flex:0 0 auto;
+  }
   .composer-toolbar.floating-toolbar{
     max-width:calc(100vw - 8px)!important;
     gap:5px!important;

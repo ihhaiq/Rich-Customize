@@ -1,3 +1,19 @@
+## 2026-11-27 — إصلاح تداخل عناصر محرر الهاتف
+
+- **التغيير:** في الشاشات الضيقة صار وصف حالة الحفظ سطراً مقتضباً وزر الحفظ
+  بسطر مستقل غير قابل للانكماش. قائمة الأوامر تحسب المساحة المتاحة فوق/تحت
+  حقل الإدخال وتحجز مساحة أزرار الإرسال السفلية قبل تحديد موضعها وارتفاعها.
+- **السبب:** أظهر iPhone تداخل زر الحفظ مع أزرار الصفحة، وامتداد قائمة
+  البلوكات إلى منطقة أزرار الإرسال.
+- **الملفات:** `app/miniapp_static/telegram_compact_layout.css`,
+  `app/miniapp_static/popup_performance.js`,
+  `app/miniapp_static/editor.html`,
+  `tests/serverless/miniapp-editor-library.test.mjs`, `md_files/log.md`.
+- **الاختبارات:** لم يتوفر مشغّل VS Code للاختبارات؛ محاولة `node --test
+  tests/serverless/miniapp-editor-library.test.mjs` توقفت قبل التنفيذ لأن
+  بيئة PowerShell لا تدعم sandbox المتاح على Windows.
+- **GitHub/النشر:** تغييرات محلية فقط؛ لا commit أو push أو نشر Cloudflare.
+
 ## 2026-11-25 — نشر أصول Mini App والتحقق من نسخة Telegram Serverless
 
 - **التغيير:** نُفّذ `npm.cmd run deploy`؛ رُفعت 8 ملفات ثابتة إلى
