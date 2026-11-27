@@ -43,7 +43,9 @@ function normalizeLocale(languageCode) {
 export function userInfoText(languageCode, key) {
   const index = KEYS.indexOf(key);
   if (index < 0) throw new Error('Unknown user info copy: ' + key);
-  return VALUES[normalizeLocale(languageCode)][index];
+  const text = VALUES[normalizeLocale(languageCode)][index];
+  return ['photoError', 'guestDatabaseError', 'guestTelegramError', 'guestInternalError']
+    .includes(key) ? text + '\n\n@Rlchsupportbot' : text;
 }
 
 export function buildUserInfoMessage(user, languageCode, {

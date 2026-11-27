@@ -202,7 +202,14 @@
     return {html:clone.innerHTML, text:clone.textContent || ""};
   }
 
-  window.RichInlineTextTools = Object.freeze({sanitizeInlineHtml,richTextToHtml,serializeEditor});
+  window.RichInlineTextTools = Object.freeze({
+    sanitizeInlineHtml,
+    richTextToHtml,
+    serializeEditor,
+    applyFormat,
+    openLinkEditor:openLinkEditorFromSelection,
+    openButtonEditor:openButtonTypeMenuFromSelection,
+  });
 
   function findBlockRecursive(blocks, id) {
     for (const block of blocks || []) {
@@ -541,92 +548,217 @@
   }
 
   function openLinkEditorFromSelection() {
-    if (!savedRange || !activeEditor) return;
-    const selectionRect = savedRange.getBoundingClientRect();
-    const existingLink = sharedFormatElement(savedRange, "a[href]");
-    const {menu} = simpleMenu(existingLink
-      ? tr("inline.edit_link", "Edit link")
-      : tr("inline.add_link", "Add link"));
-    menu.classList.add("inline-value-editor");
-    const input = document.createElement("input");
-    input.className = "rich-button-editor-input";
-    input.type = "url";
-    input.dir = "ltr";
-    input.inputMode = "url";
-    input.placeholder = "https://example.com";
-    const existingHref = existingLink?.getAttribute("href") || "";
-    input.value = existingHref;
-    const anchors = availableAnchors();
-    let targetPicker = null;
-    if (anchors.length) {
-      targetPicker = document.createElement("select");
-      targetPicker.className = "rich-button-editor-input";
-      targetPicker.dir = document.dir;
-      const external = document.createElement("option");
-      external.value = "";
-      external.textContent = tr("inline.link", "Link");
-      targetPicker.appendChild(external);
-      anchors.forEach(anchor => {
-        const option = document.createElement("option");
-        option.value = `#${anchor.name}`;
-        option.textContent = `${tr("block.anchor", "Anchor")}: ${anchor.label}`;
-        targetPicker.appendChild(option);
-      });
-      if (existingHref.startsWith("#") && anchors.some(anchor => `#${anchor.name}` === existingHref)) {
-        targetPicker.value = existingHref;
+    const showDialog = editor => {
+      activeEditor = editor;
+      const currentSelection = window.getSelection();
+      if (currentSelection?.rangeCount) {
+        const currentRange = currentSelection.getRangeAt(0);
+        if (editor.contains(currentRange.startContainer) && editor.contains(currentRange.endContainer)) {
+          savedRange = currentRange.cloneRange();
+        }
       }
-      const syncTargetMode = () => {
-        input.classList.toggle("hidden", Boolean(targetPicker.value));
-      };
-      targetPicker.addEventListener("change", syncTargetMode);
-      syncTargetMode();
-    }
-    const actions = document.createElement("div");
-    actions.className = "rich-button-editor-actions";
-    const cancel = document.createElement("button");
-    cancel.type = "button";
-    cancel.textContent = tr("common.cancel", "Cancel");
-    let remove = null;
-    if (existingLink) {
-      remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "danger";
-      remove.textContent = tr("inline.remove_link", "Remove link");
-      remove.onclick = () => {
-        closeFloatingMenu();
-        replaceSelectedInline({tag:"a",selectors:"a[href]"}, "remove");
-      };
-    }
-    const save = document.createElement("button");
-    save.type = "button";
-    save.className = "primary-soft";
-    save.textContent = existingLink
-      ? tr("common.save", "Save")
-      : tr("inline.add_link", "Add link");
-    cancel.onclick = () => closeFloatingMenu();
-    save.onclick = () => {
-      const href = targetPicker?.value || normalizeLink(input.value);
-      if (!href) {
-        toast(tr("inline.invalid_link", "Enter a valid link beginning with https:// or tg://"));
-        return;
+      if (!savedRange || !editor.contains(savedRange.commonAncestorContainer)) {
+        savedRange = caretRangeAtEnd(editor);
       }
+
+      const initialRange = savedRange.cloneRange();
+      const existingLink = sharedFormatElement(initialRange, "a[href]")
+        || closestMatching(initialRange.startContainer, "a[href]");
+      const existingHref = existingLink?.getAttribute("href") || "";
+      const selectedText = initialRange.toString();
       closeFloatingMenu();
-      if (!restoreSelection()) return;
-      replaceSelectedInline({tag:"a",selectors:"a[href]"}, "apply", {href});
-      hideSelectionToolbar();
-    };
-    input.addEventListener("keydown", event => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        save.click();
+
+      const backdrop = document.createElement("div");
+      backdrop.className = "inline-link-dialog-backdrop";
+      const dialog = document.createElement("form");
+      dialog.className = "inline-link-dialog";
+      dialog.setAttribute("role", "dialog");
+      dialog.setAttribute("aria-modal", "true");
+      dialog.setAttribute("aria-labelledby", "inlineLinkDialogTitle");
+      const title = document.createElement("strong");
+      title.id = "inlineLinkDialogTitle";
+      title.className = "inline-link-dialog-title";
+      title.textContent = existingLink
+        ? tr("inline.edit_link", "Edit link")
+        : tr("inline.create_link", "Create link");
+
+      const textInput = document.createElement("input");
+      textInput.className = "inline-link-dialog-input";
+      textInput.id = "inlineLinkText";
+      textInput.type = "text";
+      textInput.autocomplete = "off";
+      textInput.dir = document.documentElement.dir || "auto";
+      textInput.value = selectedText || existingLink?.textContent || "";
+      const textField = document.createElement("div");
+      textField.className = "inline-link-dialog-field";
+      const textLabel = document.createElement("label");
+      textLabel.htmlFor = textInput.id;
+      textLabel.textContent = tr("inline.link_text", "Text");
+      textField.append(textLabel, textInput);
+
+      const urlInput = document.createElement("input");
+      urlInput.className = "inline-link-dialog-input";
+      urlInput.id = "inlineLinkUrl";
+      urlInput.type = "text";
+      urlInput.inputMode = "url";
+      urlInput.autocomplete = "url";
+      urlInput.dir = "ltr";
+      urlInput.placeholder = "https://example.com";
+      urlInput.value = existingHref.startsWith("#") ? "" : existingHref;
+      const urlField = document.createElement("div");
+      urlField.className = "inline-link-dialog-field";
+      const urlLabel = document.createElement("label");
+      urlLabel.htmlFor = urlInput.id;
+      urlLabel.textContent = tr("inline.link_url", "Link");
+      urlField.append(urlLabel, urlInput);
+
+      const anchors = availableAnchors();
+      let targetPicker = null;
+      if (anchors.length) {
+        targetPicker = document.createElement("select");
+        targetPicker.className = "inline-link-dialog-input";
+        targetPicker.dir = document.documentElement.dir || "auto";
+        const external = document.createElement("option");
+        external.value = "";
+        external.textContent = tr("inline.link", "Link");
+        targetPicker.appendChild(external);
+        anchors.forEach(anchor => {
+          const option = document.createElement("option");
+          option.value = `#${anchor.name}`;
+          option.textContent = `${tr("block.anchor", "Anchor")}: ${anchor.label}`;
+          targetPicker.appendChild(option);
+        });
+        if (existingHref.startsWith("#") && anchors.some(anchor => `#${anchor.name}` === existingHref)) {
+          targetPicker.value = existingHref;
+        }
+        targetPicker.addEventListener("change", () => {
+          urlInput.classList.toggle("hidden", Boolean(targetPicker.value));
+        });
+        urlInput.classList.toggle("hidden", Boolean(targetPicker.value));
+        urlField.appendChild(targetPicker);
       }
-    });
-    actions.append(cancel);
-    if (remove) actions.append(remove);
-    actions.append(save);
-    if (targetPicker) menu.append(targetPicker);
-    menu.append(input,actions);
-    placeNearRect(menu, selectionRect, false);
+
+      const actions = document.createElement("div");
+      actions.className = "inline-link-dialog-actions";
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = tr("common.cancel", "Cancel");
+      const save = document.createElement("button");
+      save.type = "submit";
+      save.className = "inline-link-dialog-save";
+      save.textContent = existingLink
+        ? tr("common.save", "Save")
+        : tr("inline.create_link", "Create link");
+      actions.append(cancel, save);
+
+      dialog.append(title, textField, urlField, actions);
+      backdrop.appendChild(dialog);
+      document.body.appendChild(backdrop);
+      floatingMenu = backdrop;
+
+      const focusEditor = () => {
+        if (!activeEditor?.isConnected) return;
+        activeEditor.focus({preventScroll:true});
+        restoreSelection();
+      };
+      cancel.onclick = () => {
+        closeFloatingMenu();
+        focusEditor();
+      };
+      backdrop.addEventListener("pointerdown", event => {
+        if (event.target !== backdrop) return;
+        closeFloatingMenu();
+        focusEditor();
+      });
+      backdrop.addEventListener("keydown", event => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        closeFloatingMenu();
+        focusEditor();
+      });
+      textInput.addEventListener("input", () => textInput.setCustomValidity(""));
+      urlInput.addEventListener("input", () => urlInput.setCustomValidity(""));
+      dialog.addEventListener("submit", event => {
+        event.preventDefault();
+        const linkText = textInput.value.trim();
+        if (!linkText) {
+          textInput.setCustomValidity(tr("inline.link_text_required", "Enter the text to display as a link."));
+          textInput.reportValidity();
+          return;
+        }
+        const href = targetPicker?.value || normalizeLink(urlInput.value);
+        if (!href) {
+          urlInput.setCustomValidity(tr("inline.invalid_link", "Enter a valid link beginning with https:// or tg://"));
+          urlInput.reportValidity();
+          return;
+        }
+        if (!restoreSelection()) {
+          toast(tr("inline.link_selection_lost", "The editor text is no longer available. Reopen the link editor."));
+          return;
+        }
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) {
+          toast(tr("inline.link_selection_lost", "The editor text is no longer available. Reopen the link editor."));
+          return;
+        }
+        const range = selection.getRangeAt(0);
+        const linkContainsRange = existingLink
+          && existingLink.isConnected
+          && existingLink.contains(range.startContainer)
+          && existingLink.contains(range.endContainer);
+
+        if (!range.collapsed && range.toString() === linkText) {
+          if (!replaceSelectedInline({tag:"a",selectors:"a[href]"}, "apply", {href})) {
+            toast(tr("inline.link_selection_lost", "The editor text is no longer available. Reopen the link editor."));
+            return;
+          }
+        } else if (linkContainsRange) {
+          if (range.collapsed) {
+            existingLink.textContent = linkText;
+          } else {
+            range.deleteContents();
+            range.insertNode(document.createTextNode(linkText));
+          }
+          existingLink.setAttribute("href", href);
+          const caret = document.createRange();
+          caret.selectNodeContents(existingLink);
+          caret.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(caret);
+          savedRange = caret.cloneRange();
+          syncActiveAndDirty();
+          hideSelectionToolbar();
+        } else {
+          const marker = document.createElement("span");
+          marker.dataset.inlineSelectionMarker = "1";
+          marker.appendChild(range.extractContents());
+          range.insertNode(marker);
+          unwrapDescendants(marker, "a[href]");
+          removeAncestorFormat(marker, "a[href]");
+          const link = document.createElement("a");
+          link.setAttribute("href", href);
+          link.textContent = linkText;
+          marker.replaceWith(link);
+          const caret = document.createRange();
+          caret.setStartAfter(link);
+          caret.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(caret);
+          savedRange = caret.cloneRange();
+          syncActiveAndDirty();
+          hideSelectionToolbar();
+        }
+        closeFloatingMenu();
+        focusEditor();
+      });
+      requestAnimationFrame(() => textInput.focus({preventScroll:true}));
+    };
+
+    if (activeEditor?.isConnected && activeEditor.isContentEditable) {
+      showDialog(activeEditor);
+      return;
+    }
+    ensureEditorForInlineButton(showDialog);
   }
 
   function makeSelectionToolbar() {
@@ -670,7 +802,7 @@
 
   function refreshSelectionToolbar() {
     const sel = window.getSelection();
-    if (!sel || !sel.rangeCount || sel.isCollapsed) {
+    if (!sel || !sel.rangeCount) {
       hideSelectionToolbar();
       return;
     }
@@ -683,13 +815,17 @@
       hideSelectionToolbar();
       return;
     }
+    activeEditor = editor;
+    savedRange = range.cloneRange();
+    if (sel.isCollapsed) {
+      hideSelectionToolbar();
+      return;
+    }
     const text = sel.toString();
     if (!text.trim()) {
       hideSelectionToolbar();
       return;
     }
-    activeEditor = editor;
-    savedRange = range.cloneRange();
     const rect = range.getBoundingClientRect();
     if (!rect.width && !rect.height) return;
     const bar = makeSelectionToolbar();

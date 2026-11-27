@@ -230,6 +230,46 @@ test('verified purchases are durable, idempotent and reflected in /sup', async (
   assert.equal(me.limits.table_columns,20);
 });
 
+test('trusted discounted purchase events preserve their actual paid Stars amounts', async () => {
+  const h = await setup();
+  const now = 2_000_000_000;
+  await pin(h, now);
+  const plusWithBranding = event({
+    orderId: ORDER_A,
+    plan: 'plus',
+    permanentBranding: true,
+    amount: 129,
+    paidAt: now,
+  });
+  const goldenWithBranding = event({
+    orderId: ORDER_B,
+    plan: 'golden',
+    permanentBranding: true,
+    amount: 274,
+    paidAt: now + 1,
+  });
+
+  await h.b2b.handleRichDonateB2BMessage(eventMessage(plusWithBranding), { now });
+  await h.b2b.handleRichDonateB2BMessage(eventMessage(event({
+    orderId: ORDER_A,
+    kind: 'refund',
+    plan: 'plus',
+    permanentBranding: true,
+    amount: 129,
+    paidAt: now,
+    chargeId: plusWithBranding.charge_id,
+  })), { now });
+  await h.b2b.handleRichDonateB2BMessage(eventMessage(goldenWithBranding), { now });
+
+  assert.deepEqual(
+    h.records.editorEntitlementEvents.map(row => [row.plan, row.amount]),
+    [['plus', 129], ['plus', 129], ['golden', 274]],
+  );
+  const state = await h.status.subscriptionSnapshot(USER_ID, now + 1);
+  assert.equal(state.plan, 'golden');
+  assert.equal(await h.branding.isBrandingRemoved(USER_ID), true);
+});
+
 test('a new paid plan adds 30 days to a trusted legacy balance and switches immediately', async () => {
   const h = await setup();
   const now = 2_000_000_000;
@@ -281,7 +321,10 @@ test('rejects invalid event identity, pricing, fields and non-pinned senders wit
   await pin(h, now);
   const valid = event({ paidAt: now });
   const invalidEvents = [
-    { ...valid, amount: 149 },
+    { ...valid, amount: 0 },
+    { ...valid, amount: 149.5 },
+    { ...valid, amount: Number.MAX_SAFE_INTEGER + 1 },
+    { ...valid, plan: 'free' },
     { ...valid, user_id: 0 },
     { ...valid, extra: 'unexpected' },
     { ...valid, event_id: `refund:${ORDER_A}` },

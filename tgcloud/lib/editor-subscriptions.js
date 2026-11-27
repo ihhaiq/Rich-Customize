@@ -13,9 +13,6 @@ import { resolveEditorEntitlement, planBenefit, safePlanLimit } from 'lib/subscr
 
 export const RICH_DONATE_USERNAME = 'richdonatebot';
 export const RICH_DONATE_PLAN_DAYS = 30;
-export const RICH_DONATE_BRANDING_PRICE = 99;
-
-const PLAN_PRICES = Object.freeze({ free: 0, plus: 150, golden: 350 });
 const MINIAPP_BRIDGE_CHAT_ID = -1003993506865;
 const EDITOR_BOT_USERNAME = 'richcustomizebot';
 const RICH_DONATE_TAG = '#مزامنة_ريتش_دونيت';
@@ -101,6 +98,7 @@ function parseRichDonateEvent(text, now) {
   if (!orderMatch || !eventMatch
       || eventMatch[1] !== value.kind
       || eventMatch[2] !== value.order_id
+      || (value.plan === 'free' && !value.permanent_branding)
       || !Number.isSafeInteger(userId) || userId <= 0
       || !Number.isSafeInteger(paidAt) || paidAt <= 0
       || paidAt > now + 300 || paidAt < now - MAX_EVENT_AGE_SECONDS
@@ -108,10 +106,6 @@ function parseRichDonateEvent(text, now) {
       || chargeId.length === 0 || chargeId.length > MAX_CHARGE_ID_LENGTH
       || chargeId !== chargeId.trim()
       || /[\u0000-\u001f\u007f]/.test(chargeId)) return null;
-
-  const expectedAmount = PLAN_PRICES[value.plan]
-    + (value.permanent_branding ? RICH_DONATE_BRANDING_PRICE : 0);
-  if (expectedAmount === 0 || amount !== expectedAmount) return null;
 
   return {
     eventId: value.event_id,

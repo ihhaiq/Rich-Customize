@@ -59,7 +59,7 @@ test('regular users cannot import a rich message with a login URL button',async(
   }),{confirmReplace:true});
 
   assert.ok(h.calls.some(call=>call.method==='sendMessage'
-    && call.args.text==='زر تسجيل الدخول غير متاح, لانك لست مخول لاستعماله'));
+    && call.args.text==='زر تسجيل الدخول غير متاح, لانك لست مخول لاستعماله\n\n@Rlchsupportbot'));
   const session=await h.session.loadEditorSession(userId,{touch:false});
   assert.deepEqual(session.blocks,[]);
   assert.deepEqual(session.messageButtons,[]);

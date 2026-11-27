@@ -19,7 +19,7 @@ import { buildInputRichMessage } from 'lib/editor-renderer';
 import { prepareMessageButtons, buildMessageButtonsKeyboard } from 'lib/page-buttons';
 import { shouldIncludeBranding } from 'lib/branding';
 import { logError } from 'lib/error-log';
-import { resolveLanguage, tr } from 'lib/i18n';
+import { resolveLanguage, tr, withSupportContact } from 'lib/i18n';
 
 const CHAT_ID = -1003993506865;
 const JOB_RE = /^sch_[a-f0-9]{32}$/;
@@ -170,7 +170,7 @@ export async function handleScheduledTimeMessage(message){
     );
   } catch (error) {
     await logError('schedule.create',error,{userId:id});
-    await api.sendMessage({chat_id:id,text:'تعذر حفظ طلب الجدولة مؤقتاً. حاول مجدداً. لم يتم تأكيد جدولة المنشور.'});
+    await api.sendMessage({chat_id:id,text:withSupportContact('تعذر حفظ طلب الجدولة مؤقتاً. حاول مجدداً. لم يتم تأكيد جدولة المنشور.')});
     return true;
   }
   if(!outcome.ok){
@@ -215,7 +215,7 @@ export async function handleScheduleCancelCallback(query){
   const ownerId=Number(query?.from?.id);
   const job=JOB_RE.test(jobId)?await loadJob(jobId):null;
   if(!job||Number(job.ownerId)!==ownerId||!STATUS_PENDING.has(job.status)){
-    await api.answerCallbackQuery({callback_query_id:query.id,text:'المهمة غير متاحة للإلغاء.',show_alert:true});
+    await api.answerCallbackQuery({callback_query_id:query.id,text:withSupportContact('المهمة غير متاحة للإلغاء.'),show_alert:true});
     return true;
   }
   const stamp=now();
@@ -363,7 +363,7 @@ export async function receiveScheduleRelayControl(source){
   if(data.status==='SCHEDULE_REJECTED'&&job.status==='registering'){
     await db.update(scheduledPosts).set({status:'failed',updatedAt:now()})
       .where(and(eq(scheduledPosts.jobId,job.jobId),eq(scheduledPosts.status,'registering'))).run();
-    try{await api.sendMessage({chat_id:job.ownerId,text:'تعذر اعتماد موعد المهمة '+job.jobId+' لدى خدمة التذكير. لم تنشر الرسالة.'});}catch{}
+    try{await api.sendMessage({chat_id:job.ownerId,text:withSupportContact('تعذر اعتماد موعد المهمة '+job.jobId+' لدى خدمة التذكير. لم تنشر الرسالة.')});}catch{}
   }
   return true;
 }

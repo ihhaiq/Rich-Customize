@@ -14,6 +14,7 @@ import {
   managedBotPlanFor,
   parseManagedBotPayload,
 } from 'lib/managed-bot-billing-policy';
+import { withSupportContact } from 'lib/i18n';
 export { MANAGED_BOT_PLANS, MANAGED_BOT_CURRENCY, MANAGED_BOT_PERMANENT_EXPIRES_AT, parseManagedBotPayload };
 
 function stamp() {
@@ -131,7 +132,7 @@ export async function handleManagedBotPreCheckout(query) {
   await api.answerPreCheckoutQuery({
     pre_checkout_query_id: query.id,
     ok,
-    ...(ok ? {} : { error_message: 'تعذّر التحقق من الترخيص. أنشئ رابط دفع جديداً وجرب مرة ثانية.' }),
+    ...(ok ? {} : { error_message: withSupportContact('تعذّر التحقق من الترخيص. أنشئ رابط دفع جديداً وجرب مرة ثانية.', 200) }),
   });
   return true;
 }
@@ -146,7 +147,7 @@ async function reportUnverifiedManagedPayment(message, reason) {
     try {
       await api.sendMessage({
         chat_id: message.chat.id,
-        text: 'وصل إشعار دفع لكن تعذر التحقق من الطلب وإصدار الترخيص تلقائياً. إذا انخصمت النجوم لا تدفع مرة ثانية؛ تواصل مع الدعم واحتفظ بإيصال تليكرام.',
+        text: withSupportContact('وصل إشعار دفع لكن تعذر التحقق من الطلب وإصدار الترخيص تلقائياً. إذا انخصمت النجوم لا تدفع مرة ثانية؛ احتفظ بإيصال تليكرام.'),
       });
     } catch (error) {
       console.warn('Could not notify owner of unverified managed-bot payment', error);

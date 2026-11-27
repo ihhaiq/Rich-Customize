@@ -2,6 +2,7 @@ import { api } from 'sdk';
 import { handleBrandingPreCheckout } from 'lib/branding';
 import { handleManagedBotPreCheckout } from 'lib/managed-bot-billing';
 import { logError } from 'lib/error-log';
+import { withSupportContact } from 'lib/i18n';
 
 // Payment queries have an acceptance deadline. Never approve an unverified
 // invoice, and never leave a known failed check without a denial attempt.
@@ -19,7 +20,10 @@ export default async function (query, ctx = {}) {
     await api.answerPreCheckoutQuery({
       pre_checkout_query_id: query.id,
       ok: false,
-      error_message: arabic ? 'رابط الدفع غير معروف. أنشئ رابط دفع جديداً.' : 'Unknown invoice. Generate a fresh payment link.',
+      error_message: withSupportContact(
+        arabic ? 'رابط الدفع غير معروف. أنشئ رابط دفع جديداً.' : 'Unknown invoice. Generate a fresh payment link.',
+        200,
+      ),
     });
   } catch (error) {
     await logError('payment.pre_checkout', error, {
@@ -30,7 +34,7 @@ export default async function (query, ctx = {}) {
       await api.answerPreCheckoutQuery({
         pre_checkout_query_id: query.id,
         ok: false,
-        error_message: denial,
+        error_message: withSupportContact(denial, 200),
       });
       return;
     } catch (denialError) {

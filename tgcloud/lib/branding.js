@@ -7,7 +7,7 @@ import {
   hasPermanentRichDonateBranding,
 } from 'lib/editor-subscriptions';
 import { planBenefit } from 'lib/subscription-policy';
-import { resolveLanguage, tr } from 'lib/i18n';
+import { resolveLanguage, tr, withSupportContact } from 'lib/i18n';
 
 export const BRANDING_PRICE_STARS = 99;
 export const BRANDING_INVOICE_PAYLOAD = 'remove_branding:v1';
@@ -139,7 +139,7 @@ export async function handleBrandingPreCheckout(query) {
   await api.answerPreCheckoutQuery({
     pre_checkout_query_id: query.id,
     ok,
-    ...(ok ? {} : { error_message: errorMessage }),
+    ...(ok ? {} : { error_message: withSupportContact(errorMessage, 200) }),
   });
   return true;
 }
@@ -159,7 +159,7 @@ export async function handleBrandingSuccessfulPayment(message) {
     if (message?.chat?.id) {
       try {
         await api.sendMessage({chat_id:message.chat.id,
-          text:'وصل إشعار دفع لكن تعذر التحقق منه تلقائياً. إذا انخصمت النجوم لا تدفع مرة ثانية؛ احتفظ بإيصال تليكرام وتواصل مع الدعم.'});
+          text:withSupportContact('وصل إشعار دفع لكن تعذر التحقق منه تلقائياً. إذا انخصمت النجوم لا تدفع مرة ثانية؛ احتفظ بإيصال تليكرام.')});
       } catch (noticeError) {
         console.warn('Could not notify user of unverified branding payment', noticeError);
       }
@@ -239,7 +239,7 @@ export async function handleBrandingCallback(query) {
     if (requested !== '0' && requested !== '1') {
       await api.answerCallbackQuery({
         callback_query_id: query.id,
-        text: 'إعداد الحقوق غير صالح. أعد فتح لوحة الأدوات.',
+        text: withSupportContact('إعداد الحقوق غير صالح. أعد فتح لوحة الأدوات.'),
         show_alert: true,
       });
       return true;

@@ -6,8 +6,9 @@ const source = fs.readFileSync(new URL('../../tgcloud/handlers/pre_checkout_quer
   .replace(/^import .*?;\s*$/gm, '')
   .replace('export default async function', 'const handler = async function');
 function makeHandler(api, branding, managed, logError) {
-  return new Function('api', 'handleBrandingPreCheckout', 'handleManagedBotPreCheckout', 'logError',
-    source + '\nreturn handler;')(api, branding, managed, logError);
+  const withSupportContact = (text) => String(text) + '\n\n@Rlchsupportbot';
+  return new Function('api', 'handleBrandingPreCheckout', 'handleManagedBotPreCheckout', 'logError', 'withSupportContact',
+    source + '\nreturn handler;')(api, branding, managed, logError, withSupportContact);
 }
 const query = {id:'checkout-1',from:{id:14,language_code:'ar'},invoice_payload:'unexpected',currency:'XTR',total_amount:50};
 
@@ -19,6 +20,7 @@ test('unknown invoice payload is refused, never approved or left pending', async
   assert.equal(replies.length,1);
   assert.equal(replies[0].ok,false);
   assert.match(replies[0].error_message,/غير معروف/);
+  assert.match(replies[0].error_message,/@Rlchsupportbot/);
 });
 test('database failure during pre-checkout produces a safe denial and diagnostic log', async () => {
   const replies=[], logs=[];
@@ -28,6 +30,7 @@ test('database failure during pre-checkout produces a safe denial and diagnostic
   await handler(query,{update:{update_id:123}});
   assert.equal(replies[0].ok,false);
   assert.doesNotMatch(replies[0].error_message,/DB_SECRET_DETAILS/);
+  assert.match(replies[0].error_message,/@Rlchsupportbot/);
   assert.equal(logs[0][0],'payment.pre_checkout');
   assert.equal(logs[0][2].updateId,123);
 });

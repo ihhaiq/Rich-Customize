@@ -1,6 +1,6 @@
 # Rich Customize — Architecture Map
 
-> Branch: `serverless-cleanup` · Reviewed against source and documentation: 2026-11-19
+> Branch: `serverless-cleanup` · Reviewed against source and documentation: 2026-11-27
 > This describes the documented design, not an independent live-production audit.
 
 ## System overview
@@ -13,28 +13,27 @@ Telegram users
    |      tgcloud/schema.js / tgcloud/handlers/ / tgcloud/lib/
    |      authoritative pages, sessions, permissions, publishing
    |
-   +--> Mini App (app/miniapp_static/)
+   +--> Mini App frontend (Telegram Cloud; source: app/miniapp_static/)
           |
-          +--> Serverless-hosted origin --> authenticated `miniapp` endpoint
-          |                                --> Telegram Serverless data
+          +--> Telegram Cloud static hosting --> authenticated `miniapp` endpoint
+          |                                     --> Telegram Serverless data
           |
-          +--> Cloudflare-origin routes --> Pages Functions / D1 / RCB1 relay
-                                           --> @RichCustomizebot / Serverless
+          +--> supporting/legacy API calls --> Cloudflare Pages Functions / D1 / RCB1 relay
+                                               --> @RichCustomizebot / Serverless
 ```
 
-When the Mini App is opened from its Telegram Serverless origin, supported
-page reads and mutations use the authenticated `miniapp` endpoint directly.
-Other routes still fall back to Cloudflare for media, telemetry, and legacy
-emoji-pack import. The live BotFather origin is not verifiable from repository
-source. Cloudflare-origin routes and RCB1 remain for legacy and supported
-operations; neither is the storage path for direct Serverless page CRUD.
+The Mini App frontend is hosted on Telegram Cloud, not Cloudflare Pages.
+Supported page reads and mutations use the authenticated `miniapp` endpoint
+directly. Separate supporting API routes still use Cloudflare for media,
+telemetry, legacy emoji-pack import and bridge operations. Cloudflare is not
+the frontend host or storage path for direct Serverless page CRUD.
 
 ## Ownership boundaries
 | Component | Paths | Responsibility |
 | --- | --- | --- |
 | Telegram Serverless | `tgcloud/schema.js`, `tgcloud/handlers/*.js`, `tgcloud/lib/**/*.js` | Authoritative page and editor data, permissions, publication, compatibility and operational state |
 | Mini App | `app/miniapp_static/**` | Browser UI and local unsaved edits; direct Serverless page operations use authenticated `initData` and the `miniapp` endpoint |
-| Cloudflare Functions | `functions/**` | Cloudflare-origin authentication, legacy relay transport, webhook, media, telemetry and compatibility handling |
+| Cloudflare Functions | `functions/**` | Supporting/legacy API authentication, relay transport, webhook, media, telemetry and compatibility handling; not the Mini App frontend |
 | Cloudflare D1 | `cloudflare/d1/schema.sql` | Request correlation, identity, and transitional emoji-pack storage; older page mirrors may remain but Serverless no longer refreshes them. Binding `DB`; saved page truth remains Serverless |
 | Documentation | `md_files/**`, `docs/README.md`, root Markdown | Architecture and planning; not an executable source of truth |
 
@@ -52,7 +51,7 @@ The documented bridge uses `@Richminiappsbot` as relay and `@RichCustomizebot` a
 
 ## Deployment boundaries
 - Telegram code/schema changes: follow the documented `tgcloud` workflow; code push and database migration are separate operations.
-- Mini App/Cloudflare changes: follow the configured Pages integration and its secrets/bindings.
+- Mini App frontend changes: build and deploy through Telegram Cloud. Supporting Cloudflare Functions changes: follow the configured Pages integration and its secrets/bindings.
 - Markdown-only updates: do **not** require a Telegram schema migration or a runtime push solely because they are committed.
 
 ## Before changing architecture

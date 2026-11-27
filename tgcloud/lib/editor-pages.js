@@ -28,7 +28,7 @@ import {
   pagesCopy,
   renderPagesScreen,
 } from 'lib/pages';
-import { resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
+import { resolveLanguage, resolveUserLanguage, t, tr, withSupportContact } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import { getEditorEntitlement } from 'lib/editor-subscriptions';
 import { safePlanLimit } from 'lib/subscription-policy';
@@ -84,8 +84,8 @@ function copy(code) {
     sendName: tr(locale, 'Send a page name to save it; maximum 64 characters.'),
     originalMissing: tr(locale, 'The original page no longer exists.'),
     originalMissingPrompt: tr(locale, 'The original page no longer exists. Send a name to save it as a new page.'),
-    badName: tr(locale, 'The page name must be text.'),
-    longName: tr(locale, 'The page name is too long; maximum 64 characters.'),
+    badName: withSupportContact(tr(locale, 'The page name must be text.')),
+    longName: withSupportContact(tr(locale, 'The page name is too long; maximum 64 characters.')),
     limit: t(locale, 'pages.limit_reached', { limit: MAX_SAVED_PAGES }),
     updatedNotice: (title) => tr(locale, '✅ Updated saved page “{title}”.', { title }),
     updatedToast: tr(locale, '✅ Saved changes with the same code'),
@@ -105,7 +105,7 @@ function copy(code) {
         + '\n\n' + tr(locale, 'Or choose “CBD — Open page” from the buttons list.');
     },
     opened: tr(locale, 'Page opened'),
-    missing: tr(locale, 'The page was deleted or does not belong to you.'),
+    missing: withSupportContact(tr(locale, 'The page was deleted or does not belong to you.')),
     expired: t(locale, 'expired'),
     renamePrompt: (title) => t(locale, 'pages.rename_prompt', { title }),
     deleteConfirm: (title) => t(locale, 'pages.delete_confirm', { title }),
@@ -143,12 +143,12 @@ function limitText(result, code) {
   if (result.code === 'table_rows') return t(locale, 'limits.table_rows', { limit: result.limit });
   if (result.code === 'table_columns') return t(locale, 'limits.table_columns', { limit: result.limit });
 
-  if (result.code === 'nesting_depth') return locale === 'ar'
+  if (result.code === 'nesting_depth') return withSupportContact(locale === 'ar'
     ? 'وصلت للحد الأقصى لمستويات التداخل في باقتك: ' + result.limit
-    : 'Maximum nesting levels for your plan: ' + result.limit;
-  if (result.code === 'media_attachments') return locale === 'ar'
+    : 'Maximum nesting levels for your plan: ' + result.limit);
+  if (result.code === 'media_attachments') return withSupportContact(locale === 'ar'
     ? 'وصلت للحد الأقصى لمرفقات الوسائط بالرسالة: ' + result.limit
-    : 'Maximum media attachments per message: ' + result.limit;
+    : 'Maximum media attachments per message: ' + result.limit);
   return tr(locale, 'The content exceeds an editor limit.');
 }
 
@@ -739,9 +739,9 @@ async function receiveSaveName(message, session, code) {
       }
     } catch (error) {
       if (error?.pageNameExists) {
-        await api.sendMessage({chat_id:message.chat.id,text:resolveLanguage(code)==='ar'
+        await api.sendMessage({chat_id:message.chat.id,text:withSupportContact(resolveLanguage(code)==='ar'
           ? 'عندك صفحة ثانية بنفس الاسم. اختار اسم مختلف.'
-          : 'You already have another page with this name. Choose a different name.'});
+          : 'You already have another page with this name. Choose a different name.')});
         return true;
       }
       if (error?.editorLimit) {
@@ -749,9 +749,9 @@ async function receiveSaveName(message, session, code) {
         return true;
       }
       if (error?.code === 'LEGACY_PAGE_READ_ONLY') {
-        await api.sendMessage({chat_id:message.chat.id,text:resolveLanguage(code)==='ar'
+        await api.sendMessage({chat_id:message.chat.id,text:withSupportContact(resolveLanguage(code)==='ar'
           ? 'الصفحة تتجاوز حدود باقتك الحالية؛ متاحة للنشر كما هي، لكن تعديلها يتطلب باقة تسمح بحجمها.'
-          : 'This page exceeds your active plan. You may republish unchanged; editing requires an eligible plan.'});
+          : 'This page exceeds your active plan. You may republish unchanged; editing requires an eligible plan.')});
         return true;
       }
 
@@ -764,7 +764,7 @@ async function receiveSaveName(message, session, code) {
           addPromptMessageId: null,
         });
         const quota=error?.pageBusy
-          ? (resolveLanguage(code)==='ar'?'الصفحة مشغولة حالياً، جرّب مرة ثانية.':'The page is busy. Try again.')
+          ? withSupportContact(resolveLanguage(code)==='ar'?'الصفحة مشغولة حالياً، جرّب مرة ثانية.':'The page is busy. Try again.')
           : t(resolveLanguage(code),'pages.limit_reached',{
               limit:safePlanLimit(await getEditorEntitlement(userId),'pages')??MAX_SAVED_PAGES,
             });

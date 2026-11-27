@@ -109,8 +109,13 @@ external contract before deployment.
   from `@richDonateBot` in that exact group, requires commands addressed to
   `@RichCustomizebot`, and pins the numeric ID learned from the targeted
   `/rdb_hello_ack_v1`. Events are bounded and validated against the
-  `rich-donate/1` schema and exact Stars combinations; ACKs are targeted back
-  to `@RichDonateBot` only after the event row is durable.
+  `rich-donate/1` schema. The pinned bot's `amount` is the actual positive,
+  integer Stars amount paid, not a price recomputed from the plan; this allows
+  Rich Donate to apply subscription-only coupons while keeping permanent
+  branding in the charged total. Coupon codes and discount metadata are not
+  sent to or stored by Rich Customize. The event's plan and branding flag still
+  determine the granted entitlements. ACKs are targeted back to
+  `@RichDonateBot` only after the event row is durable.
 - Rich Customize no longer schedules or sends `/rdb_sync_v1`, and no longer
   has an RCB1 relay tick for periodic RDB synchronization. The bot continues
   to accept validated events and sends event ACKs after persistence. The

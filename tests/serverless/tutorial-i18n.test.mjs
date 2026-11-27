@@ -54,6 +54,19 @@ test('all 20 tutorial locales cover every UI, lesson and starter-content string'
   assert.equal(h.copy.tutorialCopy('fr').entry, h.copy.tutorialCopy('en').entry);
 });
 
+test('localized user errors include support while successful copy stays unchanged', async () => {
+  const h = await harness();
+  const failed = h.i18n.t('ar', 'showcase.failed');
+  assert.match(failed, /@Rlchsupportbot/);
+  assert.doesNotMatch(h.i18n.t('ar', 'pages.saved_title'), /@Rlchsupportbot/);
+  assert.match(h.i18n.tr('ar', 'تعذر تحميل بيانات الصفحة.'), /@Rlchsupportbot/);
+
+  const bounded = h.i18n.withSupportContact('x'.repeat(300), 200);
+  assert.ok(Array.from(bounded).length <= 200);
+  assert.ok(bounded.endsWith('@Rlchsupportbot'));
+  assert.equal((bounded.match(/@Rlchsupportbot/g) || []).length, 1);
+});
+
 test('subscriber-only CBD restores the original Arabic popup and still denies non-members', async () => {
   const h = await harness({ extraModules: { navigation: 'lib/page-navigation' } });
   const query = { id: 'restricted', from: { id: 333, language_code: 'ar-IQ' }, message: { message_id: 7, chat: { id: -100987, type: 'supergroup' } }, data: 'r:cbds:missing' };

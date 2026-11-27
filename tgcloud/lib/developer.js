@@ -24,6 +24,7 @@ import {
 } from 'lib/backup-import';
 import { usageSummary, usageUsersPage } from 'lib/usage-stats';
 import { syncBotProfiles } from 'lib/bot-profile';
+import { withSupportContact } from 'lib/i18n';
 import {
   configureErrorLogChannel,
   disableErrorLogChannel,
@@ -518,12 +519,17 @@ function broadcastReport(job) {
         - Number(job.privateUsers || 0)).toLocaleString() + '\n'
     + 'القنوات والمجموعات: ' + Number(job.totalChats || 0).toLocaleString() + '\n'
     + 'مستثنون لأنهم مشتركوا @RichCustomize: '
-      + Number(job.skippedSubscribers || 0).toLocaleString() + '\n'
-    + 'تعذر التحقق من عضويتهم (لم تُرسل لهم): '
+      + Number(job.skippedSubscribers || 0).toLocaleString()
+      + ' (يُعاد فحصهم في حملة لاحقة)\n'
+    + 'تعذر التحقق من عضويتهم (تجاوز هذه الحملة؛ يُعاد فحصهم لاحقاً): '
       + Number(job.membershipCheckFailed || 0).toLocaleString() + '\n'
     + 'قبلها Telegram: ' + Number(job.sent || 0).toLocaleString() + '\n'
-    + 'تعذر الإرسال: ' + Number(job.failed || 0).toLocaleString() + '\n'
-    + 'نتيجة غير مؤكدة: ' + Number(job.uncertain || 0).toLocaleString() + '\n'
+    + 'تعذر الإرسال (مستبعدون من الحملات القادمة): '
+      + Number(job.failed || 0).toLocaleString() + '\n'
+    + 'تأجيلات 429 وإعادة تلقائية: '
+      + Number(job.rateLimited || 0).toLocaleString() + '\n'
+    + 'نتيجة غير مؤكدة (لا إعادة بهذه الحملة؛ حملة لاحقة قد تكرر الإرسال): '
+      + Number(job.uncertain || 0).toLocaleString() + '\n'
     + 'متبقٍ تقريباً: ' + progress.pending.toLocaleString()
     + (job.failureReason === 'membership_check_failed'
       ? '\nسبب التوقف: لم يعد ممكناً التحقق من عضوية @RichCustomize، لذلك أُوقف الإرسال الخاص لتجنب مراسلة المشتركين.'
@@ -564,6 +570,8 @@ function broadcastOutcome(userId, status, error) {
     reason = 'MISSING_SEND_PERMISSION';
   } else if (/chat not found|user not found|bot can't initiate|bot cannot initiate|user never started/.test(value)) {
     reason = 'DESTINATION_UNAVAILABLE';
+  } else if (/USER_BOT_TO_BOT_DISABLED/i.test(value)) {
+    reason = 'BOT_TO_BOT_DISABLED';
   } else if (/timed out|timeout|etimedout/.test(value)) {
     reason = 'NETWORK_TIMEOUT';
   } else if (/network|socket|connection|fetch failed|econn/.test(value)) {
@@ -684,6 +692,7 @@ function broadcastOutcomeReason(code) {
     BOT_REMOVED_FROM_CHAT: 'البوت لم يعد عضواً في المحادثة',
     MISSING_SEND_PERMISSION: 'البوت لا يملك صلاحية الإرسال في المحادثة',
     DESTINATION_UNAVAILABLE: 'المحادثة غير موجودة أو غير متاحة للبوت',
+    BOT_TO_BOT_DISABLED: 'Telegram عطّل المراسلة بين البوتات',
     TELEGRAM_REJECTED: 'رفض Telegram الرسالة',
     MEMBERSHIP_CHECK_FAILED: 'تعذر التحقق من عضوية القناة الرسمية؛ لم تُرسل رسالة خاصة',
     NETWORK_TIMEOUT: 'انتهت مهلة الاتصال؛ نتيجة الإرسال غير محسومة',
@@ -691,6 +700,19 @@ function broadcastOutcomeReason(code) {
     OUTCOME_UNKNOWN: 'تعذر تأكيد نتيجة الإرسال؛ لم نكرر الإرسال',
   };
   return labels[String(code || '')] || 'سبب غير مصنف';
+}
+
+function broadcastOutcomeRetryAction(record) {
+  if (record[1] === 'skipped' && record[3] === 'MEMBERSHIP_CHECK_FAILED') {
+    return 'لا في هذه الحملة؛ يُعاد فحص العضوية في حملة لاحقة';
+  }
+  if (record[1] === 'failed') {
+    return 'لا؛ مستبعد من الإذاعات القادمة';
+  }
+  if (record[1] === 'uncertain') {
+    return 'لا في هذه الحملة؛ قد تُعاد لاحقاً مع احتمال التكرار';
+  }
+  return 'لا تنطبق';
 }
 
 async function broadcastReportPage(job, start) {
@@ -713,17 +735,18 @@ async function broadcastReportPage(job, start) {
   }
   const lines = [
     'تفاصيل المستخدمين والقنوات والمجموعات التي تعذر الإرسال إليها أو التحقق منها أو كانت النتيجة غير مؤكدة',
-    'Chat/User ID\tالنوع\tالحالة\tالسبب\tTelegram code\tالتفصيل',
+    'Chat/User ID\tالنوع\tالحالة\tالسبب\tTelegram code\tالتفصيل\tإعادة المحاولة / الإجراء',
     ...records.map((record) => [
       Number(record[0]),
       Number(record[0]) < 0
         ? 'قناة/مجموعة'
-        : record[3] === 'BOT_ACCOUNT' ? 'بوت' : 'مستخدم',
+        : ['BOT_ACCOUNT', 'BOT_TO_BOT_DISABLED'].includes(record[3]) ? 'بوت' : 'مستخدم',
       record[1] === 'failed' ? 'تعذر الإرسال'
         : record[1] === 'skipped' ? 'لم تُرسل' : 'نتيجة غير مؤكدة',
       broadcastOutcomeReason(record[3]),
       record[2] == null ? '—' : String(record[2]),
       String(record[4] || ''),
+      broadcastOutcomeRetryAction(record),
     ].join('\t')),
   ];
   return { bytes: new TextEncoder().encode(lines.join('\n')), end };
@@ -1325,7 +1348,7 @@ export async function handleDeveloperPendingMessage(message) {
     } catch (error) {
       await sendPanel(
         waitingPanelChatId || chatId,
-        '❌ تعذر ربط القناة.\n\n' + String(error?.message || error),
+        withSupportContact('❌ تعذر ربط القناة.\n\n' + String(error?.message || error)),
         [
           { text: 'إعادة المحاولة', callback_data: 'dev:errorlog:set', style: 'primary' },
           { text: 'إلغاء', callback_data: 'dev:errorlog:cancel', style: 'danger' },
@@ -1528,7 +1551,7 @@ async function confirmImport(query, chatId) {
     await clearState(query.from.id);
     await api.answerCallbackQuery({
       callback_query_id: query.id,
-      text: 'انتهت صلاحية الملف؛ ارفعه مجددًا.',
+      text: withSupportContact('انتهت صلاحية الملف؛ ارفعه مجددًا.'),
       show_alert: true,
     });
     return;
@@ -1972,7 +1995,7 @@ async function beginBroadcast(query, chatId) {
   if (!state || state.state !== 'confirm_broadcast') {
     await api.answerCallbackQuery({
       callback_query_id: query.id,
-      text: 'انتهت صلاحية تأكيد الإذاعة؛ ابدأ من جديد.',
+      text: withSupportContact('انتهت صلاحية تأكيد الإذاعة؛ ابدأ من جديد.'),
       show_alert: true,
     });
     return;
@@ -2020,7 +2043,7 @@ async function beginBroadcast(query, chatId) {
       await clearState(query.from.id);
       await api.answerCallbackQuery({
         callback_query_id: query.id,
-        text: 'تعذر التحقق من رسالة المصدر؛ أرسلها مجدداً.',
+        text: withSupportContact('تعذر التحقق من رسالة المصدر؛ أرسلها مجدداً.'),
         show_alert: true,
       });
       return;
@@ -2050,7 +2073,7 @@ async function beginBroadcast(query, chatId) {
         await clearState(query.from.id);
         await api.answerCallbackQuery({
           callback_query_id: query.id,
-          text: 'تعذر التحقق من مشتركي قناة @RichCustomize. اجعل البوت مشرفاً فيها ثم ابدأ الإذاعة مجدداً.',
+          text: withSupportContact('تعذر التحقق من مشتركي قناة @RichCustomize. اجعل البوت مشرفاً فيها ثم ابدأ الإذاعة مجدداً.'),
           show_alert: true,
         });
         return;
@@ -2127,12 +2150,12 @@ async function beginBroadcast(query, chatId) {
       await clearState(query.from.id);
       await api.answerCallbackQuery({
         callback_query_id: query.id,
-        text: 'تعذر تفعيل إشارة البث في Cloudflare؛ لم يبدأ الإرسال.',
+        text: withSupportContact('تعذر تفعيل إشارة البث في Cloudflare؛ لم يبدأ الإرسال.'),
         show_alert: true,
       });
       await api.sendMessage({
         chat_id: Number(query.from.id),
-        text: 'تعذر تفعيل إشارة البث في Cloudflare، لذلك لم يبدأ إرسال الرسائل. أُبلغت قناة الأخطاء.',
+        text: withSupportContact('تعذر تفعيل إشارة البث في Cloudflare، لذلك لم يبدأ إرسال الرسائل. أُبلغت قناة الأخطاء.'),
       });
       return;
     }
@@ -2335,7 +2358,7 @@ export async function handleDeveloperCallback(query) {
     } catch (error) {
       await api.answerCallbackQuery({
         callback_query_id: query.id,
-        text: String(error?.message || error).slice(0, 180),
+        text: withSupportContact(String(error?.message || error), 200),
         show_alert: true,
       });
     }
@@ -2387,7 +2410,7 @@ export async function handleDeveloperCallback(query) {
     } catch (error) {
       await api.answerCallbackQuery({
         callback_query_id: query.id,
-        text: String(error?.message || error).slice(0, 180),
+        text: withSupportContact(String(error?.message || error), 200),
         show_alert: true,
       });
     }
@@ -2561,7 +2584,7 @@ export async function handleDeveloperCallback(query) {
       console.error('Could not sync bot localization profiles', error);
       await sendPanel(
         chatId,
-        '❌ فشلت مزامنة لغات البوت.\n\n' + String(error?.message || error),
+        withSupportContact('❌ فشلت مزامنة لغات البوت.\n\n' + String(error?.message || error)),
         [],
         query.message?.message_id || null,
       );

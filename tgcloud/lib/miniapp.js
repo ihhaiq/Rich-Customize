@@ -1,5 +1,6 @@
 import { api } from 'sdk';
 import { developerAccessConfigured, isDeveloper } from 'lib/developer-access';
+import { withSupportContact } from 'lib/i18n';
 
 export const MINI_APP_SHORT_NAME = 'editor';
 
@@ -36,7 +37,7 @@ export async function handleMiniAppShortcut(message) {
   if (!me?.username) {
     await api.sendMessage({
       chat_id: message.chat.id,
-      text: 'Bot username is unavailable.',
+      text: withSupportContact('Bot username is unavailable.'),
     });
     return true;
   }

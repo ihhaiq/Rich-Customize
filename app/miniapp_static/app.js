@@ -1,6 +1,7 @@
 const tg = window.Telegram?.WebApp;
 tg?.ready();
 tg?.expand();
+let editorContentDirection = document.documentElement.dir === "rtl" ? "rtl" : "ltr";
 
 const $ = (id) => document.getElementById(id);
 const blocksEl = $("blocks");
@@ -54,6 +55,7 @@ const pageCache = new Map();
 let currentUserId=0;
 let mutationVersion=0;
 let offlineDraftTimer=null;
+let offlineDraftDiscarded=false;
 let publishRunning=false;
 const OFFLINE_DRAFT_TTL_MS=7*24*60*60*1000;
 const PERF_QUEUE_KEY="rich_customize_perf_queue_v1";
@@ -140,9 +142,9 @@ const CATEGORIES = {
   media:["photo","video","animation","audio","voice","document","collage","slideshow","map"]
 };
 
-function toast(text,duration=1900){const el=$("toast");el.textContent=text;el.classList.add("show");clearTimeout(el._timer);const ms=Math.max(1200,Number(duration)||1900);el._timer=setTimeout(()=>el.classList.remove("show"),ms)}
+function toast(text,duration=1900,forceSupport=false){const el=$("toast");const message=window.MiniAppI18n?.withSupportContact?.(text,forceSupport)??text;el.textContent=message;el.classList.add("show");clearTimeout(el._timer);const minimum=String(message).includes("@Rlchsupportbot")?4500:1200;const ms=Math.max(minimum,Number(duration)||1900);el._timer=setTimeout(()=>el.classList.remove("show"),ms)}
 function headers(){return {"X-Telegram-Init-Data":tg?.initData||"","Content-Type":"application/json"}}
-function apiError(data,fallback){const duplicate=data?.error?.code==="PAGE_NAME_EXISTS";const nameMessage=String(document.documentElement.lang||"ar").startsWith("ar")?"عندك صفحة ثانية بنفس الاسم. اختار اسم مختلف.":"You already have another page with this name. Choose a different name.";const error=new Error(duplicate?nameMessage:(data?.error?.message||fallback||"Request failed"));if(data?.error?.code)error.code=data.error.code;return error}
+function apiError(data,fallback){const duplicate=data?.error?.code==="PAGE_NAME_EXISTS";const nameMessage=String(document.documentElement.lang||"ar").startsWith("ar")?"عندك صفحة ثانية بنفس الاسم. اختار اسم مختلف.":"You already have another page with this name. Choose a different name.";const error=new Error(duplicate?nameMessage:(data?.error?.message||fallback||"Request failed"));error.message=window.MiniAppI18n?.withSupportContact?.(error.message,true)||error.message;if(data?.error?.code)error.code=data.error.code;return error}
 function shouldReportApiError(error){
   const status=Number(error?.status||0);
   if(status>=400&&status<500)return false;
@@ -297,6 +299,19 @@ function clearOfflineDraft(){
   clearTimeout(offlineDraftTimer);offlineDraftTimer=null;
   try{localStorage.removeItem(key)}catch(_){}
 }
+function discardOfflineDraftForSession(){
+  offlineDraftDiscarded=true;
+  clearTimeout(offlineDraftTimer);offlineDraftTimer=null;
+  const key=offlineDraftKey();if(!key)return true;
+  try{
+    localStorage.removeItem(key);
+    return localStorage.getItem(key)===null;
+  }catch(error){
+    offlineDraftDiscarded=false;
+    window.RichMiniAppErrors?.report?.(error,{source:"offline_draft.discard"});
+    return false;
+  }
+}
 function offlineDraftPayload(){
   if(!current)return null;
   normalizePositions();
@@ -317,6 +332,7 @@ function offlineDraftPayload(){
   }
 }
 function persistOfflineDraftNow(){
+  if(offlineDraftDiscarded){clearOfflineDraft();return}
   const key=offlineDraftKey();if(!key||!current)return;
   const payload=offlineDraftPayload();
   const meaningful=Boolean(hasSavablePageContent()||payload?.composer_text?.trim()||dirty);
@@ -614,6 +630,7 @@ function updateSaveState(text,{saving=false,saved=false}={}){
   saveState.classList.toggle("is-saving",Boolean(saving));
   saveState.classList.remove("is-saved");
   savePageBtn.classList.toggle("hidden",!dirty);
+  $("editorView")?.classList.toggle("has-unsaved-changes",dirty);
   savePageBtn.disabled=Boolean(saving);
   savePageBtn.setAttribute("aria-label",saving?mt("save.saving"):mt("common.save"));
   if(saved&&editorMotionAllowed()){
@@ -1158,8 +1175,8 @@ async function loadPages(){
     if(cachedList)await refresh();
     else await withWait(refresh,"جاري تجهيز صفحاتك");
   }catch(error){
-    if(!cachedList)pagesEl.innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`;
-    else toast(error.message);
+    if(!cachedList)pagesEl.innerHTML=`<div class="empty">${escapeHtml(window.MiniAppI18n?.withSupportContact?.(error.message,true)||error.message)}</div>`;
+    else toast(error.message,1900,true);
   }
 }
 function applyOpenedPage(page,pageId){
@@ -1243,7 +1260,7 @@ async function openPage(pageId){
     return true;
   }catch(error){
     recordPerf("page_open_failed",performance.now()-perfStarted);
-    toast(error.status===429?mt("pages.open_too_fast"):error.message);
+    toast(error.status===429?mt("pages.open_too_fast"):error.message,1900,true);
     return false;
   }finally{
     pageOpenRunning=false;
@@ -1379,7 +1396,7 @@ async function openSendPanel(){
   commitPendingComposerText();
   updatePublishValidity();
   if(publishIssues.length){openPublishIssues();return}
-  try{showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}))}
+  try{showSheet(sendPanel);destinationsEl.innerHTML=`<div class="empty">${escapeHtml(mt("send.loading_destinations"))}</div>`;const data=await api("/miniapp/api/destinations");destinationsEl.innerHTML="";data.destinations.forEach(dest=>{const btn=document.createElement("button");btn.type="button";btn.className="sheet-item";const icon=dest.kind==="private"?"user":dest.type==="channel"?"channel":"group";btn.innerHTML=`<span class="destination-icon"></span><span class="sheet-item-main"><strong>${escapeHtml(dest.title)}</strong><small>${dest.kind==="private"?escapeHtml(mt("send.private")):escapeHtml(dest.type)}</small></span><span>${escapeHtml(mt("send.action"))}</span>`;MiniAppIcons.mount(btn.querySelector(".destination-icon"),icon);btn.onclick=()=>sendTo(dest,btn);destinationsEl.appendChild(btn)})}catch(error){toast(mt("send.preparing_failed",{error:error.message}),1900,true)}
 }
 async function sendTo(dest,button){
   if(current?.legacy_read_only&&dirty){toast(legacyPageNotice(),3500);return}
@@ -1436,7 +1453,7 @@ $("newPageBtn").onclick=async()=>{if(dirty){toast(mt("editor.unsaved"));return}n
 savePageBtn.onclick=async()=>{
   if(!dirty)return;
   if(!hasSavablePageContent()){toast(mt("send.add_content"));return}
-  try{await flushSave()}catch(error){toast(error.message)}
+  try{await flushSave()}catch(error){toast(error.message,1900,true)}
 };
 $("sendBtn").onclick=openSendPanel;
 sendIssuesBtn.onclick=openPublishIssues;
@@ -1444,6 +1461,88 @@ backdrop.onclick=closeSheets;
 $("startWritingBtn").onclick=()=>addBlock("paragraph");
 $("startPhotoBtn").onclick=()=>addBlock("photo");
 $("allBlocksBtn").onclick=()=>openBlockCatalog("");
+$("boldToolBtn").onclick=()=>window.RichInlineTextTools?.applyFormat?.("bold");
+$("listToolBtn").onclick=()=>addBlock("list");
+$("tableToolBtn").onclick=()=>addBlock("table");
+function linkChoiceMenuPosition(anchor,bounds,width,height,margin=8,gap=6){
+  const maxWidth=Math.max(0,bounds.right-bounds.left-margin*2);
+  const menuWidth=Math.min(width,maxWidth);
+  const maxHeight=Math.max(0,bounds.bottom-bounds.top-margin*2);
+  const menuHeight=Math.min(height,maxHeight);
+  const left=Math.max(bounds.left+margin,Math.min(anchor.right-menuWidth,bounds.right-menuWidth-margin));
+  const below=anchor.bottom+gap;
+  const above=anchor.top-menuHeight-gap;
+  const top=below+menuHeight<=bounds.bottom-margin
+    ?below
+    :Math.max(bounds.top+margin,Math.min(above,bounds.bottom-menuHeight-margin));
+  return {left,top,width:menuWidth,maxHeight};
+}
+$("linkToolBtn").onclick=()=>{
+  const existing=document.getElementById("linkChoiceMenu");
+  if(existing){existing.remove();return}
+  const anchor=$("linkToolBtn");
+  const menu=document.createElement("aside");
+  menu.id="linkChoiceMenu";
+  menu.className="popup-menu link-choice-menu";
+  const textRow=document.createElement("button");
+  textRow.type="button";
+  textRow.className="link-choice-row";
+  const textIcon=document.createElement("span");
+  textIcon.className="link-choice-icon";
+  MiniAppIcons.mount(textIcon,"link");
+  const textLabel=document.createElement("strong");
+  textLabel.textContent=mt("inline.add_link");
+  textRow.append(textIcon,textLabel);
+  textRow.onclick=()=>{
+    menu.remove();
+    window.RichInlineTextTools?.openLinkEditor?.();
+  };
+  const buttonRow=document.createElement("button");
+  buttonRow.type="button";
+  buttonRow.className="link-choice-row";
+  const buttonIcon=document.createElement("span");
+  buttonIcon.className="link-choice-icon";
+  MiniAppIcons.mount(buttonIcon,"button");
+  const buttonLabel=document.createElement("strong");
+  buttonLabel.textContent=mt("button.rich");
+  buttonRow.append(buttonIcon,buttonLabel);
+  buttonRow.onclick=()=>{
+    menu.remove();
+    if(window.RichButtonEditor?.create)window.RichButtonEditor.create("url");
+  };
+  menu.append(textRow,buttonRow);
+  document.body.appendChild(menu);
+  const viewport=window.visualViewport;
+  const bounds={
+    left:viewport?.offsetLeft||0,
+    top:viewport?.offsetTop||0,
+    right:(viewport?.offsetLeft||0)+(viewport?.width||window.innerWidth),
+    bottom:(viewport?.offsetTop||0)+(viewport?.height||window.innerHeight),
+  };
+  menu.style.visibility="hidden";
+  menu.style.left=(bounds.left+8)+"px";
+  menu.style.top=(bounds.top+8)+"px";
+  menu.style.setProperty("width",Math.max(0,Math.min(168,bounds.right-bounds.left-16))+"px","important");
+  menu.style.maxHeight=Math.max(0,bounds.bottom-bounds.top-16)+"px";
+  const position=linkChoiceMenuPosition(anchor.getBoundingClientRect(),bounds,menu.offsetWidth,menu.offsetHeight);
+  menu.style.setProperty("width",position.width+"px","important");
+  menu.style.maxHeight=position.maxHeight+"px";
+  menu.style.left=position.left+"px";
+  menu.style.top=position.top+"px";
+  menu.style.bottom="auto";
+  menu.style.visibility="visible";
+  setTimeout(()=>{
+    const close=event=>{if(!menu.contains(event.target)&&event.target!==anchor)menu.remove()};
+    document.addEventListener("pointerdown",close,{once:true});
+  },0);
+};
+$("photoToolBtn").onclick=()=>addBlock("photo");
+$("pagesToolBtn").onclick=()=>loadPages();
+$("alignmentToolBtn").onclick=()=>{
+  editorContentDirection=editorContentDirection==="ltr"?"rtl":"ltr";
+  document.querySelectorAll(".canvas,.block,.slash-wrap").forEach(el=>{el.dir=editorContentDirection});
+  markDirty();
+};
 $("moreBtn").onclick=()=>{blockActions.innerHTML="";blockMenuTitle.textContent=mt("page.title");blockActions.appendChild(menuButton("add",mt("page.new"),"",()=>{hideMenus();if(dirty){toast(mt("editor.unsaved"));return}newDraft()}));blockMenu.classList.remove("hidden")};
 
 blockSearch.addEventListener("input",()=>renderSlashItems(blockSearch.value));
@@ -1499,7 +1598,7 @@ async function boot(){
     updateSaveState(mt("save.unauthorized"));
     slashInput.disabled=true;
     waitOverlay?.setMessage("تعذر التحقق من الجلسة","أعد فتح التطبيق من تليكرام.");
-    toast(error.message);
+    toast(error.message,1900,true);
     return;
   }
 
@@ -1544,7 +1643,7 @@ async function boot(){
     updateSaveState(mt("save.failed"));
     slashInput.disabled=true;
     waitOverlay?.setError?.("صار حادث","حاول فدشوية");
-    toast(error.message);
+    toast(error.message,1900,true);
   }
 }
 window.addEventListener("pagehide",()=>{persistOfflineDraftNow();flushPerf({keepalive:true})});

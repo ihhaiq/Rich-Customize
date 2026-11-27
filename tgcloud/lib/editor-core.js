@@ -29,7 +29,7 @@ import { openEditor } from 'lib/editor-home';
 import { directMiniAppLink } from 'lib/miniapp';
 import { parseMessageButtons, parseRichMessage, clone, orderBlocks, templateBlocks, TEMPLATE_IDS, TYPES, advice, applyAdvice, blockAt, fromInput, exampleBlock } from 'lib/editor-import';
 import { buildMessageButtonsKeyboard } from 'lib/page-buttons';
-import { loginUrlRestrictionMessage, resolveLanguage, t, tr } from 'lib/i18n';
+import { loginUrlRestrictionMessage, resolveLanguage, t, tr, withSupportContact } from 'lib/i18n';
 import { isDeveloper } from 'lib/developer-access';
 import { containsLoginUrlButton } from 'lib/button-validation';
 
@@ -44,12 +44,12 @@ function limitText(result, code) {
   if (result.code === 'table_rows') return t(locale, 'limits.table_rows', { limit: result.limit });
   if (result.code === 'table_columns') return t(locale, 'limits.table_columns', { limit: result.limit });
 
-  if (result.code === 'nesting_depth') return locale === 'ar'
+  if (result.code === 'nesting_depth') return withSupportContact(locale === 'ar'
     ? 'وصلت للحد الأقصى لمستويات التداخل في باقتك: ' + result.limit
-    : 'Maximum nesting levels for your plan: ' + result.limit;
-  if (result.code === 'media_attachments') return locale === 'ar'
+    : 'Maximum nesting levels for your plan: ' + result.limit);
+  if (result.code === 'media_attachments') return withSupportContact(locale === 'ar'
     ? 'وصلت للحد الأقصى لمرفقات الوسائط بالرسالة: ' + result.limit
-    : 'Maximum media attachments per message: ' + result.limit;
+    : 'Maximum media attachments per message: ' + result.limit);
   return tr(locale, 'The content exceeds an editor limit.');
 }
 
@@ -817,7 +817,7 @@ export async function handleEditorCoreMessage(
   ) {
     await api.sendMessage({
       chat_id:message.chat.id,
-      text:loginUrlRestrictionMessage(code),
+      text:withSupportContact(loginUrlRestrictionMessage(code)),
     });
     return true;
   }

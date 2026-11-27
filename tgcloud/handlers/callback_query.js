@@ -16,7 +16,7 @@ import {
 } from 'lib/editor-home';
 import { handleDeveloperCallback } from 'lib/developer';
 import { observeRequest } from 'lib/usage-stats';
-import { resolveUserLanguage } from 'lib/i18n';
+import { resolveUserLanguage, withSupportContact } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import {
   explainOperationalError,
@@ -77,7 +77,7 @@ async function reportDatabaseFailure(query, error) {
   try {
     await api.answerCallbackQuery({
       callback_query_id: query.id,
-      text: notice.slice(0, 200),
+      text: withSupportContact(notice, 200),
       show_alert: true,
     });
   } catch (feedbackError) {
@@ -224,7 +224,7 @@ export default async function (query, ctx = {}) {
         const notice = userOperationalError(error, query?.from?.language_code || 'ar');
         await api.answerCallbackQuery({
           callback_query_id: query.id,
-          text: notice.slice(0, 200),
+          text: withSupportContact(notice, 200),
           show_alert: true,
         });
       }

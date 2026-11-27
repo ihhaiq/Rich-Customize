@@ -1,6 +1,6 @@
 # AGENTS.md — Rich Customize
 
-Work on `serverless-cleanup`. Active editor runtime is Telegram Serverless JavaScript; Cloudflare hosts the Mini App bridge plus a separate ID-only Cron reminder Worker for scheduled posts, NOT the main bot.
+Work on `serverless-cleanup`. Active editor runtime and Mini App frontend are hosted on Telegram Serverless/Telegram Cloud. Cloudflare hosts supporting Mini App API/bridge services plus a separate ID-only Cron reminder Worker for scheduled posts, NOT the frontend or main bot.
 Read [docs/README.md](docs/README.md), [sups.md](md_files/sups.md) and [docs/subscription-rollout.md](md_files/docs/subscription-rollout.md). Archived material is historical, never implementation authority.
 
 ## Critical engineering stance and scale target

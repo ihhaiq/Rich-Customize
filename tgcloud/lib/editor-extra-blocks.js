@@ -84,6 +84,7 @@ import {
   resolveUserLanguage,
   t,
   tr,
+  withSupportContact,
 } from 'lib/i18n';
 import { requestEditorLimitConfirmation } from 'lib/editor-limit-confirmation';
 
@@ -612,7 +613,7 @@ async function replyLargeButtonInputError(message, error, languageCode) {
   } else if (error === 'login') {
     await api.sendMessage({
       chat_id: message.chat.id,
-      text: loginUrlRestrictionMessage(languageCode),
+      text: withSupportContact(loginUrlRestrictionMessage(languageCode)),
     });
     await sendPrompt(message.from.id, message.chat.id, largeButtonInputPrompt(languageCode));
   } else {

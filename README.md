@@ -27,24 +27,30 @@ Telegram Serverless is the source of truth for:
 - error-log configuration
 - backup/import compatibility state
 
-### Mini App / Cloudflare
+### Telegram Cloud Mini App and Cloudflare services
 
-The Mini App frontend lives in:
+The active Mini App frontend is hosted by Telegram Cloud. Its editable source
+lives in:
 
 - `app/miniapp_static/`
+
+`tgcloud.jsonc` configures static hosting from the generated
+`.tgcloud-miniapp-static/` directory. `npm run deploy` builds those assets and
+pushes them with Telegram Serverless; Cloudflare Pages is not the Mini App
+frontend host.
 
 Cloudflare Pages Functions live in:
 
 - `functions/`
 
-When the Mini App is served from the Telegram Serverless origin, saved-page
-reads and mutations use the authenticated Serverless `miniapp` endpoint
-directly. Cloudflare remains responsible for its own Mini App routes, relay,
-webhook and media-upload flows; it is not the authoritative saved-page store.
+The Telegram Cloud-hosted Mini App uses the authenticated Serverless `miniapp`
+endpoint for supported account, page and publishing operations. Cloudflare
+continues to provide separate API/bridge, webhook and media-upload services;
+it is not the frontend host or authoritative saved-page store.
 
 Cloudflare is responsible for:
 
-- hosting the Mini App
+- Cloudflare Pages Functions for legacy and ancillary Mini App API routes
 - validating Telegram `initData` for Cloudflare-origin routes
 - relaying B2B requests through `@Richminiappsbot`
 - receiving the relay webhook
@@ -72,9 +78,9 @@ Protocol: `RCB1`
 Bridge:
 
 ```text
-Mini App
-  ↓
-Cloudflare
+Telegram Cloud-hosted Mini App
+  ↓ ancillary/legacy API calls
+Cloudflare Pages Functions
   ↓
 @Richminiappsbot
   ↓
@@ -128,7 +134,8 @@ Bridge hardening includes:
 On every startup:
 
 1. Telegram `initData` is verified.
-2. The Mini App requests the user's saved-page list from Serverless through B2B.
+2. The Mini App requests the user's saved-page list through the authenticated
+   Telegram Serverless `miniapp` endpoint.
 3. The editor remains locked until startup data is ready.
 4. A resume target is restored when a Telegram-native picker previously closed the WebView.
 5. Otherwise a new local draft is opened.
@@ -183,7 +190,8 @@ npx tgcloud webhook sync
 
 Run `npm install` and `npm test` before deployment. Review schema separately; run `npx tgcloud migrate` only when reviewed schema changes require it. A GitHub update does not prove live deployment.
 
-Cloudflare deploys from the `serverless-cleanup` branch through the configured Git integration.
+Cloudflare Pages Functions deploy from the `serverless-cleanup` branch through
+the configured Git integration. This does not deploy the Mini App frontend.
 
 Required Cloudflare variables/secrets:
 

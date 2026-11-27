@@ -72,7 +72,7 @@ import {
   handleExtraBlockMessage,
   isExtraBlockCallback,
 } from 'lib/editor-extra-blocks';
-import { resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
+import { resolveLanguage, resolveUserLanguage, t, tr, withSupportContact } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import { getBrandingSettings, shouldIncludeBranding } from 'lib/branding';
 import { isEditorLimitFailure, userOperationalError } from 'lib/operational-errors';
@@ -988,7 +988,7 @@ async function previewBlock(query, session, block) {
     await recordOperation('preview', false);
     await api.sendMessage({
       chat_id: query.from.id,
-      text: copy.previewSingleFailed + '\n' + friendlyRichError(error, code),
+      text: withSupportContact(copy.previewSingleFailed + '\n' + friendlyRichError(error, code)),
     });
   }
 }

@@ -645,16 +645,50 @@ test('developer broadcasts send a private completion report with failed user IDs
     && call.args.document.filename.includes('_results_'));
   assert.ok(report);
   assert.equal(report.args.chat_id, developerId);
-  assert.match(report.args.caption, /تعذر الإرسال:\s*٢/);
+  assert.match(report.args.caption, /تعذر الإرسال \(مستبعدون من الحملات القادمة\):\s*٢/);
   const content = new TextDecoder().decode(new Uint8Array(Object.values(report.args.document.data)));
-  assert.match(content, /101\tمستخدم\tتعذر الإرسال\tالمستخدم حظر البوت/);
-  assert.match(content, /202\tمستخدم\tتعذر الإرسال\tالمحادثة غير موجودة أو غير متاحة للبوت/);
+  assert.match(content, /إعادة المحاولة \/ الإجراء/);
+  assert.match(content, /101\tمستخدم\tتعذر الإرسال\tالمستخدم حظر البوت\t403\t\tلا؛ مستبعد من الإذاعات القادمة/);
+  assert.match(content, /202\tمستخدم\tتعذر الإرسال\tالمحادثة غير موجودة أو غير متاحة للبوت\t400\t\tلا؛ مستبعد من الإذاعات القادمة/);
   assert.deepEqual(
     h.records.developerBroadcastExclusions.map(row => row.destinationId).sort((a, b) => a - b),
     [101, 202],
   );
   assert.ok(statements.some(queryText => queryText.includes('UNION SELECT owner_id AS user_id FROM rich_pages')));
   assert.ok(statements.some(queryText => queryText.includes('UNION SELECT user_id FROM editor_sessions')));
+});
+
+test('broadcast classifies Bot-to-Bot-disabled destinations as excluded bots', async () => {
+  const h = await developerHarness({
+    queryHandler: statement => {
+      if (statement.query.includes('MAX(audience.user_id)')) {
+        return [{ total: 1, max_user_id: 303, private_users: 1 }];
+      }
+      if (statement.query.includes('audience.user_id > 303')) return [];
+      return [{ user_id: 303 }];
+    },
+  });
+  const { jobNamespace } = await startBroadcast(h);
+  h.apiState.copyMessageErrors = {
+    303: new h.BotApiError(400, 'Bad Request: USER_BOT_TO_BOT_DISABLED'),
+  };
+  const minute = Math.floor(Date.now() / 60000) + 1;
+
+  await h.developer.runDeveloperBroadcastTick(minute);
+  await h.developer.runDeveloperBroadcastTick(minute + 1);
+
+  const jobRecord = h.records.legacyStates.find(row => row.namespace === jobNamespace);
+  assert.equal(jobRecord.payload.failed, 1);
+  assert.deepEqual(
+    h.records.developerBroadcastExclusions.map(row => ({
+      destinationId: row.destinationId,
+      reasonCode: row.reasonCode,
+    })),
+    [{ destinationId: 303, reasonCode: 'BOT_TO_BOT_DISABLED' }],
+  );
+  const report = h.calls.find(call => call.method === 'sendDocument');
+  const content = new TextDecoder().decode(new Uint8Array(Object.values(report.args.document.data)));
+  assert.match(content, /303\tبوت\tتعذر الإرسال\tTelegram عطّل المراسلة بين البوتات\t400\t\tلا؛ مستبعد من الإذاعات القادمة/);
 });
 
 test('broadcast skips users with unknown membership and reports only after the remaining audience is sent', async () => {
@@ -698,9 +732,9 @@ test('broadcast skips users with unknown membership and reports only after the r
   assert.ok(reportIndex > finalDeliveryIndex);
   const report = h.calls[reportIndex];
   const content = new TextDecoder().decode(new Uint8Array(Object.values(report.args.document.data)));
-  assert.match(report.args.caption, /تعذر التحقق من عضويتهم \(لم تُرسل لهم\): ٢/);
-  assert.match(content, /101\tمستخدم\tلم تُرسل\tتعذر التحقق من عضوية القناة الرسمية/);
-  assert.match(content, /151\tمستخدم\tلم تُرسل\tتعذر التحقق من عضوية القناة الرسمية/);
+  assert.match(report.args.caption, /تعذر التحقق من عضويتهم \(تجاوز هذه الحملة؛ يُعاد فحصهم لاحقاً\): ٢/);
+  assert.match(content, /101\tمستخدم\tلم تُرسل\tتعذر التحقق من عضوية القناة الرسمية؛ لم تُرسل رسالة خاصة\t400\t\tلا في هذه الحملة؛ يُعاد فحص العضوية في حملة لاحقة/);
+  assert.match(content, /151\tمستخدم\tلم تُرسل\tتعذر التحقق من عضوية القناة الرسمية؛ لم تُرسل رسالة خاصة\t400\t\tلا في هذه الحملة؛ يُعاد فحص العضوية في حملة لاحقة/);
   assert.equal(h.loggedErrors.length, 1);
   assert.equal(h.loggedErrors[0].scope, 'developer.broadcast.membership');
   assert.equal(h.loggedErrors[0].context.userId, 101);
@@ -970,6 +1004,10 @@ test('developer broadcasts report ambiguous delivery instead of retrying blindly
   assert.equal(jobRecord.payload.sent, 0);
   assert.equal(h.calls.filter(call => call.method === 'copyMessage'
     && call.args.chat_id === 101).length, 1);
+  const report = h.calls.find(call => call.method === 'sendDocument');
+  const content = new TextDecoder().decode(new Uint8Array(Object.values(report.args.document.data)));
+  assert.match(content, /101\tمستخدم\tنتيجة غير مؤكدة\tخطأ اتصال؛ نتيجة الإرسال غير محسومة\t0\t/);
+  assert.match(content, /لا في هذه الحملة؛ قد تُعاد لاحقاً مع احتمال التكرار/);
   assert.equal(h.loggedErrors[0].scope, 'developer.broadcast.delivery');
   assert.equal(h.loggedErrors[0].context.userId, 101);
 });

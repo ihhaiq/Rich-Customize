@@ -426,7 +426,7 @@ test('regular users cannot add login URL buttons, while bot developers can', asy
     message:{ chat:{ id:regularUserId }, message_id:1200 },
     data:'r:bct:existing:login_url',
   });
-  assert.equal(h.calls.at(-1).args.text, 'Login URL unavailable.');
+  assert.equal(h.calls.at(-1).args.text, 'Login URL unavailable.\n\n@Rlchsupportbot');
 
   await h.editorButtons.handleEditorButtonCallback({
     id:'prompt-login-url',
@@ -442,7 +442,7 @@ test('regular users cannot add login URL buttons, while bot developers can', asy
   const regularSession = await h.session.loadEditorSession(regularUserId, { touch:false });
   assert.equal(regularSession.messageButtons.length, 1);
   assert.ok(h.calls.some(call => call.method === 'sendMessage'
-    && call.args.text === 'Login URL unavailable.'));
+    && call.args.text === 'Login URL unavailable.\n\n@Rlchsupportbot'));
 
   const developerId = 8997225441;
   await h.session.createEditorSession(developerId, developerId, 1201);
@@ -496,7 +496,7 @@ test('regular users receive a clear rejection for login URLs in large buttons', 
   });
 
   assert.ok(h.calls.some(call => call.method === 'sendMessage'
-    && call.args.text === 'Login URL unavailable.'));
+    && call.args.text === 'Login URL unavailable.\n\n@Rlchsupportbot'));
   const session = await h.session.loadEditorSession(userId, { touch:false });
   assert.equal(session.blocks.some(block => block.type === 'buttons'), false);
 });
@@ -547,9 +547,10 @@ test('large-button CBD accepts saved page names and reports invalid references i
   });
   const error = h.calls.find(call => (
     call.method === 'sendRichMessage'
-    && call.args.rich_message?.blocks?.[0]?.text === 'التنسيق غلط.'
+    && call.args.rich_message?.blocks?.[0]?.text?.startsWith('التنسيق غلط.')
   ));
   assert.ok(error);
+  assert.match(error.args.rich_message.blocks[0].text, /@Rlchsupportbot/);
   assert.equal(error.args.rich_message.blocks[1].type, 'blockquote');
   assert.match(error.args.rich_message.blocks[1].blocks[0].text, /اسم صفحة محفوظة عندك كما هو أو كودها/);
   session = await h.session.loadEditorSession(otherUserId, { touch: false });

@@ -99,7 +99,10 @@
     overlay.classList.add("is-error");
     text.textContent = String(message || "صار حادث");
     if (subtext) {
-      subtext.textContent = String(detail || "حاول فدشوية");
+      subtext.textContent = window.MiniAppI18n?.withSupportContact?.(
+        detail || "حاول فدشوية",
+        true,
+      ) || String(detail || "حاول فدشوية");
       subtext.hidden = false;
     }
     lockInterface();

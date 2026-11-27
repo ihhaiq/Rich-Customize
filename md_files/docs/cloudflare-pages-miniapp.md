@@ -1,11 +1,13 @@
-# Cloudflare deployment for the Mini App
+# Cloudflare API and bridge services for the Mini App
 
-The current architecture keeps persistent bot/application state in Telegram Serverless.
+The active Mini App frontend is hosted on Telegram Cloud from
+`app/miniapp_static/`; Cloudflare Pages is not its frontend host. This document
+covers the supporting Cloudflare Pages Functions/API routes, bridge and D1.
+Persistent bot/application state is owned by Telegram Serverless.
 
-For the legacy Cloudflare-origin Mini App and the remaining cross-origin
-services, Cloudflare is responsible for:
+Cloudflare remains responsible for supporting services called by the
+Telegram Cloud-hosted Mini App and legacy Cloudflare-origin routes:
 
-- hosting the Mini App frontend;
 - validating Telegram Mini App `initData`;
 - relaying requests through `@Richminiappsbot`;
 - receiving the relay-bot webhook;
@@ -13,30 +15,22 @@ services, Cloudflare is responsible for:
 - storing short-lived B2B correlation/identity metadata.
 - media upload and preview, performance telemetry, and first-time import of
   legacy custom-emoji pack names when requested by the Serverless-hosted app.
-- the separate scheduled-reminder Worker and its D1 metadata; this Worker is
-  not the Mini App frontend.
+- the separate scheduled-reminder Worker and its D1 metadata.
 
 Telegram Serverless remains authoritative for pages and managed chats. Serverless Mini App page CRUD reads and writes `rich_pages` directly; it no longer sends saved-page documents or mirror updates to Cloudflare. D1 may still contain older owner-specific page mirrors used by legacy Cloudflare quota checks, but Serverless no longer refreshes them.
 
 ## Architecture
 
-For the Serverless-hosted Mini App, saved-page CRUD goes directly to the
-Telegram Serverless `miniapp` endpoint. The relay diagram below describes
-legacy Cloudflare-origin routes and bridge operations; it is not the page
-storage path for the Serverless-hosted app.
+The Telegram Cloud-hosted Mini App sends supported page CRUD directly to the
+Telegram Serverless `miniapp` endpoint. Cloudflare API calls are separate
+supporting/legacy services, not the Mini App's static hosting path.
 
 ```text
-Telegram Mini App
-      ↓ HTTPS
-Cloudflare Pages / Functions
-      ↓
-@Richminiappsbot
-      ↓ Telegram Bot-to-Bot
-private bridge group (-1003993506865)
-      ↓
-@RichCustomizebot / Telegram Serverless
-      ↓
-rich_pages + managed_chats + Mini App picker state
+Telegram Cloud-hosted Mini App
+  ├── page operations ──→ Telegram Serverless `miniapp` endpoint ──→ rich_pages
+  └── legacy bridge calls → Cloudflare Pages Functions → @Richminiappsbot
+                                                       → private bridge group
+                                                       → @RichCustomizebot
 ```
 
 Persistent page edits happen only after an explicit Save. Unsaved editor changes remain local in the WebView.
@@ -67,23 +61,22 @@ If an older D1 database already contains those deprecated tables, use `cloudflar
 
 Page bodies, publish destinations and native user-picker state stay in Telegram Serverless.
 
-## Frontend deployment
+## Mini App frontend hosting
 
-Static frontend:
+The active static frontend source and Telegram Cloud deployment are:
 
 ```text
 app/miniapp_static
+tgcloud.jsonc
 ```
 
-Recommended Cloudflare Pages settings:
+`npm run deploy` builds the frontend into `.tgcloud-miniapp-static/` and runs
+`tgcloud push`. This deploys to Telegram Cloud, not Cloudflare Pages. Do not
+configure `app/miniapp_static` as the production Mini App frontend output for
+Cloudflare Pages.
 
-| Setting | Value |
-| --- | --- |
-| Production branch | `serverless-cleanup` |
-| Framework preset | None |
-| Root directory | leave empty |
-| Build command | `exit 0` |
-| Build output directory | `app/miniapp_static` |
+Cloudflare Pages Git integration may deploy the supporting Functions/API
+routes from `serverless-cleanup`; it does not publish the active Mini App UI.
 
 ## Cloudflare variables
 
@@ -107,7 +100,7 @@ B2B_MAIN_BOT_ID=<numeric main-bot id>
 ## Initial setup
 
 1. Apply `cloudflare/d1/schema.sql`.
-2. Deploy Cloudflare Pages / Functions.
+2. Deploy the supporting Cloudflare Pages Functions.
 3. POST once to:
 
 ```text
@@ -162,7 +155,8 @@ Large reads such as page bodies, page lists and destination lists return as Tele
 
 Small mutation results use ACK responses.
 
-This relay flow is retained for legacy Cloudflare-origin routes. The Serverless-hosted Mini App uses its direct `miniapp` endpoint for page CRUD instead.
+This relay flow is retained for legacy and supporting API routes. The
+Telegram Cloud-hosted Mini App uses its direct `miniapp` endpoint for page CRUD.
 
 ## Source-of-truth rules
 
@@ -244,11 +238,23 @@ Bot-to-Bot Communication Mode must be enabled for both bots before smoke testing
 
 ## A1 phased rollout: Cloudflare before tgcloud (2026-10-09, historical)
 
-The production branch is `serverless-cleanup` and the owner has approved **automatic Cloudflare deployment on branch commits**. Do not use `[CF-Pages-Skip]` while this instruction remains in force. This does not authorize `tgcloud push` or `tgcloud migrate`.
+The checks in this historical rollout section described the former
+Cloudflare-origin frontend. The active Mini App frontend is now hosted by
+Telegram Cloud; retain Cloudflare only for the API/bridge services described
+above.
+
+The production branch is `serverless-cleanup` and the owner has approved
+**automatic Cloudflare Pages Functions deployment on branch commits**. This
+applies to supporting API/bridge routes, not the Telegram Cloud frontend. Do
+not use `[CF-Pages-Skip]` while this instruction remains in force. This does
+not authorize `tgcloud push` or `tgcloud migrate`.
 
 Until the new Telegram Serverless version is deployed, Cloudflare PUT for an existing page must not trust the older Serverless 25k quota. `functions/_lib/quota-baseline.js` only allows a 20k+ legacy page update if the owner-specific D1 mirror is present and its revision/updated_at matches the request base. A missing/stale mirror fails closed, preserving old content in storage but requiring the mirror to catch up before modifying >20k. CREATE and direct unsaved PUBLISH are always subject to 20k.
 
-Deployment checks: confirm Pages deployment is successful; verify `/miniapp/static/editor.html` and `/miniapp/static/app.js` are accessible. Unauthenticated HTTP checks cannot prove owner quota enforcement or Telegram B2B delivery; those require authenticated real-user smoke tests after tgcloud is deployed.
+Historical deployment checks included Pages static-file availability.
+Current checks should verify the Telegram Cloud frontend and test its
+authenticated Serverless/API integrations separately. Unauthenticated HTTP
+checks cannot prove owner quota enforcement or Telegram B2B delivery.
 
 ## Subscription quota presentation (2026-10-09)
 

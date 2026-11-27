@@ -188,6 +188,9 @@ const MESSAGES = Object.freeze(Object.fromEntries(
 
 const SUPPORTED = new Set(SUPPORTED_LOCALES);
 const RTL = new Set(['ar', 'ur']);
+const SUPPORT_USERNAME = '@Rlchsupportbot';
+const ERROR_COPY_KEY = /(?:^|[._])(?:error|errors|failed|failure|invalid|unavailable|expired|unsupported|missing|not_found|denied|unauthorized|limit_reached|restore_unavailable)(?:$|[._])/i;
+const ERROR_COPY_TEXT = /\b(?:error|failed|failure|invalid|unavailable|expired|unsupported|missing|not found|could not|cannot|can't|rejected|exceeds|exceeded|limit has been reached|no longer exists|not available)\b|خطأ|فشل|تعذر|تعذّر|غير صالح|غير متاح|انتهت صلاحية|مشكلة|رفض|يتعذر|لا يمكن|لم يتم/i;
 const CHECKLIST_COPY = Object.freeze({
   ar: {
     prompt: 'أرسل كل مهمة في سطر. السطر العادي غير منجز؛ لجعلها منجزة اكتب قبلها [x] أو ✅ أو ☑️.',
@@ -834,10 +837,25 @@ export function t(locale, key, values = null) {
   }
 
   text = String(text);
-  if (!values || typeof values !== 'object') return text;
-  return text.replace(/\{([A-Za-z0-9_]+)\}/g, (match, name) => (
-    Object.hasOwn(values, name) ? String(values[name]) : match
-  ));
+  if (values && typeof values === 'object') {
+    text = text.replace(/\{([A-Za-z0-9_]+)\}/g, (match, name) => (
+      Object.hasOwn(values, name) ? String(values[name]) : match
+    ));
+  }
+  return ERROR_COPY_KEY.test(String(key)) || ERROR_COPY_TEXT.test(String(englishText || ''))
+    ? withSupportContact(text) : text;
+}
+
+export function withSupportContact(text, maxLength = Infinity) {
+  const value = String(text ?? '').trimEnd();
+  const supportIndex = value.toLowerCase().indexOf(SUPPORT_USERNAME.toLowerCase());
+  const base = supportIndex >= 0 ? value.slice(0, supportIndex).trimEnd() : value;
+  const suffix = '\n\n' + SUPPORT_USERNAME;
+  if (!Number.isSafeInteger(maxLength) || maxLength < 1) {
+    return supportIndex >= 0 ? value : base + suffix;
+  }
+  const availableLength = Math.max(0, maxLength - Array.from(suffix).length);
+  return Array.from(base).slice(0, availableLength).join('').trimEnd() + suffix;
 }
 
 export function channelPostMiniAppLabel(locale) {
@@ -908,10 +926,12 @@ export function tr(locale, source, values = null) {
       ?? (semanticKey ? t(language, semanticKey) : null)
       ?? legacyNativeFallback(language, original);
   }
-  if (!values || typeof values !== 'object') return text;
-  return String(text).replace(/\{([A-Za-z0-9_]+)\}/g, (match, name) => (
-    Object.hasOwn(values, name) ? String(values[name]) : match
-  ));
+  if (values && typeof values === 'object') {
+    text = String(text).replace(/\{([A-Za-z0-9_]+)\}/g, (match, name) => (
+      Object.hasOwn(values, name) ? String(values[name]) : match
+    ));
+  }
+  return ERROR_COPY_TEXT.test(original) ? withSupportContact(text) : text;
 }
 
 export function hasTranslation(locale, key) {
@@ -955,7 +975,7 @@ export function tutorialCopy(locale) {
     optionsTitle:w('خيارات إضافية','More options'),
     completeOptions:w('منشورك جاهز للمراجعة. افتح «خيارات إضافية» للحفظ وأزرار الصفحات ووضع الضيف، أو أكمل بالمحرر حتى تنشر.','Your post is ready to review. Open “More options” for saving, page buttons, and guest mode, or continue to the editor to publish.'),
     fullPreview:w('هاي معاينة كاملة لمنشورك. عدّل أي بلوك أو أكمل من يصير جاهز.','Full preview of your post. Edit any block, or continue when it is ready.'),
-    previewTooLarge:w('المنشور أطول من حد رسالة تليكرام، فما أگدر أعرضه كاملاً هنا. قلّل المحتوى أو كمل تعديله بالمحرر.','This post is too long to show fully in one Telegram message. Edit it to make it shorter, or continue to the editor.'),
+    previewTooLarge:withSupportContact(w('المنشور أطول من حد رسالة تليكرام، فما أگدر أعرضه كاملاً هنا. قلّل المحتوى أو كمل تعديله بالمحرر.','This post is too long to show fully in one Telegram message. Edit it to make it shorter, or continue to the editor.')),
     startHint:w('اختَر البداية: نبني منشورك خطوة خطوة، أو تختار قالباً وتعدّله.','Choose a starting point: build step by step or pick a layout to edit.'),
     intro:w('البلوك جزء من منشورك، مثل عنوان أو جدول. اختَر طريقتك، ونرتّب منشورك خطوة بخطوة.','A block is part of your post, such as a heading or table. Choose how you want to begin.'),
     choose:w('شنو تحب تضيف بالبداية؟','What would you like to add first?'),heading:w('عنوان كبير','Large heading'),table:w('جدول','Table'),own:w('أختار بنفسي 🧩','Choose a block 🧩'),
@@ -971,10 +991,10 @@ export function tutorialCopy(locale) {
     needSave:w('احفظ الصفحة أولاً حتى تحصل على كودها.','Save the page first to get its code.'),copy:w('نسخ الكود','Copy code'),
     cbdText:w('هذا المثال ينشئ زرّاً يفتح صفحتك المحفوظة. انسخه وضعه داخل نص بلوك، وغيّر اسم الزر إذا تحب. المثال يستعمل كود صفحتك الحقيقي.','This example creates a button that opens your saved page. Copy it into a text block and change the button label if you like. It uses your actual page code.'),
     guestText:w('انسخ المثال وأرسله برسالة داخل مجموعة أو محادثة خاصة غير سرية، والبوت يرد بصفحتك حتى لو مو عضو. المجموعات المحمية من حفظ المحتوى ما تدعم هالطريقة. تگدر تستعمل اسم صفحتك المطابق بدل الكود.','Send this example in a group or a non-secret private chat. The bot replies with your page even if it is not a member. Content-protected groups are not supported. You can also use the exact name of your own page.'),
-    paused:w('توقف الدليل، ومنشورك محفوظ حتى ترجع تكمله.','Guide paused. Your draft is kept for your return.'),empty:w('أضف محتوى لمنشورك أولاً.','Add some content first.'),stale:w('هذا الزر من خطوة قديمة. افتح الدليل حتى تكمل آخر خطوة.','This button is from an older step. Open the guide to continue.'),busy:w('لحظة، كاعد نحفظ خطوتك. جرّب مرة ثانية.','Your step is being saved. Please try again.'),
+    paused:w('توقف الدليل، ومنشورك محفوظ حتى ترجع تكمله.','Guide paused. Your draft is kept for your return.'),empty:withSupportContact(w('أضف محتوى لمنشورك أولاً.','Add some content first.')),stale:withSupportContact(w('هذا الزر من خطوة قديمة. افتح الدليل حتى تكمل آخر خطوة.','This button is from an older step. Open the guide to continue.')),busy:withSupportContact(w('لحظة، كاعد نحفظ خطوتك. جرّب مرة ثانية.','Your step is being saved. Please try again.')),
     input:w('أرسل محتوى البلوك حتى تظهر النتيجة هنا.','Send the block content to see the result here.'),tableInput:w('أرسل كل صف بسطر، وافصل الأعمدة بعلامة |. مثال:\nالاسم | السعر\nمنتج | 5000','Send each row on a new line, with | between columns. Example:\nName | Price\nItem | 5000'),
     listInput:w('كل مهمة بسطر. اكتب [x] قبل المهمة المنجزة، و[ ] قبل الباقي.','One task per line. Use [x] for completed tasks and [ ] for pending tasks.'),detailsInput:w('أرسل عنوان التفاصيل. بعدها تگدر تعدّل البلوكات داخلها من «أعدّل المحتوى».','Send the details title. You can then edit its child blocks using Edit content.'),mediaInput:w('أرسل الوسائط المطلوبة. لعرض الشرائح والكولاج أرسل الصور أو الفيديوهات، ثم اضغط «تمت إضافة الصور».','Send the requested media. For slideshows and collages, send photos or videos, then tap Done adding media.'),mediaDone:w('تمت إضافة الصور','Done adding media'),locationInput:w('أرسل موقعاً من مرفقات تليكرام.','Send a location from Telegram attachments.'),
-    invalid:w('نوع المحتوى مو مناسب لهالخطوة. اتبع التوضيح وجرب مرة ثانية.','This content does not match the step. Follow the instructions and try again.'),failed:w('تعذّر إكمال العملية. منشورك محفوظ؛ جرّب مرة ثانية.','Could not complete the operation. Your draft is kept; try again.'),limit:w('المحتوى تجاوز حدود باقتك أو حدود الرسالة. قلّل المحتوى وجرب مرة ثانية.','This exceeds your plan or message limits. Reduce the content and try again.'),name:w('اختَر اسماً مختلفاً وغير فارغ، بحد أقصى 64 حرفاً.','Choose a different, non-empty name of up to 64 characters.'),pageLimit:w('وصلت لحد الصفحات المحفوظة. تگدر تكمل بالمحرر وتدير صفحاتك.','You reached the saved-page limit. Continue in the editor to manage your pages.'),
+    invalid:withSupportContact(w('نوع المحتوى مو مناسب لهالخطوة. اتبع التوضيح وجرب مرة ثانية.','This content does not match the step. Follow the instructions and try again.')),failed:withSupportContact(w('تعذّر إكمال العملية. منشورك محفوظ؛ جرّب مرة ثانية.','Could not complete the operation. Your draft is kept; try again.')),limit:withSupportContact(w('المحتوى تجاوز حدود باقتك أو حدود الرسالة. قلّل المحتوى وجرب مرة ثانية.','This exceeds your plan or message limits. Reduce the content and try again.')),name:withSupportContact(w('اختَر اسماً مختلفاً وغير فارغ، بحد أقصى 64 حرفاً.','Choose a different, non-empty name of up to 64 characters.')),pageLimit:withSupportContact(w('وصلت لحد الصفحات المحفوظة. تگدر تكمل بالمحرر وتدير صفحاتك.','You reached the saved-page limit. Continue in the editor to manage your pages.')),
     handoff:w('عندك مسودة مفتوحة بالمحرر. احفظها أو كمّلها أولاً، وبعدها ارجع للدليل. مسودة الدليل باقية.','You have an open editor draft. Save or finish it first, then return here. Your guide draft is kept.'),openExisting:w('افتح مسودتي الحالية','Open my current draft'),
     partial:w('معاينة جزء من المنشور — التنقل ما يغيّر المحتوى المحفوظ.','Preview of part of your post — navigation does not change your draft.'),next:w('التالي','Next'),previous:w('السابق','Previous'),
     templateNames:[w('عنوان وجدول','Heading and table'),w('منشور عادي','Regular post'),w('إعلان','Announcement'),w('عنوان وقائمة مهام','Heading and checklist'),w('وصفة طعام 🍖','Food recipe 🍖')],

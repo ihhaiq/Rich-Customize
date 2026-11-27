@@ -31,7 +31,7 @@ import { handleMiniAppShortcut } from 'lib/miniapp';
 import { sendPrivacyMessage, sendSupportMessage } from 'lib/legal';
 import { handleShowcaseMessage } from 'lib/showcase';
 import { observeRequest } from 'lib/usage-stats';
-import { resolveLanguage, resolveUserLanguage } from 'lib/i18n';
+import { resolveLanguage, resolveUserLanguage, withSupportContact } from 'lib/i18n';
 import { logError } from 'lib/error-log';
 import {
   explainOperationalError,
@@ -138,9 +138,9 @@ async function reportDatabaseFailure(message, error) {
   if (message?.chat?.type !== 'private' || message?.from?.is_bot) return;
   const locale = String(message?.from?.language_code || 'ar');
   const notice = message?.successful_payment
-    ? (locale.startsWith('ar')
-      ? 'قاعدة البيانات غير متاحة مؤقتاً. إذا انخصمت النجوم لا تعيد الدفع؛ تحقق من الترخيص أو تواصل مع الدعم.'
-      : 'The database is temporarily unavailable. If Stars were charged, do not pay again; check your entitlement or contact support.')
+    ? withSupportContact(locale.startsWith('ar')
+      ? 'قاعدة البيانات غير متاحة مؤقتاً. إذا انخصمت النجوم لا تعيد الدفع؛ تحقق من الترخيص.'
+      : 'The database is temporarily unavailable. If Stars were charged, do not pay again; check your entitlement.')
     : userOperationalError(error, locale, { scope: errorScope });
   try {
     await api.sendMessage({ chat_id: message.chat.id, text: notice });
@@ -495,9 +495,9 @@ export default async function (message, ctx = {}) {
       try {
         const locale = String(message?.from?.language_code || 'ar');
         const notice = message?.successful_payment
-          ? (locale.startsWith('ar')
-            ? 'واجهنا مشكلة أثناء معالجة إشعار الدفع. إذا انخصمت النجوم لا تعيد الدفع؛ تحقق من الترخيص أو تواصل مع الدعم.'
-            : 'There was a problem processing the payment notification. Do not pay twice; check your entitlement or contact support.')
+          ? withSupportContact(locale.startsWith('ar')
+            ? 'واجهنا مشكلة أثناء معالجة إشعار الدفع. إذا انخصمت النجوم لا تعيد الدفع؛ تحقق من الترخيص.'
+            : 'There was a problem processing the payment notification. Do not pay twice; check your entitlement.')
           : userOperationalError(error, locale);
         await api.sendMessage({ chat_id: message.chat.id, text: notice });
       } catch (feedbackError) {

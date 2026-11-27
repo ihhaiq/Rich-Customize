@@ -10,7 +10,7 @@ import {
   buildMessageButtonsKeyboard,
   prepareMessageButtons,
 } from 'lib/page-buttons';
-import { loginUrlRestrictionMessage, resolveLanguage, resolveUserLanguage, t, tr } from 'lib/i18n';
+import { loginUrlRestrictionMessage, resolveLanguage, resolveUserLanguage, t, tr, withSupportContact } from 'lib/i18n';
 import { isDeveloper } from 'lib/developer-access';
 
 const MAX_BUTTONS = 100;
@@ -69,10 +69,10 @@ function copy(languageCode) {
     invalidFormat: t(locale, 'buttons.invalid_format'),
     sendTitle: t(locale, 'ux.buttons.send_new_title'),
     sendValue: t(locale, 'ux.buttons.send_new_value'),
-    invalidText: tr(locale, 'Send a valid text value.'),
-    longTitle: tr(locale, 'The button title is too long; the maximum is 64 characters.'),
-    max: tr(locale, 'You reached the maximum number of buttons.'),
-    noPreview: tr(locale, 'There are no buttons to preview.'),
+    invalidText: withSupportContact(tr(locale, 'Send a valid text value.')),
+    longTitle: withSupportContact(tr(locale, 'The button title is too long; the maximum is 64 characters.')),
+    max: withSupportContact(tr(locale, 'You reached the maximum number of buttons.')),
+    noPreview: withSupportContact(tr(locale, 'There are no buttons to preview.')),
     previewText: t(locale, 'button_preview'),
     closedPreview: tr(locale, 'Preview closed'),
     typeChanged: tr(locale, '✅ Button type changed.'),
@@ -82,9 +82,9 @@ function copy(languageCode) {
     styleChanged: tr(locale, 'Color changed'),
     positionChanged: tr(locale, 'Order changed'),
     pageLinked: (title) => tr(locale, '✅ Button linked to page “{title}”.', { title }),
-    pageMissing: tr(locale, 'The page code does not exist or does not belong to you.'),
+    pageMissing: withSupportContact(tr(locale, 'The page code does not exist or does not belong to you.')),
     savePageFirst: tr(locale, 'Save a page first so you can link the button to it.'),
-    loginUrlRestricted: loginUrlRestrictionMessage(locale),
+    loginUrlRestricted: withSupportContact(loginUrlRestrictionMessage(locale)),
     choosePage: tr(locale, 'Choose the page opened by this button:'),
     editing: (title) => t(locale, 'ux.buttons.editing', { title }),
     currentType: (type) => t(locale, 'ux.buttons.current_type', { type }),
@@ -582,7 +582,7 @@ export async function handleEditorButtonMessage(message) {
     const spec=parseSpec(value);if(!spec){await api.sendMessage({chat_id:message.chat.id,text:c.invalidFormat});return true;}
     const [title,type,raw]=spec;if(title.length>64){await api.sendMessage({chat_id:message.chat.id,text:c.longTitle});return true;}
     if(type==='login_url'&&!isDeveloper(userId)){await api.sendMessage({chat_id:message.chat.id,text:c.loginUrlRestricted});return true;}
-    const [normalized,error]=validateValue(type,raw,languageCode);if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:error||c.invalid});return true;}
+    const [normalized,error]=validateValue(type,raw,languageCode);    if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:withSupportContact(error||c.invalid)});return true;}
     if(type==='page'&&!await ownedPage(userId,normalized)){await api.sendMessage({chat_id:message.chat.id,text:c.pageMissing});return true;}
     if(buttons.length>=MAX_BUTTONS){await api.sendMessage({chat_id:message.chat.id,text:c.max});await updateEditorSession(userId,{state:'managing'});return true;}
     buttons.push({id:uuid10(),text:title,type,value:normalized,style:'default',position:buttons.length,...(['url','web_app','login_url'].includes(type)?{url:normalized}:{})});
@@ -592,14 +592,14 @@ export async function handleEditorButtonMessage(message) {
     if(action==='change_type_value'){
       const type=String(session.pendingButtonType||'');
       if(type==='login_url'&&!isDeveloper(userId)){await api.sendMessage({chat_id:message.chat.id,text:c.loginUrlRestricted});return true;}
-      const [normalized,error]=validateValue(type,value,languageCode);if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:error||c.invalid});return true;}
+      const [normalized,error]=validateValue(type,value,languageCode);if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:withSupportContact(error||c.invalid)});return true;}
       if(type==='page'&&!await ownedPage(userId,normalized)){await api.sendMessage({chat_id:message.chat.id,text:c.pageMissing});return true;}
       changeType(b,type,normalized);notice=c.typeChanged;
     }else if(action==='title'){b.text=value;notice=c.titleChanged;
     }else if(action==='value'){
       const old=buttonType(b),[type,raw]=infer(value,old);
       if(type==='login_url'&&!isDeveloper(userId)){await api.sendMessage({chat_id:message.chat.id,text:c.loginUrlRestricted});return true;}
-      const [normalized,error]=validateValue(type,raw,languageCode);if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:error||c.invalid});return true;}
+      const [normalized,error]=validateValue(type,raw,languageCode);if(error||normalized==null){await api.sendMessage({chat_id:message.chat.id,text:withSupportContact(error||c.invalid)});return true;}
       if(type==='page'&&!await ownedPage(userId,normalized)){await api.sendMessage({chat_id:message.chat.id,text:c.pageMissing});return true;}
       changeType(b,type,normalized);notice=type!==old?c.valueTypeChanged:c.valueChanged;
     }else{await api.sendMessage({chat_id:message.chat.id,text:tr(c.locale,'Button editing ended. Return to the manager and try again.')});await updateEditorSession(userId,{state:'managing'});return true;}

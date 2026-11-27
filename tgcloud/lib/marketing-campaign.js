@@ -1,9 +1,8 @@
-import { tutorialCopy } from 'lib/i18n';
+import { isRtlLocale, resolveUserLanguage, tutorialCopy, withSupportContact } from 'lib/i18n';
 import { api, db } from 'sdk';
 import { eq, sql } from 'sdk/db';
 import { legacyStates, marketingCampaignAttribution } from 'schema';
 import { isDeveloper } from 'lib/developer-access';
-import { isRtlLocale, resolveUserLanguage } from 'lib/i18n';
 import { marketingCopy } from 'lib/marketing-copy';
 
 const SOURCES = new Set(['ad_a', 'ad_b', 'ad_c']);
@@ -205,7 +204,7 @@ export async function sendMarketingCampaignSummary(message) {
   try { blocks.push(tutorialFunnelBlock(await tutorialFunnelRows())); }
   catch {
     console.warn('Could not load tutorial funnel');
-    blocks.push({ type: 'paragraph', text: 'تعذّر تحميل مراحل الدليل حالياً. إحصائيات الحملات أعلاه متاحة؛ جرّب التقرير لاحقاً.' });
+    blocks.push({ type: 'paragraph', text: withSupportContact('تعذّر تحميل مراحل الدليل حالياً. إحصائيات الحملات أعلاه متاحة؛ جرّب التقرير لاحقاً.') });
   }
 
   await api.sendRichMessage({

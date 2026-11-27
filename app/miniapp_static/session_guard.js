@@ -1,6 +1,5 @@
 // Manual-save session guard.
-// Unsaved Mini App edits live only in the WebView. Discard therefore closes
-// the current local session and never mutates a saved Telegram Serverless page.
+// Discard removes the local offline draft before closing and never mutates a saved page.
 (() => {
   let discardRunning = false;
 
@@ -12,6 +11,13 @@
     if (button) button.disabled = true;
 
     clearTimeout(historyTimer);
+    if (!discardOfflineDraftForSession()) {
+      discardRunning = false;
+      if (button) button.disabled = false;
+      updateSaveState(mt("session.discard_failed"));
+      toast(mt("session.discard_failed"));
+      return;
+    }
     dirty = false;
     updateSaveState(mt("session.discarded"));
 

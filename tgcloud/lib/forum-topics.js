@@ -4,6 +4,7 @@ import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { forumTopicDefaults } from 'schema';
 import { publishFailure } from 'lib/publish-errors';
+import { withSupportContact } from 'lib/i18n';
 
 function admin(member) {
   const status=String(member?.status?.value||member?.status||'');
@@ -68,22 +69,22 @@ export async function handleDefaultTopicCommand(message) {
       const member=await api.getChatMember({chat_id:chat.id,user_id:actorId});
       permitted=admin(member);
     }catch(error){
-      await reply('❌ ما گدرت أتحقق من صلاحياتك بالمجموعة. تحقق من صلاحيات البوت وجرّب مرة ثانية.');
+      await reply(withSupportContact('❌ ما گدرت أتحقق من صلاحياتك بالمجموعة. تحقق من صلاحيات البوت وجرّب مرة ثانية.'));
       return true;
     }
   }
   if(!permitted){
-    await reply('❌ أمر /default مخصص لمالك المجموعة ومسؤوليها فقط.');
+    await reply(withSupportContact('❌ أمر /default مخصص لمالك المجموعة ومسؤوليها فقط.'));
     return true;
   }
   let info;
   try{info=await api.getChat({chat_id:chat.id});}
   catch{
-    await reply('❌ تعذّر التأكد من إعدادات المجموعة حالياً. جرّب مرة ثانية.');
+    await reply(withSupportContact('❌ تعذّر التأكد من إعدادات المجموعة حالياً. جرّب مرة ثانية.'));
     return true;
   }
   if(!forum(info)){
-    await reply('❌ هذا الأمر يعمل فقط داخل المجموعات المفعّل بيها نظام المواضيع.');
+    await reply(withSupportContact('❌ هذا الأمر يعمل فقط داخل المجموعات المفعّل بيها نظام المواضيع.'));
     return true;
   }
   const args=text.slice(command.length).trim().toLowerCase();

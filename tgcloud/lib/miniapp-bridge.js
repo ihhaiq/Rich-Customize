@@ -25,7 +25,7 @@ import { isLegacySavedPage } from 'lib/saved-page-policy';
 import { loadEditorSession } from 'lib/editor-session';
 import { allowBridgeRequest, allowMiniAppEndpointRequest } from 'lib/request-guard';
 import { containsLoginUrlButton, validateStoredButtons } from 'lib/button-validation';
-import { loginUrlRestrictionMessage } from 'lib/i18n';
+import { loginUrlRestrictionMessage, withSupportContact } from 'lib/i18n';
 import {
   listMiniAppDestinations,
   publishPageContentFromBridge,
@@ -423,12 +423,12 @@ async function sendError(message, id, action, error) {
     const syncFailure = String(action || '') === 'full_sync'
       || (Boolean(message?.document?.file_id)
         && ['create', 'save', 'delete'].includes(String(action || '')));
-    const text = '❌ ' + BRIDGE_PROTOCOL + (syncFailure ? ' SYNC_FAILED' : ' ERROR') + '\n'
+    const text = withSupportContact('❌ ' + BRIDGE_PROTOCOL + (syncFailure ? ' SYNC_FAILED' : ' ERROR') + '\n'
       + 'action: ' + String(action || 'unknown').toUpperCase() + '\n'
       + 'request_id: ' + String(id || '—') + '\n'
       + 'code: ' + code + '\n'
       + 'detail: ' + detail
-      + (notifyDeveloper ? '\n\n' + label : '');
+      + (notifyDeveloper ? '\n\n' + label : ''));
     const developerId = notifyDeveloper ? Number(DEVELOPER_IDS?.[0] || 0) : 0;
     await sendText(
       message,

@@ -1,7 +1,7 @@
 # خريطة مشروع Rich Customize
 
 > شرح مبسّط لبنية المستودع كما هي على فرع `serverless-cleanup`، راجعه
-> المستودع بتاريخ 2026-11-19.
+> المستودع بتاريخ 2026-11-27.
 > هذه خريطة للكود والملفات؛ وجود ملف هنا لا يثبت أن نسخته منشورة أو تعمل في الإنتاج.
 
 ## ١. الفكرة بأبسط شكل
@@ -9,8 +9,8 @@
 تخيّل المشروع مثل مدرسة:
 
 - **Telegram Serverless** هو الإدارة ودفتر السجلات: يشغّل البوت ويحفظ الصفحات.
-- **Mini App** هو الصف الذي يستخدمه الشخص لصنع رسالة غنيّة.
-- **Cloudflare** هو البوابة وساعي البريد: يقدّم الواجهة، ويتحقق من الطلبات، ويوصل رسائل الجسر.
+- **Mini App** واجهة لصنع الرسالة، يستضيفها Telegram Cloud.
+- **Cloudflare** يشغّل واجهات API المساندة والجسر؛ لا يستضيف واجهة Mini App النشطة.
 - **Cloudflare D1** دفتر صغير لحالة الجسر والمواعيد وبيانات البوتات المُدارة؛ ليس دفتر الصفحات.
 - **Worker** عامل Cron منفصل يعالج مواعيد النشر والتذكيرات؛
   ولا يخزن محتوى المنشورات.
@@ -24,10 +24,10 @@ flowchart TD
     B --> RT[Telegram Serverless]
     RT --> DB[قاعدة Serverless<br/>الصفحات والجلسات والصلاحيات]
 
-    U --> UI[Mini App<br/>app/miniapp_static]
+    U --> UI[Mini App على Telegram Cloud<br/>app/miniapp_static]
     UI -->|قراءة وحفظ صفحات مباشرة| EP[Serverless Mini App endpoint]
     EP --> DB
-    UI -->|ملفات وميزات Cloudflare المدعومة| CF[Cloudflare Pages + Functions]
+    UI -->|واجهات API مساندة فقط| CF[Cloudflare Pages Functions]
     CF --> D1[Cloudflare D1<br/>حالة الجسر والتذكير والبوتات المُدارة]
     CF --> RELAY[بوت الريلاي<br/>Richminiappsbot]
     GROUP[مجموعة الجسر الخاصة RCB1]
@@ -39,9 +39,9 @@ flowchart TD
     GROUP <--> RD[Rich Donate<br/>مستودع آخر]
 ```
 
-**المهم:** مو كل طلب يمرّ من Cloudflare. عمليات صفحات Mini App على استضافة
-Serverless تتصل بواجهة Serverless مباشرة. بعض الخدمات الأخرى والجسر القديم
-والرفع ما زالت تستخدم Cloudflare.
+**المهم:** واجهة Mini App نفسها مستضافة على Telegram Cloud. عمليات الصفحات
+تتصل بواجهة Serverless مباشرة؛ بعض واجهات API المساندة والجسر والرفع ما زالت
+تستخدم Cloudflare.
 
 ## ٣. شجرة المجلدات الرئيسية
 

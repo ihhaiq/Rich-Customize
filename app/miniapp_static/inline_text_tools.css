@@ -222,6 +222,82 @@ html.mobile-performance .inline-text-pop{
   .inline-text-pop{width:214px!important;min-width:214px!important}
 }
 
+.inline-link-dialog-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:5200;
+  display:grid;
+  place-items:center;
+  padding:8px;
+  background:rgba(0,0,0,.62);
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+.inline-link-dialog{
+  width:min(360px,calc(100vw - 16px));
+  max-height:min(480px,calc(100dvh - 16px));
+  overflow:auto;
+  display:grid;
+  gap:15px;
+  padding:16px 21px 10px;
+  border:0;
+  border-radius:8px;
+  background:var(--panel);
+  color:var(--text);
+  box-shadow:0 12px 28px rgba(0,0,0,.32);
+  direction:ltr;
+}
+.inline-link-dialog-title{
+  color:var(--text);
+  font-size:16px;
+  font-weight:550;
+  text-align:left;
+}
+.inline-link-dialog-field{
+  min-width:0;
+  display:grid;
+  gap:2px;
+}
+.inline-link-dialog-field>label{
+  color:var(--accent);
+  font-size:13px;
+  font-weight:500;
+  text-align:left;
+}
+.inline-link-dialog-input{
+  width:100%;
+  min-height:40px;
+  padding:5px 0;
+  border:0;
+  border-bottom:1px solid color-mix(in srgb,var(--accent) 62%,transparent);
+  border-radius:0;
+  outline:0;
+  background:transparent;
+  color:var(--text);
+  font-size:15px;
+}
+.inline-link-dialog-input:focus{
+  border-bottom-color:var(--accent);
+  border-bottom-width:2px;
+}
+.inline-link-dialog-input::placeholder{color:var(--muted)}
+.inline-link-dialog-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:13px;
+  padding-top:2px;
+  direction:ltr;
+}
+.inline-link-dialog-actions button{
+  min-width:52px;
+  min-height:38px;
+  padding:6px 8px;
+  background:transparent;
+  color:var(--accent);
+  font-size:14px;
+  font-weight:600;
+}
+
 @media(prefers-reduced-motion:reduce){
   .selection-format-bubble,
   .inline-rich-button-token,

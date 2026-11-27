@@ -5,7 +5,7 @@ import { blockId, blockLabel, validateEditorLimits } from 'lib/editor-blocks';
 import { blockPage, buildBlockEditorKeyboard, buildEditorKeyboard, buildEditorToolsKeyboard, editorDashboardRichMessage, editorCopy } from 'lib/editor-block-ui';
 import { acquireEditorMutationLock, releaseEditorMutationLock, loadEditorSession, updateEditorSession, resetEditorTransientState } from 'lib/editor-session';
 import { buildSingleBlockRichMessage } from 'lib/editor-renderer';
-import { resolveLanguage, resolveUserLanguage, t } from 'lib/i18n';
+import { resolveLanguage, resolveUserLanguage, t, withSupportContact } from 'lib/i18n';
 import { explainOperationalError } from 'lib/operational-errors';
 import { logError } from 'lib/error-log';
 import { richTextToHtml, plainRichText } from 'lib/rich-text';
@@ -171,7 +171,12 @@ export function premiumEmojiView(session, locale) {
   if (flow.stage === 'pack') return emojiPickerView(flow, locale);
   let blocks = [{ type: 'heading', size: 3, text: copy(locale, 'title') }];
   if (flow.stage === 'link') {
-    blocks.push({ type: 'paragraph', text: copy(locale, flow.error || 'prompt') });
+    blocks.push({
+      type: 'paragraph',
+      text: flow.error
+        ? withSupportContact(copy(locale, flow.error))
+        : copy(locale, 'prompt'),
+    });
   } else if (flow.stage === 'blocks') {
     blocks.push({ type: 'paragraph', text: copy(locale, 'choose_block') });
     const rows = session.blocks.map((block, index) => [cell(emojiTargets(block).length

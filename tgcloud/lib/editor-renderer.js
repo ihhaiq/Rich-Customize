@@ -1,5 +1,5 @@
 import { blockLabel } from 'lib/editor-blocks';
-import { tutorialCopy, isRtlLocale } from 'lib/i18n';
+import { tutorialCopy, isRtlLocale, withSupportContact } from 'lib/i18n';
 import { advice, applyAdvice, blockAt, clone, blockPaths, templateBlocks, TEMPLATE_IDS, TYPES, words } from 'lib/editor-import';
 import {
   anchorName,
@@ -800,7 +800,7 @@ export function tutorialView(state,locale,entitlement,notice='') {
     case 'save_retry':text=c.failed;rows=[[b(c.save,'retrySave')]];back();break;
     default:text=c.intro;rows=[[b(c.home,'home')]];
   }
-  if(state.previewFailed){preview=[];rows.push([b(w('أعد تحميل المعاينة','Reload preview'),'refresh')]);notice=notice||w('تعذّر عرض الوسائط. محتوى منشورك محفوظ؛ تگدر تعيد المحاولة أو تختار قالباً آخر.','Media could not be displayed. Your draft is kept; retry or choose another layout.');}
+  if(state.previewFailed){preview=[];rows.push([b(w('أعد تحميل المعاينة','Reload preview'),'refresh')]);notice=notice||withSupportContact(w('تعذّر عرض الوسائط. محتوى منشورك محفوظ؛ تگدر تعيد المحاولة أو تختار قالباً آخر.','Media could not be displayed. Your draft is kept; retry or choose another layout.'));}
   const header=[{type:'heading',size:2,text:c.entry},paragraph(text)];
   if(notice)header.push(paragraph(notice));
   let blocks=[...header,...extra];

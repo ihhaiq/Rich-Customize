@@ -69,7 +69,8 @@
       "editor.text_tools":"أدوات النص","heading.level_picker":"مستوى العنوان","button.type":"نوع الزر الغني",
       "inline.bold":"عريض","inline.italic":"مائل","inline.strike":"مشطوب","inline.underline":"تحته خط",
       "inline.code":"كود","inline.highlight":"تمييز","inline.subscript":"منخفض","inline.superscript":"مرتفع",
-      "inline.spoiler":"تشويش","inline.link":"رابط","inline.add_link":"إضافة رابط","inline.edit_link":"تعديل الرابط",
+      "inline.spoiler":"تشويش","inline.link":"رابط","inline.link_select_text":"حدّد النص الذي تريد ربطه أولاً.","inline.add_link":"إضافة رابط","inline.edit_link":"تعديل الرابط",
+      "inline.create_link":"إنشاء رابط","inline.link_text":"النص","inline.link_url":"الرابط","inline.link_text_required":"اكتب النص الذي سيظهر كرابط.","inline.link_selection_lost":"تعذر استعادة موضع النص. افتح محرر الرابط مرة ثانية.",
       "inline.remove_link":"إزالة الرابط","inline.create_button":"إنشاء زر",
       "inline.invalid_link":"أدخل رابطًا صحيحًا يبدأ بـ https:// أو tg://",
       "button.add":"إضافة زر","button.title":"نص الزر","button.title_placeholder":"اكتب عنوان الزر",
@@ -162,7 +163,8 @@
       "editor.text_tools":"Text tools","heading.level_picker":"Heading level","button.type":"Rich button type",
       "inline.bold":"Bold","inline.italic":"Italic","inline.strike":"Strikethrough","inline.underline":"Underline",
       "inline.code":"Code","inline.highlight":"Highlight","inline.subscript":"Subscript","inline.superscript":"Superscript",
-      "inline.spoiler":"Spoiler","inline.link":"Link","inline.add_link":"Add link","inline.edit_link":"Edit link",
+      "inline.spoiler":"Spoiler","inline.link":"Link","inline.link_select_text":"Select the text you want to link first.","inline.add_link":"Add link","inline.edit_link":"Edit link",
+      "inline.create_link":"Create link","inline.link_text":"Text","inline.link_url":"Link","inline.link_text_required":"Enter the text to display as a link.","inline.link_selection_lost":"The editor text is no longer available. Reopen the link editor.",
       "inline.remove_link":"Remove link","inline.create_button":"Create button",
       "inline.invalid_link":"Enter a valid link beginning with https:// or tg://",
       "button.add":"Add button","button.title":"Button text","button.title_placeholder":"Enter button title",
@@ -201,6 +203,7 @@
       "heading.level":"Заголовок {level}","table.add_row":"Добавить строку","table.add_column":"Добавить столбец","table.show_borders":"Показать границы","table.hide_borders":"Скрыть границы","table.striped":"Чередующиеся строки","table.unstriped":"Убрать чередование строк","table.compact":"Компактный режим","table.uncompact":"Отключить компактный режим","action.move_up":"Переместить вверх","action.move_down":"Переместить вниз","action.delete_block":"Удалить блок","editor.no_block_match":"Подходящих блоков нет",
       "send.add_content":"Сначала добавьте содержимое сообщения","send.save_before":"Не удалось сохранить страницу перед отправкой","send.loading_destinations":"Загрузка чатов…","send.private":"Отправить в личный чат","send.action":"Отправить","send.preparing_failed":"Не удалось подготовить отправку: {error}","send.sending":"Отправка…","send.sent_to":"Отправлено: {title}","send.failed":"Ошибка отправки: {error}","page.title":"Страница","page.new":"Новая страница","page.save_now":"Сохранить сейчас",
       "editor.text_tools":"Инструменты текста","heading.level_picker":"Уровень заголовка","button.type":"Тип расширенной кнопки","inline.bold":"Жирный","inline.italic":"Курсив","inline.strike":"Зачёркнутый","inline.underline":"Подчёркнутый","inline.code":"Код","inline.highlight":"Выделение","inline.subscript":"Нижний индекс","inline.superscript":"Верхний индекс","inline.spoiler":"Спойлер","inline.link":"Ссылка","inline.add_link":"Добавить ссылку","inline.edit_link":"Изменить ссылку","inline.remove_link":"Удалить ссылку","inline.create_button":"Создать кнопку","inline.invalid_link":"Введите корректную ссылку, начинающуюся с https:// или tg://",
+      "inline.create_link":"Создать ссылку","inline.link_text":"Текст","inline.link_url":"Ссылка","inline.link_text_required":"Введите текст, который будет отображаться как ссылка.","inline.link_selection_lost":"Не удалось восстановить место в тексте. Откройте редактор ссылки ещё раз.",
       "button.add":"Добавить кнопку","button.title":"Текст кнопки","button.title_placeholder":"Введите название кнопки","button.separate":"Разместить кнопку в отдельной строке","button.style":"Стиль кнопки","button.url":"Ссылка","button.copy":"Копировать","button.mention":"Пользователь","button.page":"Страница","button.callback":"Callback","button.popup":"Всплывающее окно","button.value_required":"Введите значение кнопки","button.title_required":"Введите текст кнопки","button.create_failed":"Не удалось создать кнопку","button.editor_not_ready":"Редактор кнопок ещё не готов","button.disabled":"Отключена","button.inline_search":"Встроенный поиск","button.search_here":"Искать здесь","button.select_user":"Выбрать пользователя","button.edit_url":"Изменить ссылку","button.link_page":"Связать с сохранённой страницей","button.edit_copy":"Изменить копируемый текст","button.edit_popup":"Изменить текст окна","button.edit_search":"Изменить текст поиска","button.edit_search_here":"Изменить локальный поиск","button.convert_selection":"Преобразовать текст в кнопку","button.name":"Название кнопки","button.color":"Цвет кнопки","button.rich":"Расширенная кнопка","button.large":"Большая кнопка","button.large_desc":"Кнопка на всю ширину сообщения","button.edit_name":"Изменить название","button.change_color":"Изменить цвет","button.to_text":"Преобразовать в обычный текст","button.delete":"Удалить кнопку","button.default":"По умолчанию","button.blue":"Синий","button.green":"Зелёный","button.red":"Красный","button.linked_page":"Связанная страница","button.loading_pages":"Загрузка сохранённых страниц…","button.choose_page":"Выберите страницу, которую откроет кнопка","button.no_pages":"Сохранённых страниц пока нет","button.choose_saved_page":"Выберите сохранённую страницу","button.selected_page":"Выбрано: «{title}»","button.pages_failed":"Не удалось загрузить страницы: {error}","button.copy_placeholder":"Текст для копирования","button.page_placeholder":"Код сохранённой страницы","button.popup_placeholder":"Текст всплывающего окна",
       "button.callback_data":"Данные Callback","button.generic":"Кнопка","button.linked_success":"Кнопка связана со страницей «{title}»","button.save_page_failed":"Не удалось сохранить страницу","button.pick_user_in_chat":"Выберите пользователя в чате с ботом","button.user_picker_failed":"Не удалось открыть выбор пользователя: {error}","button.search_placeholder":"Текст поиска","button.search_here_placeholder":"Текст поиска в этом чате","button.value_placeholder":"Значение","button.active":"Активная","button.accept":"Подтвердить","button.decline":"Отклонить",
       "editor.write_text":"Введите текст…","preview.message":"Предпросмотр сообщения","preview.back_to_edit":"Вернуться к редактированию","preview.mode":"Режим предпросмотра","multi.select_blocks":"Выбрать несколько блоков","multi.selected_count":"Выбрано: {count}","multi.move_up":"Переместить выбранное вверх","multi.move_down":"Переместить выбранное вниз","multi.mode":"Множественный выбор","block.drag":"Перетащите, чтобы переместить блок","block.drag_short":"Перетащите для перемещения","block.select":"Выбрать блок","editor.no_command_match":"Подходящих команд или блоков нет"
@@ -251,10 +254,22 @@
   const telegramLanguage = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code;
   const language = normalize(telegramLanguage || navigator.language);
   const rtl = ["ar","ur"].includes(language);
+  const supportHandle = "@Rlchsupportbot";
+  const errorKey = /(?:^|[._])(?:error|errors|failed|failure|invalid|unavailable|expired|unsupported|missing|not_found|denied|unauthorized|conflict|problem|uploading_file|too_large|too_fast)(?:$|[._])/i;
+  const errorText = /(?:\berror\b|\bfailed\b|\bfailure\b|\binvalid\b|\bunavailable\b|\bexpired\b|\bunsupported\b|\bmissing\b|\bcould not\b|\bcannot\b|\bcan't\b|\brejected\b|\bunable\b|\bnot found\b|\btoo large\b|\bconflict\b|خطأ|فشل|تعذر|غير صالح|غير متاح|انتهت صلاحية|مشكلة|رفض|يتعذر|لا يمكن)/i;
+
+  function withSupportContact(value, force = false) {
+    const text = String(value ?? "").trimEnd();
+    if (text.toLowerCase().includes(supportHandle.toLowerCase())
+      || (!force && !errorText.test(text))) return text;
+    return text + "\n\n" + supportHandle;
+  }
 
   function t(key, vars = {}) {
     const template = dictionaries[language]?.[key] ?? dictionaries.en[key] ?? dictionaries.ar[key] ?? key;
-    return String(template).replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
+    const text = String(template).replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
+    return errorKey.test(String(key)) || errorText.test(String(template))
+      ? withSupportContact(text, true) : text;
   }
 
   function apply(root = document) {
@@ -295,7 +310,7 @@
 
   document.documentElement.lang = language;
   document.documentElement.dir = rtl ? "rtl" : "ltr";
-  window.MiniAppI18n = {language,rtl,t,apply};
+  window.MiniAppI18n = {language,rtl,t,apply,withSupportContact};
   window.mt = t;
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => apply());
   else apply();

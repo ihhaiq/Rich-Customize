@@ -244,6 +244,7 @@ export function explainOperationalError(error, context = {}) {
 }
 export function userOperationalError(error, languageCode = 'ar', context = {}) {
   const result = explainOperationalError(error, context);
-  return String(languageCode || '').toLowerCase().startsWith('ar')
+  const message = String(languageCode || '').toLowerCase().startsWith('ar')
     ? result.userMessageAr : result.userMessageEn;
+  return message + '\n\n@Rlchsupportbot';
 }

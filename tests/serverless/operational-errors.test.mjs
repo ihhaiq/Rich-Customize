@@ -147,7 +147,9 @@ test('unknown failures have a safe fallback without revealing technical text', (
   const e = new Error('SECRET_INTERNAL_DATABASE_MESSAGE');
   assert.equal(explainOperationalError(e).code, 'UNCLASSIFIED_ERROR');
   assert.doesNotMatch(userOperationalError(e, 'ar'), /SECRET_INTERNAL_DATABASE_MESSAGE/);
+  assert.match(userOperationalError(e, 'ar'), /@Rlchsupportbot/);
   assert.match(userOperationalError(e, 'en'), /contact support/i);
+  assert.match(userOperationalError(e, 'en'), /@Rlchsupportbot/);
 });
 
 test('SQLite outages receive a safe, retryable notice without leaking details', () => {
