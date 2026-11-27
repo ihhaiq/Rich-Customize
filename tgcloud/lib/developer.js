@@ -1089,49 +1089,30 @@ export async function runDeveloperBroadcastTick(minute = Math.floor(Date.now() /
             return true;
           }
           if (isInvalidBroadcastMembershipParticipant(error)) {
-            if (!job.membershipCheckErrorLogged) {
-              await logBroadcastError('developer.broadcast.membership', error, {
-                userId: destinationId,
-                chatId: job.actorId,
-                extra: 'membership_channel=' + BROADCAST_MEMBERSHIP_CHANNEL,
-              });
-              job.membershipCheckErrorLogged = true;
-            }
-            job.cursor = destinationId;
-            job.membershipCheckFailed = Number(job.membershipCheckFailed || 0) + 1;
-            job.attempted = Number(job.attempted || 0) + 1;
-            job.pendingOutcomes = Array.isArray(job.pendingOutcomes) ? job.pendingOutcomes : [];
-            job.pendingOutcomes.push([
-              destinationId,
-              'skipped',
-              Number(error.code),
-              'MEMBERSHIP_CHECK_FAILED',
-              '',
-            ]);
-            await saveBroadcast(jobNamespace, job);
-            continue;
-          }
-          await logBroadcastError('developer.broadcast.membership', error, {
-            userId: destinationId,
-            chatId: job.actorId,
-            extra: 'membership_channel=' + BROADCAST_MEMBERSHIP_CHANNEL,
-          });
-          if (isTerminalBroadcastDestinationError(error)) {
-            job.status = 'report_pending';
-            job.finalStatus = 'failed';
-            job.failureReason = 'membership_check_failed';
-            job.completedAt = stamp;
-            await saveBroadcast(jobNamespace, job);
-            await saveBroadcast(BROADCAST_ACTIVE_NAMESPACE, {
-              jobId: current.active.jobId,
-              actorId: job.actorId,
-              status: 'report_pending',
+            membership = { status: 'left' };
+          } else {
+            await logBroadcastError('developer.broadcast.membership', error, {
+              userId: destinationId,
+              chatId: job.actorId,
+              extra: 'membership_channel=' + BROADCAST_MEMBERSHIP_CHANNEL,
             });
-            return tryCompleteBroadcastReport(job, jobNamespace, stamp);
+            if (isTerminalBroadcastDestinationError(error)) {
+              job.status = 'report_pending';
+              job.finalStatus = 'failed';
+              job.failureReason = 'membership_check_failed';
+              job.completedAt = stamp;
+              await saveBroadcast(jobNamespace, job);
+              await saveBroadcast(BROADCAST_ACTIVE_NAMESPACE, {
+                jobId: current.active.jobId,
+                actorId: job.actorId,
+                status: 'report_pending',
+              });
+              return tryCompleteBroadcastReport(job, jobNamespace, stamp);
+            }
+            job.retryAt = stamp + 60;
+            await saveBroadcast(jobNamespace, job);
+            return true;
           }
-          job.retryAt = stamp + 60;
-          await saveBroadcast(jobNamespace, job);
-          return true;
         }
 
         const membershipStatus = String(membership?.status?.value || membership?.status || '');
